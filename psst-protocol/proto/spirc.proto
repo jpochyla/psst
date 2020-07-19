@@ -1,0 +1,135 @@
+syntax = "proto2";
+
+package spirc;
+
+message Frame {
+    optional uint32 version = 0x1;
+    optional string ident = 0x2;
+    optional string protocol_version = 0x3;
+    optional uint32 seq_nr = 0x4;
+    optional MessageType typ = 0x5;
+    optional DeviceState device_state = 0x7;
+    optional Goodbye goodbye = 0xb;
+    optional State state = 0xc;
+    optional uint32 position = 0xd;
+    optional uint32 volume = 0xe;
+    optional int64 state_update_id = 0x11;
+    repeated string recipient = 0x12;
+    optional bytes context_player_state = 0x13;
+    optional string new_name = 0x14;
+    optional Metadata metadata = 0x19;
+}
+
+enum MessageType {
+    kMessageTypeHello = 0x1;
+    kMessageTypeGoodbye = 0x2;
+    kMessageTypeProbe = 0x3;
+    kMessageTypeNotify = 0xa;
+    kMessageTypeLoad = 0x14;
+    kMessageTypePlay = 0x15;
+    kMessageTypePause = 0x16;
+    kMessageTypePlayPause = 0x17;
+    kMessageTypeSeek = 0x18;
+    kMessageTypePrev = 0x19;
+    kMessageTypeNext = 0x1a;
+    kMessageTypeVolume = 0x1b;
+    kMessageTypeShuffle = 0x1c;
+    kMessageTypeRepeat = 0x1d;
+    kMessageTypeVolumeDown = 0x1f;
+    kMessageTypeVolumeUp = 0x20;
+    kMessageTypeReplace = 0x21;
+    kMessageTypeLogout = 0x22;
+    kMessageTypeAction = 0x23;
+    kMessageTypeRename = 0x24;
+    kMessageTypeUpdateMetadata = 0x80;
+}
+
+message DeviceState {
+    optional string sw_version = 0x1;
+    optional bool is_active = 0xa;
+    optional bool can_play = 0xb;
+    optional uint32 volume = 0xc;
+    optional string name = 0xd;
+    optional uint32 error_code = 0xe;
+    optional int64 became_active_at = 0xf;
+    optional string error_message = 0x10;
+    repeated Capability capabilities = 0x11;
+    optional string context_player_error = 0x14;
+    repeated Metadata metadata = 0x19;
+}
+
+message Capability {
+    optional CapabilityType typ = 0x1;
+    repeated int64 intValue = 0x2;
+    repeated string stringValue = 0x3;
+}
+
+enum CapabilityType {
+    kSupportedContexts = 0x1;
+    kCanBePlayer = 0x2;
+    kRestrictToLocal = 0x3;
+    kDeviceType = 0x4;
+    kGaiaEqConnectId = 0x5;
+    kSupportsLogout = 0x6;
+    kIsObservable = 0x7;
+    kVolumeSteps = 0x8;
+    kSupportedTypes = 0x9;
+    kCommandAcks = 0xa;
+    kSupportsRename = 0xb;
+    kHidden = 0xc;
+    kSupportsPlaylistV2 = 0xd;
+    kSupportsExternalEpisodes = 0xe;
+}
+
+message Goodbye {
+    optional string reason = 0x1;
+}
+
+message State {
+    optional string context_uri = 0x2;
+    optional uint32 index = 0x3;
+    optional uint32 position_ms = 0x4;
+    optional PlayStatus status = 0x5;
+    optional uint64 position_measured_at = 0x7;
+    optional string context_description = 0x8;
+    optional bool shuffle = 0xd;
+    optional bool repeat = 0xe;
+    optional string last_command_ident = 0x14;
+    optional uint32 last_command_msgid = 0x15;
+    optional bool playing_from_fallback = 0x18;
+    optional uint32 row = 0x19;
+    optional uint32 playing_track_index = 0x1a;
+    repeated TrackRef track = 0x1b;
+    optional Ad ad = 0x1c;
+}
+
+enum PlayStatus {
+    kPlayStatusStop = 0x0;
+    kPlayStatusPlay = 0x1;
+    kPlayStatusPause = 0x2;
+    kPlayStatusLoading = 0x3;
+}
+
+message TrackRef {
+    optional bytes gid = 0x1;
+    optional string uri = 0x2;
+    optional bool queued = 0x3;
+    optional string context = 0x4;
+}
+
+message Ad {
+    optional int32 next = 0x1;
+    optional bytes ogg_fid = 0x2;
+    optional bytes image_fid = 0x3;
+    optional int32 duration = 0x4;
+    optional string click_url = 0x5;
+    optional string impression_url = 0x6;
+    optional string product = 0x7;
+    optional string advertiser = 0x8;
+    optional bytes gid = 0x9;
+}
+
+message Metadata {
+    optional string type = 0x1;
+    optional string metadata = 0x2;
+}

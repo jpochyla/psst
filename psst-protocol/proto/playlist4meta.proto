@@ -1,0 +1,54 @@
+syntax = "proto2";
+
+package playlist;
+
+message ListChecksum {
+    optional int32 version = 0x1;
+    optional bytes sha1 = 0x4;
+}
+
+message DownloadFormat {
+    optional Codec codec = 0x1;
+    enum Codec {
+        CODEC_UNKNOWN = 0x0;
+        OGG_VORBIS = 0x1;
+        FLAC = 0x2;
+        MPEG_1_LAYER_3 = 0x3;
+    }
+}
+
+message ListAttributes {
+    optional string name = 0x1;
+    optional string description = 0x2;
+    optional bytes picture = 0x3;
+    optional bool collaborative = 0x4;
+    optional string pl3_version = 0x5;
+    optional bool deleted_by_owner = 0x6;
+    optional bool restricted_collaborative = 0x7;
+    optional int64 deprecated_client_id = 0x8;
+    optional bool public_starred = 0x9;
+    optional string client_id = 0xa;
+}
+
+message ItemAttributes {
+    optional string added_by = 0x1;
+    optional int64 timestamp = 0x2;
+    optional string message = 0x3;
+    optional bool seen = 0x4;
+    optional int64 download_count = 0x5;
+    optional DownloadFormat download_format = 0x6;
+    optional string sevendigital_id = 0x7;
+    optional int64 sevendigital_left = 0x8;
+    optional int64 seen_at = 0x9;
+    optional bool public = 0xa;
+}
+
+message StringAttribute {
+    optional string key = 0x1;
+    optional string value = 0x2;
+}
+
+message StringAttributes {
+    repeated StringAttribute attribute = 0x1;
+}
+

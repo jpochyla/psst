@@ -1,0 +1,26 @@
+[package]
+name = "psst-core"
+version = "0.1.0"
+authors = ["Jan Pochyla <jpochyla@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+psst-protocol = { path = "../psst-protocol" }
+
+aes-ctr = "0.5.0"
+byteorder = "1.3.4"
+hmac = "0.9.0"
+iset = "0.0.3"
+lewton = "0.10.1"
+log = "0.4.8"
+num-bigint = { version = "0.3.0", features = ["rand"] }
+num-traits = "0.2.12"
+quick-protobuf = "0.8.0"
+rand = "0.7.3"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+sha-1 = "0.9.1"
+shannon = "0.2.0"
+soundio = { git = "https://github.com/jpochyla/soundio-rs", branch = "static-callbacks" }
+tempfile = "3.1.0"
+ureq = { version = "1.5.1", default-features = false, features = ["native-tls", "json"] }

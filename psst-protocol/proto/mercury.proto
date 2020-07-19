@@ -1,0 +1,47 @@
+syntax = "proto2";
+
+package mercury;
+
+message MercuryMultiGetRequest {
+    repeated MercuryRequest request = 0x1;
+}
+
+message MercuryMultiGetReply {
+    repeated MercuryReply reply = 0x1;
+}
+
+message MercuryRequest {
+    optional string uri = 0x1;
+    optional string content_type = 0x2;
+    optional bytes body = 0x3;
+    optional bytes etag = 0x4;
+}
+
+message MercuryReply {
+    optional sint32 status_code = 0x1;
+    optional string status_message = 0x2;
+    optional CachePolicy cache_policy = 0x3;
+    enum CachePolicy {
+        CACHE_NO = 0x1;
+        CACHE_PRIVATE = 0x2;
+        CACHE_PUBLIC = 0x3;
+    }
+    optional sint32 ttl = 0x4;
+    optional bytes etag = 0x5;
+    optional string content_type = 0x6;
+    optional bytes body = 0x7;
+}
+
+message Header {
+    optional string uri = 0x01;
+    optional string content_type = 0x02;
+    optional string method = 0x03;
+    optional sint32 status_code = 0x04;
+    repeated UserField user_fields = 0x06;
+}
+
+message UserField {
+    optional string key = 0x01;
+    optional bytes value = 0x02;
+}
+

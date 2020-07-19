@@ -1,0 +1,10 @@
+syntax = "proto2";
+
+package pubsub;
+
+message Subscription {
+    optional string uri = 0x1;
+    optional int32 expiry = 0x2;
+    optional int32 status_code = 0x3;
+}
+

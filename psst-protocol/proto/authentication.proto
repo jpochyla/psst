@@ -1,0 +1,167 @@
+syntax = "proto2";
+
+package authentication;
+
+message ClientResponseEncrypted {
+    required LoginCredentials login_credentials = 0xa; 
+    optional AccountCreation account_creation = 0x14; 
+    optional FingerprintResponseUnion fingerprint_response = 0x1e; 
+    optional PeerTicketUnion peer_ticket = 0x28; 
+    required SystemInfo system_info = 0x32; 
+    optional string platform_model = 0x3c; 
+    optional string version_string = 0x46; 
+    optional LibspotifyAppKey appkey = 0x50; 
+    optional ClientInfo client_info = 0x5a; 
+}
+
+message LoginCredentials {
+    optional string username = 0xa;
+    required AuthenticationType typ = 0x14;
+    optional bytes auth_data = 0x1e;
+}
+
+enum AuthenticationType {
+    AUTHENTICATION_USER_PASS = 0x0;
+    AUTHENTICATION_STORED_SPOTIFY_CREDENTIALS = 0x1;
+    AUTHENTICATION_STORED_FACEBOOK_CREDENTIALS = 0x2;
+    AUTHENTICATION_SPOTIFY_TOKEN = 0x3;
+    AUTHENTICATION_FACEBOOK_TOKEN = 0x4;
+}
+
+enum AccountCreation {
+    ACCOUNT_CREATION_ALWAYS_PROMPT = 0x1;
+    ACCOUNT_CREATION_ALWAYS_CREATE = 0x3;
+}
+
+message FingerprintResponseUnion {
+    optional FingerprintGrainResponse grain = 0xa;
+    optional FingerprintHmacRipemdResponse hmac_ripemd = 0x14;
+}
+
+message FingerprintGrainResponse {
+    required bytes encrypted_key = 0xa;
+}
+
+message FingerprintHmacRipemdResponse {
+    required bytes hmac = 0xa;
+}
+
+message PeerTicketUnion {
+    optional PeerTicketPublicKey public_key = 0xa;
+    optional PeerTicketOld old_ticket = 0x14;
+}
+
+message PeerTicketPublicKey {
+    required bytes public_key = 0xa;
+}
+
+message PeerTicketOld {
+    required bytes peer_ticket = 0xa;
+    required bytes peer_ticket_signature = 0x14;
+}
+
+message SystemInfo {
+    required CpuFamily cpu_family = 0xa;
+    optional uint32 cpu_subtype = 0x14;
+    optional uint32 cpu_ext = 0x1e;
+    optional Brand brand = 0x28;
+    optional uint32 brand_flags = 0x32;
+    required Os os = 0x3c;
+    optional uint32 os_version = 0x46;
+    optional uint32 os_ext = 0x50;
+    optional string system_information_string = 0x5a;
+    optional string device_id = 0x64;
+}
+
+enum CpuFamily {
+    CPU_UNKNOWN = 0x0;
+    CPU_X86 = 0x1;
+    CPU_X86_64 = 0x2;
+    CPU_PPC = 0x3;
+    CPU_PPC_64 = 0x4;
+    CPU_ARM = 0x5;
+    CPU_IA64 = 0x6;
+    CPU_SH = 0x7;
+    CPU_MIPS = 0x8;
+    CPU_BLACKFIN = 0x9;
+}
+
+enum Brand {
+    BRAND_UNBRANDED = 0x0;
+    BRAND_INQ = 0x1;
+    BRAND_HTC = 0x2;
+    BRAND_NOKIA = 0x3;
+}
+
+enum Os {
+    OS_UNKNOWN = 0x0;
+    OS_WINDOWS = 0x1;
+    OS_OSX = 0x2;
+    OS_IPHONE = 0x3;
+    OS_S60 = 0x4;
+    OS_LINUX = 0x5;
+    OS_WINDOWS_CE = 0x6;
+    OS_ANDROID = 0x7;
+    OS_PALM = 0x8;
+    OS_FREEBSD = 0x9;
+    OS_BLACKBERRY = 0xa;
+    OS_SONOS = 0xb;
+    OS_LOGITECH = 0xc;
+    OS_WP7 = 0xd;
+    OS_ONKYO = 0xe;
+    OS_PHILIPS = 0xf;
+    OS_WD = 0x10;
+    OS_VOLVO = 0x11;
+    OS_TIVO = 0x12;
+    OS_AWOX = 0x13;
+    OS_MEEGO = 0x14;
+    OS_QNXNTO = 0x15;
+    OS_BCO = 0x16;
+}
+
+message LibspotifyAppKey {
+    required uint32 version = 0x1;
+    required bytes devkey = 0x2;
+    required bytes signature = 0x3;
+    required string useragent = 0x4;
+    required bytes callback_hash = 0x5;
+}
+
+message ClientInfo {
+    optional bool limited = 0x1;
+    optional ClientInfoFacebook fb = 0x2;
+    optional string language = 0x3;
+}
+
+message ClientInfoFacebook {
+    optional string machine_id = 0x1;
+}
+
+message APWelcome {
+    required string canonical_username = 0xa;
+    required AccountType account_type_logged_in = 0x14;
+    required AccountType credentials_type_logged_in = 0x19;
+    required AuthenticationType reusable_auth_credentials_type = 0x1e;
+    required bytes reusable_auth_credentials = 0x28;
+    optional bytes lfs_secret = 0x32;
+    optional AccountInfo account_info = 0x3c;
+    optional AccountInfoFacebook fb = 0x46;
+}
+
+enum AccountType {
+    Spotify = 0x0;
+    Facebook = 0x1;
+}
+
+message AccountInfo {
+    optional AccountInfoSpotify spotify = 0x1;
+    optional AccountInfoFacebook facebook = 0x2;
+}
+
+message AccountInfoSpotify {
+}
+
+message AccountInfoFacebook {
+    optional string access_token = 0x1;
+    optional string machine_id = 0x2;
+}

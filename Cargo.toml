@@ -1,0 +1,8 @@
+[workspace]
+
+members = [
+    "psst-protocol",
+    "psst-core",
+    "psst-bin",
+    "psst-gui",
+]
