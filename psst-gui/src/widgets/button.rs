@@ -1,6 +1,7 @@
+use crate::widgets::ExClick;
 use druid::{
-    widget::{prelude::*, BackgroundBrush},
-    Color, Data, Key, WidgetPod,
+    widget::{prelude::*, BackgroundBrush, ControllerHost},
+    Color, Data, Key, MouseButton, MouseEvent, WidgetPod,
 };
 
 pub const HOVER_HOT_COLOR: Key<Color> = Key::new("app.hover-hot-color");
@@ -54,6 +55,14 @@ impl<T: Data> Widget<T> for Hover<T> {
 pub trait HoverExt<T: Data>: Widget<T> + Sized + 'static {
     fn hover(self) -> Hover<T> {
         Hover::new(self)
+    }
+
+    fn on_ex_click(
+        self,
+        button: MouseButton,
+        f: impl Fn(&mut EventCtx, &MouseEvent, &mut T, &Env) + 'static,
+    ) -> ControllerHost<Self, ExClick<T>> {
+        ControllerHost::new(self, ExClick::new(f).with_button(button))
     }
 }
 

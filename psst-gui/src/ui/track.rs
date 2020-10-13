@@ -1,11 +1,17 @@
-use crate::{commands, data::Track, ui::theme, widgets::HoverExt};
+use crate::{
+    commands,
+    data::{State, Track},
+    ui::theme,
+    widgets::HoverExt,
+};
 use druid::{
     im::Vector,
     kurbo::Line,
     lens::{InArc, Map},
     piet::StrokeStyle,
     widget::{Controller, Flex, Label, List, Painter},
-    Color, Data, Env, Event, EventCtx, Lens, LensExt, RenderContext, Widget, WidgetExt, WidgetId,
+    Color, ContextMenu, Data, Env, Event, EventCtx, Lens, LensExt, LocalizedString, MenuDesc,
+    MenuItem, MouseButton, MouseEvent, RenderContext, Widget, WidgetExt, WidgetId,
 };
 use std::sync::Arc;
 
@@ -119,6 +125,12 @@ pub fn make_track(display: TrackDisplay, play_ctrl: WidgetId) -> impl Widget<Enu
         .with_child(track_duration.align_right())
         .padding(theme::grid(0.5))
         .hover()
+        .on_ex_click(
+            MouseButton::Right,
+            |ctx, event, enum_track: &mut EnumTrack, _| {
+                show_track_menu(ctx, event, &enum_track.track);
+            },
+        )
         .on_click(move |ctx, enum_track: &mut EnumTrack, _| {
             ctx.submit_command(
                 commands::PLAY_TRACK_AT
@@ -126,4 +138,28 @@ pub fn make_track(display: TrackDisplay, play_ctrl: WidgetId) -> impl Widget<Enu
                     .to(play_ctrl),
             );
         })
+}
+
+fn show_track_menu(ctx: &mut EventCtx, event: &MouseEvent, track: &Track) {
+    let desc = make_track_menu(track);
+    let menu = ContextMenu::new(desc, event.window_pos);
+    ctx.show_context_menu(menu);
+}
+
+fn make_track_menu(track: &Track) -> MenuDesc<State> {
+    MenuDesc::empty()
+        .append(MenuItem::new(
+            LocalizedString::new("menu-item-save-to-library").with_placeholder("Save to Library"),
+            commands::SAVE_TRACK.with(track.id.clone().unwrap()),
+        ))
+        .append(MenuItem::new(
+            LocalizedString::new("menu-item-remove-from-library")
+                .with_placeholder("Remove from Library"),
+            commands::UNSAVE_TRACK.with(track.id.clone().unwrap()),
+        ))
+        .append_separator()
+        .append(MenuItem::new(
+            LocalizedString::new("menu-item-copy-link").with_placeholder("Copy Link"),
+            commands::COPY_TO_CLIPBOARD.with(track.link()),
+        ))
 }

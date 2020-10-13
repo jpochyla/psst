@@ -238,6 +238,13 @@ impl Track {
             .map(|album| album.name.to_string())
             .unwrap_or_else(|| "Unknown".to_string())
     }
+
+    pub fn link(&self) -> String {
+        format!(
+            "https://open.spotify.com/track/{id}",
+            id = self.id.as_ref().unwrap()
+        )
+    }
 }
 
 #[derive(Clone, Debug, Default, Data, Lens)]

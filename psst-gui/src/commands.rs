@@ -5,6 +5,7 @@ use std::sync::Arc;
 // Common
 
 pub const SET_FOCUS: Selector = Selector::new("app.set-focus");
+pub const COPY_TO_CLIPBOARD: Selector<String> = Selector::new("app.copy-to-clipboard");
 
 // Session
 
@@ -30,6 +31,9 @@ pub const UPDATE_PLAYLISTS: Selector<Vector<Playlist>> = Selector::new("app.upda
 pub const UPDATE_SAVED_ALBUMS: Selector<Vector<Album>> = Selector::new("app.update-saved-albums");
 pub const UPDATE_SAVED_TRACKS: Selector<Vector<Arc<Track>>> =
     Selector::new("app.update-saved-tracks");
+
+pub const SAVE_TRACK: Selector<String> = Selector::new("app.save-track");
+pub const UNSAVE_TRACK: Selector<String> = Selector::new("app.unsave-track");
 
 // Album detail
 

@@ -6,8 +6,8 @@ use crate::{
     widgets::remote_image,
 };
 use druid::{
-    im::Vector, AppDelegate, Command, DelegateCtx, Env, Event, ExtEventSink, HotKey, ImageBuf,
-    SysMods, Target, WindowId,
+    im::Vector, AppDelegate, Application, Command, DelegateCtx, Env, Event, ExtEventSink, HotKey,
+    ImageBuf, SysMods, Target, WindowId,
 };
 use lru_cache::LruCache;
 use psst_core::{
@@ -325,9 +325,15 @@ impl AppDelegate<State> for Delegate {
         _env: &Env,
     ) -> bool {
         //
+        // Common
+        //
+        if let Some(text) = cmd.get(COPY_TO_CLIPBOARD).cloned() {
+            Application::global().clipboard().put_string(text);
+            false
+        //
         // remote_image
         //
-        if let Some(location) = cmd.get(remote_image::REQUEST_DATA).cloned() {
+        } else if let Some(location) = cmd.get(remote_image::REQUEST_DATA).cloned() {
             let sink = self.event_sink.clone();
             if let Some(image_buf) = self.image_cache.get_mut(&location) {
                 let payload = remote_image::DataPayload {
