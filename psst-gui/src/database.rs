@@ -5,60 +5,8 @@ use crate::{
 use aspotify::{ItemType, Market, Page, PlaylistItemType, Response};
 use druid::im::Vector;
 use itertools::Itertools;
-use psst_core::{
-    access_token::{AccessToken, TokenProvider},
-    session::SessionHandle,
-};
-use std::{
-    collections::HashMap,
-    future::Future,
-    sync::{Arc, RwLock},
-    time::Instant,
-};
-
-// pub struct EntityStorage {
-//     tracks: RwLock<HashMap<String, Arc<Track>>>,
-//     albums: RwLock<HashMap<String, Arc<Album>>>,
-// }
-//
-// impl EntityStorage {
-//     pub fn new() -> Self {
-//         Self {
-//             tracks: Default::default(),
-//             albums: Default::default(),
-//         }
-//     }
-//
-//     pub fn get_track(&self, id: &str) -> Option<Arc<Track>> {
-//         self.tracks
-//             .read()
-//             .expect("Failed to acquire entity storage for reading")
-//             .get(id)
-//             .cloned()
-//     }
-//
-//     pub fn insert_track(&self, id: String, track: Arc<Track>) {
-//         self.tracks
-//             .write()
-//             .expect("Failed to acquire entity storage for writing")
-//             .insert(id, track);
-//     }
-//
-//     pub fn get_album(&self, id: &str) -> Option<Arc<Album>> {
-//         self.albums
-//             .read()
-//             .expect("Failed to acquire entity storage for reading")
-//             .get(id)
-//             .cloned()
-//     }
-//
-//     pub fn insert_album(&self, id: String, album: Arc<Album>) {
-//         self.albums
-//             .write()
-//             .expect("Failed to acquire entity storage for writing")
-//             .insert(id, album);
-//     }
-// }
+use psst_core::{access_token::TokenProvider, session::SessionHandle};
+use std::{future::Future, sync::Arc, time::Instant};
 
 #[derive(Clone)]
 pub struct Web {

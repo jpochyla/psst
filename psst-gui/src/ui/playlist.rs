@@ -9,8 +9,8 @@ use crate::{
     widgets::{HoverExt, Maybe},
 };
 use druid::{
-    widget::{Flex, Label, LineBreaking, List},
-    Color, Insets, Widget, WidgetExt,
+    widget::{Label, LineBreaking, List},
+    Insets, Widget, WidgetExt,
 };
 
 pub fn make_list() -> impl Widget<State> {

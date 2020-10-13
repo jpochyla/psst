@@ -1,4 +1,4 @@
-use druid::{widget::prelude::*, Data, Rect, WidgetPod};
+use druid::{widget::prelude::*, Data, WidgetPod};
 
 pub struct Stack<T> {
     children: Vec<WidgetPod<T, Box<dyn Widget<T>>>>,

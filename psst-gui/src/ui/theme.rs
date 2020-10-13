@@ -32,7 +32,6 @@ pub const MENU_BUTTON_FG_INACTIVE: Color = GREY_2;
 pub const MENU_BUTTON_ICON_ACTIVE: Color = GREY_3;
 pub const MENU_BUTTON_ICON_INACTIVE: Color = GREY_4;
 
-pub const UI_FONT_MONO: Key<FontDescriptor> = Key::new("app.ui-font-mono");
 pub const UI_FONT_MEDIUM: Key<FontDescriptor> = Key::new("app.ui-font-medium");
 pub const TEXT_SIZE_SMALL: Key<f64> = Key::new("app.text-size-small");
 

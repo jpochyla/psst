@@ -6,11 +6,9 @@ use crate::{
 };
 use druid::{
     lens::{Id, InArc},
-    widget::{
-        Button, Controller, CrossAxisAlignment, Flex, Label, Painter, SizedBox, ViewSwitcher,
-    },
-    Color, Env, Event, EventCtx, LensExt, MouseButton, MouseEvent, PaintCtx, Point, Rect,
-    RenderContext, Size, Widget, WidgetExt,
+    widget::{Controller, CrossAxisAlignment, Flex, Label, Painter, SizedBox, ViewSwitcher},
+    Color, Env, Event, EventCtx, MouseButton, MouseEvent, PaintCtx, Point, Rect, RenderContext,
+    Size, Widget, WidgetExt,
 };
 use std::sync::Arc;
 

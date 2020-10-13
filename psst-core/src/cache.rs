@@ -1,13 +1,10 @@
 use crate::{
-    audio_file::{AudioFile, AudioPath},
     audio_key::AudioKey,
     error::Error,
-    protocol::metadata::mod_AudioFile::Format,
     spotify_id::{FileId, SpotifyId},
     util::{deserialize_protobuf, serialize_protobuf},
 };
 use psst_protocol::metadata::Track;
-use serde::{Deserialize, Serialize};
 use std::{
     fs,
     fs::File,
@@ -15,7 +12,6 @@ use std::{
     io::{Read, Write},
     path::{Path, PathBuf},
     sync::Arc,
-    time::Duration,
 };
 
 pub type CacheHandle = Arc<Cache>;

@@ -221,10 +221,6 @@ pub struct Track {
 }
 
 impl Track {
-    pub fn artist_list(&self) -> String {
-        self.artists.iter().map(|artist| &artist.name).join(", ")
-    }
-
     pub fn artist_name(&self) -> String {
         self.artists
             .front()

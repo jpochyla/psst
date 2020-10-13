@@ -4,8 +4,8 @@ use crate::{
     widgets::{button::HOVER_COLD_COLOR, icons, HoverExt, Icon, ViewDispatcher},
 };
 use druid::{
-    widget::{Button, CrossAxisAlignment, Flex, Label, Scroll, SizedBox, Split, ViewSwitcher},
-    Color, Env, FontDescriptor, FontFamily, Insets, Key, Size, Widget, WidgetExt,
+    widget::{CrossAxisAlignment, Flex, Label, Scroll, SizedBox, Split, ViewSwitcher},
+    Widget, WidgetExt,
 };
 
 pub mod album;

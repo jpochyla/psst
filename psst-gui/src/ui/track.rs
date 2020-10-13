@@ -7,11 +7,11 @@ use crate::{
 use druid::{
     im::Vector,
     kurbo::Line,
-    lens::{InArc, Map},
+    lens::Map,
     piet::StrokeStyle,
     widget::{Controller, Flex, Label, List, Painter},
-    Color, ContextMenu, Data, Env, Event, EventCtx, Lens, LensExt, LocalizedString, MenuDesc,
-    MenuItem, MouseButton, MouseEvent, RenderContext, Widget, WidgetExt, WidgetId,
+    ContextMenu, Data, Env, Event, EventCtx, Lens, LensExt, LocalizedString, MenuDesc, MenuItem,
+    MouseButton, MouseEvent, RenderContext, Widget, WidgetExt, WidgetId,
 };
 use std::sync::Arc;
 
@@ -68,7 +68,7 @@ where
 }
 
 #[derive(Clone, Data, Lens)]
-struct EnumTrack {
+pub struct EnumTrack {
     position: usize,
     track: Arc<Track>,
 }
