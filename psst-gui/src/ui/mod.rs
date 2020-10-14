@@ -19,11 +19,12 @@ pub mod track;
 pub mod utils;
 
 pub fn make_root() -> impl Widget<State> {
+    let playlists = Scroll::new(playlist::make_list()).vertical();
     let sidebar = Flex::column()
         .must_fill_main_axis(true)
         .with_child(make_menu())
         .with_default_spacer()
-        .with_child(playlist::make_list())
+        .with_flex_child(playlists, 1.0)
         .background(theme::BACKGROUND_DARK);
 
     let nav = Flex::row()
