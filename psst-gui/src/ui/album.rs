@@ -20,7 +20,7 @@ pub fn make_detail() -> impl Widget<State> {
 }
 
 fn make_detail_loaded() -> impl Widget<Album> {
-    let album_cover = make_cover(theme::grid(30.0), theme::grid(30.0)).padding(theme::grid(1.0));
+    let album_cover = make_cover(theme::grid(30.0), theme::grid(30.0));
 
     let album_name = Label::raw()
         .with_font(theme::UI_FONT_MEDIUM)
@@ -43,11 +43,18 @@ fn make_detail_loaded() -> impl Widget<Album> {
 
     let album_genres = List::new(|| Label::raw()).lens(Album::genres);
 
-    let album_type = Label::dynamic(|album: &Album, _| match album.album_type {
-        AlbumType::Album => "".to_string(),
-        AlbumType::Single => "Single".to_string(),
-        AlbumType::Compilation => "Compilation".to_string(),
-    });
+    let album_info = Flex::column()
+        .cross_axis_alignment(CrossAxisAlignment::Start)
+        .with_child(album_cover)
+        .with_default_spacer()
+        .with_child(album_name)
+        .with_spacer(theme::grid(0.2))
+        .with_child(album_artists)
+        .with_spacer(theme::grid(0.2))
+        .with_child(album_date)
+        .with_spacer(theme::grid(0.2))
+        .with_child(album_genres)
+        .fix_width(theme::grid(30.0));
 
     let album_tracks = make_tracklist(TrackDisplay {
         title: true,
@@ -58,29 +65,16 @@ fn make_detail_loaded() -> impl Widget<Album> {
 
     Flex::row()
         .cross_axis_alignment(CrossAxisAlignment::Start)
-        .with_child(
-            Flex::column()
-                .with_child(album_cover)
-                .with_child(album_name)
-                .with_child(album_artists)
-                .with_child(album_date)
-                .with_child(album_type)
-                .with_child(album_genres),
-        )
+        .with_child(album_info)
         .with_default_spacer()
         .with_flex_child(album_tracks, 1.0)
 }
 
 fn make_detail_loading() -> impl Widget<()> {
-    let album_cover = make_placeholder()
-        .fix_size(theme::grid(30.0), theme::grid(30.0))
-        .padding(theme::grid(1.0));
-    let album_tracks = Flex::column()
-        .with_child(make_placeholder().fix_height(theme::grid(3.0)))
-        .with_spacer(1.0)
-        .with_child(make_placeholder().fix_height(theme::grid(3.0)))
-        .with_spacer(1.0)
-        .with_child(make_placeholder().fix_height(theme::grid(3.0)));
+    let album_cover = make_placeholder().fix_size(theme::grid(30.0), theme::grid(30.0));
+    let album_tracks = make_placeholder()
+        .fix_height(theme::grid(6.0))
+        .expand_width();
     Flex::row()
         .cross_axis_alignment(CrossAxisAlignment::Start)
         .with_child(album_cover)
