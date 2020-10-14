@@ -1,6 +1,6 @@
 use crate::{
     commands,
-    data::{State, Track},
+    data::{Navigation, State, Track},
     ui::theme,
     widgets::HoverExt,
 };
@@ -9,7 +9,7 @@ use druid::{
     kurbo::Line,
     lens::Map,
     piet::StrokeStyle,
-    widget::{Controller, Flex, Label, List, Painter},
+    widget::{Controller, CrossAxisAlignment, Flex, Label, List, Painter},
     ContextMenu, Data, Env, Event, EventCtx, Lens, LensExt, LocalizedString, MenuDesc, MenuItem,
     MouseButton, MouseEvent, RenderContext, Widget, WidgetExt, WidgetId,
 };
@@ -77,6 +77,7 @@ pub fn make_track(display: TrackDisplay, play_ctrl: WidgetId) -> impl Widget<Enu
     let track_duration = Label::dynamic(|enum_track: &EnumTrack, _| {
         enum_track.track.duration.as_minutes_and_seconds()
     })
+    .with_text_size(theme::TEXT_SIZE_SMALL)
     .with_text_color(theme::PLACEHOLDER_COLOR);
 
     let line_painter = Painter::new(move |ctx, _, _| {
@@ -96,34 +97,38 @@ pub fn make_track(display: TrackDisplay, play_ctrl: WidgetId) -> impl Widget<Enu
     })
     .fix_height(1.0);
 
-    let mut row = Flex::row();
+    let mut major = Flex::row();
+    let mut minor = Flex::row();
+
     if display.title {
         let track_name = Label::raw()
             .with_font(theme::UI_FONT_MEDIUM)
             .lens(EnumTrack::track.then(Track::name.in_arc()));
-        row.add_child(track_name.align_left());
-        row.add_spacer(theme::grid(0.5));
+        major.add_child(track_name);
     }
     if display.artist {
         let track_artist =
-            Label::dynamic(|enum_track: &EnumTrack, _| enum_track.track.artist_name());
-        row.add_child(Label::new("·").with_text_color(theme::GREY_5));
-        row.add_spacer(theme::grid(0.25));
-        row.add_child(track_artist.align_left());
-        row.add_spacer(theme::grid(0.25));
+            Label::dynamic(|enum_track: &EnumTrack, _| enum_track.track.artist_name())
+                .with_text_size(theme::TEXT_SIZE_SMALL);
+        minor.add_child(track_artist);
     }
     if display.album {
         let track_album = Label::dynamic(|enum_track: &EnumTrack, _| enum_track.track.album_name())
+            .with_text_size(theme::TEXT_SIZE_SMALL)
             .with_text_color(theme::PLACEHOLDER_COLOR);
-        row.add_child(Label::new("/").with_text_color(theme::GREY_5));
-        row.add_spacer(theme::grid(0.25));
-        row.add_child(track_album.align_left());
-        row.add_spacer(theme::grid(0.5));
+        minor.add_child(Label::new(": ").with_text_color(theme::GREY_5));
+        minor.add_child(track_album);
     }
-    row.with_flex_child(line_painter, 1.0)
-        .with_spacer(theme::grid(0.5))
-        .with_child(track_duration.align_right())
-        .padding(theme::grid(0.5))
+    major.add_default_spacer();
+    major.add_flex_child(line_painter, 1.0);
+    major.add_default_spacer();
+    major.add_child(track_duration.align_right());
+
+    Flex::column()
+        .cross_axis_alignment(CrossAxisAlignment::Start)
+        .with_child(major)
+        .with_child(minor)
+        .padding(theme::grid(0.8))
         .hover()
         .on_ex_click(
             MouseButton::Right,
@@ -147,7 +152,7 @@ fn show_track_menu(ctx: &mut EventCtx, event: &MouseEvent, track: &Track) {
 }
 
 fn make_track_menu(track: &Track) -> MenuDesc<State> {
-    MenuDesc::empty()
+    let mut menu = MenuDesc::empty()
         .append(MenuItem::new(
             LocalizedString::new("menu-item-save-to-library").with_placeholder("Save to Library"),
             commands::SAVE_TRACK.with(track.id.clone().unwrap()),
@@ -157,9 +162,24 @@ fn make_track_menu(track: &Track) -> MenuDesc<State> {
                 .with_placeholder("Remove from Library"),
             commands::UNSAVE_TRACK.with(track.id.clone().unwrap()),
         ))
-        .append_separator()
-        .append(MenuItem::new(
-            LocalizedString::new("menu-item-copy-link").with_placeholder("Copy Link"),
-            commands::COPY_TO_CLIPBOARD.with(track.link()),
+        .append_separator();
+
+    if let Some(artist) = track.artists.front() {
+        menu = menu.append(MenuItem::new(
+            LocalizedString::new("menu-item-show-artist").with_placeholder("Show Artist"),
+            commands::NAVIGATE_TO.with(Navigation::ArtistDetail(artist.id.clone())),
+        ));
+    }
+    if let Some(album) = track.album.as_ref() {
+        menu = menu.append(MenuItem::new(
+            LocalizedString::new("menu-item-show-album").with_placeholder("Show Album"),
+            commands::NAVIGATE_TO.with(Navigation::AlbumDetail(album.id.clone())),
         ))
+    }
+    menu = menu.append(MenuItem::new(
+        LocalizedString::new("menu-item-copy-link").with_placeholder("Copy Link"),
+        commands::COPY_TO_CLIPBOARD.with(track.link()),
+    ));
+
+    menu
 }
