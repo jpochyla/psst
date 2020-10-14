@@ -88,11 +88,11 @@ pub fn setup(env: &mut Env, _state: &State) {
         Insets::new(grid(4.0), grid(1.0), 0.0, grid(1.0)),
     );
 
-    env.set(SCROLLBAR_COLOR, Color::rgb8(0xff, 0xff, 0xff));
-    env.set(SCROLLBAR_BORDER_COLOR, Color::rgb8(0x77, 0x77, 0x77));
-    env.set(SCROLLBAR_MAX_OPACITY, 0.7);
+    env.set(SCROLLBAR_COLOR, GREY_3);
+    env.set(SCROLLBAR_BORDER_COLOR, GREY_3);
+    env.set(SCROLLBAR_MAX_OPACITY, 0.8);
     env.set(SCROLLBAR_FADE_DELAY, 1500u64);
-    env.set(SCROLLBAR_WIDTH, 8.0);
+    env.set(SCROLLBAR_WIDTH, 6.0);
     env.set(SCROLLBAR_PAD, 2.0);
     env.set(SCROLLBAR_RADIUS, 5.0);
     env.set(SCROLLBAR_EDGE_WIDTH, 1.0);
