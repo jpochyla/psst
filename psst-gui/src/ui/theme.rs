@@ -33,6 +33,7 @@ pub const MENU_BUTTON_ICON_ACTIVE: Color = GREY_3;
 pub const MENU_BUTTON_ICON_INACTIVE: Color = GREY_4;
 
 pub const UI_FONT_MEDIUM: Key<FontDescriptor> = Key::new("app.ui-font-medium");
+pub const UI_FONT_MONO: Key<FontDescriptor> = Key::new("app.ui-font-mono");
 pub const TEXT_SIZE_SMALL: Key<f64> = Key::new("app.text-size-small");
 
 pub fn setup(env: &mut Env, _state: &State) {
@@ -72,6 +73,10 @@ pub fn setup(env: &mut Env, _state: &State) {
         FontDescriptor::new(FontFamily::SYSTEM_UI)
             .with_size(14.0)
             .with_weight(FontWeight::MEDIUM),
+    );
+    env.set(
+        UI_FONT_MONO,
+        FontDescriptor::new(FontFamily::MONOSPACE).with_size(14.0),
     );
     env.set(TEXT_SIZE_SMALL, 12.0);
     env.set(TEXT_SIZE_NORMAL, 14.0);
