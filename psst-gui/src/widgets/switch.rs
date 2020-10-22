@@ -35,7 +35,11 @@ impl<T: Data, U: Data + Eq + Hash> ViewDispatcher<T, U> {
 
 impl<T: Data, U: Data + Eq + Hash> Widget<T> for ViewDispatcher<T, U> {
     fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut T, env: &Env) {
-        if let Some(child) = self.active_child() {
+        if hidden_should_receive_event(event) {
+            for (_, child) in self.children.iter_mut() {
+                child.event(ctx, event, data, env);
+            }
+        } else if let Some(child) = self.active_child() {
             child.event(ctx, event, data, env);
         }
     }
@@ -47,27 +51,42 @@ impl<T: Data, U: Data + Eq + Hash> Widget<T> for ViewDispatcher<T, U> {
             self.children
                 .insert(child_id.clone(), WidgetPod::new(child));
             self.active_child_id = Some(child_id);
+            ctx.children_changed();
+            ctx.request_layout();
         }
-        if let Some(child) = self.active_child() {
+
+        if hidden_should_receive_lifecycle(event) {
+            for (_, child) in self.children.iter_mut() {
+                child.lifecycle(ctx, event, data, env);
+            }
+        } else if let Some(child) = self.active_child() {
             child.lifecycle(ctx, event, data, env);
         }
     }
 
     fn update(&mut self, ctx: &mut UpdateCtx, _old_data: &T, data: &T, env: &Env) {
         let child_id = (self.child_picker)(data, env);
+        let mut skip_active_child = false;
         // Safe to unwrap because self.active_child_id should not be empty
         if !child_id.same(self.active_child_id.as_ref().unwrap()) {
             if !self.children.contains_key(&child_id) {
                 let child = (self.child_builder)(&child_id, data, env);
                 self.children
                     .insert(child_id.clone(), WidgetPod::new(child));
+                skip_active_child = true;
             }
             self.active_child_id = Some(child_id);
             ctx.children_changed();
-        // Because the new child has not yet been initialized, we have to skip
-        // the update after switching.
-        } else if let Some(child) = self.active_child() {
-            child.update(ctx, data, env);
+            ctx.request_layout();
+        }
+        let active_child_id = self.active_child_id.as_ref().unwrap();
+        for (id, child) in self.children.iter_mut() {
+            if skip_active_child && id == active_child_id {
+                // Because the new child has not yet been initialized, we have
+                // to skip the update after switching.
+            } else {
+                child.update(ctx, data, env);
+            }
         }
     }
 
@@ -86,5 +105,31 @@ impl<T: Data, U: Data + Eq + Hash> Widget<T> for ViewDispatcher<T, U> {
         if let Some(ref mut child) = self.active_child() {
             child.paint_raw(ctx, data, env);
         }
+    }
+}
+
+fn hidden_should_receive_event(evt: &Event) -> bool {
+    match evt {
+        Event::WindowConnected
+        | Event::WindowSize(_)
+        | Event::Timer(_)
+        | Event::AnimFrame(_)
+        | Event::Command(_)
+        | Event::Internal(_) => true,
+        Event::MouseDown(_)
+        | Event::MouseUp(_)
+        | Event::MouseMove(_)
+        | Event::Wheel(_)
+        | Event::KeyDown(_)
+        | Event::KeyUp(_)
+        | Event::Paste(_)
+        | Event::Zoom(_) => false,
+    }
+}
+
+fn hidden_should_receive_lifecycle(lc: &LifeCycle) -> bool {
+    match lc {
+        LifeCycle::WidgetAdded | LifeCycle::Internal(_) => true,
+        LifeCycle::Size(_) | LifeCycle::HotChanged(_) | LifeCycle::FocusChanged(_) => false,
     }
 }
