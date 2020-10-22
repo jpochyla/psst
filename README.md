@@ -26,7 +26,7 @@ $ cat > psst-gui/config.json
 Now we're good to go:
 ```
 $ cd psst-gui
-$ RUST_LOG=info cargo run
+$ cargo run
 # Use cargo run --release for the release build.
 ```
 
