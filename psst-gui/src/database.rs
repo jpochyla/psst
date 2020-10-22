@@ -82,7 +82,6 @@ impl Web {
             .albums()
             .get_album(id, Some(Market::FromToken))
             .await?;
-        log::info!("expires in: {:?}", result.expires - Instant::now());
         let result = result.data.into();
         Ok(result)
     }
@@ -302,7 +301,13 @@ impl From<aspotify::Album> for Album {
             copyrights: album
                 .copyrights
                 .into_iter()
-                .map(|copyright| copyright.text.into())
+                .filter_map(|copyright| {
+                    if copyright.performance_copyright {
+                        Some(copyright.text.into())
+                    } else {
+                        None
+                    }
+                })
                 .collect(),
             tracks: album
                 .tracks
