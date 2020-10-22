@@ -7,7 +7,7 @@ edition = "2018"
 [dependencies]
 psst-core = { path = "../psst-core" }
 
-aspotify = { git = "https://github.com/jpochyla/aspotify", branch = "explicit_access_token" }
+aspotify = { git = "https://github.com/KaiJewson/aspotify" }
 chrono = "0.4.19"
 # druid = { git = "https://github.com/xi-editor/druid", features = ["im", "image"] }
 druid = { git = "https://github.com/jpochyla/druid", features = ["im", "image"], branch = "textbox-options" }
