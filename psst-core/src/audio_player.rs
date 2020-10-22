@@ -214,6 +214,7 @@ impl Player {
                 self.handle_finished();
             }
             PlayerEvent::Paused { .. } => {}
+            PlayerEvent::Started { .. } => {}
         };
     }
 
@@ -374,6 +375,11 @@ impl Player {
         servicing_handle: JoinHandle<()>,
     ) {
         log::info!("starting playback");
+        self.event_sender
+            .send(PlayerEvent::Started {
+                path: serviced_item.path,
+            })
+            .expect("Failed to send PlayerEvent::Started");
         self.state = PlayerState::Playing {
             path: serviced_item.path,
             servicing_handle,
@@ -506,6 +512,9 @@ pub enum PlayerEvent {
     Preloaded {
         item: PlaybackItem,
         result: Result<LoadedPlaybackItem, Error>,
+    },
+    Started {
+        path: AudioPath,
     },
     Playing {
         path: AudioPath,
