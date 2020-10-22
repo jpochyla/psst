@@ -54,6 +54,7 @@ pub struct Session {
     decoder: Mutex<ShannonDecoder<TcpStream>>,
     mercury: Mutex<MercuryDispatcher>,
     audio_key: Mutex<AudioKeyDispatcher>,
+    country_code: Mutex<Option<String>>,
     reusable_creds: Credentials,
 }
 
@@ -72,10 +73,14 @@ impl Session {
         // Create the subsystem dispatchers.
         let audio_key = Mutex::new(AudioKeyDispatcher::new());
         let mercury = Mutex::new(MercuryDispatcher::new());
+        // Start with an empty country code, it will get filled later from a server
+        // message.
+        let country_code = Mutex::new(None);
         Ok(Self {
             encoder,
             decoder,
             reusable_creds,
+            country_code,
             audio_key,
             mercury,
         })
@@ -139,10 +144,17 @@ impl Session {
             .expect("Failed to receive from audio key response channel")
     }
 
+    pub fn get_country_code(&self) -> Option<String> {
+        self.country_code.lock().unwrap().clone()
+    }
+
     fn dispatch(&self, msg: ShannonMessage) -> Result<(), Error> {
         match msg.cmd {
             ShannonMessage::PING => {
                 self.handle_ping()?;
+            }
+            ShannonMessage::COUNTRY_CODE => {
+                self.handle_country_code(msg.payload)?;
             }
             ShannonMessage::AES_KEY => {
                 self.audio_key.lock().unwrap().handle_aes_key(msg);
@@ -162,6 +174,14 @@ impl Session {
 
     fn handle_ping(&self) -> Result<(), Error> {
         self.send(ShannonMessage::new(ShannonMessage::PONG, vec![0, 0, 0, 0]))?;
+        Ok(())
+    }
+
+    fn handle_country_code(&self, payload: Vec<u8>) -> Result<(), Error> {
+        self.country_code
+            .lock()
+            .unwrap()
+            .replace(String::from_utf8(payload).map_err(|_| Error::UnexpectedResponse)?);
         Ok(())
     }
 
