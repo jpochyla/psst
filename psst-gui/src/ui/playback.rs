@@ -7,8 +7,8 @@ use crate::{
 use druid::{
     lens::{Id, InArc},
     widget::{Controller, CrossAxisAlignment, Flex, Label, Painter, SizedBox, ViewSwitcher},
-    Color, Env, Event, EventCtx, MouseButton, MouseEvent, PaintCtx, Point, Rect, RenderContext,
-    Size, Widget, WidgetExt,
+    Env, Event, EventCtx, MouseButton, MouseEvent, PaintCtx, Point, Rect, RenderContext, Size,
+    Widget, WidgetExt,
 };
 use std::sync::Arc;
 
@@ -143,67 +143,17 @@ fn make_player_progress() -> impl Widget<Playback> {
     Flex::row()
         .with_child(current_time)
         .with_default_spacer()
-        .with_flex_child(make_volume_analysis(), 1.0)
+        .with_flex_child(make_progress(), 1.0)
         .with_default_spacer()
         .with_child(total_time)
 }
 
-fn make_volume_analysis() -> impl Widget<Playback> {
+fn make_progress() -> impl Widget<Playback> {
     Painter::new(|ctx, playback: &Playback, env| {
-        if playback.analysis.is_some() {
-            paint_progress_with_analysis(ctx, &playback, env);
-        } else {
-            paint_progress(ctx, &playback, env);
-        }
+        paint_progress(ctx, &playback, env);
     })
     .controller(SeekController)
     .fix_height(theme::grid(1.0))
-}
-
-const PROGRESS_MIN_SEGMENT_WIDTH: f64 = 1.0;
-const PROGRESS_MIN_SEGMENT_HEIGHT: f64 = 3.0;
-
-fn paint_progress_with_analysis(ctx: &mut PaintCtx, playback: &Playback, _env: &Env) {
-    let analysis = playback.analysis.as_ref().unwrap();
-
-    let elapsed_time = playback
-        .progress
-        .map(|progress| progress.as_secs_f64())
-        .unwrap_or(0.0);
-    let total_time = playback
-        .item
-        .as_ref()
-        .map(|track| track.duration.as_secs_f64())
-        .unwrap_or(0.0);
-
-    let (min_loudness, max_loudness) = analysis.get_minmax_loudness();
-
-    let elapsed_color = Color::rgba(1.0, 1.0, 1.0, 1.0);
-    let remaining_color = Color::rgba(0.3, 0.3, 0.3, 1.0);
-    let bounds = ctx.size();
-    for segment in &analysis.segments {
-        let start_frac = segment.start.as_secs_f64() / total_time;
-        let duration_frac = segment.duration.as_secs_f64() / total_time;
-        let loudness_frac =
-            (segment.loudness_max + min_loudness.abs()) / (max_loudness + min_loudness.abs());
-
-        let size = Size::new(
-            (bounds.width * duration_frac as f64).max(PROGRESS_MIN_SEGMENT_WIDTH),
-            bounds.height * loudness_frac as f64,
-        );
-        let point = Point::new(
-            bounds.width * start_frac as f64,
-            bounds.height / 2.0 - size.height / 2.0,
-        );
-        ctx.fill(
-            &Rect::from_origin_size(point, size),
-            if segment.start.as_secs_f64() <= elapsed_time {
-                &elapsed_color
-            } else {
-                &remaining_color
-            },
-        );
-    }
 }
 
 fn paint_progress(ctx: &mut PaintCtx, playback: &Playback, env: &Env) {
@@ -221,13 +171,14 @@ fn paint_progress(ctx: &mut PaintCtx, playback: &Playback, env: &Env) {
     let remaining_color = env.get(theme::PRIMARY_LIGHT).with_alpha(0.5);
     let bounds = ctx.size();
 
+    const HEIGHT: f64 = 2.0;
     let elapsed_frac = elapsed_time / total_time;
     let elapsed_width = bounds.width * elapsed_frac as f64;
     let remaining_width = bounds.width - elapsed_width;
-    let elapsed = Size::new(elapsed_width, PROGRESS_MIN_SEGMENT_HEIGHT).round();
-    let remaining = Size::new(remaining_width, PROGRESS_MIN_SEGMENT_HEIGHT).round();
+    let elapsed = Size::new(elapsed_width, HEIGHT).round();
+    let remaining = Size::new(remaining_width, HEIGHT).round();
 
-    let vertical_center = bounds.height / 2.0 - PROGRESS_MIN_SEGMENT_HEIGHT / 2.0;
+    let vertical_center = bounds.height / 2.0 - HEIGHT / 2.0;
     ctx.fill(
         &Rect::from_origin_size(Point::new(0.0, vertical_center), elapsed),
         &elapsed_color,
