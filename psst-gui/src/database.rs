@@ -1,5 +1,8 @@
 use crate::{
-    data::{Album, AlbumType, Artist, AudioAnalysis, AudioAnalysisSegment, Image, Playlist, Track},
+    data::{
+        Album, AlbumType, Artist, AudioAnalysis, AudioAnalysisSegment, Image, Playlist,
+        SearchResults, Track,
+    },
     error::Error,
 };
 use aspotify::{ItemType, Market, Page, PlaylistItemType, Response};
@@ -36,13 +39,9 @@ impl Web {
         let access_token = self
             .token_provider
             .get(&self.session)
-            .map_err(|err| Error::WebApiError(Box::new(err)))?;
+            .map_err(|err| Error::WebApiError(err.to_string()))?;
         self.spotify
-            .set_current_access_token(aspotify::AccessToken {
-                token: access_token.token,
-                expires: access_token.expires,
-                refresh_token: None,
-            })
+            .set_current_access_token(access_token.token, access_token.expires)
             .await;
         Ok(self.spotify.as_ref())
     }
@@ -77,7 +76,12 @@ impl Web {
     }
 
     pub async fn load_album(&self, id: &str) -> Result<Album, Error> {
-        let result = self.client().await?.albums().get_album(id, None).await?;
+        let result = self
+            .client()
+            .await?
+            .albums()
+            .get_album(id, Some(Market::FromToken))
+            .await?;
         log::info!("expires in: {:?}", result.expires - Instant::now());
         let result = result.data.into();
         Ok(result)
@@ -98,7 +102,11 @@ impl Web {
     pub async fn load_saved_albums(&self) -> Result<Vector<Album>, Error> {
         let result = self
             .with_paging(
-                |client, limit, offset| client.library().get_saved_albums(limit, offset, None),
+                |client, limit, offset| {
+                    client
+                        .library()
+                        .get_saved_albums(limit, offset, Some(Market::FromToken))
+                },
                 |saved| saved.album.into(),
             )
             .await?;
@@ -108,7 +116,11 @@ impl Web {
     pub async fn load_saved_tracks(&self) -> Result<Vector<Arc<Track>>, Error> {
         let result = self
             .with_paging(
-                |client, limit, offset| client.library().get_saved_tracks(limit, offset, None),
+                |client, limit, offset| {
+                    client
+                        .library()
+                        .get_saved_tracks(limit, offset, Some(Market::FromToken))
+                },
                 |saved| Arc::new(Track::from(saved.track)),
             )
             .await?;
@@ -129,9 +141,12 @@ impl Web {
         let result = self
             .with_paging(
                 |client, limit, offset| {
-                    client
-                        .playlists()
-                        .get_playlists_items(id, limit, offset, None)
+                    client.playlists().get_playlists_items(
+                        id,
+                        limit,
+                        offset,
+                        Some(Market::FromToken),
+                    )
                 },
                 |item| match item.item {
                     PlaylistItemType::Track(track) => Arc::new(Track::from(track)),
@@ -146,9 +161,13 @@ impl Web {
         let result = self
             .with_paging(
                 |client, limit, offset| {
-                    client
-                        .artists()
-                        .get_artist_albums(id, None, limit, offset, None)
+                    client.artists().get_artist_albums(
+                        id,
+                        None,
+                        limit,
+                        offset,
+                        Some(Market::FromToken),
+                    )
                 },
                 |artists_album| artists_album.into(),
             )
@@ -157,12 +176,11 @@ impl Web {
     }
 
     pub async fn load_artist_top_tracks(&self, id: &str) -> Result<Vector<Arc<Track>>, Error> {
-        let market = Market::FromToken;
         let result = self
             .client()
             .await?
             .artists()
-            .get_artist_top(id, market)
+            .get_artist_top(id, Market::FromToken)
             .await?
             .data
             .into_iter()
@@ -177,10 +195,7 @@ impl Web {
         Ok(result)
     }
 
-    pub async fn search(
-        &self,
-        query: &str,
-    ) -> Result<(Vector<Artist>, Vector<Album>, Vector<Arc<Track>>), Error> {
+    pub async fn search(&self, query: &str) -> Result<SearchResults, Error> {
         let results = self
             .client()
             .await?
@@ -193,7 +208,7 @@ impl Web {
                 false,
                 25,
                 0,
-                None,
+                Some(Market::FromToken),
             )
             .await?
             .data;
@@ -215,7 +230,11 @@ impl Web {
             .into_iter()
             .map(|track| Arc::new(Track::from(track)))
             .collect();
-        Ok((artists, albums, tracks))
+        Ok(SearchResults {
+            artists,
+            albums,
+            tracks,
+        })
     }
 
     pub async fn analyze_track(&self, id: &str) -> Result<AudioAnalysis, Error> {
@@ -262,7 +281,9 @@ impl From<aspotify::AlbumSimplified> for Album {
             release_date: album.release_date,
             release_date_precision: album.release_date_precision,
             genres: Vector::new(),
+            copyrights: Vector::new(),
             tracks: Vector::new(),
+            label: "".into(),
         }
     }
 }
@@ -278,12 +299,18 @@ impl From<aspotify::Album> for Album {
             release_date: Some(album.release_date),
             release_date_precision: Some(album.release_date_precision),
             genres: album.genres.into_iter().map_into().collect(),
+            copyrights: album
+                .copyrights
+                .into_iter()
+                .map(|copyright| copyright.text.into())
+                .collect(),
             tracks: album
                 .tracks
                 .items
                 .into_iter()
                 .map(|track| Arc::new(Track::from(track)))
                 .collect(),
+            label: album.label.into(),
         }
     }
 }
@@ -299,7 +326,9 @@ impl From<aspotify::ArtistsAlbum> for Album {
             release_date: Some(album.release_date),
             release_date_precision: Some(album.release_date_precision),
             genres: Vector::new(),
+            copyrights: Vector::new(),
             tracks: Vector::new(),
+            label: "".into(),
         }
     }
 }
@@ -394,19 +423,19 @@ impl From<aspotify::Segment> for AudioAnalysisSegment {
 }
 
 impl From<aspotify::Error> for Error {
-    fn from(error: aspotify::Error) -> Self {
-        Error::WebApiError(Box::new(error))
+    fn from(err: aspotify::Error) -> Self {
+        Error::WebApiError(err.to_string())
     }
 }
 
 impl From<reqwest::Error> for Error {
-    fn from(error: reqwest::Error) -> Self {
-        Error::WebApiError(Box::new(error))
+    fn from(err: reqwest::Error) -> Self {
+        Error::WebApiError(err.to_string())
     }
 }
 
 impl From<image::ImageError> for Error {
-    fn from(error: image::ImageError) -> Self {
-        Error::WebApiError(Box::new(error))
+    fn from(err: image::ImageError) -> Self {
+        Error::WebApiError(err.to_string())
     }
 }

@@ -1,8 +1,9 @@
+use druid::Data;
 use std::{error, fmt};
 
-#[derive(Debug)]
+#[derive(Clone, Debug, Data)]
 pub enum Error {
-    WebApiError(Box<dyn error::Error + Send>),
+    WebApiError(String),
 }
 
 impl error::Error for Error {}
@@ -10,7 +11,7 @@ impl error::Error for Error {}
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Self::WebApiError(e) => e.fmt(f),
+            Self::WebApiError(err) => f.write_str(err),
         }
     }
 }
