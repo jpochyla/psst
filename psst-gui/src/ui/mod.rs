@@ -122,6 +122,7 @@ pub fn make_back_button() -> impl Widget<State> {
                     .scale((10.0, theme::grid(2.0)))
                     .padding(theme::grid(1.0))
                     .hover()
+                    .rounded(theme::BUTTON_BORDER_RADIUS)
                     .on_click(|ctx, _state, _env| {
                         ctx.submit_command(commands::NAVIGATE_BACK);
                     })

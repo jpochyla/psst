@@ -1,7 +1,7 @@
 use crate::widgets::ExClick;
 use druid::{
     widget::{prelude::*, BackgroundBrush, ControllerHost},
-    Color, Data, Key, MouseButton, MouseEvent, WidgetPod,
+    Color, Data, Key, KeyOrValue, MouseEvent, WidgetPod,
 };
 
 pub const HOVER_HOT_COLOR: Key<Color> = Key::new("app.hover-hot-color");
@@ -9,13 +9,24 @@ pub const HOVER_COLD_COLOR: Key<Color> = Key::new("app.hover-cold-color");
 
 pub struct Hover<T> {
     inner: WidgetPod<T, Box<dyn Widget<T>>>,
+    corner_radius: KeyOrValue<f64>,
 }
 
 impl<T: Data> Hover<T> {
     pub fn new(inner: impl Widget<T> + 'static) -> Self {
         Self {
             inner: WidgetPod::new(inner).boxed(),
+            corner_radius: 0.0.into(),
         }
+    }
+
+    pub fn rounded(mut self, radius: impl Into<KeyOrValue<f64>>) -> Self {
+        self.set_rounded(radius);
+        self
+    }
+
+    pub fn set_rounded(&mut self, radius: impl Into<KeyOrValue<f64>>) {
+        self.corner_radius = radius.into();
     }
 }
 
@@ -47,7 +58,12 @@ impl<T: Data> Widget<T> for Hover<T> {
         } else {
             env.get(HOVER_COLD_COLOR).into()
         };
-        background.paint(ctx, data, env);
+        let corner_radius = self.corner_radius.resolve(env);
+        let panel = ctx.size().to_rounded_rect(corner_radius);
+        ctx.with_save(|ctx| {
+            ctx.clip(panel);
+            background.paint(ctx, data, env);
+        });
         self.inner.paint(ctx, data, env);
     }
 }
