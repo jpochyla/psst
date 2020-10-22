@@ -6,6 +6,7 @@ mod data;
 mod database;
 mod delegate;
 mod error;
+mod promise;
 mod ui;
 mod widgets;
 

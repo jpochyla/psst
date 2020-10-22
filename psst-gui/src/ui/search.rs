@@ -1,16 +1,16 @@
 use crate::{
     commands, consts,
-    data::{Navigation, Search, State},
+    data::{Navigation, Search, SearchResults, State},
     ui::{
         album::make_album,
         artist::make_artist,
         theme,
         track::{make_tracklist, TrackDisplay},
     },
-    widgets::{icons, InputController, Stack},
+    widgets::{icons, InputController, Promised, Stack},
 };
 use druid::{
-    widget::{Flex, List, TextBox},
+    widget::{Flex, Label, List, TextBox},
     Widget, WidgetExt,
 };
 
@@ -39,31 +39,39 @@ pub fn make_input() -> impl Widget<State> {
 }
 
 pub fn make_results() -> impl Widget<State> {
-    Flex::column()
-        .with_child(make_artist_results())
-        .with_child(make_album_results())
-        .with_child(make_track_results())
-        .lens(State::search)
+    Promised::new(
+        || Label::new("Loading"),
+        || {
+            Flex::column()
+                .with_child(make_artist_results())
+                .with_child(make_album_results())
+                .with_child(make_track_results())
+        },
+        || Label::new("Error"),
+    )
+    .lens(Search::results)
+    .lens(State::search)
 }
 
-fn make_artist_results() -> impl Widget<Search> {
+fn make_artist_results() -> impl Widget<SearchResults> {
     Flex::column()
         .with_child(List::new(make_artist))
-        .lens(Search::artists)
+        .lens(SearchResults::artists)
 }
 
-fn make_album_results() -> impl Widget<Search> {
+fn make_album_results() -> impl Widget<SearchResults> {
     Flex::column()
         .with_child(List::new(make_album))
-        .lens(Search::albums)
+        .lens(SearchResults::albums)
 }
 
-fn make_track_results() -> impl Widget<Search> {
+fn make_track_results() -> impl Widget<SearchResults> {
     Flex::column()
         .with_child(make_tracklist(TrackDisplay {
+            number: false,
             title: true,
             artist: true,
             album: true,
         }))
-        .lens(Search::tracks)
+        .lens(SearchResults::tracks)
 }

@@ -75,10 +75,9 @@ pub trait HoverExt<T: Data>: Widget<T> + Sized + 'static {
 
     fn on_ex_click(
         self,
-        button: MouseButton,
         f: impl Fn(&mut EventCtx, &MouseEvent, &mut T, &Env) + 'static,
     ) -> ControllerHost<Self, ExClick<T>> {
-        ControllerHost::new(self, ExClick::new(f).with_button(button))
+        ControllerHost::new(self, ExClick::new(f))
     }
 }
 

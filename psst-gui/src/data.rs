@@ -1,3 +1,4 @@
+use crate::{error::Error, promise::Promise};
 use aspotify::DatePrecision;
 use chrono::NaiveDate;
 use druid::{im::Vector, Data, Lens};
@@ -78,6 +79,12 @@ impl Navigation {
     }
 }
 
+#[derive(Clone, Debug, Data)]
+pub struct PlaybackContext {
+    pub tracks: Vector<Arc<Track>>,
+    pub position: usize,
+}
+
 #[derive(Clone, Debug, Default)]
 pub struct PlaybackReport {
     pub progress: AudioDuration,
@@ -89,12 +96,16 @@ pub struct Playback {
     pub is_playing: bool,
     pub progress: Option<AudioDuration>,
     pub item: Option<Arc<Track>>,
-    pub analysis: Option<AudioAnalysis>,
 }
 
 #[derive(Clone, Debug, Default, Data, Lens)]
 pub struct Search {
     pub input: String,
+    pub results: Promise<SearchResults, String>,
+}
+
+#[derive(Clone, Debug, Data, Lens)]
+pub struct SearchResults {
     pub artists: Vector<Artist>,
     pub albums: Vector<Album>,
     pub tracks: Vector<Arc<Track>>,
@@ -103,28 +114,28 @@ pub struct Search {
 #[derive(Clone, Debug, Default, Data, Lens)]
 pub struct AlbumDetail {
     pub id: String,
-    pub album: Option<Album>,
+    pub album: Promise<Album, String>,
 }
 
 #[derive(Clone, Debug, Default, Data, Lens)]
 pub struct ArtistDetail {
     pub id: String,
-    pub artist: Option<Artist>,
-    pub albums: Option<Vector<Album>>,
-    pub top_tracks: Option<Vector<Arc<Track>>>,
+    pub artist: Promise<Artist, String>,
+    pub albums: Promise<Vector<Album>, String>,
+    pub top_tracks: Promise<Vector<Arc<Track>>, String>,
 }
 
 #[derive(Clone, Debug, Default, Data, Lens)]
 pub struct PlaylistDetail {
-    pub playlist: Option<Playlist>,
-    pub tracks: Option<Vector<Arc<Track>>>,
+    pub playlist: Promise<Playlist>,
+    pub tracks: Promise<Vector<Arc<Track>>, String>,
 }
 
 #[derive(Clone, Debug, Default, Data, Lens)]
 pub struct Library {
-    pub saved_albums: Option<Vector<Album>>,
-    pub saved_tracks: Option<Vector<Arc<Track>>>,
-    pub playlists: Option<Vector<Playlist>>,
+    pub saved_albums: Promise<Vector<Album>>,
+    pub saved_tracks: Promise<Vector<Arc<Track>>>,
+    pub playlists: Promise<Vector<Playlist>>,
 }
 
 #[derive(Clone, Debug, Data, Lens)]
@@ -151,6 +162,8 @@ pub struct Album {
     pub id: String,
     pub images: Vector<Image>,
     pub genres: Vector<Arc<str>>,
+    pub copyrights: Vector<Arc<str>>,
+    pub label: Arc<str>,
     pub name: Arc<str>,
     #[data(same_fn = "PartialEq::eq")]
     pub release_date: Option<NaiveDate>,

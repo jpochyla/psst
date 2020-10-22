@@ -1,22 +1,26 @@
 use crate::{
     commands,
-    data::{Album, AlbumDetail, AlbumType, Artist, Navigation, State},
+    data::{Album, AlbumDetail, Artist, Navigation, State},
     ui::{
         theme,
         track::{make_tracklist, TrackDisplay},
         utils::make_placeholder,
     },
-    widgets::{HoverExt, Maybe, RemoteImage},
+    widgets::{HoverExt, Promised, RemoteImage},
 };
 use druid::{
     widget::{CrossAxisAlignment, Flex, Label, LineBreaking, List},
-    Widget, WidgetExt,
+    Data, Widget, WidgetExt,
 };
 
 pub fn make_detail() -> impl Widget<State> {
-    Maybe::new(make_detail_loaded, make_detail_loading)
-        .lens(AlbumDetail::album)
-        .lens(State::album)
+    Promised::new(
+        || make_detail_loading(),
+        || make_detail_loaded(),
+        || Label::new("Error"),
+    )
+    .lens(AlbumDetail::album)
+    .lens(State::album)
 }
 
 fn make_detail_loaded() -> impl Widget<Album> {
@@ -41,7 +45,11 @@ fn make_detail_loaded() -> impl Widget<Album> {
 
     let album_date = Label::dynamic(|album: &Album, _| album.release());
 
+    let album_label = Label::raw().lens(Album::label);
+
     let album_genres = List::new(|| Label::raw()).lens(Album::genres);
+
+    let album_copyrights = List::new(|| Label::raw()).lens(Album::copyrights);
 
     let album_info = Flex::column()
         .cross_axis_alignment(CrossAxisAlignment::Start)
@@ -53,10 +61,15 @@ fn make_detail_loaded() -> impl Widget<Album> {
         .with_spacer(theme::grid(0.2))
         .with_child(album_date)
         .with_spacer(theme::grid(0.2))
+        .with_child(album_label)
+        .with_spacer(theme::grid(0.2))
+        .with_child(album_copyrights)
+        .with_spacer(theme::grid(0.2))
         .with_child(album_genres)
         .fix_width(theme::grid(30.0));
 
     let album_tracks = make_tracklist(TrackDisplay {
+        number: true,
         title: true,
         artist: false,
         album: false,
@@ -70,7 +83,7 @@ fn make_detail_loaded() -> impl Widget<Album> {
         .with_flex_child(album_tracks, 1.0)
 }
 
-fn make_detail_loading() -> impl Widget<()> {
+fn make_detail_loading<T: Data>() -> impl Widget<T> {
     let album_cover = make_placeholder().fix_size(theme::grid(30.0), theme::grid(30.0));
     let album_tracks = make_placeholder()
         .fix_height(theme::grid(6.0))

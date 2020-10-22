@@ -7,20 +7,34 @@ use crate::{
         track::{make_tracklist, TrackDisplay},
         utils::make_placeholder,
     },
-    widgets::{HoverExt, Maybe, RemoteImage},
+    widgets::{HoverExt, Promised, RemoteImage},
 };
 use druid::{
     im::Vector,
     widget::{Flex, Label, List},
-    Widget, WidgetExt,
+    Data, Widget, WidgetExt,
 };
 use std::sync::Arc;
 
 pub fn make_detail() -> impl Widget<State> {
-    let artist = Maybe::new(make_detail_loaded, make_detail_loading).lens(ArtistDetail::artist);
-    let albums = Maybe::new(make_albums_loaded, make_albums_loading).lens(ArtistDetail::albums);
-    let top_tracks =
-        Maybe::new(make_top_tracks_loaded, make_top_tracks_loading).lens(ArtistDetail::top_tracks);
+    let artist = Promised::new(
+        || make_detail_loading(),
+        || make_detail_loaded(),
+        || Label::new("Error"),
+    )
+    .lens(ArtistDetail::artist);
+    let albums = Promised::new(
+        || make_albums_loading(),
+        || make_albums_loaded(),
+        || Label::new("Error"),
+    )
+    .lens(ArtistDetail::albums);
+    let top_tracks = Promised::new(
+        || make_top_tracks_loading(),
+        || make_top_tracks_loaded(),
+        || Label::new("Error"),
+    )
+    .lens(ArtistDetail::top_tracks);
     Flex::column()
         .with_child(artist)
         .with_child(albums)
@@ -36,7 +50,7 @@ fn make_detail_loaded() -> impl Widget<Artist> {
         .center()
 }
 
-fn make_detail_loading() -> impl Widget<()> {
+fn make_detail_loading<T: Data>() -> impl Widget<T> {
     Flex::row()
         .with_child(make_placeholder().fix_size(theme::grid(12.0), theme::grid(12.0)))
         .with_spacer(theme::grid(2.0))
@@ -62,7 +76,7 @@ fn make_albums_loaded() -> impl Widget<Vector<Album>> {
     List::new(make_album)
 }
 
-fn make_albums_loading() -> impl Widget<()> {
+fn make_albums_loading<T: Data>() -> impl Widget<T> {
     Flex::row()
         .with_child(make_placeholder().fix_height(theme::grid(3.0)))
         .with_spacer(1.0)
@@ -73,13 +87,14 @@ fn make_albums_loading() -> impl Widget<()> {
 
 fn make_top_tracks_loaded() -> impl Widget<Vector<Arc<Track>>> {
     make_tracklist(TrackDisplay {
+        number: false,
         title: true,
         artist: false,
         album: true,
     })
 }
 
-fn make_top_tracks_loading() -> impl Widget<()> {
+fn make_top_tracks_loading<T: Data>() -> impl Widget<T> {
     Flex::row()
         .with_child(make_placeholder().fix_height(theme::grid(3.0)))
         .with_spacer(1.0)

@@ -1,3 +1,4 @@
+use crate::data::PlaybackContext;
 use crate::{
     commands,
     data::{Navigation, State, Track},
@@ -7,85 +8,145 @@ use crate::{
 use druid::{
     im::Vector,
     kurbo::Line,
-    lens::Map,
     piet::StrokeStyle,
-    widget::{Controller, CrossAxisAlignment, Flex, Label, List, Painter},
+    widget::{Controller, CrossAxisAlignment, Flex, Label, List, ListIter, Painter, Scope},
     ContextMenu, Data, Env, Event, EventCtx, Lens, LensExt, LocalizedString, MenuDesc, MenuItem,
-    MouseButton, MouseEvent, RenderContext, Widget, WidgetExt, WidgetId,
+    MouseButton, RenderContext, Widget, WidgetExt, WidgetId,
 };
 use std::sync::Arc;
 
 #[derive(Copy, Clone)]
 pub struct TrackDisplay {
+    pub number: bool,
     pub title: bool,
     pub artist: bool,
     pub album: bool,
 }
 
+#[derive(Clone, Data)]
+struct TrackShared {
+    playing: Option<String>,
+}
+
+impl TrackShared {
+    fn new() -> Self {
+        Self { playing: None }
+    }
+}
+
+#[derive(Clone, Data, Lens)]
+pub struct TrackState {
+    shared: TrackShared,
+    track: Arc<Track>,
+    index: usize,
+}
+
+#[derive(Clone, Data, Lens)]
+struct TrackScope {
+    shared: TrackShared,
+    tracks: Vector<Arc<Track>>,
+}
+
+impl ListIter<TrackState> for TrackScope {
+    fn for_each(&self, mut cb: impl FnMut(&TrackState, usize)) {
+        for (i, item) in self.tracks.iter().enumerate() {
+            let d = TrackState {
+                shared: self.shared.to_owned(),
+                track: item.to_owned(),
+                index: i,
+            };
+            cb(&d, i);
+        }
+    }
+
+    fn for_each_mut(&mut self, mut cb: impl FnMut(&mut TrackState, usize)) {
+        for (i, item) in self.tracks.iter_mut().enumerate() {
+            let mut d = TrackState {
+                shared: self.shared.to_owned(),
+                track: item.to_owned(),
+                index: i,
+            };
+            cb(&mut d, i);
+
+            if !self.shared.same(&d.shared) {
+                self.shared = d.shared;
+            }
+            if !item.same(&d.track) {
+                *item = d.track;
+            }
+        }
+    }
+
+    fn data_len(&self) -> usize {
+        self.tracks.len()
+    }
+}
+
 pub fn make_tracklist(mode: TrackDisplay) -> impl Widget<Vector<Arc<Track>>> {
     let id = WidgetId::next();
-
-    List::new(move || make_track(mode, id))
-        .lens(Map::new(
-            |t: &Vector<Arc<Track>>| {
-                t.into_iter()
-                    .cloned()
-                    .enumerate()
-                    .map(|(position, track)| EnumTrack { position, track })
-                    .collect()
-            },
-            |_t: &mut Vector<Arc<Track>>, _enum_t: Vector<EnumTrack>| {
-                // Ignore mutation.
-            },
-        ))
+    let list = List::new(move || make_track(mode, id))
         .controller(PlayController)
-        .with_id(id)
+        .with_id(id);
+    let scope = Scope::from_lens(
+        |tracks: Vector<Arc<Track>>| TrackScope {
+            tracks,
+            shared: TrackShared::new(),
+        },
+        TrackScope::tracks,
+        list,
+    );
+    scope
 }
 
 struct PlayController;
 
-impl<W> Controller<Vector<Arc<Track>>, W> for PlayController
+impl<W> Controller<TrackScope, W> for PlayController
 where
-    W: Widget<Vector<Arc<Track>>>,
+    W: Widget<TrackScope>,
 {
     fn event(
         &mut self,
         child: &mut W,
         ctx: &mut EventCtx,
         event: &Event,
-        tracks: &mut Vector<Arc<Track>>,
+        scope: &mut TrackScope,
         env: &Env,
     ) {
         match event {
-            Event::Command(cmd) => {
-                if let Some(&position) = cmd.get(commands::PLAY_TRACK_AT) {
-                    ctx.submit_command(commands::PLAY_TRACKS.with((tracks.clone(), position)));
-                }
+            Event::Command(cmd) if cmd.is(commands::PLAY_TRACK_AT) => {
+                let position = cmd.get_unchecked(commands::PLAY_TRACK_AT);
+                let pb_ctx = PlaybackContext {
+                    position: position.to_owned(),
+                    tracks: scope.tracks.to_owned(),
+                };
+                ctx.submit_command(commands::PLAY_TRACKS.with(pb_ctx));
             }
-            _ => child.event(ctx, event, tracks, env),
+            Event::Command(cmd) if cmd.is(commands::PLAYBACK_PLAYING) => {
+                let report = cmd.get_unchecked(commands::PLAYBACK_PLAYING);
+                scope.shared.playing = Some(report.item.to_owned());
+            }
+            _ => child.event(ctx, event, scope, env),
         }
     }
 }
 
-#[derive(Clone, Data, Lens)]
-pub struct EnumTrack {
-    position: usize,
-    track: Arc<Track>,
-}
+pub fn make_track(display: TrackDisplay, play_ctrl: WidgetId) -> impl Widget<TrackState> {
+    let track_duration =
+        Label::dynamic(|ts: &TrackState, _| ts.track.duration.as_minutes_and_seconds())
+            .with_text_size(theme::TEXT_SIZE_SMALL)
+            .with_text_color(theme::PLACEHOLDER_COLOR);
 
-pub fn make_track(display: TrackDisplay, play_ctrl: WidgetId) -> impl Widget<EnumTrack> {
-    let track_duration = Label::dynamic(|enum_track: &EnumTrack, _| {
-        enum_track.track.duration.as_minutes_and_seconds()
-    })
-    .with_text_size(theme::TEXT_SIZE_SMALL)
-    .with_text_color(theme::PLACEHOLDER_COLOR);
-
-    let line_painter = Painter::new(move |ctx, _, _| {
+    let line_painter = Painter::new(move |ctx, ts: &TrackState, _| {
         let size = ctx.size();
-        let line = Line::new((0.0, size.height), (size.width, size.height));
+        let line = Line::new((0.0, 0.0), (size.width, 0.0));
+        let color = if ts.shared.playing.same(&ts.track.id) {
+            theme::BLACK
+        } else {
+            theme::GREY_5
+        };
         ctx.stroke_styled(
             line,
-            &theme::GREY_5,
+            &color,
             1.0,
             &StrokeStyle {
                 line_join: None,
@@ -100,20 +161,27 @@ pub fn make_track(display: TrackDisplay, play_ctrl: WidgetId) -> impl Widget<Enu
     let mut major = Flex::row();
     let mut minor = Flex::row();
 
+    if display.number {
+        let track_number = Label::dynamic(|ts: &TrackState, _| ts.track.track_number.to_string())
+            .with_font(theme::UI_FONT_MONO)
+            .with_text_size(theme::TEXT_SIZE_SMALL)
+            .with_text_color(theme::PLACEHOLDER_COLOR);
+        major.add_child(track_number);
+        major.add_default_spacer();
+    }
     if display.title {
         let track_name = Label::raw()
             .with_font(theme::UI_FONT_MEDIUM)
-            .lens(EnumTrack::track.then(Track::name.in_arc()));
+            .lens(TrackState::track.then(Track::name.in_arc()));
         major.add_child(track_name);
     }
     if display.artist {
-        let track_artist =
-            Label::dynamic(|enum_track: &EnumTrack, _| enum_track.track.artist_name())
-                .with_text_size(theme::TEXT_SIZE_SMALL);
+        let track_artist = Label::dynamic(|ts: &TrackState, _| ts.track.artist_name())
+            .with_text_size(theme::TEXT_SIZE_SMALL);
         minor.add_child(track_artist);
     }
     if display.album {
-        let track_album = Label::dynamic(|enum_track: &EnumTrack, _| enum_track.track.album_name())
+        let track_album = Label::dynamic(|ts: &TrackState, _| ts.track.album_name())
             .with_text_size(theme::TEXT_SIZE_SMALL)
             .with_text_color(theme::PLACEHOLDER_COLOR);
         minor.add_child(Label::new(": ").with_text_color(theme::GREY_5));
@@ -122,7 +190,7 @@ pub fn make_track(display: TrackDisplay, play_ctrl: WidgetId) -> impl Widget<Enu
     major.add_default_spacer();
     major.add_flex_child(line_painter, 1.0);
     major.add_default_spacer();
-    major.add_child(track_duration.align_right());
+    major.add_child(track_duration);
 
     Flex::column()
         .cross_axis_alignment(CrossAxisAlignment::Start)
@@ -131,24 +199,17 @@ pub fn make_track(display: TrackDisplay, play_ctrl: WidgetId) -> impl Widget<Enu
         .padding(theme::grid(0.8))
         .hover()
         .on_ex_click(
-            MouseButton::Right,
-            |ctx, event, enum_track: &mut EnumTrack, _| {
-                show_track_menu(ctx, event, &enum_track.track);
+            move |ctx, event, ts: &mut TrackState, _| match event.button {
+                MouseButton::Right => {
+                    let menu = ContextMenu::new(make_track_menu(&ts.track), event.window_pos);
+                    ctx.show_context_menu(menu);
+                }
+                MouseButton::Left => {
+                    ctx.submit_command(commands::PLAY_TRACK_AT.with(ts.index).to(play_ctrl));
+                }
+                _ => {}
             },
         )
-        .on_click(move |ctx, enum_track: &mut EnumTrack, _| {
-            ctx.submit_command(
-                commands::PLAY_TRACK_AT
-                    .with(enum_track.position)
-                    .to(play_ctrl),
-            );
-        })
-}
-
-fn show_track_menu(ctx: &mut EventCtx, event: &MouseEvent, track: &Track) {
-    let desc = make_track_menu(track);
-    let menu = ContextMenu::new(desc, event.window_pos);
-    ctx.show_context_menu(menu);
 }
 
 fn make_track_menu(track: &Track) -> MenuDesc<State> {

@@ -1,6 +1,7 @@
 use crate::{
     commands,
     data::{Navigation, Route, State},
+    promise::Promise,
     widgets::{button::HOVER_COLD_COLOR, icons, HoverExt, Icon, ViewDispatcher},
 };
 use druid::{
@@ -141,24 +142,21 @@ fn get_route_title(state: &State) -> String {
     match state.route {
         Route::Home => "".to_string(),
         Route::Library => "Library".to_string(),
-        Route::SearchResults => format!("‟{}‟", state.search.input),
-        Route::AlbumDetail => state
-            .album
-            .album
-            .as_ref()
-            .map(|album| album.name.to_string())
-            .unwrap_or_else(|| "...".to_string()),
-        Route::ArtistDetail => state
-            .artist
-            .artist
-            .as_ref()
-            .map(|artist| artist.name.to_string())
-            .unwrap_or_else(|| "...".to_string()),
-        Route::PlaylistDetail => state
-            .playlist
-            .playlist
-            .as_ref()
-            .map(|playlist| playlist.name.to_string())
-            .unwrap_or_else(|| "...".to_string()),
+        Route::SearchResults => format!("Search: \"{}\"", state.search.input),
+        Route::AlbumDetail => match &state.album.album {
+            Promise::Empty | Promise::Deferred(_) => "...".to_string(),
+            Promise::Resolved(album) => album.name.to_string(),
+            Promise::Rejected(err) => err.to_string(),
+        },
+        Route::ArtistDetail => match &state.artist.artist {
+            Promise::Empty | Promise::Deferred(_) => "...".to_string(),
+            Promise::Resolved(artist) => artist.name.to_string(),
+            Promise::Rejected(err) => err.to_string(),
+        },
+        Route::PlaylistDetail => match &state.playlist.playlist {
+            Promise::Empty | Promise::Deferred(_) => "...".to_string(),
+            Promise::Resolved(playlist) => playlist.name.to_string(),
+            Promise::Rejected(err) => err.to_string(),
+        },
     }
 }

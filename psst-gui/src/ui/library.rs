@@ -4,10 +4,10 @@ use crate::{
         album::make_album,
         track::{make_tracklist, TrackDisplay},
     },
-    widgets::Maybe,
+    widgets::Promised,
 };
 use druid::{
-    widget::{CrossAxisAlignment, Flex, List},
+    widget::{CrossAxisAlignment, Flex, Label, List},
     Widget, WidgetExt,
 };
 
@@ -21,16 +21,26 @@ pub fn make_detail() -> impl Widget<State> {
 }
 
 pub fn make_saved_albums() -> impl Widget<Library> {
-    Maybe::or_empty(|| List::new(make_album)).lens(Library::saved_albums)
+    Promised::new(
+        || Label::new("Loading"),
+        || List::new(make_album),
+        || Label::new("Error"),
+    )
+    .lens(Library::saved_albums)
 }
 
 pub fn make_saved_tracks() -> impl Widget<Library> {
-    Maybe::or_empty(|| {
-        make_tracklist(TrackDisplay {
-            title: true,
-            artist: true,
-            album: true,
-        })
-    })
+    Promised::new(
+        || Label::new("Loading"),
+        || {
+            make_tracklist(TrackDisplay {
+                number: false,
+                title: true,
+                artist: true,
+                album: true,
+            })
+        },
+        || Label::new("Error"),
+    )
     .lens(Library::saved_tracks)
 }

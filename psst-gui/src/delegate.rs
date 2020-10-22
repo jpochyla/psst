@@ -1,13 +1,13 @@
 use crate::{
     commands::*,
     consts,
-    data::{Config, Navigation, Playback, PlaybackReport, Route, State, Track},
+    data::{Config, Navigation, PlaybackReport, Route, State, Track},
     database::Web,
     widgets::remote_image,
 };
 use druid::{
-    im::Vector, AppDelegate, Application, Command, DelegateCtx, Env, Event, ExtEventSink, HotKey,
-    ImageBuf, SysMods, Target, WindowId,
+    im::Vector, AppDelegate, Application, Command, DelegateCtx, Env, Event, ExtEventSink, Handled,
+    HotKey, ImageBuf, SysMods, Target, WindowId,
 };
 use lru_cache::LruCache;
 use psst_core::{
@@ -88,11 +88,21 @@ fn handle_player_events(
 ) {
     for event in player_events {
         match &event {
-            PlayerEvent::Playing { path, duration, .. } => {
-                let item = path.item_id.to_base62();
-                let progress = duration.clone().into();
-                let report = PlaybackReport { item, progress };
+            PlayerEvent::Started { path } => {
+                let report = PlaybackReport {
+                    item: path.item_id.to_base62(),
+                    // TODO: Zero duration is wrong here.
+                    progress: Duration::new(0, 0).into(),
+                };
                 sink.submit_command(PLAYBACK_PLAYING, report, Target::Auto)
+                    .unwrap();
+            }
+            PlayerEvent::Playing { path, duration, .. } => {
+                let report = PlaybackReport {
+                    item: path.item_id.to_base62(),
+                    progress: duration.to_owned().into(),
+                };
+                sink.submit_command(PLAYBACK_PROGRESS, report, Target::Auto)
                     .unwrap();
             }
             PlayerEvent::Paused { .. } => {
@@ -318,18 +328,18 @@ impl AppDelegate<State> for Delegate {
 
     fn command(
         &mut self,
-        ctx: &mut DelegateCtx,
+        _ctx: &mut DelegateCtx,
         target: Target,
         cmd: &Command,
         data: &mut State,
         _env: &Env,
-    ) -> bool {
+    ) -> Handled {
         //
         // Common
         //
         if let Some(text) = cmd.get(COPY_TO_CLIPBOARD).cloned() {
             Application::global().clipboard().put_string(text);
-            false
+            Handled::Yes
         //
         // remote_image
         //
@@ -355,11 +365,11 @@ impl AppDelegate<State> for Delegate {
                         .unwrap();
                 });
             }
-            false
+            Handled::Yes
         } else if let Some(payload) = cmd.get(remote_image::PROVIDE_DATA) {
             self.image_cache
                 .insert(payload.location.clone(), payload.image_buf.clone());
-            true
+            Handled::No
         //
         // Session
         //
@@ -367,139 +377,154 @@ impl AppDelegate<State> for Delegate {
             self.event_sink
                 .submit_command(LOAD_PLAYLISTS, (), Target::Auto)
                 .unwrap();
-            true
+            Handled::No
         //
         // Navigation
         //
         } else if let Some(nav) = cmd.get(NAVIGATE_TO) {
             data.nav_stack.push_back(nav.clone());
             self.navigate(data, nav.clone());
-            true
+            Handled::Yes
         } else if cmd.is(NAVIGATE_BACK) {
             data.nav_stack.pop_back();
             let nav = data.nav_stack.last().cloned().unwrap_or(Navigation::Home);
             self.navigate(data, nav);
-            true
+            Handled::Yes
         //
         // Playlists
         //
         } else if cmd.is(LOAD_PLAYLISTS) {
             let web = self.web.clone();
             let sink = self.event_sink.clone();
+            data.library.playlists.defer_default();
             self.runtime.spawn(async move {
-                let payload = web.load_playlists().await.unwrap();
-                sink.submit_command(UPDATE_PLAYLISTS, payload, Target::Auto)
+                let result = web.load_playlists().await;
+                sink.submit_command(UPDATE_PLAYLISTS, result, Target::Auto)
                     .unwrap();
             });
-            false
-        } else if let Some(playlists) = cmd.get(UPDATE_PLAYLISTS).cloned() {
-            data.library.playlists = Some(playlists);
-            false
+            Handled::Yes
+        } else if let Some(result) = cmd.get(UPDATE_PLAYLISTS).cloned() {
+            data.library.playlists.resolve_or_reject(result);
+            Handled::Yes
         } else if let Some(playlist) = cmd.get(GOTO_PLAYLIST_DETAIL).cloned() {
             let web = self.web.clone();
             let sink = self.event_sink.clone();
             let playlist_id = playlist.id.clone();
             data.route = Route::PlaylistDetail;
-            data.playlist.tracks = None;
-            data.playlist.playlist = Some(playlist);
+            data.playlist.playlist.resolve(playlist);
+            data.playlist.tracks.defer(playlist_id.clone());
             self.runtime.spawn(async move {
-                let payload = web.load_playlist_tracks(&playlist_id).await.unwrap();
-                sink.submit_command(UPDATE_PLAYLIST_TRACKS, payload, Target::Auto)
+                let result = web.load_playlist_tracks(&playlist_id).await;
+                sink.submit_command(UPDATE_PLAYLIST_TRACKS, (playlist_id, result), Target::Auto)
                     .unwrap();
             });
-            false
-        } else if let Some(tracks) = cmd.get(UPDATE_PLAYLIST_TRACKS).cloned() {
-            data.playlist.tracks = Some(tracks);
-            false
+            Handled::Yes
+        } else if let Some((playlist_id, result)) = cmd.get(UPDATE_PLAYLIST_TRACKS).cloned() {
+            if data.playlist.tracks.is_deferred(&playlist_id) {
+                data.playlist.tracks.resolve_or_reject(result);
+            }
+            Handled::Yes
         //
         // Library, saved albums and tracks
         //
         } else if cmd.is(GOTO_LIBRARY) {
             data.route = Route::Library;
-            if data.library.saved_albums.is_none() {
+            if data.library.saved_albums.is_empty() || data.library.saved_albums.is_rejected() {
+                data.library.saved_albums.defer_default();
                 let web = self.web.clone();
                 let sink = self.event_sink.clone();
                 self.runtime.spawn(async move {
-                    let payload = web.load_saved_albums().await.unwrap();
-                    sink.submit_command(UPDATE_SAVED_ALBUMS, payload, Target::Auto)
+                    let result = web.load_saved_albums().await;
+                    sink.submit_command(UPDATE_SAVED_ALBUMS, result, Target::Auto)
                         .unwrap();
                 });
             }
-            if data.library.saved_tracks.is_none() {
+            if data.library.saved_tracks.is_empty() || data.library.saved_tracks.is_rejected() {
+                data.library.saved_tracks.defer_default();
                 let web = self.web.clone();
                 let sink = self.event_sink.clone();
                 self.runtime.spawn(async move {
-                    let payload = web.load_saved_tracks().await.unwrap();
-                    sink.submit_command(UPDATE_SAVED_TRACKS, payload, Target::Auto)
+                    let result = web.load_saved_tracks().await;
+                    sink.submit_command(UPDATE_SAVED_TRACKS, result, Target::Auto)
                         .unwrap();
                 });
             }
-            false
-        } else if let Some(saved_albums) = cmd.get(UPDATE_SAVED_ALBUMS).cloned() {
-            data.library.saved_albums = Some(saved_albums);
-            false
-        } else if let Some(saved_tracks) = cmd.get(UPDATE_SAVED_TRACKS).cloned() {
-            data.library.saved_tracks = Some(saved_tracks);
-            false
+            Handled::Yes
+        } else if let Some(result) = cmd.get(UPDATE_SAVED_ALBUMS).cloned() {
+            data.library.saved_albums.resolve_or_reject(result);
+            Handled::Yes
+        } else if let Some(result) = cmd.get(UPDATE_SAVED_TRACKS).cloned() {
+            data.library.saved_tracks.resolve_or_reject(result);
+            Handled::Yes
         //
         // Album detail
         //
         } else if let Some(album_id) = cmd.get(GOTO_ALBUM_DETAIL).cloned() {
             data.route = Route::AlbumDetail;
             data.album.id = album_id.clone();
-            data.album.album = None;
+            data.album.album.defer(album_id.clone());
             let web = self.web.clone();
             let sink = self.event_sink.clone();
             self.runtime.spawn(async move {
-                let payload = web.load_album(&album_id).await.unwrap();
-                sink.submit_command(UPDATE_ALBUM_DETAIL, payload, Target::Auto)
+                let result = web.load_album(&album_id).await;
+                sink.submit_command(UPDATE_ALBUM_DETAIL, (album_id, result), Target::Auto)
                     .unwrap();
             });
-            false
-        } else if let Some(album) = cmd.get(UPDATE_ALBUM_DETAIL).cloned() {
-            data.album.album = Some(album);
-            false
+            Handled::Yes
+        } else if let Some((album_id, result)) = cmd.get(UPDATE_ALBUM_DETAIL).cloned() {
+            if data.album.album.is_deferred(&album_id) {
+                data.album.album.resolve_or_reject(result);
+            }
+            Handled::Yes
         //
         // Artist detail
         //
         } else if let Some(artist_id) = cmd.get(GOTO_ARTIST_DETAIL) {
             data.route = Route::ArtistDetail;
             data.artist.id = artist_id.clone();
-            data.artist.artist = None;
+            data.artist.artist.defer(artist_id.clone());
             let id = artist_id.clone();
             let web = self.web.clone();
             let sink = self.event_sink.clone();
             self.runtime.spawn(async move {
-                let payload = web.load_artist(&id).await.unwrap();
-                sink.submit_command(UPDATE_ARTIST_DETAIL, payload, Target::Auto)
+                let result = web.load_artist(&id).await;
+                sink.submit_command(UPDATE_ARTIST_DETAIL, (id, result), Target::Auto)
                     .unwrap();
             });
+            data.artist.top_tracks.defer(artist_id.clone());
             let id = artist_id.clone();
             let web = self.web.clone();
             let sink = self.event_sink.clone();
             self.runtime.spawn(async move {
-                let payload = web.load_artist_albums(&id).await.unwrap();
-                sink.submit_command(UPDATE_ARTIST_ALBUMS, payload, Target::Auto)
+                let result = web.load_artist_albums(&id).await;
+                sink.submit_command(UPDATE_ARTIST_ALBUMS, (id, result), Target::Auto)
                     .unwrap();
             });
+            data.artist.albums.defer(artist_id.clone());
             let id = artist_id.clone();
             let web = self.web.clone();
             let sink = self.event_sink.clone();
             self.runtime.spawn(async move {
-                let payload = web.load_artist_top_tracks(&id).await.unwrap();
-                sink.submit_command(UPDATE_ARTIST_TOP_TRACKS, payload, Target::Auto)
+                let result = web.load_artist_top_tracks(&id).await;
+                sink.submit_command(UPDATE_ARTIST_TOP_TRACKS, (id, result), Target::Auto)
                     .unwrap();
             });
-            false
-        } else if let Some(artist) = cmd.get(UPDATE_ARTIST_DETAIL).cloned() {
-            data.artist.artist = Some(artist);
-            false
-        } else if let Some(albums) = cmd.get(UPDATE_ARTIST_ALBUMS).cloned() {
-            data.artist.albums = Some(albums);
-            false
-        } else if let Some(top_tracks) = cmd.get(UPDATE_ARTIST_TOP_TRACKS).cloned() {
-            data.artist.top_tracks = Some(top_tracks);
-            false
+            Handled::Yes
+        } else if let Some((artist_id, result)) = cmd.get(UPDATE_ARTIST_DETAIL).cloned() {
+            if data.artist.artist.is_deferred(&artist_id) {
+                data.artist.artist.resolve_or_reject(result);
+            }
+            Handled::Yes
+        } else if let Some((artist_id, result)) = cmd.get(UPDATE_ARTIST_ALBUMS).cloned() {
+            if data.artist.albums.is_deferred(&artist_id) {
+                data.artist.albums.resolve_or_reject(result);
+            }
+            Handled::Yes
+        } else if let Some((artist_id, result)) = cmd.get(UPDATE_ARTIST_TOP_TRACKS).cloned() {
+            if data.artist.top_tracks.is_deferred(&artist_id) {
+                data.artist.top_tracks.resolve_or_reject(result);
+            }
+            Handled::Yes
         //
         // Search
         //
@@ -507,90 +532,60 @@ impl AppDelegate<State> for Delegate {
             data.route = Route::SearchResults;
             let web = self.web.clone();
             let sink = self.event_sink.clone();
+            data.search.results.defer(query.clone());
             self.runtime.spawn(async move {
-                let payload = web.search(&query).await.unwrap();
-                sink.submit_command(UPDATE_SEARCH_RESULTS, payload, Target::Auto)
+                let result = web.search(&query).await;
+                sink.submit_command(UPDATE_SEARCH_RESULTS, result, Target::Auto)
                     .unwrap();
             });
-            false
-        } else if let Some((artists, albums, tracks)) = cmd.get(UPDATE_SEARCH_RESULTS).cloned() {
-            data.search.artists = artists;
-            data.search.albums = albums;
-            data.search.tracks = tracks;
-            false
+            Handled::Yes
+        } else if let Some(result) = cmd.get(UPDATE_SEARCH_RESULTS).cloned() {
+            data.search.results.resolve_or_reject(result);
+            Handled::Yes
         //
         // Playback status
         //
-        } else if let Some(report) = cmd.get(PLAYBACK_PLAYING).cloned() {
-            let updated_playback = Playback {
-                is_playing: true,
-                progress: Some(report.progress),
-                item: self.player.get_track(&report.item),
-                analysis: None,
-            };
-            let current_track_id = data
-                .playback
-                .item
-                .as_ref()
-                .and_then(|track| track.id.as_ref());
-            let updated_track_id = updated_playback
-                .item
-                .as_ref()
-                .and_then(|track| track.id.as_ref());
-            if current_track_id != updated_track_id {
-                if let Some(id) = updated_track_id {
-                    ctx.submit_command(LOAD_AUDIO_ANALYSIS.with(id.clone()));
-                }
-                data.playback.analysis = None;
-            }
-            data.playback = updated_playback;
-            false
+        } else if let Some(report) = cmd.get(PLAYBACK_PROGRESS).cloned() {
+            data.playback.is_playing = true;
+            data.playback.progress = Some(report.progress);
+            data.playback.item = self.player.get_track(&report.item);
+            Handled::Yes
         } else if cmd.is(PLAYBACK_PAUSED) {
             data.playback.is_playing = false;
-            false
-        //
-        // Audio analysis
-        //
-        } else if let Some(_track_id) = cmd.get(LOAD_AUDIO_ANALYSIS).cloned() {
-            // let web = self.web.clone();
-            // let sink = self.event_sink.clone();
-            // self.runtime.spawn(async move {
-            //     let payload = web.analyze_track(&track_id).await.unwrap();
-            //     sink.submit_command(UPDATE_AUDIO_ANALYSIS, payload, Target::Auto)
-            //         .unwrap();
-            // });
-            false
-        } else if let Some(analysis) = cmd.get(UPDATE_AUDIO_ANALYSIS).cloned() {
-            data.playback.analysis = Some(analysis);
-            false
+            Handled::No
+        } else if cmd.is(PLAYBACK_STOPPED) {
+            data.playback.is_playing = false;
+            data.playback.progress = None;
+            data.playback.item = None;
+            Handled::No
         //
         // Playback control
         //
-        } else if let Some((tracks, position)) = cmd.get(PLAY_TRACKS).cloned() {
-            self.player.set_tracks(tracks);
-            self.player.play(position);
-            false
+        } else if let Some(pb_ctx) = cmd.get(PLAY_TRACKS).cloned() {
+            self.player.set_tracks(pb_ctx.tracks);
+            self.player.play(pb_ctx.position);
+            Handled::Yes
         } else if cmd.is(PLAY_PAUSE) {
             self.player.pause();
-            false
+            Handled::Yes
         } else if cmd.is(PLAY_RESUME) {
             self.player.resume();
-            false
+            Handled::Yes
         } else if cmd.is(PLAY_PREVIOUS) {
             self.player.previous();
-            false
+            Handled::Yes
         } else if cmd.is(PLAY_NEXT) {
             self.player.next();
-            false
+            Handled::Yes
         } else if let Some(frac) = cmd.get(SEEK_TO_FRACTION) {
             if let Some(track) = &data.playback.item {
                 log::info!("seeking to {}", frac);
                 let position = Duration::from_secs_f64(track.duration.as_secs_f64() * frac);
                 self.player.seek(position);
             }
-            false
+            Handled::Yes
         } else {
-            true
+            Handled::No
         }
     }
 }
