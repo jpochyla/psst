@@ -6,7 +6,7 @@ use crate::{
         album::make_album,
         theme,
         track::{make_tracklist, TrackDisplay},
-        utils::make_placeholder,
+        utils::{make_error, make_placeholder},
     },
     widgets::{HoverExt, Promised, RemoteImage},
 };
@@ -21,19 +21,19 @@ pub fn make_detail() -> impl Widget<State> {
     let artist = Promised::new(
         || make_detail_loading(),
         || make_detail_loaded(),
-        || Label::new("Error"),
+        || make_error(),
     )
     .lens(State::artist.then(ArtistDetail::artist));
     let albums = Promised::new(
         || make_albums_loading(),
         || make_albums_loaded(),
-        || Label::new("Error"),
+        || make_error(),
     )
     .lens(State::artist.then(ArtistDetail::albums));
     let top_tracks = Promised::new(
         || make_top_tracks_loading(),
         || make_top_tracks_loaded(),
-        || Label::new("Error"),
+        || make_error(),
     )
     .lens(
         Ctx::make(

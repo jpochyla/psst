@@ -5,6 +5,7 @@ use crate::{
     ui::{
         theme,
         track::{make_tracklist, TrackDisplay},
+        utils::{make_error, make_loader},
     },
     widgets::{HoverExt, Promised},
 };
@@ -15,7 +16,7 @@ use druid::{
 
 pub fn make_list() -> impl Widget<State> {
     Promised::new(
-        || Label::new("Loading"),
+        || make_loader(),
         || {
             List::new(|| {
                 Label::dynamic(|playlist: &Playlist, _| playlist.name.clone())
@@ -30,7 +31,7 @@ pub fn make_list() -> impl Widget<State> {
                     })
             })
         },
-        || Label::new("Error"),
+        || make_error(),
     )
     .lens(Library::playlists)
     .lens(State::library)
@@ -38,7 +39,7 @@ pub fn make_list() -> impl Widget<State> {
 
 pub fn make_detail() -> impl Widget<State> {
     Promised::new(
-        || Label::new("Loading"),
+        || make_loader(),
         || {
             make_tracklist(TrackDisplay {
                 number: false,
@@ -47,7 +48,7 @@ pub fn make_detail() -> impl Widget<State> {
                 album: true,
             })
         },
-        || Label::new("Error"),
+        || make_error(),
     )
     .lens(
         Ctx::make(

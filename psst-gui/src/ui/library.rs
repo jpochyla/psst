@@ -4,11 +4,12 @@ use crate::{
     ui::{
         album::make_album,
         track::{make_tracklist, TrackDisplay},
+        utils::{make_error, make_loader},
     },
     widgets::Promised,
 };
 use druid::{
-    widget::{CrossAxisAlignment, Flex, Label, List},
+    widget::{CrossAxisAlignment, Flex, List},
     LensExt, Widget, WidgetExt,
 };
 
@@ -21,17 +22,13 @@ pub fn make_detail() -> impl Widget<State> {
 }
 
 fn make_saved_albums() -> impl Widget<State> {
-    Promised::new(
-        || Label::new("Loading"),
-        || List::new(make_album),
-        || Label::new("Error"),
-    )
-    .lens(State::library.then(Library::saved_albums))
+    Promised::new(|| make_loader(), || List::new(make_album), || make_error())
+        .lens(State::library.then(Library::saved_albums))
 }
 
 fn make_saved_tracks() -> impl Widget<State> {
     Promised::new(
-        || Label::new("Loading"),
+        || make_loader(),
         || {
             make_tracklist(TrackDisplay {
                 number: false,
@@ -40,7 +37,7 @@ fn make_saved_tracks() -> impl Widget<State> {
                 album: true,
             })
         },
-        || Label::new("Error"),
+        || make_error(),
     )
     .lens(
         Ctx::make(

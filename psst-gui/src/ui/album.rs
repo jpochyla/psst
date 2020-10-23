@@ -5,7 +5,7 @@ use crate::{
     ui::{
         theme,
         track::{make_tracklist, TrackDisplay},
-        utils::make_placeholder,
+        utils::{make_error, make_placeholder},
     },
     widgets::{HoverExt, Promised, RemoteImage},
 };
@@ -18,7 +18,7 @@ pub fn make_detail() -> impl Widget<State> {
     Promised::new(
         || make_detail_loading(),
         || make_detail_loaded(),
-        || Label::new("Error"),
+        || make_error(),
     )
     .lens(
         Ctx::make(

@@ -7,11 +7,12 @@ use crate::{
         artist::make_artist,
         theme,
         track::{make_tracklist, TrackDisplay},
+        utils::{make_error, make_loader},
     },
     widgets::{icons, InputController, Promised, Stack},
 };
 use druid::{
-    widget::{Flex, Label, List, TextBox},
+    widget::{Flex, List, TextBox},
     LensExt, Widget, WidgetExt,
 };
 
@@ -41,14 +42,14 @@ pub fn make_input() -> impl Widget<State> {
 
 pub fn make_results() -> impl Widget<State> {
     Promised::new(
-        || Label::new("Loading"),
+        || make_loader(),
         || {
             Flex::column()
                 .with_child(make_artist_results())
                 .with_child(make_album_results())
                 .with_child(make_track_results())
         },
-        || Label::new("Error"),
+        || make_error(),
     )
     .lens(
         Ctx::make(State::track_context(), State::search.then(Search::results))
