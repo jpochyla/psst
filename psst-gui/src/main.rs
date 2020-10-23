@@ -2,6 +2,7 @@
 
 mod commands;
 mod consts;
+mod ctx;
 mod data;
 mod database;
 mod delegate;

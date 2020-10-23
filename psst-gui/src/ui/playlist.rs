@@ -1,5 +1,6 @@
 use crate::{
     commands,
+    ctx::Ctx,
     data::{Library, Navigation, Playlist, PlaylistDetail, State},
     ui::{
         theme,
@@ -9,7 +10,7 @@ use crate::{
 };
 use druid::{
     widget::{Label, LineBreaking, List},
-    Insets, Widget, WidgetExt,
+    Insets, LensExt, Widget, WidgetExt,
 };
 
 pub fn make_list() -> impl Widget<State> {
@@ -48,6 +49,11 @@ pub fn make_detail() -> impl Widget<State> {
         },
         || Label::new("Error"),
     )
-    .lens(PlaylistDetail::tracks)
-    .lens(State::playlist)
+    .lens(
+        Ctx::make(
+            State::track_context(),
+            State::playlist.then(PlaylistDetail::tracks),
+        )
+        .then(Ctx::in_promise()),
+    )
 }

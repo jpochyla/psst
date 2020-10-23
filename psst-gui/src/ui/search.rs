@@ -1,6 +1,7 @@
 use crate::{
     commands, consts,
-    data::{Navigation, Search, SearchResults, State},
+    ctx::Ctx,
+    data::{Navigation, Search, SearchResults, State, TrackCtx},
     ui::{
         album::make_album,
         artist::make_artist,
@@ -11,7 +12,7 @@ use crate::{
 };
 use druid::{
     widget::{Flex, Label, List, TextBox},
-    Widget, WidgetExt,
+    LensExt, Widget, WidgetExt,
 };
 
 pub fn make_input() -> impl Widget<State> {
@@ -49,23 +50,25 @@ pub fn make_results() -> impl Widget<State> {
         },
         || Label::new("Error"),
     )
-    .lens(Search::results)
-    .lens(State::search)
+    .lens(
+        Ctx::make(State::track_context(), State::search.then(Search::results))
+            .then(Ctx::in_promise()),
+    )
 }
 
-fn make_artist_results() -> impl Widget<SearchResults> {
+fn make_artist_results() -> impl Widget<Ctx<TrackCtx, SearchResults>> {
     Flex::column()
         .with_child(List::new(make_artist))
-        .lens(SearchResults::artists)
+        .lens(Ctx::data().then(SearchResults::artists))
 }
 
-fn make_album_results() -> impl Widget<SearchResults> {
+fn make_album_results() -> impl Widget<Ctx<TrackCtx, SearchResults>> {
     Flex::column()
         .with_child(List::new(make_album))
-        .lens(SearchResults::albums)
+        .lens(Ctx::data().then(SearchResults::albums))
 }
 
-fn make_track_results() -> impl Widget<SearchResults> {
+fn make_track_results() -> impl Widget<Ctx<TrackCtx, SearchResults>> {
     Flex::column()
         .with_child(make_tracklist(TrackDisplay {
             number: false,
@@ -73,5 +76,5 @@ fn make_track_results() -> impl Widget<SearchResults> {
             artist: true,
             album: true,
         }))
-        .lens(SearchResults::tracks)
+        .lens(Ctx::map(SearchResults::tracks))
 }

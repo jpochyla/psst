@@ -1,7 +1,7 @@
-use crate::{error::Error, promise::Promise};
+use crate::promise::Promise;
 use aspotify::DatePrecision;
 use chrono::NaiveDate;
-use druid::{im::Vector, Data, Lens};
+use druid::{im::Vector, lens::Map, Data, Lens};
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use std::{fs::File, ops::Deref, sync::Arc, time::Duration};
@@ -38,6 +38,23 @@ pub struct State {
     pub artist: ArtistDetail,
     pub playlist: PlaylistDetail,
     pub library: Library,
+}
+
+impl State {
+    pub fn track_context() -> impl Lens<State, TrackCtx> {
+        Map::new(
+            |s: &Self| s.make_track_context(),
+            |s: &mut Self, t: TrackCtx| {
+                s.playback = t.playback;
+            },
+        )
+    }
+
+    pub fn make_track_context(&self) -> TrackCtx {
+        TrackCtx {
+            playback: self.playback.to_owned(),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Data, Eq, PartialEq, Hash)]
@@ -80,7 +97,7 @@ impl Navigation {
 }
 
 #[derive(Clone, Debug, Data)]
-pub struct PlaybackContext {
+pub struct PlaybackCtx {
     pub tracks: Vector<Arc<Track>>,
     pub position: usize,
 }
@@ -96,6 +113,15 @@ pub struct Playback {
     pub is_playing: bool,
     pub progress: Option<AudioDuration>,
     pub item: Option<Arc<Track>>,
+}
+
+impl Playback {
+    pub fn is_playing_track(&self, track: &Track) -> bool {
+        self.item
+            .as_ref()
+            .map(|t| t.id == track.id)
+            .unwrap_or(false)
+    }
 }
 
 #[derive(Clone, Debug, Default, Data, Lens)]
@@ -216,6 +242,11 @@ impl Default for AlbumType {
     fn default() -> Self {
         Self::Album
     }
+}
+
+#[derive(Clone, Data)]
+pub struct TrackCtx {
+    pub playback: Playback,
 }
 
 #[derive(Clone, Debug, Data, Lens)]

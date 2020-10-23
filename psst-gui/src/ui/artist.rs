@@ -1,6 +1,7 @@
 use crate::{
     commands,
-    data::{Album, Artist, ArtistDetail, Navigation, State, Track},
+    ctx::Ctx,
+    data::{Album, Artist, ArtistDetail, Navigation, State, Track, TrackCtx},
     ui::{
         album::make_album,
         theme,
@@ -12,7 +13,7 @@ use crate::{
 use druid::{
     im::Vector,
     widget::{Flex, Label, List},
-    Data, Widget, WidgetExt,
+    Data, LensExt, Widget, WidgetExt,
 };
 use std::sync::Arc;
 
@@ -22,24 +23,31 @@ pub fn make_detail() -> impl Widget<State> {
         || make_detail_loaded(),
         || Label::new("Error"),
     )
-    .lens(ArtistDetail::artist);
+    .lens(State::artist.then(ArtistDetail::artist));
     let albums = Promised::new(
         || make_albums_loading(),
         || make_albums_loaded(),
         || Label::new("Error"),
     )
-    .lens(ArtistDetail::albums);
+    .lens(State::artist.then(ArtistDetail::albums));
     let top_tracks = Promised::new(
         || make_top_tracks_loading(),
         || make_top_tracks_loaded(),
         || Label::new("Error"),
     )
-    .lens(ArtistDetail::top_tracks);
+    .lens(
+        Ctx::make(
+            State::track_context(),
+            State::artist.then(ArtistDetail::top_tracks),
+        )
+        .then(Ctx::in_promise()),
+    );
     Flex::column()
         .with_child(artist)
-        .with_child(albums)
+        .with_default_spacer()
         .with_child(top_tracks)
-        .lens(State::artist)
+        .with_default_spacer()
+        .with_child(albums)
 }
 
 fn make_detail_loaded() -> impl Widget<Artist> {
@@ -85,7 +93,7 @@ fn make_albums_loading<T: Data>() -> impl Widget<T> {
         .with_child(make_placeholder().fix_height(theme::grid(3.0)))
 }
 
-fn make_top_tracks_loaded() -> impl Widget<Vector<Arc<Track>>> {
+fn make_top_tracks_loaded() -> impl Widget<Ctx<TrackCtx, Vector<Arc<Track>>>> {
     make_tracklist(TrackDisplay {
         number: false,
         title: true,

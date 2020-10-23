@@ -1,7 +1,4 @@
-use crate::{
-    error::Error,
-    promise::{Promise, PromiseState},
-};
+use crate::promise::{Promise, PromiseState};
 use druid::{widget::prelude::*, Data, WidgetExt, WidgetPod};
 
 pub struct Promised<T, D, E> {

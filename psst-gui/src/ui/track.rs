@@ -1,7 +1,7 @@
-use crate::data::PlaybackContext;
 use crate::{
     commands,
-    data::{Navigation, State, Track},
+    ctx::Ctx,
+    data::{Navigation, PlaybackCtx, State, Track, TrackCtx},
     ui::theme,
     widgets::HoverExt,
 };
@@ -9,7 +9,7 @@ use druid::{
     im::Vector,
     kurbo::Line,
     piet::StrokeStyle,
-    widget::{Controller, CrossAxisAlignment, Flex, Label, List, ListIter, Painter, Scope},
+    widget::{Controller, CrossAxisAlignment, Flex, Label, List, ListIter, Painter},
     ContextMenu, Data, Env, Event, EventCtx, Lens, LensExt, LocalizedString, MenuDesc, MenuItem,
     MouseButton, RenderContext, Widget, WidgetExt, WidgetId,
 };
@@ -23,35 +23,18 @@ pub struct TrackDisplay {
     pub album: bool,
 }
 
-#[derive(Clone, Data)]
-struct TrackShared {
-    playing: Option<String>,
-}
-
-impl TrackShared {
-    fn new() -> Self {
-        Self { playing: None }
-    }
-}
-
 #[derive(Clone, Data, Lens)]
-pub struct TrackState {
-    shared: TrackShared,
+struct TrackState {
+    ctx: TrackCtx,
     track: Arc<Track>,
     index: usize,
 }
 
-#[derive(Clone, Data, Lens)]
-struct TrackScope {
-    shared: TrackShared,
-    tracks: Vector<Arc<Track>>,
-}
-
-impl ListIter<TrackState> for TrackScope {
+impl ListIter<TrackState> for Ctx<TrackCtx, Vector<Arc<Track>>> {
     fn for_each(&self, mut cb: impl FnMut(&TrackState, usize)) {
-        for (i, item) in self.tracks.iter().enumerate() {
+        for (i, item) in self.data.iter().enumerate() {
             let d = TrackState {
-                shared: self.shared.to_owned(),
+                ctx: self.ctx.to_owned(),
                 track: item.to_owned(),
                 index: i,
             };
@@ -60,86 +43,73 @@ impl ListIter<TrackState> for TrackScope {
     }
 
     fn for_each_mut(&mut self, mut cb: impl FnMut(&mut TrackState, usize)) {
-        for (i, item) in self.tracks.iter_mut().enumerate() {
+        for (i, item) in self.data.iter_mut().enumerate() {
             let mut d = TrackState {
-                shared: self.shared.to_owned(),
+                ctx: self.ctx.to_owned(),
                 track: item.to_owned(),
                 index: i,
             };
             cb(&mut d, i);
 
-            if !self.shared.same(&d.shared) {
-                self.shared = d.shared;
+            if !self.ctx.same(&d.ctx) {
+                self.ctx = d.ctx;
             }
             if !item.same(&d.track) {
                 *item = d.track;
             }
+            // `d.index` is considered immutable.
         }
     }
 
     fn data_len(&self) -> usize {
-        self.tracks.len()
+        self.data.len()
     }
 }
 
-pub fn make_tracklist(mode: TrackDisplay) -> impl Widget<Vector<Arc<Track>>> {
+pub fn make_tracklist(mode: TrackDisplay) -> impl Widget<Ctx<TrackCtx, Vector<Arc<Track>>>> {
     let id = WidgetId::next();
-    let list = List::new(move || make_track(mode, id))
+    List::new(move || make_track(mode, id))
         .controller(PlayController)
-        .with_id(id);
-    let scope = Scope::from_lens(
-        |tracks: Vector<Arc<Track>>| TrackScope {
-            tracks,
-            shared: TrackShared::new(),
-        },
-        TrackScope::tracks,
-        list,
-    );
-    scope
+        .with_id(id)
 }
 
 struct PlayController;
 
-impl<W> Controller<TrackScope, W> for PlayController
+impl<W> Controller<Ctx<TrackCtx, Vector<Arc<Track>>>, W> for PlayController
 where
-    W: Widget<TrackScope>,
+    W: Widget<Ctx<TrackCtx, Vector<Arc<Track>>>>,
 {
     fn event(
         &mut self,
         child: &mut W,
         ctx: &mut EventCtx,
         event: &Event,
-        scope: &mut TrackScope,
+        tracks: &mut Ctx<TrackCtx, Vector<Arc<Track>>>,
         env: &Env,
     ) {
         match event {
             Event::Command(cmd) if cmd.is(commands::PLAY_TRACK_AT) => {
                 let position = cmd.get_unchecked(commands::PLAY_TRACK_AT);
-                let pb_ctx = PlaybackContext {
+                let pb = PlaybackCtx {
                     position: position.to_owned(),
-                    tracks: scope.tracks.to_owned(),
+                    tracks: tracks.data.to_owned(),
                 };
-                ctx.submit_command(commands::PLAY_TRACKS.with(pb_ctx));
+                ctx.submit_command(commands::PLAY_TRACKS.with(pb));
             }
-            Event::Command(cmd) if cmd.is(commands::PLAYBACK_PLAYING) => {
-                let report = cmd.get_unchecked(commands::PLAYBACK_PLAYING);
-                scope.shared.playing = Some(report.item.to_owned());
-            }
-            _ => child.event(ctx, event, scope, env),
+            _ => child.event(ctx, event, tracks, env),
         }
     }
 }
 
-pub fn make_track(display: TrackDisplay, play_ctrl: WidgetId) -> impl Widget<TrackState> {
+fn make_track(display: TrackDisplay, play_ctrl: WidgetId) -> impl Widget<TrackState> {
     let track_duration =
         Label::dynamic(|ts: &TrackState, _| ts.track.duration.as_minutes_and_seconds())
             .with_text_size(theme::TEXT_SIZE_SMALL)
             .with_text_color(theme::PLACEHOLDER_COLOR);
 
     let line_painter = Painter::new(move |ctx, ts: &TrackState, _| {
-        let size = ctx.size();
-        let line = Line::new((0.0, 0.0), (size.width, 0.0));
-        let color = if ts.shared.playing.same(&ts.track.id) {
+        let line = Line::new((0.0, 0.0), (ctx.size().width, 0.0));
+        let color = if ts.ctx.playback.is_playing_track(&ts.track) {
             theme::BLACK
         } else {
             theme::GREY_5
@@ -184,7 +154,9 @@ pub fn make_track(display: TrackDisplay, play_ctrl: WidgetId) -> impl Widget<Tra
         let track_album = Label::dynamic(|ts: &TrackState, _| ts.track.album_name())
             .with_text_size(theme::TEXT_SIZE_SMALL)
             .with_text_color(theme::PLACEHOLDER_COLOR);
-        minor.add_child(Label::new(": ").with_text_color(theme::GREY_5));
+        if display.artist {
+            minor.add_child(Label::new(": ").with_text_color(theme::GREY_5));
+        }
         minor.add_child(track_album);
     }
     major.add_default_spacer();

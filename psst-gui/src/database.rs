@@ -9,7 +9,7 @@ use aspotify::{ItemType, Market, Page, PlaylistItemType, Response};
 use druid::im::Vector;
 use itertools::Itertools;
 use psst_core::{access_token::TokenProvider, session::SessionHandle};
-use std::{future::Future, sync::Arc, time::Instant};
+use std::{future::Future, sync::Arc};
 
 #[derive(Clone)]
 pub struct Web {

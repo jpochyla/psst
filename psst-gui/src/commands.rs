@@ -1,6 +1,7 @@
-use crate::data::PlaybackContext;
 use crate::{
-    data::{Album, Artist, Navigation, PlaybackReport, Playlist, SearchResults, Track},
+    data::{
+        Album, Artist, Navigation, PlaybackCtx, PlaybackReport, Playlist, SearchResults, Track,
+    },
     error::Error,
 };
 use druid::{im::Vector, Selector};
@@ -73,7 +74,7 @@ pub const PLAYBACK_STOPPED: Selector = Selector::new("app.playback-stopped");
 // Playback control
 
 pub const PLAY_TRACK_AT: Selector<usize> = Selector::new("app.play-index");
-pub const PLAY_TRACKS: Selector<PlaybackContext> = Selector::new("app.play-tracks");
+pub const PLAY_TRACKS: Selector<PlaybackCtx> = Selector::new("app.play-tracks");
 pub const PLAY_PREVIOUS: Selector = Selector::new("app.play-previous");
 pub const PLAY_PAUSE: Selector = Selector::new("app.play-pause");
 pub const PLAY_RESUME: Selector = Selector::new("app.play-resume");

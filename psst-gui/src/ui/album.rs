@@ -1,6 +1,7 @@
 use crate::{
     commands,
-    data::{Album, AlbumDetail, Artist, Navigation, State},
+    ctx::Ctx,
+    data::{Album, AlbumDetail, Artist, Navigation, State, TrackCtx},
     ui::{
         theme,
         track::{make_tracklist, TrackDisplay},
@@ -10,7 +11,7 @@ use crate::{
 };
 use druid::{
     widget::{CrossAxisAlignment, Flex, Label, LineBreaking, List},
-    Data, Widget, WidgetExt,
+    Data, LensExt, Widget, WidgetExt,
 };
 
 pub fn make_detail() -> impl Widget<State> {
@@ -19,11 +20,16 @@ pub fn make_detail() -> impl Widget<State> {
         || make_detail_loaded(),
         || Label::new("Error"),
     )
-    .lens(AlbumDetail::album)
-    .lens(State::album)
+    .lens(
+        Ctx::make(
+            State::track_context(),
+            State::album.then(AlbumDetail::album),
+        )
+        .then(Ctx::in_promise()),
+    )
 }
 
-fn make_detail_loaded() -> impl Widget<Album> {
+fn make_detail_loaded() -> impl Widget<Ctx<TrackCtx, Album>> {
     let album_cover = make_cover(theme::grid(30.0), theme::grid(30.0));
 
     let album_name = Label::raw()
@@ -66,7 +72,8 @@ fn make_detail_loaded() -> impl Widget<Album> {
         .with_child(album_copyrights)
         .with_spacer(theme::grid(0.2))
         .with_child(album_genres)
-        .fix_width(theme::grid(30.0));
+        .fix_width(theme::grid(30.0))
+        .lens(Ctx::data());
 
     let album_tracks = make_tracklist(TrackDisplay {
         number: true,
@@ -74,7 +81,7 @@ fn make_detail_loaded() -> impl Widget<Album> {
         artist: false,
         album: false,
     })
-    .lens(Album::tracks);
+    .lens(Ctx::map(Album::tracks));
 
     Flex::row()
         .cross_axis_alignment(CrossAxisAlignment::Start)

@@ -1,4 +1,5 @@
 use crate::{
+    ctx::Ctx,
     data::{Library, State},
     ui::{
         album::make_album,
@@ -8,7 +9,7 @@ use crate::{
 };
 use druid::{
     widget::{CrossAxisAlignment, Flex, Label, List},
-    Widget, WidgetExt,
+    LensExt, Widget, WidgetExt,
 };
 
 pub fn make_detail() -> impl Widget<State> {
@@ -17,19 +18,18 @@ pub fn make_detail() -> impl Widget<State> {
         .cross_axis_alignment(CrossAxisAlignment::Start)
         .with_flex_child(make_saved_albums(), 1.0)
         .with_flex_child(make_saved_tracks(), 1.0)
-        .lens(State::library)
 }
 
-pub fn make_saved_albums() -> impl Widget<Library> {
+fn make_saved_albums() -> impl Widget<State> {
     Promised::new(
         || Label::new("Loading"),
         || List::new(make_album),
         || Label::new("Error"),
     )
-    .lens(Library::saved_albums)
+    .lens(State::library.then(Library::saved_albums))
 }
 
-pub fn make_saved_tracks() -> impl Widget<Library> {
+fn make_saved_tracks() -> impl Widget<State> {
     Promised::new(
         || Label::new("Loading"),
         || {
@@ -42,5 +42,11 @@ pub fn make_saved_tracks() -> impl Widget<Library> {
         },
         || Label::new("Error"),
     )
-    .lens(Library::saved_tracks)
+    .lens(
+        Ctx::make(
+            State::track_context(),
+            State::library.then(Library::saved_tracks),
+        )
+        .then(Ctx::in_promise()),
+    )
 }
