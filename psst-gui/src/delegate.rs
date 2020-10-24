@@ -1,3 +1,4 @@
+use crate::data::TrackId;
 use crate::{
     commands::*,
     consts,
@@ -6,8 +7,8 @@ use crate::{
     widgets::remote_image,
 };
 use druid::{
-    im::Vector, AppDelegate, Application, Command, DelegateCtx, Env, Event, ExtEventSink, Handled,
-    HotKey, ImageBuf, SysMods, Target, WindowId,
+    im::Vector, AppDelegate, Application, Command, Data, DelegateCtx, Env, Event, ExtEventSink,
+    Handled, HotKey, ImageBuf, SysMods, Target, WindowId,
 };
 use lru_cache::LruCache;
 use psst_core::{
@@ -16,7 +17,6 @@ use psst_core::{
     cache::Cache,
     cdn::{Cdn, CdnHandle},
     connection::Credentials,
-    item_id::{ItemId, ItemIdType},
     session::SessionHandle,
 };
 use std::{
@@ -89,7 +89,7 @@ fn handle_player_events(
     for event in player_events {
         match &event {
             PlayerEvent::Started { path } => {
-                let item = path.item_id.to_base62();
+                let item: TrackId = path.item_id.into();
                 sink.submit_command(PLAYBACK_PLAYING, item, Target::Auto)
                     .unwrap();
             }
@@ -155,10 +155,10 @@ impl PlayerDelegate {
         }
     }
 
-    fn get_track(&self, track_id: &str) -> Option<Arc<Track>> {
+    fn get_track(&self, id: &TrackId) -> Option<Arc<Track>> {
         self.player_queue
             .iter()
-            .find(|track| matches!(&track.id, Some(id) if id == track_id))
+            .find(|track| track.id.same(id))
             .cloned()
     }
 
@@ -170,12 +170,7 @@ impl PlayerDelegate {
         let items = self
             .player_queue
             .iter()
-            .map(|track| {
-                let id = track.id.as_ref().unwrap();
-                let id_type = ItemIdType::Track;
-                let item_id = ItemId::from_base62(&id, id_type).unwrap();
-                PlaybackItem { item_id }
-            })
+            .map(|track| PlaybackItem { item_id: *track.id })
             .collect();
         self.player_sender
             .send(PlayerEvent::Command(PlayerCommand::LoadQueue {

@@ -188,12 +188,12 @@ fn make_track_menu(track: &Track) -> MenuDesc<State> {
     let mut menu = MenuDesc::empty()
         .append(MenuItem::new(
             LocalizedString::new("menu-item-save-to-library").with_placeholder("Save to Library"),
-            commands::SAVE_TRACK.with(track.id.clone().unwrap()),
+            commands::SAVE_TRACK.with(track.id),
         ))
         .append(MenuItem::new(
             LocalizedString::new("menu-item-remove-from-library")
                 .with_placeholder("Remove from Library"),
-            commands::UNSAVE_TRACK.with(track.id.clone().unwrap()),
+            commands::UNSAVE_TRACK.with(track.id),
         ))
         .append_separator();
 

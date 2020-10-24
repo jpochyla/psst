@@ -356,7 +356,8 @@ impl From<aspotify::TrackSimplified> for Track {
             disc_number: track.disc_number,
             duration: track.duration.into(),
             explicit: track.explicit,
-            id: track.id,
+            // TODO: Local tracks do not have IDs, account for them.
+            id: track.id.unwrap().parse().unwrap(),
             is_local: track.is_local,
             is_playable: None,
             name: track.name.into(),
@@ -374,7 +375,8 @@ impl From<aspotify::Track> for Track {
             disc_number: track.disc_number,
             duration: track.duration.into(),
             explicit: track.explicit,
-            id: track.id,
+            // TODO: Local tracks do not have IDs, account for them.
+            id: track.id.unwrap().parse().unwrap(),
             is_local: track.is_local,
             is_playable: track.is_playable,
             name: track.name.into(),

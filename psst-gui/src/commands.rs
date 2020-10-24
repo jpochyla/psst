@@ -1,3 +1,4 @@
+use crate::data::TrackId;
 use crate::{
     data::{Album, Artist, AudioDuration, Navigation, PlaybackCtx, Playlist, SearchResults, Track},
     error::Error,
@@ -37,8 +38,8 @@ pub const UPDATE_SAVED_ALBUMS: Selector<Result<Vector<Album>, Error>> =
 pub const UPDATE_SAVED_TRACKS: Selector<Result<Vector<Arc<Track>>, Error>> =
     Selector::new("app.update-saved-tracks");
 
-pub const SAVE_TRACK: Selector<String> = Selector::new("app.save-track");
-pub const UNSAVE_TRACK: Selector<String> = Selector::new("app.unsave-track");
+pub const SAVE_TRACK: Selector<TrackId> = Selector::new("app.save-track");
+pub const UNSAVE_TRACK: Selector<TrackId> = Selector::new("app.unsave-track");
 
 // Album detail
 
@@ -64,7 +65,7 @@ pub const UPDATE_PLAYLIST_TRACKS: Selector<(String, Result<Vector<Arc<Track>>, E
 
 // Playback state
 
-pub const PLAYBACK_PLAYING: Selector<String> = Selector::new("app.playback-playing");
+pub const PLAYBACK_PLAYING: Selector<TrackId> = Selector::new("app.playback-playing");
 pub const PLAYBACK_PROGRESS: Selector<AudioDuration> = Selector::new("app.playback-progress");
 pub const PLAYBACK_PAUSED: Selector = Selector::new("app.playback-paused");
 pub const PLAYBACK_STOPPED: Selector = Selector::new("app.playback-stopped");

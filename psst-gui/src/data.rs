@@ -3,7 +3,9 @@ use aspotify::DatePrecision;
 use chrono::NaiveDate;
 use druid::{im::Vector, Data, Lens};
 use itertools::Itertools;
+use psst_core::item_id::{ItemId, ItemIdType};
 use serde::{Deserialize, Serialize};
+use std::str::FromStr;
 use std::{fs::File, ops::Deref, sync::Arc, time::Duration};
 
 #[derive(Clone, Debug, Default, Data, Serialize, Deserialize)]
@@ -281,33 +283,23 @@ impl TrackCtx {
     pub fn is_playing(&self, track: &Track) -> bool {
         self.playback_item
             .as_ref()
-            .map(|t| t.id == track.id)
+            .map(|t| t.id.same(&track.id))
             .unwrap_or(false)
     }
 }
 
 #[derive(Clone, Debug, Data, Lens)]
 pub struct Track {
-    pub id: Option<String>,
-    #[data(ignore)]
+    pub id: TrackId,
     pub album: Option<Album>,
-    #[data(ignore)]
     pub artists: Vector<Artist>,
-    #[data(ignore)]
     pub disc_number: usize,
-    #[data(ignore)]
     pub duration: AudioDuration,
-    #[data(ignore)]
     pub explicit: bool,
-    #[data(ignore)]
     pub is_local: bool,
-    #[data(ignore)]
     pub is_playable: Option<bool>,
-    #[data(ignore)]
     pub name: Arc<str>,
-    #[data(ignore)]
     pub popularity: Option<u32>,
-    #[data(ignore)]
     pub track_number: usize,
 }
 
@@ -329,7 +321,7 @@ impl Track {
     pub fn link(&self) -> String {
         format!(
             "https://open.spotify.com/track/{id}",
-            id = self.id.as_ref().unwrap()
+            id = self.id.to_base62()
         )
     }
 }
@@ -414,5 +406,40 @@ impl AudioDuration {
         let minutes = self.as_secs() / 60;
         let seconds = self.as_secs() % 60;
         format!("{}:{:02}", minutes, seconds)
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct TrackId(ItemId);
+
+impl Data for TrackId {
+    fn same(&self, other: &Self) -> bool {
+        self.0 == other.0
+    }
+}
+
+impl Deref for TrackId {
+    type Target = ItemId;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl From<ItemId> for TrackId {
+    fn from(id: ItemId) -> Self {
+        TrackId(id)
+    }
+}
+
+impl FromStr for TrackId {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if let Some(id) = ItemId::from_base62(s, ItemIdType::Track) {
+            Ok(Self(id))
+        } else {
+            Err(())
+        }
     }
 }
