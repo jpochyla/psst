@@ -109,7 +109,7 @@ fn make_track(display: TrackDisplay, play_ctrl: WidgetId) -> impl Widget<TrackSt
 
     let line_painter = Painter::new(move |ctx, ts: &TrackState, _| {
         let line = Line::new((0.0, 0.0), (ctx.size().width, 0.0));
-        let color = if ts.ctx.playback.is_playing_track(&ts.track) {
+        let color = if ts.ctx.is_playing(&ts.track) {
             theme::BLACK
         } else {
             theme::GREY_5

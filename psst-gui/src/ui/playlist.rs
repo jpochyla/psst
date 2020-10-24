@@ -52,7 +52,7 @@ pub fn make_detail() -> impl Widget<State> {
     )
     .lens(
         Ctx::make(
-            State::track_context(),
+            State::track_ctx,
             State::playlist.then(PlaylistDetail::tracks),
         )
         .then(Ctx::in_promise()),

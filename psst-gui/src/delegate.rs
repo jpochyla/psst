@@ -546,17 +546,15 @@ impl AppDelegate<State> for Delegate {
         // Playback status
         //
         } else if let Some(report) = cmd.get(PLAYBACK_PROGRESS).cloned() {
-            data.playback.is_playing = true;
-            data.playback.progress = Some(report.progress);
-            data.playback.item = self.player.get_track(&report.item);
+            if let Some(track) = self.player.get_track(&report.item) {
+                data.set_playback_progress(track, report.progress);
+            }
             Handled::Yes
         } else if cmd.is(PLAYBACK_PAUSED) {
-            data.playback.is_playing = false;
+            data.set_playback_paused();
             Handled::No
         } else if cmd.is(PLAYBACK_STOPPED) {
-            data.playback.is_playing = false;
-            data.playback.progress = None;
-            data.playback.item = None;
+            data.set_playback_stopped();
             Handled::No
         //
         // Playback control

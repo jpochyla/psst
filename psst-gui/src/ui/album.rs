@@ -21,11 +21,7 @@ pub fn make_detail() -> impl Widget<State> {
         || make_error(),
     )
     .lens(
-        Ctx::make(
-            State::track_context(),
-            State::album.then(AlbumDetail::album),
-        )
-        .then(Ctx::in_promise()),
+        Ctx::make(State::track_ctx, State::album.then(AlbumDetail::album)).then(Ctx::in_promise()),
     )
 }
 

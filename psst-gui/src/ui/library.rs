@@ -40,10 +40,7 @@ fn make_saved_tracks() -> impl Widget<State> {
         || make_error(),
     )
     .lens(
-        Ctx::make(
-            State::track_context(),
-            State::library.then(Library::saved_tracks),
-        )
-        .then(Ctx::in_promise()),
+        Ctx::make(State::track_ctx, State::library.then(Library::saved_tracks))
+            .then(Ctx::in_promise()),
     )
 }

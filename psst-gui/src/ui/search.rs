@@ -51,10 +51,7 @@ pub fn make_results() -> impl Widget<State> {
         },
         || make_error(),
     )
-    .lens(
-        Ctx::make(State::track_context(), State::search.then(Search::results))
-            .then(Ctx::in_promise()),
-    )
+    .lens(Ctx::make(State::track_ctx, State::search.then(Search::results)).then(Ctx::in_promise()))
 }
 
 fn make_artist_results() -> impl Widget<Ctx<TrackCtx, SearchResults>> {

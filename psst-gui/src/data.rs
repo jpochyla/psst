@@ -1,7 +1,7 @@
 use crate::promise::Promise;
 use aspotify::DatePrecision;
 use chrono::NaiveDate;
-use druid::{im::Vector, lens::Map, Data, Lens};
+use druid::{im::Vector, Data, Lens};
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use std::{fs::File, ops::Deref, sync::Arc, time::Duration};
@@ -38,22 +38,26 @@ pub struct State {
     pub artist: ArtistDetail,
     pub playlist: PlaylistDetail,
     pub library: Library,
+    pub track_ctx: TrackCtx,
 }
 
 impl State {
-    pub fn track_context() -> impl Lens<State, TrackCtx> {
-        Map::new(
-            |s: &Self| s.make_track_context(),
-            |s: &mut Self, t: TrackCtx| {
-                s.playback = t.playback;
-            },
-        )
+    pub fn set_playback_progress(&mut self, item: Arc<Track>, progress: AudioDuration) {
+        self.playback.is_playing = true;
+        self.playback.item.replace(item.clone());
+        self.playback.progress.replace(progress);
+        self.track_ctx.playback_item.replace(item);
     }
 
-    pub fn make_track_context(&self) -> TrackCtx {
-        TrackCtx {
-            playback: self.playback.to_owned(),
-        }
+    pub fn set_playback_paused(&mut self) {
+        self.playback.is_playing = false;
+    }
+
+    pub fn set_playback_stopped(&mut self) {
+        self.playback.is_playing = false;
+        self.playback.item.take();
+        self.playback.progress.take();
+        self.track_ctx.playback_item.take();
     }
 }
 
@@ -113,15 +117,6 @@ pub struct Playback {
     pub is_playing: bool,
     pub progress: Option<AudioDuration>,
     pub item: Option<Arc<Track>>,
-}
-
-impl Playback {
-    pub fn is_playing_track(&self, track: &Track) -> bool {
-        self.item
-            .as_ref()
-            .map(|t| t.id == track.id)
-            .unwrap_or(false)
-    }
 }
 
 #[derive(Clone, Debug, Default, Data, Lens)]
@@ -244,23 +239,42 @@ impl Default for AlbumType {
     }
 }
 
-#[derive(Clone, Data)]
+#[derive(Clone, Default, Debug, Data)]
 pub struct TrackCtx {
-    pub playback: Playback,
+    pub playback_item: Option<Arc<Track>>,
+}
+
+impl TrackCtx {
+    pub fn is_playing(&self, track: &Track) -> bool {
+        self.playback_item
+            .as_ref()
+            .map(|t| t.id == track.id)
+            .unwrap_or(false)
+    }
 }
 
 #[derive(Clone, Debug, Data, Lens)]
 pub struct Track {
-    pub album: Option<Album>,
-    pub artists: Vector<Artist>,
-    pub disc_number: usize,
-    pub duration: AudioDuration,
-    pub explicit: bool,
     pub id: Option<String>,
+    #[data(ignore)]
+    pub album: Option<Album>,
+    #[data(ignore)]
+    pub artists: Vector<Artist>,
+    #[data(ignore)]
+    pub disc_number: usize,
+    #[data(ignore)]
+    pub duration: AudioDuration,
+    #[data(ignore)]
+    pub explicit: bool,
+    #[data(ignore)]
     pub is_local: bool,
+    #[data(ignore)]
     pub is_playable: Option<bool>,
+    #[data(ignore)]
     pub name: Arc<str>,
+    #[data(ignore)]
     pub popularity: Option<u32>,
+    #[data(ignore)]
     pub track_number: usize,
 }
 

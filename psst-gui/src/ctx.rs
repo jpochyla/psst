@@ -1,7 +1,7 @@
 use crate::promise::Promise;
 use druid::{
     lens::{Field, Map},
-    Data, Lens,
+    Data, Lens, LensExt,
 };
 
 #[derive(Clone, Data)]
@@ -43,26 +43,19 @@ where
     TL: Lens<S, T>,
 {
     fn with<V, F: FnOnce(&Ctx<C, T>) -> V>(&self, data: &S, f: F) -> V {
-        self.cl.with(data, |c| {
-            self.tl.with(data, |t| {
-                let ct = Ctx::new(c.to_owned(), t.to_owned());
-                f(&ct)
-            })
-        })
+        let c = self.cl.get(data);
+        let t = self.tl.get(data);
+        let ct = Ctx::new(c, t);
+        f(&ct)
     }
 
     fn with_mut<V, F: FnOnce(&mut Ctx<C, T>) -> V>(&self, data: &mut S, f: F) -> V {
-        let mut t_data = data.to_owned();
-        let v = self.cl.with_mut(data, |c| {
-            self.tl.with_mut(&mut t_data, |t| {
-                let mut ct = Ctx::new(c.to_owned(), t.to_owned());
-                let v = f(&mut ct);
-                *c = ct.ctx;
-                *t = ct.data;
-                v
-            })
-        });
-        *data = t_data;
+        let c = self.cl.get(data);
+        let t = self.tl.get(data);
+        let mut ct = Ctx::new(c, t);
+        let v = f(&mut ct);
+        self.cl.put(data, ct.ctx);
+        self.tl.put(data, ct.data);
         v
     }
 }
