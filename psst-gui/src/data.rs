@@ -237,7 +237,7 @@ impl Album {
         self.format_release_date(match self.release_date_precision {
             Some(DatePrecision::Year) | None => "%Y",
             Some(DatePrecision::Month) => "%B %Y",
-            Some(DatePrecision::Day) => "%x",
+            Some(DatePrecision::Day) => "%v",
         })
     }
 

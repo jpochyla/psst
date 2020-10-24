@@ -47,11 +47,27 @@ fn make_detail_loaded() -> impl Widget<Ctx<TrackCtx, Album>> {
 
     let album_date = Label::dynamic(|album: &Album, _| album.release());
 
-    let album_label = Label::raw().lens(Album::label);
-
     let album_genres = List::new(|| Label::raw()).lens(Album::genres);
 
-    let album_copyrights = List::new(|| Label::raw()).lens(Album::copyrights);
+    let album_label = Label::raw()
+        .with_text_size(theme::TEXT_SIZE_SMALL)
+        .with_text_color(theme::PLACEHOLDER_COLOR)
+        .lens(Album::label);
+
+    let album_copyrights = List::new(|| {
+        Flex::row()
+            .with_child(
+                Label::new("© ")
+                    .with_text_size(theme::TEXT_SIZE_SMALL)
+                    .with_text_color(theme::PLACEHOLDER_COLOR),
+            )
+            .with_child(
+                Label::raw()
+                    .with_text_size(theme::TEXT_SIZE_SMALL)
+                    .with_text_color(theme::PLACEHOLDER_COLOR),
+            )
+    })
+    .lens(Album::copyrights);
 
     let album_info = Flex::column()
         .cross_axis_alignment(CrossAxisAlignment::Start)
