@@ -27,7 +27,7 @@ impl Config {
     }
 }
 
-#[derive(Clone, Debug, Default, Data, Lens)]
+#[derive(Clone, Debug, Data, Lens)]
 pub struct State {
     pub route: Route,
     pub nav_stack: Vector<Navigation>,
@@ -39,6 +39,47 @@ pub struct State {
     pub playlist: PlaylistDetail,
     pub library: Library,
     pub track_ctx: TrackCtx,
+}
+
+impl Default for State {
+    fn default() -> Self {
+        Self {
+            route: Route::Home,
+            nav_stack: Vector::new(),
+            config: Config::default(),
+            playback: Playback {
+                is_playing: false,
+                progress: None,
+                item: None,
+            },
+            search: Search {
+                input: String::new(),
+                results: Promise::Empty,
+            },
+            album: AlbumDetail {
+                id: String::new(),
+                album: Promise::Empty,
+            },
+            artist: ArtistDetail {
+                id: String::new(),
+                artist: Promise::Empty,
+                albums: Promise::Empty,
+                top_tracks: Promise::Empty,
+            },
+            playlist: PlaylistDetail {
+                playlist: Promise::Empty,
+                tracks: Promise::Empty,
+            },
+            library: Library {
+                saved_albums: Promise::Empty,
+                saved_tracks: Promise::Empty,
+                playlists: Promise::Empty,
+            },
+            track_ctx: TrackCtx {
+                playback_item: None,
+            },
+        }
+    }
 }
 
 impl State {
@@ -75,12 +116,6 @@ pub enum Route {
     Library,
 }
 
-impl Default for Route {
-    fn default() -> Self {
-        Route::Home
-    }
-}
-
 #[derive(Clone, Debug, Data)]
 pub enum Navigation {
     Home,
@@ -110,14 +145,14 @@ pub struct PlaybackCtx {
     pub position: usize,
 }
 
-#[derive(Clone, Debug, Default, Data, Lens)]
+#[derive(Clone, Debug, Data, Lens)]
 pub struct Playback {
     pub is_playing: bool,
     pub progress: Option<AudioDuration>,
     pub item: Option<Arc<Track>>,
 }
 
-#[derive(Clone, Debug, Default, Data, Lens)]
+#[derive(Clone, Debug, Data, Lens)]
 pub struct Search {
     pub input: String,
     pub results: Promise<SearchResults, String>,
@@ -130,13 +165,13 @@ pub struct SearchResults {
     pub tracks: Vector<Arc<Track>>,
 }
 
-#[derive(Clone, Debug, Default, Data, Lens)]
+#[derive(Clone, Debug, Data, Lens)]
 pub struct AlbumDetail {
     pub id: String,
     pub album: Promise<Album, String>,
 }
 
-#[derive(Clone, Debug, Default, Data, Lens)]
+#[derive(Clone, Debug, Data, Lens)]
 pub struct ArtistDetail {
     pub id: String,
     pub artist: Promise<Artist, String>,
@@ -144,13 +179,13 @@ pub struct ArtistDetail {
     pub top_tracks: Promise<Vector<Arc<Track>>, String>,
 }
 
-#[derive(Clone, Debug, Default, Data, Lens)]
+#[derive(Clone, Debug, Data, Lens)]
 pub struct PlaylistDetail {
     pub playlist: Promise<Playlist>,
     pub tracks: Promise<Vector<Arc<Track>>, String>,
 }
 
-#[derive(Clone, Debug, Default, Data, Lens)]
+#[derive(Clone, Debug, Data, Lens)]
 pub struct Library {
     pub saved_albums: Promise<Vector<Album>>,
     pub saved_tracks: Promise<Vector<Arc<Track>>>,
@@ -237,7 +272,7 @@ impl Default for AlbumType {
     }
 }
 
-#[derive(Clone, Default, Debug, Data)]
+#[derive(Clone, Debug, Data)]
 pub struct TrackCtx {
     pub playback_item: Option<Arc<Track>>,
 }
@@ -299,14 +334,14 @@ impl Track {
     }
 }
 
-#[derive(Clone, Debug, Default, Data, Lens)]
+#[derive(Clone, Debug, Data, Lens)]
 pub struct Playlist {
     pub id: String,
     pub images: Vector<Image>,
     pub name: String,
 }
 
-#[derive(Clone, Debug, Default, Data)]
+#[derive(Clone, Debug, Data)]
 pub struct Image {
     pub url: String,
     pub width: Option<usize>,
@@ -323,7 +358,7 @@ impl Image {
     }
 }
 
-#[derive(Clone, Debug, Default, Data, Lens)]
+#[derive(Clone, Debug, Data, Lens)]
 pub struct AudioAnalysis {
     pub segments: Vector<AudioAnalysisSegment>,
 }
@@ -339,7 +374,7 @@ impl AudioAnalysis {
     }
 }
 
-#[derive(Clone, Debug, Default, Data)]
+#[derive(Clone, Debug, Data)]
 pub struct AudioAnalysisSegment {
     pub start: AudioDuration,
     pub duration: AudioDuration,
