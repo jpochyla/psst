@@ -10,12 +10,14 @@ use druid::im::Vector;
 use itertools::Itertools;
 use psst_core::{access_token::TokenProvider, session::SessionHandle};
 use std::{future::Future, sync::Arc};
+use tokio_compat_02::FutureExt;
 
 #[derive(Clone)]
 pub struct Web {
     session: SessionHandle,
     token_provider: Arc<TokenProvider>,
     spotify: Arc<aspotify::Client>,
+    image_client: reqwest::Client,
 }
 
 impl Web {
@@ -28,8 +30,10 @@ impl Web {
             secret: String::new(),
         };
         let spotify = aspotify::Client::new(dummy_credentials);
+        let image_client = reqwest::Client::new();
         Self {
             session,
+            image_client,
             spotify: Arc::new(spotify),
             token_provider: Arc::new(TokenProvider::new()),
         }
@@ -189,9 +193,11 @@ impl Web {
     }
 
     pub async fn load_image(&self, uri: &str) -> Result<image::DynamicImage, Error> {
-        let image_bytes = reqwest::get(uri).await?.bytes().await?;
-        let result = image::load_from_memory(&image_bytes)?;
-        Ok(result)
+        let req = self.image_client.get(uri).build()?;
+        let res = self.image_client.execute(req).compat().await?;
+        let img_bytes = res.bytes().await?;
+        let img = image::load_from_memory(&img_bytes)?;
+        Ok(img)
     }
 
     pub async fn search(&self, query: &str) -> Result<SearchResults, Error> {

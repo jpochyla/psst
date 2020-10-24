@@ -1,7 +1,8 @@
 use crate::audio_key::AudioKey;
 use aes_ctr::{
-    stream_cipher::{
-        generic_array::GenericArray, NewStreamCipher, SyncStreamCipher, SyncStreamCipherSeek,
+    cipher::{
+        generic_array::GenericArray,
+        stream::{NewStreamCipher, SyncStreamCipher, SyncStreamCipherSeek},
     },
     Aes128Ctr,
 };

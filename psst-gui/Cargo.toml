@@ -7,16 +7,16 @@ edition = "2018"
 [dependencies]
 psst-core = { path = "../psst-core" }
 
-aspotify = { git = "https://github.com/KaiJewson/aspotify" }
-chrono = "0.4.19"
-# druid = { git = "https://github.com/xi-editor/druid", features = ["im", "image"] }
-druid = { git = "https://github.com/jpochyla/druid", features = ["im", "image"], branch = "textbox-options" }
-env_logger = "0.7"
-image = "0.23"
+aspotify = { git = "https://github.com/KaiJewson/aspotify", default_features = false }
+chrono = "0.4"
+druid = { git = "https://github.com/jpochyla/druid", features = ["im", "image", "jpeg"], branch = "textbox-options" }
+env_logger = "0.8"
+image = { version = "0.23", default_features = false }
 itertools = "0.9"
 log = "0.4"
 lru-cache = "0.1"
 reqwest = { version = "0.10" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-tokio = { version = "0.2", features = ["full", "sync"] }
+tokio = { version = "0.3", features = ["rt-multi-thread"] }
+tokio-compat-02 = "0.1"
