@@ -1,29 +1,29 @@
 use crate::{
     audio_file::{AudioFile, AudioPath},
     error::Error,
+    item_id::{FileId, ItemId, ItemIdType},
     protocol::metadata::{Restriction, Track},
     session::SessionHandle,
-    spotify_id::{FileId, SpotifyId, SpotifyIdType},
 };
 use quick_protobuf::MessageRead;
 use std::time::Duration;
 
 pub trait Fetch: MessageRead<'static> {
-    fn uri(id: SpotifyId) -> String;
-    fn fetch(session: &SessionHandle, id: SpotifyId) -> Result<Self, Error> {
+    fn uri(id: ItemId) -> String;
+    fn fetch(session: &SessionHandle, id: ItemId) -> Result<Self, Error> {
         session.connected()?.get_mercury_protobuf(Self::uri(id))
     }
 }
 
 impl Fetch for Track {
-    fn uri(id: SpotifyId) -> String {
+    fn uri(id: ItemId) -> String {
         format!("hm://metadata/3/track/{}", id.to_base16())
     }
 }
 
 pub trait ToAudioPath {
     fn is_restricted_in_region(&self, country: &str) -> bool;
-    fn find_allowed_alternative(&self, country: &str) -> Option<SpotifyId>;
+    fn find_allowed_alternative(&self, country: &str) -> Option<ItemId>;
     fn to_audio_path(&self) -> Option<AudioPath>;
 }
 
@@ -34,12 +34,12 @@ impl ToAudioPath for Track {
             .any(|rest| is_restricted_in_region(rest, country))
     }
 
-    fn find_allowed_alternative(&self, country: &str) -> Option<SpotifyId> {
+    fn find_allowed_alternative(&self, country: &str) -> Option<ItemId> {
         let alt_track = self
             .alternative
             .iter()
             .find(|alt_track| !alt_track.is_restricted_in_region(country))?;
-        SpotifyId::from_raw(alt_track.gid.as_ref()?, SpotifyIdType::Track)
+        ItemId::from_raw(alt_track.gid.as_ref()?, ItemIdType::Track)
     }
 
     fn to_audio_path(&self) -> Option<AudioPath> {
@@ -51,7 +51,7 @@ impl ToAudioPath for Track {
                     .find(|file| file.format == Some(preferred_format))
             })?;
         let file_format = file.format?;
-        let item_id = SpotifyId::from_raw(self.gid.as_ref()?, SpotifyIdType::Track)?;
+        let item_id = ItemId::from_raw(self.gid.as_ref()?, ItemIdType::Track)?;
         let file_id = FileId::from_raw(file.file_id.as_ref()?)?;
         let duration = Duration::from_millis(self.duration? as u64);
         Some(AudioPath {

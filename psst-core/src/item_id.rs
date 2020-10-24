@@ -1,27 +1,27 @@
 use std::{convert::TryInto, fmt, ops::Deref};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum SpotifyIdType {
+pub enum ItemIdType {
     Track,
     Podcast,
     Unknown,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct SpotifyId {
+pub struct ItemId {
     pub id: u128,
-    pub id_type: SpotifyIdType,
+    pub id_type: ItemIdType,
 }
 
 const BASE62_DIGITS: &[u8] = b"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
 const BASE16_DIGITS: &[u8] = b"0123456789abcdef";
 
-impl SpotifyId {
-    fn new(id: u128, id_type: SpotifyIdType) -> Self {
+impl ItemId {
+    fn new(id: u128, id_type: ItemIdType) -> Self {
         Self { id, id_type }
     }
 
-    pub fn from_base16(id: &str, id_type: SpotifyIdType) -> Option<Self> {
+    pub fn from_base16(id: &str, id_type: ItemIdType) -> Option<Self> {
         let mut n = 0_u128;
         for c in id.as_bytes() {
             let d = BASE16_DIGITS.iter().position(|e| e == c)? as u128;
@@ -31,7 +31,7 @@ impl SpotifyId {
         Some(Self::new(n, id_type))
     }
 
-    pub fn from_base62(id: &str, id_type: SpotifyIdType) -> Option<Self> {
+    pub fn from_base62(id: &str, id_type: ItemIdType) -> Option<Self> {
         let mut n = 0_u128;
         for c in id.as_bytes() {
             let d = BASE62_DIGITS.iter().position(|e| e == c)? as u128;
@@ -41,7 +41,7 @@ impl SpotifyId {
         Some(Self::new(n, id_type))
     }
 
-    pub fn from_raw(data: &[u8], id_type: SpotifyIdType) -> Option<Self> {
+    pub fn from_raw(data: &[u8], id_type: ItemIdType) -> Option<Self> {
         let n = u128::from_be_bytes(data.try_into().ok()?);
         Some(Self::new(n, id_type))
     }
@@ -49,11 +49,11 @@ impl SpotifyId {
     pub fn from_uri(uri: &str) -> Option<Self> {
         let gid = uri.split(':').last()?;
         if uri.contains(":episode:") {
-            Self::from_base62(gid, SpotifyIdType::Podcast)
+            Self::from_base62(gid, ItemIdType::Podcast)
         } else if uri.contains(":track:") {
-            Self::from_base62(gid, SpotifyIdType::Track)
+            Self::from_base62(gid, ItemIdType::Track)
         } else {
-            Self::from_base62(gid, SpotifyIdType::Unknown)
+            Self::from_base62(gid, ItemIdType::Unknown)
         }
     }
 

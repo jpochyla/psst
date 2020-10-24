@@ -5,8 +5,8 @@ use psst_core::{
     cdn::{Cdn, CdnHandle},
     connection::Credentials,
     error::Error,
+    item_id::{ItemId, ItemIdType},
     session::SessionHandle,
-    spotify_id::{SpotifyId, SpotifyIdType},
 };
 use std::{io, io::BufRead, thread};
 
@@ -30,7 +30,7 @@ fn main() {
 fn start(session: SessionHandle) -> Result<(), Error> {
     let cdn = Cdn::connect(session.clone());
     let cache = Cache::new()?;
-    let item_id = SpotifyId::from_base62("6UCFZ9ZOFRxK8oak7MdPZu", SpotifyIdType::Track).unwrap();
+    let item_id = ItemId::from_base62("6UCFZ9ZOFRxK8oak7MdPZu", ItemIdType::Track).unwrap();
     play_item(session, cdn, cache, PlaybackItem { item_id })
 }
 

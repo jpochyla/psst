@@ -5,10 +5,10 @@ use crate::{
     cache::CacheHandle,
     cdn::CdnHandle,
     error::Error,
+    item_id::{ItemId, ItemIdType},
     metadata::{Fetch, ToAudioPath},
     protocol::metadata::Track,
     session::SessionHandle,
-    spotify_id::{SpotifyId, SpotifyIdType},
 };
 use std::{
     mem,
@@ -34,7 +34,7 @@ const PREVIOUS_TRACK_THRESHOLD: Duration = Duration::from_secs(3);
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub struct PlaybackItem {
-    pub item_id: SpotifyId,
+    pub item_id: ItemId,
 }
 
 impl PlaybackItem {
@@ -54,13 +54,13 @@ impl PlaybackItem {
 }
 
 fn load_audio_path(
-    item_id: SpotifyId,
+    item_id: ItemId,
     session: &SessionHandle,
     cache: &CacheHandle,
     config: &PlaybackConfig,
 ) -> Result<AudioPath, Error> {
     match item_id.id_type {
-        SpotifyIdType::Track => {
+        ItemIdType::Track => {
             let track = load_track(item_id, session, cache)?;
 
             let path = if track.is_restricted_in_region(&config.country) {
@@ -84,13 +84,13 @@ fn load_audio_path(
 
             Ok(path)
         }
-        SpotifyIdType::Podcast => unimplemented!(),
-        SpotifyIdType::Unknown => unimplemented!(),
+        ItemIdType::Podcast => unimplemented!(),
+        ItemIdType::Unknown => unimplemented!(),
     }
 }
 
 fn load_track(
-    item_id: SpotifyId,
+    item_id: ItemId,
     session: &SessionHandle,
     cache: &CacheHandle,
 ) -> Result<Track, Error> {

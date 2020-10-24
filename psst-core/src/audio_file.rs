@@ -5,8 +5,8 @@ use crate::{
     cache::CacheHandle,
     cdn::{CdnHandle, CdnUrl},
     error::Error,
+    item_id::{FileId, ItemId},
     protocol::metadata::mod_AudioFile::Format,
-    spotify_id::{FileId, SpotifyId},
     stream_storage::{StreamReader, StreamStorage, StreamWriter},
     util::OffsetFile,
 };
@@ -22,7 +22,7 @@ pub type FileAudioSource = VorbisDecoder<OffsetFile<AudioDecrypt<BufReader<Strea
 
 #[derive(Debug, Clone, Copy)]
 pub struct AudioPath {
-    pub item_id: SpotifyId,
+    pub item_id: ItemId,
     pub file_id: FileId,
     pub file_format: Format,
     pub duration: Duration,

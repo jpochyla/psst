@@ -1,7 +1,7 @@
 use crate::{
     connection::codec::{ShannonEncoder, ShannonMessage},
     error::Error,
-    spotify_id::{FileId, SpotifyId},
+    item_id::{FileId, ItemId},
     util::Sequence,
 };
 use byteorder::{ReadBytesExt, BE};
@@ -42,7 +42,7 @@ impl AudioKeyDispatcher {
     pub fn request(
         &mut self,
         encoder: &mut ShannonEncoder<TcpStream>,
-        track: SpotifyId,
+        track: ItemId,
         file: FileId,
     ) -> io::Result<Receiver<Result<AudioKey, Error>>> {
         let (res_sender, res_receiver) = mpsc::channel();
@@ -52,7 +52,7 @@ impl AudioKeyDispatcher {
         Ok(res_receiver)
     }
 
-    fn make_key_request(&self, seq: u32, track: SpotifyId, file: FileId) -> ShannonMessage {
+    fn make_key_request(&self, seq: u32, track: ItemId, file: FileId) -> ShannonMessage {
         let mut buf = Vec::new();
         buf.extend_from_slice(&file);
         buf.extend_from_slice(&track.to_raw());

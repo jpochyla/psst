@@ -1,7 +1,7 @@
 use crate::{
     audio_key::AudioKey,
     error::Error,
-    spotify_id::{FileId, SpotifyId},
+    item_id::{FileId, ItemId},
     util::{deserialize_protobuf, serialize_protobuf},
 };
 use psst_protocol::metadata::Track;
@@ -37,14 +37,14 @@ impl Cache {
 
 // Cache of `Track` protobuf structures.
 impl Cache {
-    pub fn get_track(&self, item_id: SpotifyId) -> Option<Track> {
+    pub fn get_track(&self, item_id: ItemId) -> Option<Track> {
         let mut file = File::open(self.track_path(item_id)).ok()?;
         let mut buf = Vec::new();
         file.read_to_end(&mut buf).ok()?;
         deserialize_protobuf(&buf).ok()
     }
 
-    pub fn save_track(&self, item_id: SpotifyId, track: &Track) -> Result<(), Error> {
+    pub fn save_track(&self, item_id: ItemId, track: &Track) -> Result<(), Error> {
         log::debug!("saving track to cache: {:?}", item_id);
         let mut file = File::create(self.track_path(item_id))?;
         let buf = serialize_protobuf(track)?;
@@ -52,14 +52,14 @@ impl Cache {
         Ok(())
     }
 
-    fn track_path(&self, item_id: SpotifyId) -> PathBuf {
+    fn track_path(&self, item_id: ItemId) -> PathBuf {
         self.base.join("track").join(item_id.to_base62())
     }
 }
 
 // Cache of `AudioKey`s.
 impl Cache {
-    pub fn get_audio_key(&self, item_id: SpotifyId, file_id: FileId) -> Option<AudioKey> {
+    pub fn get_audio_key(&self, item_id: ItemId, file_id: FileId) -> Option<AudioKey> {
         let mut file = File::open(self.audio_key_path(item_id, file_id)).ok()?;
         let mut buf = Vec::new();
         file.read_to_end(&mut buf).ok()?;
@@ -68,7 +68,7 @@ impl Cache {
 
     pub fn save_audio_key(
         &self,
-        item_id: SpotifyId,
+        item_id: ItemId,
         file_id: FileId,
         key: &AudioKey,
     ) -> Result<(), Error> {
@@ -78,7 +78,7 @@ impl Cache {
         Ok(())
     }
 
-    fn audio_key_path(&self, item_id: SpotifyId, file_id: FileId) -> PathBuf {
+    fn audio_key_path(&self, item_id: ItemId, file_id: FileId) -> PathBuf {
         let mut key_id = String::new();
         key_id += &item_id.to_base62()[..16];
         key_id += &file_id.to_base16()[..16];

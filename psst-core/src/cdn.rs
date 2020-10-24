@@ -1,6 +1,4 @@
-use crate::{
-    access_token::TokenProvider, error::Error, session::SessionHandle, spotify_id::FileId,
-};
+use crate::{access_token::TokenProvider, error::Error, item_id::FileId, session::SessionHandle};
 use serde::Deserialize;
 use std::{
     io::Read,

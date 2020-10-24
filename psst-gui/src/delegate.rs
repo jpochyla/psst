@@ -16,8 +16,8 @@ use psst_core::{
     cache::Cache,
     cdn::{Cdn, CdnHandle},
     connection::Credentials,
+    item_id::{ItemId, ItemIdType},
     session::SessionHandle,
-    spotify_id::{SpotifyId, SpotifyIdType},
 };
 use std::{
     sync::{
@@ -172,8 +172,8 @@ impl PlayerDelegate {
             .iter()
             .map(|track| {
                 let id = track.id.as_ref().unwrap();
-                let id_type = SpotifyIdType::Track;
-                let item_id = SpotifyId::from_base62(&id, id_type).unwrap();
+                let id_type = ItemIdType::Track;
+                let item_id = ItemId::from_base62(&id, id_type).unwrap();
                 PlaybackItem { item_id }
             })
             .collect();

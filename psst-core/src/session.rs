@@ -5,8 +5,8 @@ use crate::{
         Credentials, Transport,
     },
     error::Error,
+    item_id::{FileId, ItemId},
     mercury::{MercuryDispatcher, MercuryRequest},
-    spotify_id::{FileId, SpotifyId},
     util::deserialize_protobuf,
 };
 use quick_protobuf::MessageRead;
@@ -131,7 +131,7 @@ impl Session {
         Ok(message)
     }
 
-    pub fn get_audio_key(&self, track: SpotifyId, file: FileId) -> Result<AudioKey, Error> {
+    pub fn get_audio_key(&self, track: ItemId, file: FileId) -> Result<AudioKey, Error> {
         let request = {
             let mut encoder = self.encoder.lock().unwrap();
             self.audio_key
