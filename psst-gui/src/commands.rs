@@ -1,7 +1,5 @@
 use crate::{
-    data::{
-        Album, Artist, Navigation, PlaybackCtx, PlaybackReport, Playlist, SearchResults, Track,
-    },
+    data::{Album, Artist, AudioDuration, Navigation, PlaybackCtx, Playlist, SearchResults, Track},
     error::Error,
 };
 use druid::{im::Vector, Selector};
@@ -66,8 +64,8 @@ pub const UPDATE_PLAYLIST_TRACKS: Selector<(String, Result<Vector<Arc<Track>>, E
 
 // Playback state
 
-pub const PLAYBACK_PLAYING: Selector<PlaybackReport> = Selector::new("app.playback-playing");
-pub const PLAYBACK_PROGRESS: Selector<PlaybackReport> = Selector::new("app.playback-progress");
+pub const PLAYBACK_PLAYING: Selector<String> = Selector::new("app.playback-playing");
+pub const PLAYBACK_PROGRESS: Selector<AudioDuration> = Selector::new("app.playback-progress");
 pub const PLAYBACK_PAUSED: Selector = Selector::new("app.playback-paused");
 pub const PLAYBACK_STOPPED: Selector = Selector::new("app.playback-stopped");
 

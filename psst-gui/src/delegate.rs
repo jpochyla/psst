@@ -1,7 +1,7 @@
 use crate::{
     commands::*,
     consts,
-    data::{Config, Navigation, PlaybackReport, Route, State, Track},
+    data::{AudioDuration, Config, Navigation, Route, State, Track},
     database::Web,
     widgets::remote_image,
 };
@@ -89,27 +89,24 @@ fn handle_player_events(
     for event in player_events {
         match &event {
             PlayerEvent::Started { path } => {
-                let report = PlaybackReport {
-                    item: path.item_id.to_base62(),
-                    // TODO: Zero duration is wrong here.
-                    progress: Duration::new(0, 0).into(),
-                };
-                sink.submit_command(PLAYBACK_PLAYING, report, Target::Auto)
+                let item = path.item_id.to_base62();
+                sink.submit_command(PLAYBACK_PLAYING, item, Target::Auto)
                     .unwrap();
             }
-            PlayerEvent::Playing { path, duration, .. } => {
-                let report = PlaybackReport {
-                    item: path.item_id.to_base62(),
-                    progress: duration.to_owned().into(),
-                };
-                sink.submit_command(PLAYBACK_PROGRESS, report, Target::Auto)
+            PlayerEvent::Playing { duration, .. } => {
+                let progress: AudioDuration = duration.to_owned().into();
+                sink.submit_command(PLAYBACK_PROGRESS, progress, Target::Auto)
                     .unwrap();
             }
             PlayerEvent::Paused { .. } => {
                 sink.submit_command(PLAYBACK_PAUSED, (), Target::Auto)
                     .unwrap();
             }
-            PlayerEvent::Finished => {}
+            PlayerEvent::Finished => {
+                // TODO:
+                //  We should clear current playback, but only at the end
+                //  of the queue.
+            }
             _ => {}
         }
         player.handle(event);
@@ -545,17 +542,22 @@ impl AppDelegate<State> for Delegate {
         //
         // Playback status
         //
-        } else if let Some(report) = cmd.get(PLAYBACK_PROGRESS).cloned() {
-            if let Some(track) = self.player.get_track(&report.item) {
-                data.set_playback_progress(track, report.progress);
+        } else if let Some(item) = cmd.get(PLAYBACK_PLAYING) {
+            if let Some(track) = self.player.get_track(item) {
+                data.set_playback_playing(track);
+            } else {
+                log::warn!("played item not found in playback queue");
             }
+            Handled::Yes
+        } else if let Some(progress) = cmd.get(PLAYBACK_PROGRESS).cloned() {
+            data.set_playback_progress(progress);
             Handled::Yes
         } else if cmd.is(PLAYBACK_PAUSED) {
             data.set_playback_paused();
-            Handled::No
+            Handled::Yes
         } else if cmd.is(PLAYBACK_STOPPED) {
             data.set_playback_stopped();
-            Handled::No
+            Handled::Yes
         //
         // Playback control
         //

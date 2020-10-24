@@ -42,11 +42,15 @@ pub struct State {
 }
 
 impl State {
-    pub fn set_playback_progress(&mut self, item: Arc<Track>, progress: AudioDuration) {
+    pub fn set_playback_playing(&mut self, item: Arc<Track>) {
         self.playback.is_playing = true;
         self.playback.item.replace(item.clone());
-        self.playback.progress.replace(progress);
+        self.playback.progress.take();
         self.track_ctx.playback_item.replace(item);
+    }
+
+    pub fn set_playback_progress(&mut self, progress: AudioDuration) {
+        self.playback.progress.replace(progress);
     }
 
     pub fn set_playback_paused(&mut self) {
@@ -104,12 +108,6 @@ impl Navigation {
 pub struct PlaybackCtx {
     pub tracks: Vector<Arc<Track>>,
     pub position: usize,
-}
-
-#[derive(Clone, Debug, Default)]
-pub struct PlaybackReport {
-    pub progress: AudioDuration,
-    pub item: String,
 }
 
 #[derive(Clone, Debug, Default, Data, Lens)]
