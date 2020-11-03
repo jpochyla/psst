@@ -1,17 +1,23 @@
 use crate::promise::Promise;
 use aspotify::DatePrecision;
 use chrono::NaiveDate;
-use druid::{im::Vector, Data, Lens};
+use druid::{
+    im::{HashSet, Vector},
+    Data, Lens,
+};
 use itertools::Itertools;
-use psst_core::item_id::{ItemId, ItemIdType};
+use psst_core::{
+    audio_player::PlaybackConfig,
+    item_id::{ItemId, ItemIdType},
+};
 use serde::{Deserialize, Serialize};
-use std::str::FromStr;
-use std::{fs::File, ops::Deref, sync::Arc, time::Duration};
+use std::{fs::File, ops::Deref, str::FromStr, sync::Arc, time::Duration};
 
 #[derive(Clone, Debug, Default, Data, Serialize, Deserialize)]
 pub struct Config {
     pub username: Option<String>,
     pub password: Option<String>,
+    pub bitrate: usize,
 }
 
 impl Config {
@@ -26,6 +32,12 @@ impl Config {
     pub fn save(&self) {
         let file = File::create("config.json").expect("Failed to open config");
         serde_json::to_writer_pretty(file, self).expect("Failed to write config");
+    }
+
+    pub fn playback(&self) -> PlaybackConfig {
+        PlaybackConfig {
+            bitrate: self.bitrate,
+        }
     }
 }
 

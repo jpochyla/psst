@@ -34,12 +34,26 @@ pub enum AudioFile {
 }
 
 impl AudioFile {
-    // List of compatible audio formats, sorted by preference.
-    pub const COMPATIBLE_AUDIO_FORMATS: [Format; 3] = [
-        Format::OGG_VORBIS_96,
-        Format::OGG_VORBIS_160,
-        Format::OGG_VORBIS_320,
-    ];
+    pub fn compatible_audio_formats(preferred_bitrate: usize) -> &'static [Format] {
+        match preferred_bitrate {
+            96 => &[
+                Format::OGG_VORBIS_96,
+                Format::OGG_VORBIS_160,
+                Format::OGG_VORBIS_320,
+            ],
+            160 => &[
+                Format::OGG_VORBIS_160,
+                Format::OGG_VORBIS_320,
+                Format::OGG_VORBIS_96,
+            ],
+            320 => &[
+                Format::OGG_VORBIS_320,
+                Format::OGG_VORBIS_160,
+                Format::OGG_VORBIS_96,
+            ],
+            _ => unreachable!(),
+        }
+    }
 
     pub fn open(path: AudioPath, cdn: CdnHandle, cache: CacheHandle) -> Result<Self, Error> {
         let cached_file = cache.audio_file_path(path.file_id);

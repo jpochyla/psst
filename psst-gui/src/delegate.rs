@@ -114,7 +114,7 @@ fn handle_player_events(
 }
 
 impl PlayerDelegate {
-    fn new(session: SessionHandle, event_sink: ExtEventSink) -> Self {
+    fn new(config: &Config, session: SessionHandle, event_sink: ExtEventSink) -> Self {
         let cdn = Cdn::connect(session.clone());
         let cache = Cache::new().expect("Failed to open cache");
 
@@ -123,11 +123,8 @@ impl PlayerDelegate {
         let (player, player_receiver) = {
             let session = session.clone();
             let cdn = cdn.clone();
-            let cache = cache.clone();
             let ctrl = audio_output.controller();
-            let config = PlaybackConfig {
-                country: "CZ".to_string(),
-            };
+            let config = config.playback();
             Player::new(session, cdn, cache, config, ctrl)
         };
         let player_sender = player.event_sender();
@@ -233,7 +230,7 @@ impl Delegate {
         let player = {
             let session = session.handle.clone();
             let sink = event_sink.clone();
-            PlayerDelegate::new(session, sink)
+            PlayerDelegate::new(config, session, sink)
         };
         let web = {
             let session = session.handle.clone();

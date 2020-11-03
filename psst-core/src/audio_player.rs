@@ -22,15 +22,18 @@ use std::{
     time::Duration,
 };
 
+const PREVIOUS_TRACK_THRESHOLD: Duration = Duration::from_secs(3);
+
 #[derive(Clone)]
 pub struct PlaybackConfig {
-    // ISO 3166-1 alpha-2 country code used for track re-linking purposes in case of regional
-    // restrictions.
-    pub country: String,
-    // TODO: Preferred quality.
+    pub bitrate: usize,
 }
 
-const PREVIOUS_TRACK_THRESHOLD: Duration = Duration::from_secs(3);
+impl Default for PlaybackConfig {
+    fn default() -> Self {
+        Self { bitrate: 320 }
+    }
+}
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub struct PlaybackItem {
@@ -45,7 +48,7 @@ impl PlaybackItem {
         cache: CacheHandle,
         config: &PlaybackConfig,
     ) -> Result<LoadedPlaybackItem, Error> {
-        let path = load_audio_path(self.item_id, &session, &cache, config)?;
+        let path = load_audio_path(self.item_id, &session, &cache, &config)?;
         let key = load_audio_key(&path, &session, &cache)?;
         let file = AudioFile::open(path, cdn, cache)?;
         let source = file.audio_source(key)?;
@@ -61,31 +64,60 @@ fn load_audio_path(
 ) -> Result<AudioPath, Error> {
     match item_id.id_type {
         ItemIdType::Track => {
-            let track = load_track(item_id, session, cache)?;
-
-            let path = if track.is_restricted_in_region(&config.country) {
-                // The track is regionally restricted and is unavailable.  Let's try to find an
-                // alternative track.
-                let alt_id = track
-                    .find_allowed_alternative(&config.country)
-                    .ok_or(Error::AudioFileNotFound)?;
-                let alt_track = load_track(alt_id, session, cache)?;
-                let alt_path = alt_track.to_audio_path().ok_or(Error::AudioFileNotFound)?;
-                // We've found an alternative track with a fitting audio file.  Let's cheat a
-                // little and pretend we've obtained it from the requested track.
-                // TODO: We should be honest and display the real track information.
-                AudioPath {
-                    item_id,
-                    ..alt_path
-                }
-            } else {
-                track.to_audio_path().ok_or(Error::AudioFileNotFound)?
-            };
-
-            Ok(path)
+            load_audio_path_from_track_or_alternative(item_id, session, cache, config)
         }
         ItemIdType::Podcast => unimplemented!(),
         ItemIdType::Unknown => unimplemented!(),
+    }
+}
+
+fn load_audio_path_from_track_or_alternative(
+    item_id: ItemId,
+    session: &SessionHandle,
+    cache: &CacheHandle,
+    config: &PlaybackConfig,
+) -> Result<AudioPath, Error> {
+    let track = load_track(item_id, session, cache)?;
+    let country = get_country_code(session, cache);
+    let path = match country {
+        Some(user_country) if track.is_restricted_in_region(&user_country) => {
+            // The track is regionally restricted and is unavailable.  Let's try to find an
+            // alternative track.
+            let alt_id = track
+                .find_allowed_alternative(&user_country)
+                .ok_or(Error::AudioFileNotFound)?;
+            let alt_track = load_track(alt_id, session, cache)?;
+            let alt_path = alt_track
+                .to_audio_path(config.bitrate)
+                .ok_or(Error::AudioFileNotFound)?;
+            // We've found an alternative track with a fitting audio file.  Let's cheat a
+            // little and pretend we've obtained it from the requested track.
+            // TODO: We should be honest and display the real track information.
+            AudioPath {
+                item_id,
+                ..alt_path
+            }
+        }
+        _ => {
+            // Either we do not have a country code loaded or the track is available, return
+            // it.
+            track
+                .to_audio_path(config.bitrate)
+                .ok_or(Error::AudioFileNotFound)?
+        }
+    };
+    Ok(path)
+}
+
+fn get_country_code(session: &SessionHandle, cache: &CacheHandle) -> Option<String> {
+    if let Some(cached_country_code) = cache.get_country_code() {
+        Some(cached_country_code)
+    } else {
+        let country_code = session.connected().ok()?.get_country_code()?;
+        if let Err(err) = cache.save_country_code(&country_code) {
+            log::warn!("failed to save country code to cache: {:?}", err);
+        }
+        Some(country_code)
     }
 }
 
@@ -229,6 +261,7 @@ impl Player {
             PlayerCommand::Next => self.next(),
             PlayerCommand::Stop => self.stop(),
             PlayerCommand::Seek { position } => self.seek(position),
+            PlayerCommand::Configure { config } => self.configure(config),
         }
     }
 
@@ -473,6 +506,10 @@ impl Player {
             .seek(position);
     }
 
+    fn configure(&mut self, config: PlaybackConfig) {
+        self.config = config;
+    }
+
     fn is_in_preload(&self, item: PlaybackItem) -> bool {
         match self.preload {
             PreloadState::Preloading { item: p_item, .. }
@@ -500,6 +537,9 @@ pub enum PlayerCommand {
     Stop,
     Seek {
         position: Duration,
+    },
+    Configure {
+        config: PlaybackConfig,
     },
 }
 

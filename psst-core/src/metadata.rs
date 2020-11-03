@@ -24,7 +24,7 @@ impl Fetch for Track {
 pub trait ToAudioPath {
     fn is_restricted_in_region(&self, country: &str) -> bool;
     fn find_allowed_alternative(&self, country: &str) -> Option<ItemId>;
-    fn to_audio_path(&self) -> Option<AudioPath>;
+    fn to_audio_path(&self, preferred_bitrate: usize) -> Option<AudioPath>;
 }
 
 impl ToAudioPath for Track {
@@ -42,8 +42,8 @@ impl ToAudioPath for Track {
         ItemId::from_raw(alt_track.gid.as_ref()?, ItemIdType::Track)
     }
 
-    fn to_audio_path(&self) -> Option<AudioPath> {
-        let file = AudioFile::COMPATIBLE_AUDIO_FORMATS
+    fn to_audio_path(&self, preferred_bitrate: usize) -> Option<AudioPath> {
+        let file = AudioFile::compatible_audio_formats(preferred_bitrate)
             .iter()
             .find_map(|&preferred_format| {
                 self.file

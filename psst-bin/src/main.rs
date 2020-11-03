@@ -42,9 +42,7 @@ fn play_item(
 ) -> Result<(), Error> {
     let output = AudioOutput::open()?;
     let output_ctrl = output.controller();
-    let config = PlaybackConfig {
-        country: "CZ".to_string(),
-    };
+    let config = PlaybackConfig::default();
 
     let (mut player, player_receiver) =
         Player::new(session, cdn, cache, config, output.controller());

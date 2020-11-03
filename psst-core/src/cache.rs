@@ -38,17 +38,13 @@ impl Cache {
 // Cache of `Track` protobuf structures.
 impl Cache {
     pub fn get_track(&self, item_id: ItemId) -> Option<Track> {
-        let mut file = File::open(self.track_path(item_id)).ok()?;
-        let mut buf = Vec::new();
-        file.read_to_end(&mut buf).ok()?;
+        let buf = fs::read(self.track_path(item_id)).ok()?;
         deserialize_protobuf(&buf).ok()
     }
 
     pub fn save_track(&self, item_id: ItemId, track: &Track) -> Result<(), Error> {
         log::debug!("saving track to cache: {:?}", item_id);
-        let mut file = File::create(self.track_path(item_id))?;
-        let buf = serialize_protobuf(track)?;
-        file.write_all(&buf)?;
+        fs::write(self.track_path(item_id), &serialize_protobuf(track)?)?;
         Ok(())
     }
 
@@ -60,9 +56,7 @@ impl Cache {
 // Cache of `AudioKey`s.
 impl Cache {
     pub fn get_audio_key(&self, item_id: ItemId, file_id: FileId) -> Option<AudioKey> {
-        let mut file = File::open(self.audio_key_path(item_id, file_id)).ok()?;
-        let mut buf = Vec::new();
-        file.read_to_end(&mut buf).ok()?;
+        let buf = fs::read(self.audio_key_path(item_id, file_id)).ok()?;
         AudioKey::from_raw(&buf)
     }
 
@@ -73,8 +67,7 @@ impl Cache {
         key: &AudioKey,
     ) -> Result<(), Error> {
         log::debug!("saving audio key to cache: {:?}:{:?}", item_id, file_id);
-        let mut file = File::create(self.audio_key_path(item_id, file_id))?;
-        file.write_all(&key.0)?;
+        fs::write(self.audio_key_path(item_id, file_id), &key.0)?;
         Ok(())
     }
 
@@ -96,6 +89,22 @@ impl Cache {
         log::debug!("saving audio file to cache: {:?}", file_id);
         fs::copy(from_path, self.audio_file_path(file_id))?;
         Ok(())
+    }
+}
+
+// Cache of user country code.
+impl Cache {
+    pub fn get_country_code(&self) -> Option<String> {
+        fs::read_to_string(self.country_code_path()).ok()
+    }
+
+    pub fn save_country_code(&self, country_code: &str) -> Result<(), Error> {
+        fs::write(self.country_code_path(), country_code)?;
+        Ok(())
+    }
+
+    fn country_code_path(&self) -> PathBuf {
+        self.base.join("country_code")
     }
 }
 
