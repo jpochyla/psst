@@ -6,12 +6,13 @@ use druid::{
     Data, Lens,
 };
 use itertools::Itertools;
+use platform_dirs::AppDirs;
 use psst_core::{
     audio_player::PlaybackConfig,
     item_id::{ItemId, ItemIdType},
 };
 use serde::{Deserialize, Serialize};
-use std::{fs::File, ops::Deref, str::FromStr, sync::Arc, time::Duration};
+use std::{fs::File, ops::Deref, path::PathBuf, str::FromStr, sync::Arc, time::Duration};
 
 #[derive(Clone, Debug, Default, Data, Serialize, Deserialize)]
 pub struct Config {
@@ -21,6 +22,16 @@ pub struct Config {
 }
 
 impl Config {
+    fn app_dirs() -> Option<AppDirs> {
+        const USE_XDG_ON_MACOS: bool = false;
+
+        AppDirs::new(Some("Psst"), USE_XDG_ON_MACOS)
+    }
+
+    pub fn cache_path() -> Option<PathBuf> {
+        Self::app_dirs().map(|dirs| dirs.cache_dir)
+    }
+
     pub fn load() -> Option<Config> {
         if let Ok(file) = File::open("config.json") {
             Some(serde_json::from_reader(file).expect("Failed to read config"))

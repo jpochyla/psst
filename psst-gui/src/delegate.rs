@@ -4,6 +4,7 @@ use crate::{
     consts,
     data::{AudioDuration, Config, Navigation, Route, State, Track},
     database::Web,
+    database::{Web, WebCache},
     widgets::remote_image,
 };
 use druid::{

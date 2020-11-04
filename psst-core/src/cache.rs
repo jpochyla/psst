@@ -21,8 +21,8 @@ pub struct Cache {
 }
 
 impl Cache {
-    pub fn new() -> Result<CacheHandle, Error> {
-        let base = PathBuf::from("cache");
+    pub fn new(base: PathBuf) -> Result<CacheHandle, Error> {
+        log::info!("using cache: {:?}", base);
 
         // Create the cache structure.
         mkdir_if_not_exists(&base)?;
@@ -108,7 +108,7 @@ impl Cache {
     }
 }
 
-fn mkdir_if_not_exists(path: &Path) -> io::Result<()> {
+pub fn mkdir_if_not_exists(path: &Path) -> io::Result<()> {
     fs::create_dir(path).or_else(|err| {
         if err.kind() == io::ErrorKind::AlreadyExists {
             Ok(())
