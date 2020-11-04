@@ -117,7 +117,10 @@ fn handle_player_events(
 impl PlayerDelegate {
     fn new(config: &Config, session: SessionHandle, event_sink: ExtEventSink) -> Self {
         let cdn = Cdn::connect(session.clone());
-        let cache = Cache::new().expect("Failed to open cache");
+        let cache = {
+            let path = Config::cache_path().expect("Failed to find cache path location");
+            Cache::new(path).expect("Failed to open cache")
+        };
 
         let audio_output = AudioOutput::open().expect("Failed to open audio output");
 
@@ -235,7 +238,9 @@ impl Delegate {
         };
         let web = {
             let session = session.handle.clone();
-            Web::new(session)
+            let path = Config::cache_path().expect("Failed to find cache path location");
+            let cache = WebCache::new(path).expect("Failed to create web API cache");
+            Web::new(session, cache)
         };
 
         Self {

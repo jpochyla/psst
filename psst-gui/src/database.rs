@@ -8,20 +8,89 @@ use crate::{
 use aspotify::{ItemType, Market, Page, PlaylistItemType, Response};
 use druid::im::Vector;
 use itertools::Itertools;
-use psst_core::{access_token::TokenProvider, session::SessionHandle};
-use std::{future::Future, sync::Arc};
+use psst_core::{access_token::TokenProvider, cache::mkdir_if_not_exists, session::SessionHandle};
+use serde::{de::DeserializeOwned, Serialize};
+use std::{
+    fs::File,
+    future::Future,
+    io,
+    marker::PhantomData,
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 use tokio_compat_02::FutureExt;
+
+struct CacheEntry<T> {
+    path: PathBuf,
+    _phantom: PhantomData<T>,
+}
+
+impl<T> CacheEntry<T> {
+    fn new(base: &Path, bucket: &str, id: &str) -> Self {
+        Self {
+            path: base.join(bucket).join(id),
+            _phantom: PhantomData::default(),
+        }
+    }
+}
+
+impl<T: Serialize + DeserializeOwned> CacheEntry<T> {
+    fn load(&self) -> Option<T> {
+        serde_json::from_reader(File::open(&self.path).ok()?).ok()
+    }
+
+    fn store(&self, value: &T) -> Result<(), Error> {
+        serde_json::to_writer(File::create(&self.path)?, &value)?;
+        Ok(())
+    }
+
+    async fn load_or_store(
+        &self,
+        request: impl Future<Output = Result<T, Error>>,
+    ) -> Result<T, Error> {
+        if let Some(item) = self.load() {
+            Ok(item)
+        } else {
+            let item = request.await?;
+            if let Err(err) = self.store(&item) {
+                log::warn!("failed to save to cache: {:?}", err);
+            }
+            Ok(item)
+        }
+    }
+}
+
+pub struct WebCache {
+    base: PathBuf,
+}
+
+const CACHE_ALBUM: &str = "album";
+
+impl WebCache {
+    pub fn new(base: PathBuf) -> Result<WebCache, Error> {
+        // Create the cache structure.
+        mkdir_if_not_exists(&base)?;
+        mkdir_if_not_exists(&base.join(CACHE_ALBUM))?;
+
+        Ok(Self { base })
+    }
+
+    fn album(&self, id: &str) -> CacheEntry<aspotify::Album> {
+        CacheEntry::new(&self.base, CACHE_ALBUM, &id)
+    }
+}
 
 #[derive(Clone)]
 pub struct Web {
     session: SessionHandle,
     token_provider: Arc<TokenProvider>,
+    cache: Arc<WebCache>,
     spotify: Arc<aspotify::Client>,
     image_client: reqwest::Client,
 }
 
 impl Web {
-    pub fn new(session: SessionHandle) -> Self {
+    pub fn new(session: SessionHandle, cache: WebCache) -> Self {
         // Web API access tokens are requested from the `TokenProvider`, not through the
         // usual Spotify Authorization process, but we still need to give _some_
         // credentials to `aspotify::Client`.
@@ -34,6 +103,7 @@ impl Web {
         Self {
             session,
             image_client,
+            cache: Arc::new(cache),
             spotify: Arc::new(spotify),
             token_provider: Arc::new(TokenProvider::new()),
         }
@@ -80,14 +150,20 @@ impl Web {
     }
 
     pub async fn load_album(&self, id: &str) -> Result<Album, Error> {
-        let result = self
-            .client()
+        Ok(self
+            .cache
+            .album(id)
+            .load_or_store(async {
+                Ok(self
+                    .client()
+                    .await?
+                    .albums()
+                    .get_album(id, Some(Market::FromToken))
+                    .await?
+                    .data)
+            })
             .await?
-            .albums()
-            .get_album(id, Some(Market::FromToken))
-            .await?;
-        let result = result.data.into();
-        Ok(result)
+            .into())
     }
 
     pub async fn load_artist(&self, id: &str) -> Result<Artist, Error> {
@@ -432,6 +508,18 @@ impl From<aspotify::Segment> for AudioAnalysisSegment {
             pitches: segment.pitches.into(),
             timbre: segment.timbre.into(),
         }
+    }
+}
+
+impl From<serde_json::Error> for Error {
+    fn from(err: serde_json::Error) -> Self {
+        Error::WebApiError(err.to_string())
+    }
+}
+
+impl From<io::Error> for Error {
+    fn from(err: io::Error) -> Self {
+        Error::WebApiError(err.to_string())
     }
 }
 
