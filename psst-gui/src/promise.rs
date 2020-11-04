@@ -50,6 +50,10 @@ impl<T: Data, D: Data, E: Data> Promise<T, D, E> {
         *self = Self::Resolved(val);
     }
 
+    pub fn reject(&mut self, err: E) {
+        *self = Self::Rejected(err);
+    }
+
     pub fn resolve_or_reject(&mut self, res: Result<T, E>) {
         *self = match res {
             Ok(ok) => Self::Resolved(ok),

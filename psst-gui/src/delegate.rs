@@ -1,9 +1,7 @@
-use crate::data::TrackId;
 use crate::{
     commands::*,
     consts,
-    data::{AudioDuration, Config, Navigation, Route, State, Track},
-    database::Web,
+    data::{AudioDuration, Config, Navigation, Route, State, Track, TrackId},
     database::{Web, WebCache},
     widgets::remote_image,
 };
@@ -14,7 +12,7 @@ use druid::{
 use lru_cache::LruCache;
 use psst_core::{
     audio_output::AudioOutput,
-    audio_player::{PlaybackConfig, PlaybackItem, Player, PlayerCommand, PlayerEvent},
+    audio_player::{PlaybackItem, Player, PlayerCommand, PlayerEvent},
     cache::Cache,
     cdn::{Cdn, CdnHandle},
     connection::Credentials,
@@ -449,7 +447,28 @@ impl AppDelegate<State> for Delegate {
             data.library.saved_albums.resolve_or_reject(result);
             Handled::Yes
         } else if let Some(result) = cmd.get(UPDATE_SAVED_TRACKS).cloned() {
-            data.library.saved_tracks.resolve_or_reject(result);
+            match result {
+                Ok(tracks) => {
+                    data.track_ctx.set_saved_tracks(&tracks);
+                    data.library.saved_tracks.resolve(tracks);
+                }
+                Err(err) => {
+                    data.track_ctx.set_saved_tracks(&Vector::new());
+                    data.library.saved_tracks.reject(err);
+                }
+            };
+            Handled::Yes
+        } else if let Some(track_id) = cmd.get(SAVE_TRACK).cloned() {
+            // TODO
+            Handled::Yes
+        } else if let Some(track_id) = cmd.get(UNSAVE_TRACK).cloned() {
+            // TODO
+            Handled::Yes
+        } else if let Some(album_id) = cmd.get(SAVE_ALBUM).cloned() {
+            // TODO
+            Handled::Yes
+        } else if let Some(album_id) = cmd.get(UNSAVE_ALBUM).cloned() {
+            // TODO
             Handled::Yes
         //
         // Album detail

@@ -102,6 +102,7 @@ impl Default for State {
             },
             track_ctx: TrackCtx {
                 playback_item: None,
+                saved_tracks: HashSet::new(),
             },
         }
     }
@@ -300,6 +301,7 @@ impl Default for AlbumType {
 #[derive(Clone, Debug, Data)]
 pub struct TrackCtx {
     pub playback_item: Option<Arc<Track>>,
+    pub saved_tracks: HashSet<TrackId>,
 }
 
 impl TrackCtx {
@@ -308,6 +310,14 @@ impl TrackCtx {
             .as_ref()
             .map(|t| t.id.same(&track.id))
             .unwrap_or(false)
+    }
+
+    pub fn is_saved(&self, track: &Track) -> bool {
+        self.saved_tracks.contains(&track.id)
+    }
+
+    pub fn set_saved_tracks(&mut self, tracks: &Vector<Arc<Track>>) {
+        self.saved_tracks = tracks.iter().map(|track| track.id).collect();
     }
 }
 
@@ -432,7 +442,7 @@ impl AudioDuration {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
 pub struct TrackId(ItemId);
 
 impl Data for TrackId {

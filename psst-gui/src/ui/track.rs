@@ -173,7 +173,7 @@ fn make_track(display: TrackDisplay, play_ctrl: WidgetId) -> impl Widget<TrackSt
         .on_ex_click(
             move |ctx, event, ts: &mut TrackState, _| match event.button {
                 MouseButton::Right => {
-                    let menu = ContextMenu::new(make_track_menu(&ts.track), event.window_pos);
+                    let menu = ContextMenu::new(make_track_menu(ts), event.window_pos);
                     ctx.show_context_menu(menu);
                 }
                 MouseButton::Left => {
@@ -184,26 +184,16 @@ fn make_track(display: TrackDisplay, play_ctrl: WidgetId) -> impl Widget<TrackSt
         )
 }
 
-fn make_track_menu(track: &Track) -> MenuDesc<State> {
-    let mut menu = MenuDesc::empty()
-        .append(MenuItem::new(
-            LocalizedString::new("menu-item-save-to-library").with_placeholder("Save to Library"),
-            commands::SAVE_TRACK.with(track.id),
-        ))
-        .append(MenuItem::new(
-            LocalizedString::new("menu-item-remove-from-library")
-                .with_placeholder("Remove from Library"),
-            commands::UNSAVE_TRACK.with(track.id),
-        ))
-        .append_separator();
+fn make_track_menu(ts: &TrackState) -> MenuDesc<State> {
+    let mut menu = MenuDesc::empty();
 
-    if let Some(artist) = track.artists.front() {
+    if let Some(artist) = ts.track.artists.front() {
         menu = menu.append(MenuItem::new(
             LocalizedString::new("menu-item-show-artist").with_placeholder("Show Artist"),
             commands::NAVIGATE_TO.with(Navigation::ArtistDetail(artist.id.clone())),
         ));
     }
-    if let Some(album) = track.album.as_ref() {
+    if let Some(album) = ts.track.album.as_ref() {
         menu = menu.append(MenuItem::new(
             LocalizedString::new("menu-item-show-album").with_placeholder("Show Album"),
             commands::NAVIGATE_TO.with(Navigation::AlbumDetail(album.id.clone())),
@@ -211,8 +201,23 @@ fn make_track_menu(track: &Track) -> MenuDesc<State> {
     }
     menu = menu.append(MenuItem::new(
         LocalizedString::new("menu-item-copy-link").with_placeholder("Copy Link"),
-        commands::COPY_TO_CLIPBOARD.with(track.link()),
+        commands::COPY_TO_CLIPBOARD.with(ts.track.link()),
     ));
+
+    menu = menu.append_separator();
+
+    if ts.ctx.is_saved(&ts.track) {
+        menu = menu.append(MenuItem::new(
+            LocalizedString::new("menu-item-remove-from-library")
+                .with_placeholder("Remove from Library"),
+            commands::UNSAVE_TRACK.with(ts.track.id),
+        ));
+    } else {
+        menu = menu.append(MenuItem::new(
+            LocalizedString::new("menu-item-save-to-library").with_placeholder("Save to Library"),
+            commands::SAVE_TRACK.with(ts.track.id),
+        ));
+    }
 
     menu
 }
