@@ -14,11 +14,34 @@ use psst_core::{
 use serde::{Deserialize, Serialize};
 use std::{fs::File, ops::Deref, path::PathBuf, str::FromStr, sync::Arc, time::Duration};
 
-#[derive(Clone, Debug, Default, Data, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Data, Serialize, Deserialize)]
+pub enum AudioQuality {
+    Low,
+    Normal,
+    High,
+}
+
+impl AudioQuality {
+    fn as_bitrate(self) -> usize {
+        match self {
+            AudioQuality::Low => 96,
+            AudioQuality::Normal => 160,
+            AudioQuality::High => 320,
+        }
+    }
+}
+
+impl Default for AudioQuality {
+    fn default() -> Self {
+        Self::High
+    }
+}
+
+#[derive(Clone, Debug, Default, Data, Lens, Serialize, Deserialize)]
 pub struct Config {
-    pub username: Option<String>,
-    pub password: Option<String>,
-    pub bitrate: usize,
+    pub username: String,
+    pub password: String,
+    pub audio_quality: AudioQuality,
 }
 
 impl Config {
@@ -47,7 +70,7 @@ impl Config {
 
     pub fn playback(&self) -> PlaybackConfig {
         PlaybackConfig {
-            bitrate: self.bitrate,
+            bitrate: self.audio_quality.as_bitrate(),
         }
     }
 }
@@ -140,6 +163,7 @@ pub enum Route {
     ArtistDetail,
     PlaylistDetail,
     Library,
+    Config,
 }
 
 #[derive(Clone, Debug, Data)]
@@ -150,6 +174,7 @@ pub enum Navigation {
     ArtistDetail(String),
     PlaylistDetail(Playlist),
     Library,
+    Config,
 }
 
 impl Navigation {
@@ -161,6 +186,7 @@ impl Navigation {
             Navigation::ArtistDetail(_) => Route::ArtistDetail,
             Navigation::PlaylistDetail(_) => Route::PlaylistDetail,
             Navigation::Library => Route::Library,
+            Navigation::Config => Route::Config,
         }
     }
 }

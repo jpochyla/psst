@@ -11,6 +11,7 @@ use druid::{
 
 pub mod album;
 pub mod artist;
+pub mod config;
 pub mod library;
 pub mod playback;
 pub mod playlist;
@@ -28,14 +29,15 @@ pub fn make_root() -> impl Widget<State> {
         .with_flex_child(playlists, 1.0)
         .background(theme::BACKGROUND_DARK);
 
-    let nav = Flex::row()
+    let topbar = Flex::row()
         .with_child(make_back_button())
         .with_default_spacer()
-        .with_child(make_title());
+        .with_child(make_title())
+        .with_flex_child(make_config_button().align_right(), 1.0);
 
     let main = Flex::column()
         .cross_axis_alignment(CrossAxisAlignment::Start)
-        .with_child(nav)
+        .with_child(topbar)
         .with_flex_child(make_route(), 1.0)
         .with_child(playback::make_panel());
 
@@ -97,16 +99,22 @@ pub fn make_route() -> impl Widget<State> {
     let switcher = ViewDispatcher::new(
         |state: &State, _| state.route.clone(),
         |route: &Route, _, _| match route {
-            Route::Home => SizedBox::empty().boxed(),
+            Route::Home => make_home().boxed(),
             Route::SearchResults => search::make_results().boxed(),
             Route::AlbumDetail => album::make_detail().boxed(),
             Route::ArtistDetail => artist::make_detail().boxed(),
             Route::PlaylistDetail => playlist::make_detail().boxed(),
             Route::Library => library::make_detail().boxed(),
+            Route::Config => config::make_config().boxed(),
         },
     )
     .padding(theme::grid(1.0));
+
     Scroll::new(switcher).vertical().expand()
+}
+
+pub fn make_home() -> impl Widget<State> {
+    SizedBox::empty()
 }
 
 pub fn make_back_button() -> impl Widget<State> {
@@ -138,6 +146,19 @@ pub fn make_title() -> impl Widget<State> {
     Label::dynamic(|state: &State, _| get_route_title(state)).with_font(theme::UI_FONT_MEDIUM)
 }
 
+pub fn make_config_button() -> impl Widget<State> {
+    icons::CONFIG
+        .scale((theme::grid(2.0), theme::grid(2.0)))
+        .padding(theme::grid(1.0))
+        .hover()
+        .rounded(theme::BUTTON_BORDER_RADIUS)
+        .on_click(|ctx, _state, _env| {
+            ctx.submit_command(commands::NAVIGATE_TO.with(Navigation::Config));
+        })
+        .padding(theme::grid(1.0))
+        .env_scope(|env, _state| env.set(icons::ICON_COLOR, theme::GREY_4))
+}
+
 fn get_route_title(state: &State) -> String {
     match state.route {
         Route::Home => "".to_string(),
@@ -158,5 +179,6 @@ fn get_route_title(state: &State) -> String {
             Promise::Resolved(playlist) => playlist.name.to_string(),
             Promise::Rejected(err) => err.to_string(),
         },
+        Route::Config => "Preferences".to_string(),
     }
 }

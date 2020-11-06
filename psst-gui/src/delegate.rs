@@ -40,8 +40,8 @@ const RECONNECT_AFTER_DELAY: Duration = Duration::from_secs(3);
 impl SessionDelegate {
     fn new(config: &Config, event_sink: ExtEventSink) -> Self {
         let creds = Credentials::from_username_and_password(
-            config.username.as_ref().cloned().unwrap(),
-            config.password.as_ref().cloned().unwrap(),
+            config.username.clone(),
+            config.password.clone(),
         );
         let handle = SessionHandle::new();
         let thread = thread::spawn({
@@ -282,6 +282,9 @@ impl Delegate {
                 self.event_sink
                     .submit_command(GOTO_LIBRARY, (), Target::Auto)
                     .unwrap();
+            }
+            Navigation::Config => {
+                data.route = Route::Config;
             }
         }
     }
