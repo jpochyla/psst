@@ -1,13 +1,12 @@
 use crate::{
-    commands,
-    ctx::Ctx,
-    data::{Library, Navigation, Playlist, PlaylistDetail, State},
+    cmd,
+    data::{Ctx, Library, Navigation, Playlist, PlaylistDetail, State},
     ui::{
         theme,
         track::{make_tracklist, TrackDisplay},
         utils::{make_error, make_loader},
     },
-    widgets::{HoverExt, Promised},
+    widget::{HoverExt, Promised},
 };
 use druid::{
     widget::{Label, LineBreaking, List},
@@ -27,7 +26,7 @@ pub fn make_list() -> impl Widget<State> {
                     .hover()
                     .on_click(|ctx, playlist, _| {
                         let nav = Navigation::PlaylistDetail(playlist.clone());
-                        ctx.submit_command(commands::NAVIGATE_TO.with(nav));
+                        ctx.submit_command(cmd::NAVIGATE_TO.with(nav));
                     })
             })
         },

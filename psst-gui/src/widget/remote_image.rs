@@ -2,26 +2,28 @@ use druid::{
     widget::{prelude::*, Image},
     Data, ImageBuf, Selector, WidgetPod,
 };
+use std::sync::Arc;
 
-pub const REQUEST_DATA: Selector<String> = Selector::new("remote-image.request-data");
-pub const PROVIDE_DATA: Selector<DataPayload> = Selector::new("remote-image.provide-data");
+pub const REQUEST_DATA: Selector<Arc<str>> = Selector::new("remote-image.request-data");
+pub const PROVIDE_DATA: Selector<ImagePayload> = Selector::new("remote-image.provide-data");
 
-pub struct DataPayload {
-    pub location: String,
+#[derive(Clone)]
+pub struct ImagePayload {
+    pub location: Arc<str>,
     pub image_buf: ImageBuf,
 }
 
 pub struct RemoteImage<T> {
     placeholder: WidgetPod<T, Box<dyn Widget<T>>>,
     image: Option<WidgetPod<T, Image>>,
-    locator: Box<dyn Fn(&T, &Env) -> Option<String>>,
-    location: Option<String>,
+    locator: Box<dyn Fn(&T, &Env) -> Option<Arc<str>>>,
+    location: Option<Arc<str>>,
 }
 
 impl<T: Data> RemoteImage<T> {
     pub fn new(
         placeholder: impl Widget<T> + 'static,
-        locator: impl Fn(&T, &Env) -> Option<String> + 'static,
+        locator: impl Fn(&T, &Env) -> Option<Arc<str>> + 'static,
     ) -> Self {
         Self {
             placeholder: WidgetPod::new(placeholder).boxed(),

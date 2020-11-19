@@ -109,7 +109,7 @@ where
                 // Skip these and continue to next packet.
             }
             Err(err) => break Err(err.into()),
-            Ok(Some(packet)) if packet.len() == 0 => {
+            Ok(Some(packet)) if packet.is_empty() => {
                 // Skip empty packets, i.e. when we seek in the stream.
             }
             Ok(res) => break Ok(res),

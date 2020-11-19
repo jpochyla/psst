@@ -1,18 +1,18 @@
 use crate::{
-    commands,
-    data::{Navigation, Route, State},
-    promise::Promise,
-    widgets::{button::HOVER_COLD_COLOR, icons, HoverExt, Icon, ViewDispatcher},
+    cmd,
+    data::{Navigation, Promise, Route, State},
+    widget::{button::HOVER_COLD_COLOR, icons, HoverExt, Icon, ViewDispatcher},
 };
 use druid::{
     widget::{CrossAxisAlignment, Flex, Label, Scroll, SizedBox, Split, ViewSwitcher},
-    Widget, WidgetExt,
+    Widget, WidgetExt, WindowDesc,
 };
 
 pub mod album;
 pub mod artist;
 pub mod config;
 pub mod library;
+pub mod menu;
 pub mod playback;
 pub mod playlist;
 pub mod search;
@@ -20,11 +20,31 @@ pub mod theme;
 pub mod track;
 pub mod utils;
 
+pub fn make_main_window() -> WindowDesc<State> {
+    WindowDesc::new(make_root)
+        .title("Psst")
+        .menu(menu::make_menu())
+        .with_min_size((200.0, 200.0))
+        .window_size((1000.0, 800.0))
+}
+
+pub fn make_config_window() -> WindowDesc<State> {
+    WindowDesc::new(make_config)
+        .title("Preferences")
+        .menu(menu::make_menu())
+        .window_size((500.0, 500.0))
+        .resizable(false)
+}
+
+fn make_config() -> impl Widget<State> {
+    config::make_config().center()
+}
+
 pub fn make_root() -> impl Widget<State> {
     let playlists = Scroll::new(playlist::make_list()).vertical();
     let sidebar = Flex::column()
         .must_fill_main_axis(true)
-        .with_child(make_menu())
+        .with_child(make_nav())
         .with_default_spacer()
         .with_flex_child(playlists, 1.0)
         .background(theme::BACKGROUND_DARK);
@@ -32,8 +52,7 @@ pub fn make_root() -> impl Widget<State> {
     let topbar = Flex::row()
         .with_child(make_back_button())
         .with_default_spacer()
-        .with_child(make_title())
-        .with_flex_child(make_config_button().align_right(), 1.0);
+        .with_child(make_title());
 
     let main = Flex::column()
         .cross_axis_alignment(CrossAxisAlignment::Start)
@@ -48,23 +67,23 @@ pub fn make_root() -> impl Widget<State> {
         .solid_bar(true)
 }
 
-pub fn make_menu() -> impl Widget<State> {
+pub fn make_nav() -> impl Widget<State> {
     Flex::column()
         .with_default_spacer()
-        .with_child(make_menu_button(
+        .with_child(make_nav_button(
             "Home",
             icons::HOME.scale((theme::grid(2.0), theme::grid(2.0))),
             Navigation::Home,
         ))
-        .with_child(make_menu_button(
+        .with_child(make_nav_button(
             "Library",
             icons::LIBRARY.scale((theme::grid(2.0), theme::grid(2.0))),
             Navigation::Library,
         ))
-        .with_child(make_menu_search())
+        .with_child(make_nav_search())
 }
 
-fn make_menu_button(title: &str, icon: Icon, nav: Navigation) -> impl Widget<State> {
+fn make_nav_button(title: &str, icon: Icon, nav: Navigation) -> impl Widget<State> {
     let label = Label::new(title);
 
     Flex::row()
@@ -88,10 +107,10 @@ fn make_menu_button(title: &str, icon: Icon, nav: Navigation) -> impl Widget<Sta
                 };
             }
         })
-        .on_click(move |ctx, _, _| ctx.submit_command(commands::NAVIGATE_TO.with(nav.clone())))
+        .on_click(move |ctx, _, _| ctx.submit_command(cmd::NAVIGATE_TO.with(nav.clone())))
 }
 
-fn make_menu_search() -> impl Widget<State> {
+fn make_nav_search() -> impl Widget<State> {
     search::make_input().padding((theme::grid(1.0), theme::grid(1.0)))
 }
 
@@ -105,7 +124,6 @@ pub fn make_route() -> impl Widget<State> {
             Route::ArtistDetail => artist::make_detail().boxed(),
             Route::PlaylistDetail => playlist::make_detail().boxed(),
             Route::Library => library::make_detail().boxed(),
-            Route::Config => config::make_config().boxed(),
         },
     )
     .padding(theme::grid(1.0));
@@ -119,7 +137,7 @@ pub fn make_home() -> impl Widget<State> {
 
 pub fn make_back_button() -> impl Widget<State> {
     ViewSwitcher::new(
-        |state: &State, _| state.nav_stack.is_empty(),
+        |state: &State, _| state.history.is_empty(),
         |&no_nav_history, _, _| {
             if no_nav_history {
                 SizedBox::empty()
@@ -133,7 +151,7 @@ pub fn make_back_button() -> impl Widget<State> {
                     .hover()
                     .rounded(theme::BUTTON_BORDER_RADIUS)
                     .on_click(|ctx, _state, _env| {
-                        ctx.submit_command(commands::NAVIGATE_BACK);
+                        ctx.submit_command(cmd::NAVIGATE_BACK);
                     })
                     .padding(theme::grid(1.0))
                     .boxed()
@@ -144,19 +162,6 @@ pub fn make_back_button() -> impl Widget<State> {
 
 pub fn make_title() -> impl Widget<State> {
     Label::dynamic(|state: &State, _| get_route_title(state)).with_font(theme::UI_FONT_MEDIUM)
-}
-
-pub fn make_config_button() -> impl Widget<State> {
-    icons::CONFIG
-        .scale((theme::grid(2.0), theme::grid(2.0)))
-        .padding(theme::grid(1.0))
-        .hover()
-        .rounded(theme::BUTTON_BORDER_RADIUS)
-        .on_click(|ctx, _state, _env| {
-            ctx.submit_command(commands::NAVIGATE_TO.with(Navigation::Config));
-        })
-        .padding(theme::grid(1.0))
-        .env_scope(|env, _state| env.set(icons::ICON_COLOR, theme::GREY_4))
 }
 
 fn get_route_title(state: &State) -> String {
@@ -179,6 +184,5 @@ fn get_route_title(state: &State) -> String {
             Promise::Resolved(playlist) => playlist.name.to_string(),
             Promise::Rejected(err) => err.to_string(),
         },
-        Route::Config => "Preferences".to_string(),
     }
 }

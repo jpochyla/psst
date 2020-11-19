@@ -1,15 +1,23 @@
-use crate::data::TrackId;
 use crate::{
-    data::{Album, Artist, AudioDuration, Navigation, PlaybackCtx, Playlist, SearchResults, Track},
+    data::{
+        Album, Artist, AudioDuration, Navigation, PlaybackCtx, Playlist, SearchResults, Track,
+        TrackId,
+    },
     error::Error,
 };
-use druid::{im::Vector, Selector};
+use druid::{im::Vector, Selector, WidgetId};
 use std::sync::Arc;
+
+// Widget IDs
+
+pub const WIDGET_SEARCH_INPUT: WidgetId = WidgetId::reserved(1);
 
 // Common
 
+pub const CONFIGURE: Selector = Selector::new("app.configure");
+pub const SHOW_MAIN: Selector = Selector::new("app.show-main");
 pub const SET_FOCUS: Selector = Selector::new("app.set-focus");
-pub const COPY_TO_CLIPBOARD: Selector<String> = Selector::new("app.copy-to-clipboard");
+pub const COPY: Selector<String> = Selector::new("app.copy-to-clipboard");
 
 // Session
 
@@ -37,9 +45,10 @@ pub const UPDATE_SAVED_ALBUMS: Selector<Result<Vector<Album>, Error>> =
     Selector::new("app.update-saved-albums");
 pub const UPDATE_SAVED_TRACKS: Selector<Result<Vector<Arc<Track>>, Error>> =
     Selector::new("app.update-saved-tracks");
-
 pub const SAVE_TRACK: Selector<TrackId> = Selector::new("app.save-track");
 pub const UNSAVE_TRACK: Selector<TrackId> = Selector::new("app.unsave-track");
+pub const SAVE_ALBUM: Selector<String> = Selector::new("app.save-album");
+pub const UNSAVE_ALBUM: Selector<String> = Selector::new("app.unsave-album");
 
 // Album detail
 

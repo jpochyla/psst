@@ -1,11 +1,11 @@
 use crate::{
-    commands,
+    cmd,
     data::{AudioDuration, Navigation, Playback, State, Track},
     ui::{album, theme},
-    widgets::{icons, HoverExt, Maybe},
+    widget::{icons, HoverExt, Maybe},
 };
 use druid::{
-    lens::{Id, InArc},
+    lens::{Identity, InArc},
     widget::{Controller, CrossAxisAlignment, Flex, Label, Painter, SizedBox, ViewSwitcher},
     Env, Event, EventCtx, MouseButton, MouseEvent, PaintCtx, Point, Rect, RenderContext, Size,
     Widget, WidgetExt,
@@ -40,7 +40,7 @@ fn make_info_track() -> impl Widget<Arc<Track>> {
         .on_click(|ctx: &mut EventCtx, track: &mut Track, _| {
             if let Some(artist) = track.artists.front() {
                 let nav = Navigation::ArtistDetail(artist.id.clone());
-                ctx.submit_command(commands::NAVIGATE_TO.with(nav));
+                ctx.submit_command(cmd::NAVIGATE_TO.with(nav));
             }
         });
 
@@ -50,7 +50,7 @@ fn make_info_track() -> impl Widget<Arc<Track>> {
         .on_click(|ctx, track: &mut Track, _| {
             if let Some(album) = track.album.as_ref() {
                 let nav = Navigation::AlbumDetail(album.id.clone());
-                ctx.submit_command(commands::NAVIGATE_TO.with(nav));
+                ctx.submit_command(cmd::NAVIGATE_TO.with(nav));
             }
         });
 
@@ -64,7 +64,7 @@ fn make_info_track() -> impl Widget<Arc<Track>> {
         .with_child(album_cover)
         .with_default_spacer()
         .with_child(track_info)
-        .lens(InArc::new::<Arc<Track>, Arc<Track>>(Id))
+        .lens(InArc::new::<Arc<Track>, Arc<Track>>(Identity))
 }
 
 fn make_player() -> impl Widget<Playback> {
@@ -89,7 +89,7 @@ fn make_player_controls() -> impl Widget<Playback> {
         .scale((theme::grid(2.0), theme::grid(2.0)))
         .padding(theme::grid(1.0))
         .hover()
-        .on_click(|ctx, _, _| ctx.submit_command(commands::PLAY_PREVIOUS));
+        .on_click(|ctx, _, _| ctx.submit_command(cmd::PLAY_PREVIOUS));
 
     let play_pause = ViewSwitcher::new(
         |playback: &Playback, _| playback.is_playing,
@@ -99,14 +99,14 @@ fn make_player_controls() -> impl Widget<Playback> {
                     .scale((theme::grid(2.0), theme::grid(2.0)))
                     .padding(theme::grid(1.0))
                     .hover()
-                    .on_click(|ctx, _, _| ctx.submit_command(commands::PLAY_PAUSE))
+                    .on_click(|ctx, _, _| ctx.submit_command(cmd::PLAY_PAUSE))
                     .boxed()
             } else {
                 icons::PLAY
                     .scale((theme::grid(2.0), theme::grid(2.0)))
                     .padding(theme::grid(1.0))
                     .hover()
-                    .on_click(|ctx, _, _| ctx.submit_command(commands::PLAY_RESUME))
+                    .on_click(|ctx, _, _| ctx.submit_command(cmd::PLAY_RESUME))
                     .boxed()
             }
         },
@@ -116,7 +116,7 @@ fn make_player_controls() -> impl Widget<Playback> {
         .scale((theme::grid(2.0), theme::grid(2.0)))
         .padding(theme::grid(1.0))
         .hover()
-        .on_click(|ctx, _, _| ctx.submit_command(commands::PLAY_NEXT));
+        .on_click(|ctx, _, _| ctx.submit_command(cmd::PLAY_NEXT));
 
     Flex::row()
         .with_child(play_previous)
@@ -137,7 +137,7 @@ fn make_player_progress() -> impl Widget<Playback> {
             .with_text_size(12.0)
             .align_left()
             .fix_width(theme::grid(4.0))
-            .lens(InArc::new::<Arc<Track>, _>(Id))
+            .lens(InArc::new::<Arc<Track>, _>(Identity))
     })
     .lens(Playback::item);
     Flex::row()
@@ -195,7 +195,7 @@ impl<T, W: Widget<T>> Controller<T, W> for SeekController {
     fn event(&mut self, child: &mut W, ctx: &mut EventCtx, event: &Event, data: &mut T, env: &Env) {
         let seek_to_mouse_pos = |ctx: &mut EventCtx, mouse_event: &MouseEvent| {
             let frac = mouse_event.pos.x / ctx.size().width;
-            ctx.submit_command(commands::SEEK_TO_FRACTION.with(frac));
+            ctx.submit_command(cmd::SEEK_TO_FRACTION.with(frac));
         };
 
         match event {

@@ -6,10 +6,7 @@ use crate::{
 };
 use psst_protocol::metadata::Track;
 use std::{
-    fs,
-    fs::File,
-    io,
-    io::{Read, Write},
+    fs, io,
     path::{Path, PathBuf},
     sync::Arc,
 };

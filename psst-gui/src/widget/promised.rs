@@ -1,4 +1,4 @@
-use crate::promise::{Promise, PromiseState};
+use crate::data::{Promise, PromiseState};
 use druid::{widget::prelude::*, Data, WidgetExt, WidgetPod};
 
 pub struct Promised<T, D, E> {

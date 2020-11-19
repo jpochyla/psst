@@ -1,12 +1,11 @@
 use crate::{
-    ctx::Ctx,
-    data::{Library, State},
+    data::{Ctx, Library, State},
     ui::{
         album::make_album,
         track::{make_tracklist, TrackDisplay},
         utils::{make_error, make_loader},
     },
-    widgets::Promised,
+    widget::Promised,
 };
 use druid::{
     widget::{CrossAxisAlignment, Flex, List},

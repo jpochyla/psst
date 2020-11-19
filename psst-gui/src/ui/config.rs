@@ -1,7 +1,13 @@
-use crate::data::{AudioQuality, Config, State};
-use crate::ui::theme;
-use druid::widget::{Button, CrossAxisAlignment, Flex, Label, RadioGroup, TextBox};
-use druid::{Widget, WidgetExt};
+use crate::{
+    cmd,
+    data::{AudioQuality, Config, State},
+    ui::theme,
+};
+use druid::{
+    commands,
+    widget::{Button, CrossAxisAlignment, Flex, Label, RadioGroup, TextBox},
+    Widget, WidgetExt,
+};
 
 pub fn make_config() -> impl Widget<State> {
     Flex::column()
@@ -12,12 +18,14 @@ pub fn make_config() -> impl Widget<State> {
         .with_child(
             TextBox::new()
                 .with_placeholder("Username")
+                .env_scope(|env, _state| env.set(theme::WIDE_WIDGET_WIDTH, theme::grid(16.0)))
                 .lens(Config::username),
         )
         .with_spacer(theme::grid(1.0))
         .with_child(
             TextBox::new()
                 .with_placeholder("Password")
+                .env_scope(|env, _state| env.set(theme::WIDE_WIDGET_WIDTH, theme::grid(16.0)))
                 .lens(Config::password),
         )
         // Audio quality
@@ -35,8 +43,11 @@ pub fn make_config() -> impl Widget<State> {
         // Save
         .with_spacer(theme::grid(3.0))
         .with_child(
-            Button::new("Save").on_click(|_, config: &mut Config, _env| {
+            Button::new("Save").on_click(move |ctx, config: &mut Config, _env| {
                 config.save();
+                ctx.submit_command(cmd::CONFIGURE);
+                ctx.submit_command(cmd::SHOW_MAIN);
+                ctx.submit_command(commands::CLOSE_WINDOW);
             }),
         )
         .padding(theme::grid(2.0))

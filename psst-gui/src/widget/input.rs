@@ -1,4 +1,4 @@
-use crate::commands;
+use crate::cmd;
 use druid::{
     text::{EditAction, Movement},
     widget::{prelude::*, Controller, TextBox},
@@ -37,7 +37,7 @@ impl Controller<String, TextBox<String>> for InputController {
             child.event(ctx, &command, data, env);
         };
         match event {
-            Event::Command(command) if command.is(commands::SET_FOCUS) => {
+            Event::Command(command) if command.is(cmd::SET_FOCUS) => {
                 ctx.request_focus();
                 ctx.request_paint();
             }

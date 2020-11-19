@@ -1,8 +1,5 @@
 use crate::{
-    data::{
-        Album, AlbumType, Artist, AudioAnalysis, AudioAnalysisSegment, Image, Playlist,
-        SearchResults, Track,
-    },
+    data::{Album, AlbumType, Artist, Image, Playlist, SearchResults, Track},
     error::Error,
 };
 use aspotify::{ItemType, Market, Page, PlaylistItemType, Response};
@@ -80,12 +77,11 @@ impl WebCache {
     }
 }
 
-#[derive(Clone)]
 pub struct Web {
     session: SessionHandle,
-    token_provider: Arc<TokenProvider>,
-    cache: Arc<WebCache>,
-    spotify: Arc<aspotify::Client>,
+    token_provider: TokenProvider,
+    cache: WebCache,
+    spotify: aspotify::Client,
     image_client: reqwest::Client,
 }
 
@@ -100,12 +96,13 @@ impl Web {
         };
         let spotify = aspotify::Client::new(dummy_credentials);
         let image_client = reqwest::Client::new();
+        let token_provider = TokenProvider::new();
         Self {
             session,
             image_client,
-            cache: Arc::new(cache),
-            spotify: Arc::new(spotify),
-            token_provider: Arc::new(TokenProvider::new()),
+            cache,
+            spotify,
+            token_provider,
         }
     }
 
@@ -117,7 +114,7 @@ impl Web {
         self.spotify
             .set_current_access_token(access_token.token, access_token.expires)
             .await;
-        Ok(self.spotify.as_ref())
+        Ok(&self.spotify)
     }
 
     async fn with_paging<'a, PerFn, PerFut, MapFn, T, U>(
@@ -317,18 +314,6 @@ impl Web {
             tracks,
         })
     }
-
-    pub async fn analyze_track(&self, id: &str) -> Result<AudioAnalysis, Error> {
-        let result = self
-            .client()
-            .await?
-            .tracks()
-            .get_analysis(id)
-            .await?
-            .data
-            .into();
-        Ok(result)
-    }
 }
 
 impl From<aspotify::ArtistSimplified> for Artist {
@@ -481,32 +466,9 @@ impl From<aspotify::PlaylistSimplified> for Playlist {
 impl From<aspotify::Image> for Image {
     fn from(image: aspotify::Image) -> Self {
         Self {
-            url: image.url,
+            url: image.url.into(),
             width: image.width,
             height: image.height,
-        }
-    }
-}
-
-impl From<aspotify::AudioAnalysis> for AudioAnalysis {
-    fn from(analysis: aspotify::AudioAnalysis) -> Self {
-        Self {
-            segments: analysis.segments.into_iter().map_into().collect(),
-        }
-    }
-}
-
-impl From<aspotify::Segment> for AudioAnalysisSegment {
-    fn from(segment: aspotify::Segment) -> Self {
-        Self {
-            start: segment.interval.start.into(),
-            duration: segment.interval.duration.into(),
-            confidence: segment.interval.confidence,
-            loudness_start: segment.loudness_start,
-            loudness_max_time: segment.loudness_max_time,
-            loudness_max: segment.loudness_max,
-            pitches: segment.pitches.into(),
-            timbre: segment.timbre.into(),
         }
     }
 }

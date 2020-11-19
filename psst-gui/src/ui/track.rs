@@ -1,9 +1,8 @@
 use crate::{
-    commands,
-    ctx::Ctx,
-    data::{Navigation, PlaybackCtx, State, Track, TrackCtx},
+    cmd,
+    data::{Ctx, Navigation, PlaybackCtx, State, Track, TrackCtx},
     ui::theme,
-    widgets::HoverExt,
+    widget::HoverExt,
 };
 use druid::{
     im::Vector,
@@ -88,13 +87,13 @@ where
         env: &Env,
     ) {
         match event {
-            Event::Command(cmd) if cmd.is(commands::PLAY_TRACK_AT) => {
-                let position = cmd.get_unchecked(commands::PLAY_TRACK_AT);
+            Event::Command(cmd) if cmd.is(cmd::PLAY_TRACK_AT) => {
+                let position = cmd.get_unchecked(cmd::PLAY_TRACK_AT);
                 let pb = PlaybackCtx {
                     position: position.to_owned(),
                     tracks: tracks.data.to_owned(),
                 };
-                ctx.submit_command(commands::PLAY_TRACKS.with(pb));
+                ctx.submit_command(cmd::PLAY_TRACKS.with(pb));
             }
             _ => child.event(ctx, event, tracks, env),
         }
@@ -177,7 +176,7 @@ fn make_track(display: TrackDisplay, play_ctrl: WidgetId) -> impl Widget<TrackSt
                     ctx.show_context_menu(menu);
                 }
                 MouseButton::Left => {
-                    ctx.submit_command(commands::PLAY_TRACK_AT.with(ts.index).to(play_ctrl));
+                    ctx.submit_command(cmd::PLAY_TRACK_AT.with(ts.index).to(play_ctrl));
                 }
                 _ => {}
             },
@@ -190,18 +189,18 @@ fn make_track_menu(ts: &TrackState) -> MenuDesc<State> {
     if let Some(artist) = ts.track.artists.front() {
         menu = menu.append(MenuItem::new(
             LocalizedString::new("menu-item-show-artist").with_placeholder("Show Artist"),
-            commands::NAVIGATE_TO.with(Navigation::ArtistDetail(artist.id.clone())),
+            cmd::NAVIGATE_TO.with(Navigation::ArtistDetail(artist.id.clone())),
         ));
     }
     if let Some(album) = ts.track.album.as_ref() {
         menu = menu.append(MenuItem::new(
             LocalizedString::new("menu-item-show-album").with_placeholder("Show Album"),
-            commands::NAVIGATE_TO.with(Navigation::AlbumDetail(album.id.clone())),
+            cmd::NAVIGATE_TO.with(Navigation::AlbumDetail(album.id.clone())),
         ))
     }
     menu = menu.append(MenuItem::new(
         LocalizedString::new("menu-item-copy-link").with_placeholder("Copy Link"),
-        commands::COPY_TO_CLIPBOARD.with(ts.track.link()),
+        cmd::COPY.with(ts.track.link()),
     ));
 
     menu = menu.append_separator();
@@ -210,12 +209,12 @@ fn make_track_menu(ts: &TrackState) -> MenuDesc<State> {
         menu = menu.append(MenuItem::new(
             LocalizedString::new("menu-item-remove-from-library")
                 .with_placeholder("Remove from Library"),
-            commands::UNSAVE_TRACK.with(ts.track.id),
+            cmd::UNSAVE_TRACK.with(ts.track.id),
         ));
     } else {
         menu = menu.append(MenuItem::new(
             LocalizedString::new("menu-item-save-to-library").with_placeholder("Save to Library"),
-            commands::SAVE_TRACK.with(ts.track.id),
+            cmd::SAVE_TRACK.with(ts.track.id),
         ));
     }
 

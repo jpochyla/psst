@@ -1,4 +1,4 @@
-use crate::promise::Promise;
+use crate::data::Promise;
 use druid::{
     lens::{Field, Map},
     Data, Lens, LensExt,

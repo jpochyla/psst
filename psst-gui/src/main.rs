@@ -1,21 +1,18 @@
 #![recursion_limit = "256"]
 
-mod commands;
-mod consts;
-mod ctx;
+mod cmd;
 mod data;
-mod database;
 mod delegate;
 mod error;
-mod promise;
 mod ui;
-mod widgets;
+mod web;
+mod widget;
 
 use crate::{
     data::{Config, State},
-    delegate::Delegate,
+    delegate::DelegateHolder,
 };
-use druid::{AppLauncher, WindowDesc};
+use druid::AppLauncher;
 use env_logger::{Builder, Env};
 
 const ENV_LOG: &str = "PSST_LOG";
@@ -31,19 +28,32 @@ fn main() {
     )
     .init();
 
-    let main_window = WindowDesc::new(ui::make_root)
-        .title("Psst")
-        .window_size((1000.0, 800.0));
-    let app_launcher = AppLauncher::with_window(main_window).configure_env(ui::theme::setup);
-
     let config = Config::load().unwrap_or_default();
-    let delegate = Delegate::new(&config, app_launcher.get_external_handle());
-    let app_state = State {
+
+    let (launcher, delegate) = if config.has_credentials() {
+        let win = ui::make_main_window();
+        let win_id = win.id;
+        let launcher = AppLauncher::with_window(win).configure_env(ui::theme::setup);
+        let mut delegate = DelegateHolder::new(launcher.get_external_handle());
+        delegate.configure(&config);
+        delegate.main_window.replace(win_id);
+        (launcher, delegate)
+    } else {
+        let win = ui::make_config_window();
+        let win_id = win.id;
+        let launcher =
+            AppLauncher::with_window(ui::make_config_window()).configure_env(ui::theme::setup);
+        let mut delegate = DelegateHolder::new(launcher.get_external_handle());
+        delegate.config_window.replace(win_id);
+        (launcher, delegate)
+    };
+
+    let state = State {
         config,
         ..State::default()
     };
-    app_launcher
+    launcher
         .delegate(delegate)
-        .launch(app_state)
+        .launch(state)
         .expect("Application launch");
 }

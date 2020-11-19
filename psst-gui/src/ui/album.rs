@@ -1,13 +1,12 @@
 use crate::{
-    commands,
-    ctx::Ctx,
-    data::{Album, AlbumDetail, Artist, Navigation, State, TrackCtx},
+    cmd,
+    data::{Album, AlbumDetail, Artist, Ctx, Navigation, State, TrackCtx},
     ui::{
         theme,
         track::{make_tracklist, TrackDisplay},
         utils::{make_error, make_placeholder},
     },
-    widgets::{HoverExt, Promised, RemoteImage},
+    widget::{HoverExt, Promised, RemoteImage},
 };
 use druid::{
     widget::{CrossAxisAlignment, Flex, Label, LineBreaking, List},
@@ -40,7 +39,7 @@ fn make_detail_loaded() -> impl Widget<Ctx<TrackCtx, Album>> {
             .lens(Artist::name)
             .on_click(|ctx, artist: &mut Artist, _| {
                 let nav = Navigation::ArtistDetail(artist.id.clone());
-                ctx.submit_command(commands::NAVIGATE_TO.with(nav));
+                ctx.submit_command(cmd::NAVIGATE_TO.with(nav));
             })
     })
     .lens(Album::artists);
@@ -152,6 +151,6 @@ pub fn make_album() -> impl Widget<Album> {
         .hover()
         .on_click(|ctx, album, _| {
             let nav = Navigation::AlbumDetail(album.id.clone());
-            ctx.submit_command(commands::NAVIGATE_TO.with(nav));
+            ctx.submit_command(cmd::NAVIGATE_TO.with(nav));
         })
 }

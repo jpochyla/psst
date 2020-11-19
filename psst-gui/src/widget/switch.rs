@@ -123,7 +123,8 @@ fn hidden_should_receive_event(evt: &Event) -> bool {
         | Event::KeyDown(_)
         | Event::KeyUp(_)
         | Event::Paste(_)
-        | Event::Zoom(_) => false,
+        | Event::Zoom(_)
+        | Event::Notification(_) => false,
     }
 }
 

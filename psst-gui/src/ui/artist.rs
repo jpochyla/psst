@@ -1,14 +1,13 @@
 use crate::{
-    commands,
-    ctx::Ctx,
-    data::{Album, Artist, ArtistDetail, Navigation, State, Track, TrackCtx},
+    cmd,
+    data::{Album, Artist, ArtistDetail, Ctx, Navigation, State, Track, TrackCtx},
     ui::{
         album::make_album,
         theme,
         track::{make_tracklist, TrackDisplay},
         utils::{make_error, make_placeholder},
     },
-    widgets::{HoverExt, Promised, RemoteImage},
+    widget::{HoverExt, Promised, RemoteImage},
 };
 use druid::{
     im::Vector,
@@ -121,6 +120,6 @@ pub fn make_artist() -> impl Widget<Artist> {
         .hover()
         .on_click(|ctx, artist, _| {
             let nav = Navigation::ArtistDetail(artist.id.clone());
-            ctx.submit_command(commands::NAVIGATE_TO.with(nav));
+            ctx.submit_command(cmd::NAVIGATE_TO.with(nav));
         })
 }

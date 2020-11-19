@@ -1,6 +1,6 @@
 use crate::{
     data::State,
-    widgets::{
+    widget::{
         button::{HOVER_COLD_COLOR, HOVER_HOT_COLOR},
         icons,
     },
@@ -90,7 +90,7 @@ pub fn setup(env: &mut Env, _state: &State) {
     env.set(TEXTBOX_BORDER_WIDTH, 1.0);
     env.set(
         TEXTBOX_INSETS,
-        Insets::new(grid(4.0), grid(1.0), 0.0, grid(1.0)),
+        Insets::new(grid(1.0), grid(1.0), grid(1.0), grid(1.0)),
     );
 
     env.set(SCROLLBAR_COLOR, GREY_3);
