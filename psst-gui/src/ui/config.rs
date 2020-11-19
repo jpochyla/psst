@@ -1,3 +1,4 @@
+use crate::widget::HoverExt;
 use crate::{
     cmd,
     data::{AudioQuality, Config, State},
@@ -14,6 +15,27 @@ pub fn make_config() -> impl Widget<State> {
         .cross_axis_alignment(CrossAxisAlignment::Start)
         // Credentials
         .with_child(Label::new("Device credentials").with_font(theme::UI_FONT_MEDIUM))
+        .with_spacer(theme::grid(2.0))
+        .with_child(
+            Flex::row()
+                .with_child(
+                    Label::new("You can set these up in your ")
+                        .with_text_color(theme::PLACEHOLDER_COLOR)
+                        .with_text_size(theme::TEXT_SIZE_SMALL),
+                )
+                .with_child(
+                    Label::new("Spotify Account Settings.")
+                        .with_text_size(theme::TEXT_SIZE_SMALL)
+                        .hover()
+                        .on_click(|ctx, data, env| {
+                            if let Err(err) =
+                                open::that("https://www.spotify.com/account/set-device-password")
+                            {
+                                log::error!("error while opening url: {:?}", err);
+                            }
+                        }),
+                ),
+        )
         .with_spacer(theme::grid(2.0))
         .with_child(
             TextBox::new()

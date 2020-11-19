@@ -16,14 +16,6 @@ $ cargo build --release
 
 ##### Running and configuration
 
-First we need to setup the client with device username and password.  You can configure these in the [Spotify Settings](https://www.spotify.com/cz/account/set-device-password). 
-```
-$ cat > psst-gui/config.json
-{ "username": "...",
-  "password": "..." } 
-```
-
-Now we're good to go:
 ```
 $ cd psst-gui
 $ cargo run
