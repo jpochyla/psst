@@ -10,7 +10,7 @@ psst-core = { path = "../psst-core" }
 aspotify = { git = "https://github.com/KaiJewson/aspotify", default_features = false }
 chrono = "0.4"
 platform-dirs = "0.3.0"
-druid = { git = "https://github.com/jpochyla/druid", features = ["im", "image", "jpeg"], branch = "textbox-options" }
+druid = { git = "https://github.com/linebender/druid", features = ["im", "image", "jpeg"] }
 env_logger = "0.8"
 image = { version = "0.23", default_features = false }
 itertools = "0.9"
