@@ -2,7 +2,7 @@ use crate::{
     cmd,
     data::{Navigation, State},
 };
-use druid::{platform_menus, LocalizedString, MenuDesc, MenuItem, SysMods};
+use druid::{commands, platform_menus, LocalizedString, MenuDesc, MenuItem, SysMods};
 
 #[allow(unused_mut)]
 pub fn make_menu() -> MenuDesc<State> {
@@ -16,11 +16,18 @@ pub fn make_menu() -> MenuDesc<State> {
 
 fn make_mac_app_menu() -> MenuDesc<State> {
     MenuDesc::new(LocalizedString::new("macos-menu-application-menu"))
-        .append(platform_menus::mac::application::about())
-        .append_separator()
         .append(platform_menus::mac::application::preferences())
         .append_separator()
-        .append(platform_menus::mac::application::quit())
+        .append(
+            // TODO:
+            //  This is just overriding `platform_menus::mac::application::quit()`
+            //  because l10n is a bit stupid now.
+            MenuItem::new(
+                LocalizedString::new("macos-menu-quit").with_placeholder("Quit Psst"),
+                commands::QUIT_APP,
+            )
+            .hotkey(SysMods::Cmd, "q"),
+        )
 }
 
 fn make_edit_menu() -> MenuDesc<State> {
