@@ -87,8 +87,10 @@ fn make_player() -> impl Widget<Playback> {
 fn make_player_controls() -> impl Widget<Playback> {
     let play_previous = icons::SKIP_BACK
         .scale((theme::grid(2.0), theme::grid(2.0)))
+        .with_color(theme::PLACEHOLDER_COLOR)
         .padding(theme::grid(1.0))
         .hover()
+        .rounded(theme::BUTTON_BORDER_RADIUS)
         .on_click(|ctx, _, _| ctx.submit_command(cmd::PLAY_PREVIOUS));
 
     let play_pause = ViewSwitcher::new(
@@ -96,16 +98,20 @@ fn make_player_controls() -> impl Widget<Playback> {
         |&is_playing, _, _| {
             if is_playing {
                 icons::PAUSE
-                    .scale((theme::grid(2.0), theme::grid(2.0)))
+                    .scale((theme::grid(3.0), theme::grid(3.0)))
                     .padding(theme::grid(1.0))
                     .hover()
+                    .circle()
+                    .border(theme::GREY_5)
                     .on_click(|ctx, _, _| ctx.submit_command(cmd::PLAY_PAUSE))
                     .boxed()
             } else {
                 icons::PLAY
-                    .scale((theme::grid(2.0), theme::grid(2.0)))
+                    .scale((theme::grid(3.0), theme::grid(3.0)))
                     .padding(theme::grid(1.0))
                     .hover()
+                    .circle()
+                    .border(theme::GREY_5)
                     .on_click(|ctx, _, _| ctx.submit_command(cmd::PLAY_RESUME))
                     .boxed()
             }
@@ -114,27 +120,31 @@ fn make_player_controls() -> impl Widget<Playback> {
 
     let play_next = icons::SKIP_FORWARD
         .scale((theme::grid(2.0), theme::grid(2.0)))
+        .with_color(theme::PLACEHOLDER_COLOR)
         .padding(theme::grid(1.0))
         .hover()
+        .rounded(theme::BUTTON_BORDER_RADIUS)
         .on_click(|ctx, _, _| ctx.submit_command(cmd::PLAY_NEXT));
 
     Flex::row()
         .with_child(play_previous)
+        .with_default_spacer()
         .with_child(play_pause)
+        .with_default_spacer()
         .with_child(play_next)
 }
 
 fn make_player_progress() -> impl Widget<Playback> {
     let current_time = Maybe::or_empty(|| {
         Label::dynamic(|progress: &AudioDuration, _| progress.as_minutes_and_seconds())
-            .with_text_size(12.0)
+            .with_text_size(theme::TEXT_SIZE_SMALL)
             .align_right()
             .fix_width(theme::grid(4.0))
     })
     .lens(Playback::progress);
     let total_time = Maybe::or_empty(|| {
         Label::dynamic(|track: &Track, _| track.duration.as_minutes_and_seconds())
-            .with_text_size(12.0)
+            .with_text_size(theme::TEXT_SIZE_SMALL)
             .align_left()
             .fix_width(theme::grid(4.0))
             .lens(InArc::new::<Arc<Track>, _>(Identity))

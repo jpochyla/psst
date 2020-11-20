@@ -9,6 +9,7 @@ pub const HOVER_COLD_COLOR: Key<Color> = Key::new("app.hover-cold-color");
 
 pub struct Hover<T> {
     inner: WidgetPod<T, Box<dyn Widget<T>>>,
+    border_color: KeyOrValue<Color>,
     corner_radius: KeyOrValue<f64>,
 }
 
@@ -16,8 +17,23 @@ impl<T: Data> Hover<T> {
     pub fn new(inner: impl Widget<T> + 'static) -> Self {
         Self {
             inner: WidgetPod::new(inner).boxed(),
+            border_color: Color::rgba8(0, 0, 0, 0).into(),
             corner_radius: 0.0.into(),
         }
+    }
+
+    pub fn border(mut self, color: impl Into<KeyOrValue<Color>>) -> Self {
+        self.set_border(color);
+        self
+    }
+
+    pub fn set_border(&mut self, color: impl Into<KeyOrValue<Color>>) {
+        self.border_color = color.into();
+    }
+
+    pub fn circle(mut self) -> Self {
+        self.set_rounded(64.0);
+        self
     }
 
     pub fn rounded(mut self, radius: impl Into<KeyOrValue<f64>>) -> Self {
@@ -53,17 +69,16 @@ impl<T: Data> Widget<T> for Hover<T> {
     }
 
     fn paint(&mut self, ctx: &mut PaintCtx, data: &T, env: &Env) {
-        let mut background: BackgroundBrush<T> = if ctx.is_hot() {
-            env.get(HOVER_HOT_COLOR).into()
+        let mut background = if ctx.is_hot() {
+            env.get(HOVER_HOT_COLOR)
         } else {
-            env.get(HOVER_COLD_COLOR).into()
+            env.get(HOVER_COLD_COLOR)
         };
+        let border_color = self.border_color.resolve(env);
         let corner_radius = self.corner_radius.resolve(env);
-        let panel = ctx.size().to_rounded_rect(corner_radius);
-        ctx.with_save(|ctx| {
-            ctx.clip(panel);
-            background.paint(ctx, data, env);
-        });
+        let rounded_rect = ctx.size().to_rounded_rect(corner_radius);
+        ctx.stroke(rounded_rect, &border_color, 1.0);
+        ctx.fill(rounded_rect, &background);
         self.inner.paint(ctx, data, env);
     }
 }
