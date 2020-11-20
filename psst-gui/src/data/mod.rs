@@ -89,6 +89,7 @@ impl State {
     }
 
     pub fn set_playback_progress(&mut self, progress: AudioDuration) {
+        self.playback.is_playing = true;
         self.playback.progress.replace(progress);
     }
 
