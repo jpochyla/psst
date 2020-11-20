@@ -24,20 +24,23 @@ pub fn make_main_window() -> WindowDesc<State> {
     WindowDesc::new(make_root)
         .title("Psst")
         .menu(menu::make_menu())
-        .with_min_size((200.0, 200.0))
-        .window_size((1000.0, 800.0))
+        .with_min_size((theme::grid(25.0), theme::grid(25.0)))
+        .window_size((theme::grid(125.0), theme::grid(100.0)))
 }
 
 pub fn make_config_window() -> WindowDesc<State> {
     WindowDesc::new(make_config)
         .title("Preferences")
         .menu(menu::make_menu())
-        .window_size((500.0, 500.0))
+        .window_size((theme::grid(45.0), theme::grid(50.0)))
         .resizable(false)
 }
 
 fn make_config() -> impl Widget<State> {
-    config::make_config().center()
+    config::make_config()
+        .center()
+        .background(theme::BACKGROUND_DARK)
+        .expand()
 }
 
 pub fn make_root() -> impl Widget<State> {
