@@ -314,6 +314,9 @@ impl Player {
     fn handle_playing(&mut self, progress: Duration, path: AudioPath) {
         const PRELOAD_BEFORE_END_OF_TRACK: Duration = Duration::from_secs(30);
 
+        if let PlayerState::Playing { duration, .. } = &mut self.state {
+            *duration = progress;
+        }
         if let Some(&item_to_preload) = self.queue.get_next() {
             let time_until_end_of_track = path.duration.checked_sub(progress).unwrap_or_default();
             if time_until_end_of_track <= PRELOAD_BEFORE_END_OF_TRACK {
@@ -415,6 +418,7 @@ impl Player {
             .expect("Failed to send PlayerEvent::Started");
         self.state = PlayerState::Playing {
             path: serviced_item.path,
+            duration: Duration::default(),
             servicing_handle,
         };
         self.audio_source
@@ -428,10 +432,12 @@ impl Player {
         match mem::replace(&mut self.state, PlayerState::Invalid) {
             PlayerState::Playing {
                 path,
+                duration,
                 servicing_handle,
             }
             | PlayerState::Paused {
                 path,
+                duration,
                 servicing_handle,
             } => {
                 log::info!("pausing playback");
@@ -440,6 +446,7 @@ impl Player {
                     .expect("Failed to send PlayerEvent::Paused");
                 self.state = PlayerState::Paused {
                     path,
+                    duration,
                     servicing_handle,
                 };
                 self.audio_output_ctrl.pause();
@@ -454,15 +461,18 @@ impl Player {
         match mem::replace(&mut self.state, PlayerState::Invalid) {
             PlayerState::Playing {
                 path,
+                duration,
                 servicing_handle,
             }
             | PlayerState::Paused {
                 path,
+                duration,
                 servicing_handle,
             } => {
                 log::info!("resuming playback");
                 self.state = PlayerState::Playing {
                     path,
+                    duration,
                     servicing_handle,
                 };
                 self.audio_output_ctrl.resume();
@@ -474,12 +484,15 @@ impl Player {
     }
 
     fn previous(&mut self) {
-        // TODO: If position < PREVIOUS_TRACK_THRESHOLD, seek to beginning.
-        self.queue.previous();
-        if let Some(&item) = self.queue.get_current() {
-            self.load_and_play(item);
+        if self.is_near_playback_start() {
+            self.queue.previous();
+            if let Some(&item) = self.queue.get_current() {
+                self.load_and_play(item);
+            } else {
+                self.stop();
+            }
         } else {
-            self.stop();
+            self.seek(Duration::default());
         }
     }
 
@@ -508,6 +521,15 @@ impl Player {
 
     fn configure(&mut self, config: PlaybackConfig) {
         self.config = config;
+    }
+
+    fn is_near_playback_start(&self) -> bool {
+        match self.state {
+            PlayerState::Playing { duration, .. } | PlayerState::Paused { duration, .. } => {
+                duration < PREVIOUS_TRACK_THRESHOLD
+            }
+            _ => false,
+        }
     }
 
     fn is_in_preload(&self, item: PlaybackItem) -> bool {
@@ -573,10 +595,12 @@ enum PlayerState {
     },
     Playing {
         path: AudioPath,
+        duration: Duration,
         servicing_handle: JoinHandle<()>,
     },
     Paused {
         path: AudioPath,
+        duration: Duration,
         servicing_handle: JoinHandle<()>,
     },
     Stopped,
