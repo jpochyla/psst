@@ -7,7 +7,7 @@ use crate::{
 use druid::{
     lens::{Identity, InArc},
     widget::{
-        Controller, CrossAxisAlignment, Flex, Label, Painter, SizedBox, Spinner, ViewSwitcher,
+        Controller, CrossAxisAlignment, Flex, Label, Painter, SizedBox, Spinner, ViewSwitcher, LineBreaking,
     },
     Env, Event, EventCtx, MouseButton, MouseEvent, PaintCtx, Point, Rect, RenderContext, Size,
     Widget, WidgetExt,
@@ -16,9 +16,9 @@ use std::sync::Arc;
 
 pub fn make_panel() -> impl Widget<State> {
     Flex::row()
-        .with_flex_child(make_info().align_left(), 1.0)
-        .with_flex_child(make_player().align_right(), 1.0)
-        .expand_width()
+        .must_fill_main_axis(true)
+        .with_flex_child(make_info(), 1.0)
+        .with_flex_child(make_player(), 1.0)
         .padding(theme::grid(1.0))
         .background(theme::WHITE)
         .lens(State::playback)
@@ -33,10 +33,12 @@ fn make_info_track() -> impl Widget<Arc<Track>> {
         .lens(Track::album);
 
     let track_name = Label::raw()
+        .with_line_break_mode(LineBreaking::Clip)
         .with_font(theme::UI_FONT_MEDIUM)
         .lens(Track::name);
 
     let track_artist = Label::dynamic(|track: &Track, _| track.artist_name())
+        .with_line_break_mode(LineBreaking::Clip)
         .with_text_size(theme::TEXT_SIZE_SMALL)
         .hover()
         .on_click(|ctx: &mut EventCtx, track: &mut Track, _| {
@@ -47,6 +49,7 @@ fn make_info_track() -> impl Widget<Arc<Track>> {
         });
 
     let track_album = Label::dynamic(|track: &Track, _| track.album_name())
+        .with_line_break_mode(LineBreaking::Clip)
         .with_text_size(theme::TEXT_SIZE_SMALL)
         .hover()
         .on_click(|ctx, track: &mut Track, _| {
@@ -65,7 +68,7 @@ fn make_info_track() -> impl Widget<Arc<Track>> {
     Flex::row()
         .with_child(album_cover)
         .with_default_spacer()
-        .with_child(track_info)
+        .with_flex_child(track_info, 1.0)
         .lens(InArc::new::<Arc<Track>, Arc<Track>>(Identity))
 }
 
