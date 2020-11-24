@@ -63,8 +63,8 @@ impl StreamStorage {
         let (data_req_sender, data_req_receiver) = mpsc::channel();
 
         // Because the file is complete, let's mark the full range of data as
-        // downloaded.  We mark it as requested as well, because the downloaded set
-        // should always be included in the requested ranges.
+        // downloaded.  We mark it as requested as well, because the downloaded set is
+        // always ⊆ the requested set.
         let mut downloaded_set = IntervalSet::new();
         downloaded_set.insert(0..total_size);
         let requested_set = downloaded_set.clone();

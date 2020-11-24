@@ -45,7 +45,7 @@ impl Default for State {
             history: Vector::new(),
             config: Config::default(),
             playback: Playback {
-                is_playing: false,
+                state: PlaybackState::Stopped,
                 progress: None,
                 item: None,
             },
@@ -81,24 +81,31 @@ impl Default for State {
 }
 
 impl State {
+    pub fn set_playback_loading(&mut self, item: Arc<Track>) {
+        self.playback.state = PlaybackState::Loading;
+        self.playback.item.replace(item);
+        self.playback.progress.take();
+        self.track_ctx.playback_item.take();
+    }
+
     pub fn set_playback_playing(&mut self, item: Arc<Track>) {
-        self.playback.is_playing = true;
+        self.playback.state = PlaybackState::Playing;
         self.playback.item.replace(item.clone());
         self.playback.progress.take();
         self.track_ctx.playback_item.replace(item);
     }
 
     pub fn set_playback_progress(&mut self, progress: AudioDuration) {
-        self.playback.is_playing = true;
+        self.playback.state = PlaybackState::Playing;
         self.playback.progress.replace(progress);
     }
 
     pub fn set_playback_paused(&mut self) {
-        self.playback.is_playing = false;
+        self.playback.state = PlaybackState::Paused;
     }
 
     pub fn set_playback_stopped(&mut self) {
-        self.playback.is_playing = false;
+        self.playback.state = PlaybackState::Stopped;
         self.playback.item.take();
         self.playback.progress.take();
         self.track_ctx.playback_item.take();
@@ -111,9 +118,17 @@ pub struct PlaybackCtx {
     pub position: usize,
 }
 
+#[derive(Copy, Clone, Debug, Data, Eq, PartialEq)]
+pub enum PlaybackState {
+    Loading,
+    Playing,
+    Paused,
+    Stopped,
+}
+
 #[derive(Clone, Debug, Data, Lens)]
 pub struct Playback {
-    pub is_playing: bool,
+    pub state: PlaybackState,
     pub progress: Option<AudioDuration>,
     pub item: Option<Arc<Track>>,
 }

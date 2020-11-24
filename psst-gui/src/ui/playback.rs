@@ -1,12 +1,14 @@
 use crate::{
     cmd,
-    data::{AudioDuration, Navigation, Playback, State, Track},
+    data::{AudioDuration, Navigation, Playback, PlaybackState, State, Track},
     ui::{album, theme},
     widget::{icons, HoverExt, Maybe},
 };
 use druid::{
     lens::{Identity, InArc},
-    widget::{Controller, CrossAxisAlignment, Flex, Label, Painter, SizedBox, ViewSwitcher},
+    widget::{
+        Controller, CrossAxisAlignment, Flex, Label, Painter, SizedBox, Spinner, ViewSwitcher,
+    },
     Env, Event, EventCtx, MouseButton, MouseEvent, PaintCtx, Point, Rect, RenderContext, Size,
     Widget, WidgetExt,
 };
@@ -94,27 +96,29 @@ fn make_player_controls() -> impl Widget<Playback> {
         .on_click(|ctx, _, _| ctx.submit_command(cmd::PLAY_PREVIOUS));
 
     let play_pause = ViewSwitcher::new(
-        |playback: &Playback, _| playback.is_playing,
-        |&is_playing, _, _| {
-            if is_playing {
-                icons::PAUSE
-                    .scale((theme::grid(3.0), theme::grid(3.0)))
-                    .padding(theme::grid(1.0))
-                    .hover()
-                    .circle()
-                    .border(theme::GREY_5)
-                    .on_click(|ctx, _, _| ctx.submit_command(cmd::PLAY_PAUSE))
-                    .boxed()
-            } else {
-                icons::PLAY
-                    .scale((theme::grid(3.0), theme::grid(3.0)))
-                    .padding(theme::grid(1.0))
-                    .hover()
-                    .circle()
-                    .border(theme::GREY_5)
-                    .on_click(|ctx, _, _| ctx.submit_command(cmd::PLAY_RESUME))
-                    .boxed()
-            }
+        |playback: &Playback, _| playback.state,
+        |&state, _, _| match state {
+            PlaybackState::Loading => Spinner::new()
+                .with_color(theme::GREY_4)
+                .padding(theme::grid(1.0))
+                .boxed(),
+            PlaybackState::Playing => icons::PAUSE
+                .scale((theme::grid(3.0), theme::grid(3.0)))
+                .padding(theme::grid(1.0))
+                .hover()
+                .circle()
+                .border(theme::GREY_5)
+                .on_click(|ctx, _, _| ctx.submit_command(cmd::PLAY_PAUSE))
+                .boxed(),
+            PlaybackState::Paused => icons::PLAY
+                .scale((theme::grid(3.0), theme::grid(3.0)))
+                .padding(theme::grid(1.0))
+                .hover()
+                .circle()
+                .border(theme::GREY_5)
+                .on_click(|ctx, _, _| ctx.submit_command(cmd::PLAY_RESUME))
+                .boxed(),
+            PlaybackState::Stopped => SizedBox::empty().boxed(),
         },
     );
 

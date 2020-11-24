@@ -123,6 +123,11 @@ impl PlayerDelegate {
     fn service(mut player: Player, player_events: Receiver<PlayerEvent>, sink: ExtEventSink) {
         for event in player_events {
             match &event {
+                PlayerEvent::Loading { item } => {
+                    let item: TrackId = item.item_id.into();
+                    sink.submit_command(cmd::PLAYBACK_LOADING, item, Target::Auto)
+                        .unwrap();
+                }
                 PlayerEvent::Started { path } => {
                     let item: TrackId = path.item_id.into();
                     sink.submit_command(cmd::PLAYBACK_PLAYING, item, Target::Auto)
@@ -699,7 +704,14 @@ impl Delegate {
     }
 
     fn command_playback(&mut self, _target: Target, cmd: &Command, data: &mut State) -> Handled {
-        if let Some(item) = cmd.get(cmd::PLAYBACK_PLAYING) {
+        if let Some(item) = cmd.get(cmd::PLAYBACK_LOADING) {
+            if let Some(track) = self.player.get_track(item) {
+                data.set_playback_loading(track);
+            } else {
+                log::warn!("loaded item not found in playback queue");
+            }
+            Handled::Yes
+        } else if let Some(item) = cmd.get(cmd::PLAYBACK_PLAYING) {
             if let Some(track) = self.player.get_track(item) {
                 data.set_playback_playing(track);
             } else {

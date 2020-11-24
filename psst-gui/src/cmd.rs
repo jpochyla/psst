@@ -74,6 +74,7 @@ pub const UPDATE_PLAYLIST_TRACKS: Selector<(String, Result<Vector<Arc<Track>>, E
 
 // Playback state
 
+pub const PLAYBACK_LOADING: Selector<TrackId> = Selector::new("app.playback-loading");
 pub const PLAYBACK_PLAYING: Selector<TrackId> = Selector::new("app.playback-playing");
 pub const PLAYBACK_PROGRESS: Selector<AudioDuration> = Selector::new("app.playback-progress");
 pub const PLAYBACK_PAUSED: Selector = Selector::new("app.playback-paused");

@@ -1,8 +1,8 @@
-use crate::widget::HoverExt;
 use crate::{
     cmd,
     data::{AudioQuality, Config, State},
     ui::theme,
+    widget::HoverExt,
 };
 use druid::{
     commands,

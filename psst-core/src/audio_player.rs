@@ -247,6 +247,7 @@ impl Player {
             }
             PlayerEvent::Paused { .. } => {}
             PlayerEvent::Started { .. } => {}
+            PlayerEvent::Loading { .. } => {}
         };
     }
 
@@ -353,11 +354,11 @@ impl Player {
             }
             preloading_or_none => {
                 // Restore the preloader to the previous state.
+                // TODO: If the iteam is being preloaded, extract the loading handle.
                 self.preload = preloading_or_none;
             }
         }
-        // Item is not preloaded yet, load it in a background thread and transfer to
-        // Loading state.
+        // Item is not preloaded yet, load it in a background thread.
         let loading_handle = thread::spawn({
             let event_sender = self.event_sender.clone();
             let session = self.session.clone();
@@ -371,6 +372,11 @@ impl Player {
                     .expect("Failed to send PlayerEvent::Loaded");
             }
         });
+        // Make sure the output is paused, so any currently playing item is stopped.
+        self.audio_output_ctrl.pause();
+        self.event_sender
+            .send(PlayerEvent::Loading { item })
+            .expect("Failed to send PlayerEvent::Loading");
         self.state = PlayerState::Loading {
             item,
             loading_handle,
@@ -452,7 +458,7 @@ impl Player {
                 self.audio_output_ctrl.pause();
             }
             _ => {
-                unreachable!("invalid state transition");
+                log::warn!("invalid state transition");
             }
         }
     }
@@ -478,7 +484,7 @@ impl Player {
                 self.audio_output_ctrl.resume();
             }
             _ => {
-                unreachable!("invalid state transition");
+                log::warn!("invalid state transition");
             }
         }
     }
@@ -508,7 +514,7 @@ impl Player {
     fn stop(&mut self) {
         self.state = PlayerState::Stopped;
         self.audio_output_ctrl.pause();
-        self.queue.position = 0;
+        self.queue.clear();
     }
 
     fn seek(&mut self, position: Duration) {
@@ -567,6 +573,9 @@ pub enum PlayerCommand {
 
 pub enum PlayerEvent {
     Command(PlayerCommand),
+    Loading {
+        item: PlaybackItem,
+    },
     Loaded {
         item: PlaybackItem,
         result: Result<LoadedPlaybackItem, Error>,
@@ -721,6 +730,11 @@ impl Queue {
             items: Vec::new(),
             position: 0,
         }
+    }
+
+    fn clear(&mut self) {
+        self.position = 0;
+        self.items.clear();
     }
 
     fn previous(&mut self) {
