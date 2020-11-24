@@ -1,7 +1,7 @@
 use crate::{
     data::{
-        Album, Artist, AudioDuration, Navigation, PlaybackCtx, Playlist, SearchResults, Track,
-        TrackId,
+        Album, Artist, ArtistAlbums, AudioDuration, Navigation, PlaybackCtx, Playlist,
+        SearchResults, Track, TrackId,
     },
     error::Error,
 };
@@ -47,29 +47,31 @@ pub const UPDATE_SAVED_TRACKS: Selector<Result<Vector<Arc<Track>>, Error>> =
     Selector::new("app.update-saved-tracks");
 pub const SAVE_TRACK: Selector<TrackId> = Selector::new("app.save-track");
 pub const UNSAVE_TRACK: Selector<TrackId> = Selector::new("app.unsave-track");
-pub const SAVE_ALBUM: Selector<String> = Selector::new("app.save-album");
-pub const UNSAVE_ALBUM: Selector<String> = Selector::new("app.unsave-album");
+pub const SAVE_ALBUM: Selector<Arc<str>> = Selector::new("app.save-album");
+pub const UNSAVE_ALBUM: Selector<Arc<str>> = Selector::new("app.unsave-album");
 
 // Album detail
 
-pub const GOTO_ALBUM_DETAIL: Selector<String> = Selector::new("app.goto-album-detail");
-pub const UPDATE_ALBUM_DETAIL: Selector<(String, Result<Album, Error>)> =
+pub const GOTO_ALBUM_DETAIL: Selector<Arc<str>> = Selector::new("app.goto-album-detail");
+pub const UPDATE_ALBUM_DETAIL: Selector<(Arc<str>, Result<Album, Error>)> =
     Selector::new("app.update-album-detail");
 
 // Artist detail
 
-pub const GOTO_ARTIST_DETAIL: Selector<String> = Selector::new("app.goto-artist-detail");
-pub const UPDATE_ARTIST_DETAIL: Selector<(String, Result<Artist, Error>)> =
+pub const GOTO_ARTIST_DETAIL: Selector<Arc<str>> = Selector::new("app.goto-artist-detail");
+pub const UPDATE_ARTIST_DETAIL: Selector<(Arc<str>, Result<Artist, Error>)> =
     Selector::new("app.update-artist-detail");
-pub const UPDATE_ARTIST_ALBUMS: Selector<(String, Result<Vector<Album>, Error>)> =
+pub const UPDATE_ARTIST_ALBUMS: Selector<(Arc<str>, Result<ArtistAlbums, Error>)> =
     Selector::new("app.update-artist-album");
-pub const UPDATE_ARTIST_TOP_TRACKS: Selector<(String, Result<Vector<Arc<Track>>, Error>)> =
+pub const UPDATE_ARTIST_TOP_TRACKS: Selector<(Arc<str>, Result<Vector<Arc<Track>>, Error>)> =
     Selector::new("app.update-artist-top_tracks");
+pub const UPDATE_ARTIST_RELATED: Selector<(Arc<str>, Result<Vector<Artist>, Error>)> =
+    Selector::new("app.update-artist-related");
 
 // Playlist detail
 
 pub const GOTO_PLAYLIST_DETAIL: Selector<Playlist> = Selector::new("app.goto-playlist-detail");
-pub const UPDATE_PLAYLIST_TRACKS: Selector<(String, Result<Vector<Arc<Track>>, Error>)> =
+pub const UPDATE_PLAYLIST_TRACKS: Selector<(Arc<str>, Result<Vector<Arc<Track>>, Error>)> =
     Selector::new("app.update-playlist-tracks");
 
 // Playback state

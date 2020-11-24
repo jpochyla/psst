@@ -18,9 +18,10 @@ pub fn make_list() -> impl Widget<State> {
         || make_loader(),
         || {
             List::new(|| {
-                Label::dynamic(|playlist: &Playlist, _| playlist.name.clone())
+                Label::raw()
                     .with_line_break_mode(LineBreaking::WordWrap)
                     .with_text_size(theme::TEXT_SIZE_SMALL)
+                    .lens(Playlist::name)
                     .expand_width()
                     .padding(Insets::uniform_xy(theme::grid(2.0), theme::grid(0.6)))
                     .hover()

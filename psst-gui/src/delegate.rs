@@ -635,6 +635,7 @@ impl Delegate {
         if let Some(artist_id) = cmd.get(cmd::GOTO_ARTIST_DETAIL) {
             data.route = Route::ArtistDetail;
             data.artist.id = artist_id.clone();
+            // Load artist detail
             data.artist.artist.defer(artist_id.clone());
             let id = artist_id.clone();
             let web = self.web.clone();
@@ -644,22 +645,34 @@ impl Delegate {
                 sink.submit_command(cmd::UPDATE_ARTIST_DETAIL, (id, result), Target::Auto)
                     .unwrap();
             });
+            // Load artist top tracks
             data.artist.top_tracks.defer(artist_id.clone());
-            let id = artist_id.clone();
-            let web = self.web.clone();
-            let sink = self.event_sink.clone();
-            self.runtime.spawn(async move {
-                let result = web.load_artist_albums(&id).await;
-                sink.submit_command(cmd::UPDATE_ARTIST_ALBUMS, (id, result), Target::Auto)
-                    .unwrap();
-            });
-            data.artist.albums.defer(artist_id.clone());
             let id = artist_id.clone();
             let web = self.web.clone();
             let sink = self.event_sink.clone();
             self.runtime.spawn(async move {
                 let result = web.load_artist_top_tracks(&id).await;
                 sink.submit_command(cmd::UPDATE_ARTIST_TOP_TRACKS, (id, result), Target::Auto)
+                    .unwrap();
+            });
+            // Load artist's related artists
+            data.artist.related.defer(artist_id.clone());
+            let id = artist_id.clone();
+            let web = self.web.clone();
+            let sink = self.event_sink.clone();
+            self.runtime.spawn(async move {
+                let result = web.load_related_artists(&id).await;
+                sink.submit_command(cmd::UPDATE_ARTIST_RELATED, (id, result), Target::Auto)
+                    .unwrap();
+            });
+            // Load artist albums
+            data.artist.albums.defer(artist_id.clone());
+            let id = artist_id.clone();
+            let web = self.web.clone();
+            let sink = self.event_sink.clone();
+            self.runtime.spawn(async move {
+                let result = web.load_artist_albums(&id).await;
+                sink.submit_command(cmd::UPDATE_ARTIST_ALBUMS, (id, result), Target::Auto)
                     .unwrap();
             });
             Handled::Yes
@@ -676,6 +689,11 @@ impl Delegate {
         } else if let Some((artist_id, result)) = cmd.get(cmd::UPDATE_ARTIST_TOP_TRACKS).cloned() {
             if data.artist.top_tracks.is_deferred(&artist_id) {
                 data.artist.top_tracks.resolve_or_reject(result);
+            }
+            Handled::Yes
+        } else if let Some((artist_id, result)) = cmd.get(cmd::UPDATE_ARTIST_RELATED).cloned() {
+            if data.artist.related.is_deferred(&artist_id) {
+                data.artist.related.resolve_or_reject(result);
             }
             Handled::Yes
         } else {

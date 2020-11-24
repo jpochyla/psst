@@ -86,7 +86,7 @@ impl Deref for TrackId {
 
 impl From<ItemId> for TrackId {
     fn from(id: ItemId) -> Self {
-        TrackId(id)
+        Self(id)
     }
 }
 

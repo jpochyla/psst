@@ -1,37 +1,31 @@
 use crate::{
     cmd,
-    data::{Album, Artist, ArtistDetail, Ctx, Navigation, State, Track, TrackCtx},
+    data::{Artist, ArtistAlbums, ArtistDetail, Ctx, Navigation, State},
     ui::{
         album::make_album,
         theme,
         track::{make_tracklist, TrackDisplay},
-        utils::{make_error, make_placeholder},
+        utils::{make_error, make_loader, make_placeholder},
     },
     widget::{HoverExt, Promised, RemoteImage},
 };
 use druid::{
     im::Vector,
     widget::{Flex, Label, List},
-    Data, LensExt, Widget, WidgetExt,
+    LensExt, Widget, WidgetExt,
 };
-use std::sync::Arc;
 
 pub fn make_detail() -> impl Widget<State> {
-    let artist = Promised::new(
-        || make_detail_loading(),
-        || make_detail_loaded(),
-        || make_error(),
-    )
-    .lens(State::artist.then(ArtistDetail::artist));
-    let albums = Promised::new(
-        || make_albums_loading(),
-        || make_albums_loaded(),
-        || make_error(),
-    )
-    .lens(State::artist.then(ArtistDetail::albums));
     let top_tracks = Promised::new(
-        || make_top_tracks_loading(),
-        || make_top_tracks_loaded(),
+        || make_loader(),
+        || {
+            make_tracklist(TrackDisplay {
+                number: false,
+                title: true,
+                artist: false,
+                album: true,
+            })
+        },
         || make_error(),
     )
     .lens(
@@ -41,28 +35,19 @@ pub fn make_detail() -> impl Widget<State> {
         )
         .then(Ctx::in_promise()),
     );
+
+    let albums = Promised::new(|| make_loader(), || make_albums(), || make_error())
+        .lens(State::artist.then(ArtistDetail::albums));
+
+    let related = Promised::new(|| make_loader(), || make_related(), || make_error())
+        .lens(State::artist.then(ArtistDetail::related));
+
     Flex::column()
-        .with_child(artist)
-        .with_default_spacer()
         .with_child(top_tracks)
         .with_default_spacer()
         .with_child(albums)
-}
-
-fn make_detail_loaded() -> impl Widget<Artist> {
-    Flex::row()
-        .with_child(make_cover(theme::grid(12.0), theme::grid(12.0)))
-        .with_spacer(theme::grid(2.0))
-        .with_child(make_title())
-        .center()
-}
-
-fn make_detail_loading<T: Data>() -> impl Widget<T> {
-    Flex::row()
-        .with_child(make_placeholder().fix_size(theme::grid(12.0), theme::grid(12.0)))
-        .with_spacer(theme::grid(2.0))
-        .with_child(make_placeholder().fix_height(theme::grid(4.0)))
-        .center()
+        .with_default_spacer()
+        .with_child(related)
 }
 
 pub fn make_cover(width: f64, height: f64) -> impl Widget<Artist> {
@@ -72,47 +57,15 @@ pub fn make_cover(width: f64, height: f64) -> impl Widget<Artist> {
     .fix_size(width, height)
 }
 
-fn make_title() -> impl Widget<Artist> {
-    Label::raw()
-        .with_text_size(theme::TEXT_SIZE_LARGE)
-        .padding(theme::grid(1.0))
-        .lens(Artist::name)
-}
-
-fn make_albums_loaded() -> impl Widget<Vector<Album>> {
-    List::new(make_album)
-}
-
-fn make_albums_loading<T: Data>() -> impl Widget<T> {
-    Flex::row()
-        .with_child(make_placeholder().fix_height(theme::grid(3.0)))
-        .with_spacer(1.0)
-        .with_child(make_placeholder().fix_height(theme::grid(3.0)))
-        .with_spacer(1.0)
-        .with_child(make_placeholder().fix_height(theme::grid(3.0)))
-}
-
-fn make_top_tracks_loaded() -> impl Widget<Ctx<TrackCtx, Vector<Arc<Track>>>> {
-    make_tracklist(TrackDisplay {
-        number: false,
-        title: true,
-        artist: false,
-        album: true,
-    })
-}
-
-fn make_top_tracks_loading<T: Data>() -> impl Widget<T> {
-    Flex::row()
-        .with_child(make_placeholder().fix_height(theme::grid(3.0)))
-        .with_spacer(1.0)
-        .with_child(make_placeholder().fix_height(theme::grid(3.0)))
-        .with_spacer(1.0)
-        .with_child(make_placeholder().fix_height(theme::grid(3.0)))
-}
-
 pub fn make_artist() -> impl Widget<Artist> {
-    let artist_image = make_cover(theme::grid(12.0), theme::grid(12.0));
-    let artist_label = Label::raw().lens(Artist::name);
+    make_artist_with_cover(theme::grid(12.0), theme::grid(12.0))
+}
+
+fn make_artist_with_cover(width: f64, height: f64) -> impl Widget<Artist> {
+    let artist_image = make_cover(width, height);
+    let artist_label = Label::raw()
+        .with_font(theme::UI_FONT_MEDIUM)
+        .lens(Artist::name);
     Flex::row()
         .with_child(artist_image)
         .with_default_spacer()
@@ -122,4 +75,26 @@ pub fn make_artist() -> impl Widget<Artist> {
             let nav = Navigation::ArtistDetail(artist.id.clone());
             ctx.submit_command(cmd::NAVIGATE_TO.with(nav));
         })
+}
+
+fn make_albums() -> impl Widget<ArtistAlbums> {
+    Flex::column()
+        .with_child(Label::new("Albums").with_text_color(theme::PLACEHOLDER_COLOR))
+        .with_default_spacer()
+        .with_child(List::new(make_album).lens(ArtistAlbums::albums))
+        .with_default_spacer()
+        .with_child(Label::new("Singles").with_text_color(theme::PLACEHOLDER_COLOR))
+        .with_default_spacer()
+        .with_child(List::new(make_album).lens(ArtistAlbums::singles))
+        .with_default_spacer()
+        .with_child(Label::new("Compilations").with_text_color(theme::PLACEHOLDER_COLOR))
+        .with_default_spacer()
+        .with_child(List::new(make_album).lens(ArtistAlbums::compilations))
+}
+
+fn make_related() -> impl Widget<Vector<Artist>> {
+    Flex::column()
+        .with_child(Label::new("Related Artists").with_text_color(theme::PLACEHOLDER_COLOR))
+        .with_default_spacer()
+        .with_child(List::new(make_artist))
 }

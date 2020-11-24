@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 #[derive(Clone, Debug, Data, Lens)]
 pub struct Artist {
-    pub id: String,
+    pub id: Arc<str>,
     pub name: Arc<str>,
     pub images: Vector<Image>,
 }

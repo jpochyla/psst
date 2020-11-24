@@ -1,5 +1,5 @@
 use crate::{
-    data::{Album, AlbumType, Artist, Image, Playlist, SearchResults, Track},
+    data::{Album, AlbumType, Artist, ArtistAlbums, Image, Playlist, SearchResults, Track},
     error::Error,
 };
 use aspotify::{ItemType, Market, Page, PlaylistItemType, Response};
@@ -233,8 +233,8 @@ impl Web {
         Ok(result)
     }
 
-    pub async fn load_artist_albums(&self, id: &str) -> Result<Vector<Album>, Error> {
-        let result = self
+    pub async fn load_artist_albums(&self, id: &str) -> Result<ArtistAlbums, Error> {
+        let result: Vector<Album> = self
             .with_paging(
                 |client, limit, offset| {
                     client.artists().get_artist_albums(
@@ -248,7 +248,19 @@ impl Web {
                 |artists_album| artists_album.into(),
             )
             .await?;
-        Ok(result)
+        let mut artist_albums = ArtistAlbums {
+            albums: Vector::new(),
+            singles: Vector::new(),
+            compilations: Vector::new(),
+        };
+        for album in result {
+            match album.album_type {
+                AlbumType::Album => artist_albums.albums.push_back(album),
+                AlbumType::Single => artist_albums.singles.push_back(album),
+                AlbumType::Compilation => artist_albums.compilations.push_back(album),
+            }
+        }
+        Ok(artist_albums)
     }
 
     pub async fn load_artist_top_tracks(&self, id: &str) -> Result<Vector<Arc<Track>>, Error> {
@@ -261,6 +273,20 @@ impl Web {
             .data
             .into_iter()
             .map(|track| Arc::new(Track::from(track)))
+            .collect();
+        Ok(result)
+    }
+
+    pub async fn load_related_artists(&self, id: &str) -> Result<Vector<Artist>, Error> {
+        let result = self
+            .client()
+            .await?
+            .artists()
+            .get_related_artists(id)
+            .await?
+            .data
+            .into_iter()
+            .map_into()
             .collect();
         Ok(result)
     }
@@ -319,7 +345,7 @@ impl Web {
 impl From<aspotify::ArtistSimplified> for Artist {
     fn from(artist: aspotify::ArtistSimplified) -> Self {
         Self {
-            id: artist.id.unwrap(),
+            id: artist.id.unwrap().into(),
             name: artist.name.into(),
             images: Vector::new(),
         }
@@ -329,7 +355,7 @@ impl From<aspotify::ArtistSimplified> for Artist {
 impl From<aspotify::Artist> for Artist {
     fn from(artist: aspotify::Artist) -> Self {
         Self {
-            id: artist.id,
+            id: artist.id.into(),
             name: artist.name.into(),
             images: artist.images.into_iter().map_into().collect(),
         }
@@ -341,7 +367,7 @@ impl From<aspotify::AlbumSimplified> for Album {
         Self {
             album_type: album.album_type.map(AlbumType::from).unwrap_or_default(),
             artists: album.artists.into_iter().map_into().collect(),
-            id: album.id.unwrap(),
+            id: album.id.unwrap().into(),
             images: album.images.into_iter().map_into().collect(),
             name: album.name.into(),
             release_date: album.release_date,
@@ -359,7 +385,7 @@ impl From<aspotify::Album> for Album {
         Self {
             album_type: album.album_type.into(),
             artists: album.artists.into_iter().map_into().collect(),
-            id: album.id,
+            id: album.id.into(),
             images: album.images.into_iter().map_into().collect(),
             name: album.name.into(),
             release_date: Some(album.release_date),
@@ -392,7 +418,7 @@ impl From<aspotify::ArtistsAlbum> for Album {
         Self {
             album_type: album.album_type.into(),
             artists: album.artists.into_iter().map_into().collect(),
-            id: album.id,
+            id: album.id.into(),
             images: album.images.into_iter().map_into().collect(),
             name: album.name.into(),
             release_date: Some(album.release_date),
@@ -456,9 +482,9 @@ impl From<aspotify::Track> for Track {
 impl From<aspotify::PlaylistSimplified> for Playlist {
     fn from(playlist: aspotify::PlaylistSimplified) -> Self {
         Self {
-            id: playlist.id,
+            id: playlist.id.into(),
             images: playlist.images.into_iter().map_into().collect(),
-            name: playlist.name,
+            name: playlist.name.into(),
         }
     }
 }

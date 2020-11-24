@@ -50,18 +50,19 @@ impl Default for State {
                 item: None,
             },
             search: Search {
-                input: String::new(),
+                input: "".into(),
                 results: Promise::Empty,
             },
             album: AlbumDetail {
-                id: String::new(),
+                id: "".into(),
                 album: Promise::Empty,
             },
             artist: ArtistDetail {
-                id: String::new(),
+                id: "".into(),
                 artist: Promise::Empty,
                 albums: Promise::Empty,
                 top_tracks: Promise::Empty,
+                related: Promise::Empty,
             },
             playlist: PlaylistDetail {
                 playlist: Promise::Empty,
@@ -155,27 +156,35 @@ pub struct Library {
 
 #[derive(Clone, Debug, Data, Lens)]
 pub struct AlbumDetail {
-    pub id: String,
-    pub album: Promise<Album, String>,
+    pub id: Arc<str>,
+    pub album: Promise<Album, Arc<str>>,
 }
 
 #[derive(Clone, Debug, Data, Lens)]
 pub struct ArtistDetail {
-    pub id: String,
-    pub artist: Promise<Artist, String>,
-    pub albums: Promise<Vector<Album>, String>,
-    pub top_tracks: Promise<Vector<Arc<Track>>, String>,
+    pub id: Arc<str>,
+    pub artist: Promise<Artist, Arc<str>>,
+    pub albums: Promise<ArtistAlbums, Arc<str>>,
+    pub top_tracks: Promise<Vector<Arc<Track>>, Arc<str>>,
+    pub related: Promise<Vector<Artist>, Arc<str>>,
+}
+
+#[derive(Clone, Debug, Data, Lens)]
+pub struct ArtistAlbums {
+    pub albums: Vector<Album>,
+    pub singles: Vector<Album>,
+    pub compilations: Vector<Album>,
 }
 
 #[derive(Clone, Debug, Data, Lens)]
 pub struct PlaylistDetail {
     pub playlist: Promise<Playlist>,
-    pub tracks: Promise<Vector<Arc<Track>>, String>,
+    pub tracks: Promise<Vector<Arc<Track>>, Arc<str>>,
 }
 
 #[derive(Clone, Debug, Data, Lens)]
 pub struct Playlist {
-    pub id: String,
+    pub id: Arc<str>,
     pub images: Vector<Image>,
-    pub name: String,
+    pub name: Arc<str>,
 }

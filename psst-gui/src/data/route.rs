@@ -1,5 +1,6 @@
 use crate::data::Playlist;
 use druid::Data;
+use std::sync::Arc;
 
 #[derive(Clone, Debug, Data, Eq, PartialEq, Hash)]
 pub enum Route {
@@ -15,8 +16,8 @@ pub enum Route {
 pub enum Navigation {
     Home,
     SearchResults(String),
-    AlbumDetail(String),
-    ArtistDetail(String),
+    AlbumDetail(Arc<str>),
+    ArtistDetail(Arc<str>),
     PlaylistDetail(Playlist),
     Library,
 }

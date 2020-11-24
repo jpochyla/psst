@@ -9,7 +9,7 @@ use std::sync::Arc;
 pub struct Album {
     pub album_type: AlbumType,
     pub artists: Vector<Artist>,
-    pub id: String,
+    pub id: Arc<str>,
     pub images: Vector<Image>,
     pub genres: Vector<Arc<str>>,
     pub copyrights: Vector<Arc<str>>,
