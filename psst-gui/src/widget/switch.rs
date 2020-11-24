@@ -35,7 +35,7 @@ impl<T: Data, U: Data + Eq + Hash> ViewDispatcher<T, U> {
 
 impl<T: Data, U: Data + Eq + Hash> Widget<T> for ViewDispatcher<T, U> {
     fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut T, env: &Env) {
-        if hidden_should_receive_event(event) {
+        if event.should_propagate_to_hidden() {
             for (_, child) in self.children.iter_mut() {
                 child.event(ctx, event, data, env);
             }
@@ -55,7 +55,7 @@ impl<T: Data, U: Data + Eq + Hash> Widget<T> for ViewDispatcher<T, U> {
             ctx.request_layout();
         }
 
-        if hidden_should_receive_lifecycle(event) {
+        if event.should_propagate_to_hidden() {
             for (_, child) in self.children.iter_mut() {
                 child.lifecycle(ctx, event, data, env);
             }
@@ -105,32 +105,5 @@ impl<T: Data, U: Data + Eq + Hash> Widget<T> for ViewDispatcher<T, U> {
         if let Some(ref mut child) = self.active_child() {
             child.paint_raw(ctx, data, env);
         }
-    }
-}
-
-fn hidden_should_receive_event(evt: &Event) -> bool {
-    match evt {
-        Event::WindowConnected
-        | Event::WindowSize(_)
-        | Event::Timer(_)
-        | Event::AnimFrame(_)
-        | Event::Command(_)
-        | Event::Internal(_) => true,
-        Event::MouseDown(_)
-        | Event::MouseUp(_)
-        | Event::MouseMove(_)
-        | Event::Wheel(_)
-        | Event::KeyDown(_)
-        | Event::KeyUp(_)
-        | Event::Paste(_)
-        | Event::Zoom(_)
-        | Event::Notification(_) => false,
-    }
-}
-
-fn hidden_should_receive_lifecycle(lc: &LifeCycle) -> bool {
-    match lc {
-        LifeCycle::WidgetAdded | LifeCycle::Internal(_) => true,
-        LifeCycle::Size(_) | LifeCycle::HotChanged(_) | LifeCycle::FocusChanged(_) => false,
     }
 }
