@@ -10,7 +10,7 @@ use druid::{
     piet::StrokeStyle,
     widget::{Controller, CrossAxisAlignment, Flex, Label, List, ListIter, Painter},
     ContextMenu, Data, Env, Event, EventCtx, Lens, LensExt, LocalizedString, MenuDesc, MenuItem,
-    MouseButton, RenderContext, Widget, WidgetExt, WidgetId,
+    MouseButton, RenderContext, Widget, WidgetExt,
 };
 use std::sync::Arc;
 
@@ -66,10 +66,7 @@ impl ListIter<TrackState> for Ctx<TrackCtx, Vector<Arc<Track>>> {
 }
 
 pub fn make_tracklist(mode: TrackDisplay) -> impl Widget<Ctx<TrackCtx, Vector<Arc<Track>>>> {
-    let id = WidgetId::next();
-    List::new(move || make_track(mode, id))
-        .controller(PlayController)
-        .with_id(id)
+    List::new(move || make_track(mode)).controller(PlayController)
 }
 
 struct PlayController;
@@ -87,20 +84,22 @@ where
         env: &Env,
     ) {
         match event {
-            Event::Command(cmd) if cmd.is(cmd::PLAY_TRACK_AT) => {
-                let position = cmd.get_unchecked(cmd::PLAY_TRACK_AT);
-                let pb = PlaybackCtx {
-                    position: position.to_owned(),
-                    tracks: tracks.data.to_owned(),
-                };
-                ctx.submit_command(cmd::PLAY_TRACKS.with(pb));
+            Event::Notification(note) => {
+                if let Some(position) = note.get(cmd::PLAY_TRACK_AT) {
+                    let playback_ctx = PlaybackCtx {
+                        position: position.to_owned(),
+                        tracks: tracks.data.to_owned(),
+                    };
+                    ctx.submit_command(cmd::PLAY_TRACKS.with(playback_ctx));
+                    ctx.set_handled();
+                }
             }
             _ => child.event(ctx, event, tracks, env),
         }
     }
 }
 
-fn make_track(display: TrackDisplay, play_ctrl: WidgetId) -> impl Widget<TrackState> {
+fn make_track(display: TrackDisplay) -> impl Widget<TrackState> {
     let track_duration =
         Label::dynamic(|ts: &TrackState, _| ts.track.duration.as_minutes_and_seconds())
             .with_text_size(theme::TEXT_SIZE_SMALL)
@@ -172,11 +171,11 @@ fn make_track(display: TrackDisplay, play_ctrl: WidgetId) -> impl Widget<TrackSt
         .on_ex_click(
             move |ctx, event, ts: &mut TrackState, _| match event.button {
                 MouseButton::Right => {
-                    let menu = ContextMenu::new(make_track_menu(ts), event.window_pos);
-                    ctx.show_context_menu(menu);
+                    let menu = make_track_menu(ts);
+                    ctx.show_context_menu(ContextMenu::new(menu, event.window_pos));
                 }
                 MouseButton::Left => {
-                    ctx.submit_command(cmd::PLAY_TRACK_AT.with(ts.index).to(play_ctrl));
+                    ctx.submit_notification(cmd::PLAY_TRACK_AT.with(ts.index));
                 }
                 _ => {}
             },
