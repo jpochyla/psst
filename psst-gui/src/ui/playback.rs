@@ -7,7 +7,8 @@ use crate::{
 use druid::{
     lens::{Identity, InArc},
     widget::{
-        Controller, CrossAxisAlignment, Flex, Label, Painter, SizedBox, Spinner, ViewSwitcher, LineBreaking,
+        Controller, CrossAxisAlignment, Flex, Label, LineBreaking, Painter, SizedBox, Spinner,
+        ViewSwitcher,
     },
     Env, Event, EventCtx, MouseButton, MouseEvent, PaintCtx, Point, Rect, RenderContext, Size,
     Widget, WidgetExt,

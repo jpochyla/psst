@@ -1,6 +1,6 @@
 use crate::widget::ExClick;
 use druid::{
-    widget::{prelude::*, BackgroundBrush, ControllerHost},
+    widget::{prelude::*, ControllerHost},
     Color, Data, Key, KeyOrValue, MouseEvent, WidgetPod,
 };
 
@@ -69,7 +69,7 @@ impl<T: Data> Widget<T> for Hover<T> {
     }
 
     fn paint(&mut self, ctx: &mut PaintCtx, data: &T, env: &Env) {
-        let mut background = if ctx.is_hot() {
+        let background = if ctx.is_hot() {
             env.get(HOVER_HOT_COLOR)
         } else {
             env.get(HOVER_COLD_COLOR)

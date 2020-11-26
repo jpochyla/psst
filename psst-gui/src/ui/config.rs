@@ -27,7 +27,7 @@ pub fn make_config() -> impl Widget<State> {
                     Label::new("Spotify Account Settings.")
                         .with_text_size(theme::TEXT_SIZE_SMALL)
                         .hover()
-                        .on_click(|ctx, data, env| {
+                        .on_click(|_ctx, _data, _env| {
                             if let Err(err) =
                                 open::that("https://www.spotify.com/account/set-device-password")
                             {

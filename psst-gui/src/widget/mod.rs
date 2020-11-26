@@ -5,7 +5,6 @@ pub mod input;
 pub mod maybe;
 pub mod promised;
 pub mod remote_image;
-pub mod stack;
 pub mod switch;
 
 pub use button::{Hover, HoverExt};
@@ -15,5 +14,4 @@ pub use input::InputController;
 pub use maybe::Maybe;
 pub use promised::Promised;
 pub use remote_image::RemoteImage;
-pub use stack::Stack;
 pub use switch::ViewDispatcher;
