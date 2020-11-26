@@ -66,6 +66,7 @@ pub fn make_root() -> impl Widget<State> {
     Split::columns(sidebar, main)
         .split_point(0.2)
         .bar_size(1.0)
+        .min_size(150.0, 0.0)
         .min_bar_area(1.0)
         .solid_bar(true)
 }
