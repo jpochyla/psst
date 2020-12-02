@@ -591,16 +591,16 @@ impl Delegate {
                 }
             };
             Handled::Yes
-        } else if let Some(track_id) = cmd.get(cmd::SAVE_TRACK).cloned() {
+        } else if let Some(_track_id) = cmd.get(cmd::SAVE_TRACK).cloned() {
             // TODO
             Handled::Yes
-        } else if let Some(track_id) = cmd.get(cmd::UNSAVE_TRACK).cloned() {
+        } else if let Some(_track_id) = cmd.get(cmd::UNSAVE_TRACK).cloned() {
             // TODO
             Handled::Yes
-        } else if let Some(album_id) = cmd.get(cmd::SAVE_ALBUM).cloned() {
+        } else if let Some(_album_id) = cmd.get(cmd::SAVE_ALBUM).cloned() {
             // TODO
             Handled::Yes
-        } else if let Some(album_id) = cmd.get(cmd::UNSAVE_ALBUM).cloned() {
+        } else if let Some(_album_id) = cmd.get(cmd::UNSAVE_ALBUM).cloned() {
             // TODO
             Handled::Yes
         } else {

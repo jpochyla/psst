@@ -145,6 +145,7 @@ impl StreamedFile {
 
             // TODO: We spawn threads here without any accounting.  Seems wrong.
             thread::spawn({
+                // TODO: Do not bury the whole servicing loop in case the URL renewal fails.
                 let url = self.renew_url_if_needed()?.url.clone();
                 let cdn = self.cdn.clone();
                 let cache = self.cache.clone();

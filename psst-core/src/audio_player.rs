@@ -220,7 +220,7 @@ impl Player {
         )
     }
 
-    pub fn audio_source(&self) -> Arc<Mutex<PlayerAudioSource>> {
+    pub fn audio_source(&self) -> Arc<Mutex<impl AudioSource>> {
         self.audio_source.clone()
     }
 
@@ -638,7 +638,7 @@ struct ServicedPlaybackItem {
     source: FileAudioSource,
 }
 
-pub struct PlayerAudioSource {
+struct PlayerAudioSource {
     current: Option<ServicedPlaybackItem>,
     event_sender: Sender<PlayerEvent>,
     samples: u64,

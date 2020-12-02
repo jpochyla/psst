@@ -94,22 +94,6 @@ impl AudioOutput {
     where
         T: AudioSource,
     {
-        loop {
-            match self.play_on_default_device(source.clone())? {
-                Continuation::Restart => {
-                    continue;
-                }
-                Continuation::Close => {
-                    return Ok(());
-                }
-            }
-        }
-    }
-
-    fn play_on_default_device<T>(&self, source: Arc<Mutex<T>>) -> Result<Continuation, Error>
-    where
-        T: AudioSource,
-    {
         let write_callback = {
             let source = source.clone();
             move |out: &mut soundio::OutStreamWriter| {
@@ -175,7 +159,7 @@ impl AudioOutput {
                     }
                     InternalEvent::Close => {
                         log::debug!("closing audio output");
-                        return Ok(Continuation::Close);
+                        return Ok(());
                     }
                     InternalEvent::DevicesChanged => {
                         log::info!("audio devices changed");
@@ -211,11 +195,6 @@ enum InternalEvent {
     Close,
     Pause,
     Resume,
-}
-
-enum Continuation {
-    Restart,
-    Close,
 }
 
 impl From<soundio::Error> for Error {
