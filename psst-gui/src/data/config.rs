@@ -49,7 +49,7 @@ impl Config {
     pub fn save(&self) {
         let dir = Self::config_dir().expect("Failed to get config dir");
         let path = Self::config_path().expect("Failed to get config path");
-        mkdir_if_not_exists(&dir);
+        mkdir_if_not_exists(&dir).expect("Failed to create config dir");
         let file = File::create(path).expect("Failed to create config");
         serde_json::to_writer_pretty(file, self).expect("Failed to write config");
     }
