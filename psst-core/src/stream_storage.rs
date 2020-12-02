@@ -131,6 +131,10 @@ impl StreamWriter {
     pub fn is_complete(&self) -> bool {
         self.data_map.is_complete()
     }
+
+    pub fn mark_as_not_requested(&self, offset: u64, length: u64) {
+        self.data_map.mark_as_not_requested(offset, length);
+    }
 }
 
 impl Write for StreamWriter {
@@ -201,12 +205,12 @@ fn round_up_to_multiple(n: u64, m: u64) -> u64 {
 #[derive(Debug)]
 struct StreamDataMap {
     total_size: u64,
-    // Contains ranges of data sure to be present in the backing storage.  Always a subset of the
-    // requested ranges.
-    downloaded: Mutex<IntervalSet<u64>>,
     // Contains ranges of data requested from the server.  Downloaded ranges are not removed from
     // this set.
     requested: Mutex<IntervalSet<u64>>,
+    // Contains ranges of data sure to be present in the backing storage.  Always a subset of the
+    // requested ranges.
+    downloaded: Mutex<IntervalSet<u64>>,
     condvar: Condvar,
 }
 
@@ -214,6 +218,41 @@ impl StreamDataMap {
     /// Return the number of bytes from offset until the end of the file.
     fn remaining(&self, offset: u64) -> u64 {
         self.total_size.saturating_sub(offset)
+    }
+
+    /// Return an iterator of sub-ranges of `offset..offset+length` that have
+    /// not yet been requested from the backend.
+    fn not_yet_requested(&self, offset: u64, length: u64) -> impl IntoIterator<Item = (u64, u64)> {
+        let requested = self
+            .requested
+            .lock()
+            .expect("Failed to acquire data map lock");
+        let overlaps = requested.iter(offset..offset + length);
+        interval_difference(offset..offset + length, overlaps)
+            .into_iter()
+            .map(range_to_offset_and_length)
+    }
+
+    /// Mark given range as requested from the backend, so we can avoid
+    /// requesting it more than once.
+    fn mark_as_requested(&self, offset: u64, length: u64) {
+        self.requested
+            .lock()
+            .expect("Failed to acquire data map lock")
+            .insert(offset..offset + length);
+    }
+
+    fn mark_as_not_requested(&self, offset: u64, length: u64) {
+        let mut requested = self
+            .requested
+            .lock()
+            .expect("Failed to acquire data map lock");
+        let unmarked_range = offset..offset + length;
+        let filtered_set = requested
+            .iter(0..self.total_size)
+            .filter(|range| range != &unmarked_range)
+            .collect();
+        *requested = filtered_set;
     }
 
     /// Mark the range as downloaded and notify the `self.condvar`, so tasks
@@ -258,28 +297,6 @@ impl StreamDataMap {
             })
             .expect("Failed to acquire data map lock");
         available_len
-    }
-
-    /// Mark given range as requested from the backend, so we can avoid
-    /// requesting it more than once.
-    fn mark_as_requested(&self, offset: u64, length: u64) {
-        self.requested
-            .lock()
-            .expect("Failed to acquire data map lock")
-            .insert(offset..offset + length);
-    }
-
-    /// Return an iterator of sub-ranges of `offset..offset+length` that have
-    /// not yet been requested from the backend.
-    fn not_yet_requested(&self, offset: u64, length: u64) -> impl IntoIterator<Item = (u64, u64)> {
-        let requested = self
-            .requested
-            .lock()
-            .expect("Failed to acquire data map lock");
-        let overlaps = requested.iter(offset..offset + length);
-        interval_difference(offset..offset + length, overlaps)
-            .into_iter()
-            .map(range_to_offset_and_length)
     }
 
     // Returns true if data is completely downloaded.

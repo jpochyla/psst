@@ -164,9 +164,8 @@ impl StreamedFile {
                         }
                         Err(err) => {
                             log::error!("failed to download: {}", err);
-                            // TODO:
-                            //  Either retry the request or remove the range
-                            //  from the requested set.
+                            // Range failed to download, remove it from the requested set.
+                            writer.mark_as_not_requested(position, length);
                         }
                     }
                 }
