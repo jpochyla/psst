@@ -1,6 +1,7 @@
 pub mod codec;
 pub mod diffie_hellman;
 
+use crate::util::{HTTP_CONNECT_TIMEOUT_MILLIS, HTTP_IO_TIMEOUT_MILLIS};
 use crate::{
     connection::{
         codec::{ShannonDecoder, ShannonEncoder, ShannonMessage},
@@ -69,6 +70,9 @@ impl Transport {
         }
 
         let data: APResolveData = ureq::get(AP_RESOLVE_ENDPOINT)
+            .timeout_connect(HTTP_CONNECT_TIMEOUT_MILLIS)
+            .timeout_read(HTTP_IO_TIMEOUT_MILLIS)
+            .timeout_write(HTTP_IO_TIMEOUT_MILLIS)
             .call()
             .into_json_deserialize()?;
         data.ap_list

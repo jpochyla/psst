@@ -1,3 +1,4 @@
+use crate::util::{HTTP_CONNECT_TIMEOUT_MILLIS, HTTP_IO_TIMEOUT_MILLIS};
 use crate::{access_token::TokenProvider, error::Error, item_id::FileId, session::SessionHandle};
 use serde::Deserialize;
 use std::{
@@ -5,12 +6,6 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
-
-// See `ureq::Request::timeout_connect`.
-const CONNECTION_TIMEOUT_MILLIS: u64 = 4 * 1000;
-
-// See `ureq::Request::timeout_read` and `ureq::Request::timeout_write`.
-const IO_TIMEOUT_MILLIS: u64 = 4 * 1000;
 
 pub type CdnHandle = Arc<Cdn>;
 
@@ -43,9 +38,9 @@ impl Cdn {
             .query("platform", "39")
             .query("alt", "json")
             .auth_kind("Bearer", &access_token.token)
-            .timeout_connect(CONNECTION_TIMEOUT_MILLIS)
-            .timeout_read(IO_TIMEOUT_MILLIS)
-            .timeout_write(IO_TIMEOUT_MILLIS)
+            .timeout_connect(HTTP_CONNECT_TIMEOUT_MILLIS)
+            .timeout_read(HTTP_IO_TIMEOUT_MILLIS)
+            .timeout_write(HTTP_IO_TIMEOUT_MILLIS)
             .call();
 
         if !response.ok() {
@@ -92,9 +87,9 @@ impl Cdn {
             .agent
             .get(uri)
             .set("Range", &range_header(position, length))
-            .timeout_connect(CONNECTION_TIMEOUT_MILLIS)
-            .timeout_read(IO_TIMEOUT_MILLIS)
-            .timeout_write(IO_TIMEOUT_MILLIS)
+            .timeout_connect(HTTP_CONNECT_TIMEOUT_MILLIS)
+            .timeout_read(HTTP_IO_TIMEOUT_MILLIS)
+            .timeout_write(HTTP_IO_TIMEOUT_MILLIS)
             .call();
 
         if !response.ok() {

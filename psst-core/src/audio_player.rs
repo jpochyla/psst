@@ -354,7 +354,7 @@ impl Player {
             }
             preloading_or_none => {
                 // Restore the preloader to the previous state.
-                // TODO: If the iteam is being preloaded, extract the loading handle.
+                // TODO: If the item is being preloaded, extract the loading handle.
                 self.preload = preloading_or_none;
             }
         }

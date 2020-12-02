@@ -3,6 +3,12 @@ use num_traits::{One, WrappingAdd};
 use quick_protobuf::{BytesReader, MessageRead, MessageWrite, Writer};
 use std::{io, io::SeekFrom, mem};
 
+// See `ureq::Request::timeout_connect`.
+pub const HTTP_CONNECT_TIMEOUT_MILLIS: u64 = 4 * 1000;
+
+// See `ureq::Request::timeout_read` and `ureq::Request::timeout_write`.
+pub const HTTP_IO_TIMEOUT_MILLIS: u64 = 4 * 1000;
+
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord, Default)]
 pub struct Sequence<T>(T);
 
