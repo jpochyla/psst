@@ -1,7 +1,7 @@
 pub mod codec;
 pub mod diffie_hellman;
 
-use crate::util::{HTTP_CONNECT_TIMEOUT_MILLIS, HTTP_IO_TIMEOUT_MILLIS};
+use crate::util::{HTTP_CONNECT_TIMEOUT, HTTP_IO_TIMEOUT};
 use crate::{
     connection::{
         codec::{ShannonDecoder, ShannonEncoder, ShannonMessage},
@@ -69,12 +69,12 @@ impl Transport {
             ap_list: Vec<String>,
         }
 
-        let data: APResolveData = ureq::get(AP_RESOLVE_ENDPOINT)
-            .timeout_connect(HTTP_CONNECT_TIMEOUT_MILLIS)
-            .timeout_read(HTTP_IO_TIMEOUT_MILLIS)
-            .timeout_write(HTTP_IO_TIMEOUT_MILLIS)
-            .call()
-            .into_json_deserialize()?;
+        let agent = ureq::AgentBuilder::new()
+            .timeout_connect(HTTP_CONNECT_TIMEOUT)
+            .timeout_read(HTTP_IO_TIMEOUT)
+            .timeout_write(HTTP_IO_TIMEOUT)
+            .build();
+        let data: APResolveData = agent.get(AP_RESOLVE_ENDPOINT).call()?.into_json()?;
         data.ap_list
             .into_iter()
             .next()

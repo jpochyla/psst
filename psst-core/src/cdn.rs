@@ -1,4 +1,4 @@
-use crate::util::{HTTP_CONNECT_TIMEOUT_MILLIS, HTTP_IO_TIMEOUT_MILLIS};
+use crate::util::{HTTP_CONNECT_TIMEOUT, HTTP_IO_TIMEOUT};
 use crate::{access_token::TokenProvider, error::Error, item_id::FileId, session::SessionHandle};
 use serde::Deserialize;
 use std::{
@@ -17,9 +17,14 @@ pub struct Cdn {
 
 impl Cdn {
     pub fn connect(session: SessionHandle) -> CdnHandle {
+        let agent = ureq::AgentBuilder::new()
+            .timeout_connect(HTTP_CONNECT_TIMEOUT)
+            .timeout_read(HTTP_IO_TIMEOUT)
+            .timeout_write(HTTP_IO_TIMEOUT)
+            .build();
         Arc::new(Self {
             session,
-            agent: ureq::agent(),
+            agent,
             token_provider: TokenProvider::new(),
         })
     }
@@ -37,22 +42,8 @@ impl Cdn {
             .query("product", "9")
             .query("platform", "39")
             .query("alt", "json")
-            .auth_kind("Bearer", &access_token.token)
-            .timeout_connect(HTTP_CONNECT_TIMEOUT_MILLIS)
-            .timeout_read(HTTP_IO_TIMEOUT_MILLIS)
-            .timeout_write(HTTP_IO_TIMEOUT_MILLIS)
-            .call();
-
-        if !response.ok() {
-            if response.status() == 429 {
-                // TODO: Retry after delay.
-                let retry_after = response.header("Retry-After").unwrap_or("?");
-                log::warn!("resolving rate limited, Retry-After={}", retry_after);
-            } else {
-                log::warn!("resolving failed: {:?}", response);
-            }
-            return Err(Error::UnexpectedResponse);
-        }
+            .set("Authorization", &format!("Bearer {}", access_token.token))
+            .call()?;
 
         #[derive(Deserialize, Debug, Clone)]
         struct AudioFileLocations {
@@ -62,7 +53,7 @@ impl Cdn {
         }
 
         // Deserialize the response and pick a file URL from the returned CDN list.
-        let locations: AudioFileLocations = response.into_json_deserialize()?;
+        let locations: AudioFileLocations = response.into_json()?;
         let file_uri = locations
             .cdnurl
             .into_iter()
@@ -87,16 +78,7 @@ impl Cdn {
             .agent
             .get(uri)
             .set("Range", &range_header(position, length))
-            .timeout_connect(HTTP_CONNECT_TIMEOUT_MILLIS)
-            .timeout_read(HTTP_IO_TIMEOUT_MILLIS)
-            .timeout_write(HTTP_IO_TIMEOUT_MILLIS)
-            .call();
-
-        if !response.ok() {
-            log::warn!("data request failed: {:?}", response);
-            return Err(Error::UnexpectedResponse);
-        }
-
+            .call()?;
         let total_length = parse_total_content_length(&response);
         let data_reader = response.into_reader();
         Ok((total_length, data_reader))
