@@ -1,5 +1,8 @@
 use crate::{
-    data::{Album, AlbumType, Artist, ArtistAlbums, Image, Playlist, SearchResults, Track},
+    data::{
+        Album, AlbumType, Artist, ArtistAlbums, Image, Playlist, SearchResults, Track,
+        LOCAL_TRACK_ID,
+    },
     error::Error,
 };
 use aspotify::{ItemType, Market, Page, PlaylistItemType, Response};
@@ -342,10 +345,15 @@ impl Web {
     }
 }
 
+const LOCAL_ARTIST_ID: &str = "local_artist";
+const LOCAL_ALBUM_ID: &str = "local_album";
+
 impl From<aspotify::ArtistSimplified> for Artist {
     fn from(artist: aspotify::ArtistSimplified) -> Self {
         Self {
-            id: artist.id.unwrap().into(),
+            id: artist
+                .id
+                .map_or_else(|| LOCAL_ARTIST_ID.into(), |id| id.into()),
             name: artist.name.into(),
             images: Vector::new(),
         }
@@ -367,7 +375,9 @@ impl From<aspotify::AlbumSimplified> for Album {
         Self {
             album_type: album.album_type.map(AlbumType::from).unwrap_or_default(),
             artists: album.artists.into_iter().map_into().collect(),
-            id: album.id.unwrap().into(),
+            id: album
+                .id
+                .map_or_else(|| LOCAL_ALBUM_ID.into(), |id| id.into()),
             images: album.images.into_iter().map_into().collect(),
             name: album.name.into(),
             release_date: album.release_date,
@@ -449,8 +459,7 @@ impl From<aspotify::TrackSimplified> for Track {
             disc_number: track.disc_number,
             duration: track.duration.into(),
             explicit: track.explicit,
-            // TODO: Local tracks do not have IDs, account for them.
-            id: track.id.unwrap().parse().unwrap(),
+            id: track.id.map_or(LOCAL_TRACK_ID, |id| id.parse().unwrap()),
             is_local: track.is_local,
             is_playable: None,
             name: track.name.into(),
@@ -468,8 +477,7 @@ impl From<aspotify::Track> for Track {
             disc_number: track.disc_number,
             duration: track.duration.into(),
             explicit: track.explicit,
-            // TODO: Local tracks do not have IDs, account for them.
-            id: track.id.unwrap().parse().unwrap(),
+            id: track.id.map_or(LOCAL_TRACK_ID, |id| id.parse().unwrap()),
             is_local: track.is_local,
             is_playable: track.is_playable,
             name: track.name.into(),

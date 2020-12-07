@@ -17,7 +17,7 @@ const BASE62_DIGITS: &[u8] = b"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLM
 const BASE16_DIGITS: &[u8] = b"0123456789abcdef";
 
 impl ItemId {
-    fn new(id: u128, id_type: ItemIdType) -> Self {
+    pub const fn new(id: u128, id_type: ItemIdType) -> Self {
         Self { id, id_type }
     }
 

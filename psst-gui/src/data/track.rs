@@ -67,6 +67,8 @@ impl Track {
     }
 }
 
+pub const LOCAL_TRACK_ID: TrackId = TrackId(ItemId::new(0u128, ItemIdType::Unknown));
+
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
 pub struct TrackId(ItemId);
 
