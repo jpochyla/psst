@@ -192,6 +192,16 @@ impl Web {
         Ok(result)
     }
 
+    pub async fn save_album(&self, id: &str) -> Result<(), Error> {
+        self.client().await?.library().save_albums(&[id]).await?;
+        Ok(())
+    }
+
+    pub async fn unsave_album(&self, id: &str) -> Result<(), Error> {
+        self.client().await?.library().unsave_albums(&[id]).await?;
+        Ok(())
+    }
+
     pub async fn load_saved_tracks(&self) -> Result<Vector<Arc<Track>>, Error> {
         let result = self
             .with_paging(
@@ -204,6 +214,16 @@ impl Web {
             )
             .await?;
         Ok(result)
+    }
+
+    pub async fn save_track(&self, id: &str) -> Result<(), Error> {
+        self.client().await?.library().save_tracks(&[id]).await?;
+        Ok(())
+    }
+
+    pub async fn unsave_track(&self, id: &str) -> Result<(), Error> {
+        self.client().await?.library().unsave_tracks(&[id]).await?;
+        Ok(())
     }
 
     pub async fn load_playlists(&self) -> Result<Vector<Playlist>, Error> {

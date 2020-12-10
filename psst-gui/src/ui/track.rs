@@ -107,7 +107,7 @@ fn make_track(display: TrackDisplay) -> impl Widget<TrackState> {
 
     let line_painter = Painter::new(move |ctx, ts: &TrackState, _| {
         let line = Line::new((0.0, 0.0), (ctx.size().width, 0.0));
-        let color = if ts.ctx.is_playing(&ts.track) {
+        let color = if ts.ctx.is_track_playing(&ts.track) {
             theme::BLACK
         } else {
             theme::GREY_5
@@ -204,16 +204,16 @@ fn make_track_menu(ts: &TrackState) -> MenuDesc<State> {
 
     menu = menu.append_separator();
 
-    if ts.ctx.is_saved(&ts.track) {
+    if ts.ctx.is_track_saved(&ts.track) {
         menu = menu.append(MenuItem::new(
             LocalizedString::new("menu-item-remove-from-library")
                 .with_placeholder("Remove from Library"),
-            cmd::UNSAVE_TRACK.with(ts.track.id),
+            cmd::UNSAVE_TRACK.with(ts.track.clone()),
         ));
     } else {
         menu = menu.append(MenuItem::new(
             LocalizedString::new("menu-item-save-to-library").with_placeholder("Save to Library"),
-            cmd::SAVE_TRACK.with(ts.track.id),
+            cmd::SAVE_TRACK.with(ts.track.clone()),
         ));
     }
 

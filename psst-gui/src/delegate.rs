@@ -591,17 +591,49 @@ impl Delegate {
                 }
             };
             Handled::Yes
-        } else if let Some(_track_id) = cmd.get(cmd::SAVE_TRACK).cloned() {
-            // TODO
+        } else if let Some(track) = cmd.get(cmd::SAVE_TRACK).cloned() {
+            let web = self.web.clone();
+            let track_id = track.id.to_base62();
+            data.save_track(track);
+            self.runtime.spawn(async move {
+                let result = web.save_track(&track_id).await;
+                if result.is_err() {
+                    // TODO: Refresh saved tracks.
+                }
+            });
             Handled::Yes
-        } else if let Some(_track_id) = cmd.get(cmd::UNSAVE_TRACK).cloned() {
-            // TODO
+        } else if let Some(track) = cmd.get(cmd::UNSAVE_TRACK) {
+            let web = self.web.clone();
+            let track_id = track.id.to_base62();
+            data.unsave_track(&track.id);
+            self.runtime.spawn(async move {
+                let result = web.unsave_track(&track_id).await;
+                if result.is_err() {
+                    // TODO: Refresh saved tracks.
+                }
+            });
             Handled::Yes
-        } else if let Some(_album_id) = cmd.get(cmd::SAVE_ALBUM).cloned() {
-            // TODO
+        } else if let Some(album) = cmd.get(cmd::SAVE_ALBUM).cloned() {
+            let web = self.web.clone();
+            let album_id = album.id.clone();
+            data.save_album(album);
+            self.runtime.spawn(async move {
+                let result = web.save_album(&album_id).await;
+                if result.is_err() {
+                    // TODO: Refresh saved albums.
+                }
+            });
             Handled::Yes
-        } else if let Some(_album_id) = cmd.get(cmd::UNSAVE_ALBUM).cloned() {
-            // TODO
+        } else if let Some(album_id) = cmd.get(cmd::UNSAVE_ALBUM) {
+            let album_id = album_id.clone();
+            let web = self.web.clone();
+            data.unsave_album(&album_id);
+            self.runtime.spawn(async move {
+                let result = web.unsave_album(&album_id).await;
+                if result.is_err() {
+                    // TODO: Refresh saved albums.
+                }
+            });
             Handled::Yes
         } else {
             Handled::No

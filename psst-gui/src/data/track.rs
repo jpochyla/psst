@@ -13,14 +13,14 @@ pub struct TrackCtx {
 }
 
 impl TrackCtx {
-    pub fn is_playing(&self, track: &Track) -> bool {
+    pub fn is_track_playing(&self, track: &Track) -> bool {
         self.playback_item
             .as_ref()
             .map(|t| t.id.same(&track.id))
             .unwrap_or(false)
     }
 
-    pub fn is_saved(&self, track: &Track) -> bool {
+    pub fn is_track_saved(&self, track: &Track) -> bool {
         self.saved_tracks.contains(&track.id)
     }
 

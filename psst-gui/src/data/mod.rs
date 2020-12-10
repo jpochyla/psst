@@ -17,7 +17,6 @@ pub use crate::data::{
     track::{Track, TrackCtx, TrackId, LOCAL_TRACK_ID},
     utils::{AudioDuration, Image},
 };
-
 use druid::{
     im::{HashSet, Vector},
     Data, Lens,
@@ -110,6 +109,34 @@ impl State {
         self.playback.item.take();
         self.playback.progress.take();
         self.track_ctx.playback_item.take();
+    }
+}
+
+impl State {
+    pub fn save_track(&mut self, track: Arc<Track>) {
+        if let Promise::Resolved(tracks) = &mut self.library.saved_tracks {
+            tracks.push_front(track);
+            self.track_ctx.set_saved_tracks(tracks);
+        }
+    }
+
+    pub fn unsave_track(&mut self, track_id: &TrackId) {
+        if let Promise::Resolved(tracks) = &mut self.library.saved_tracks {
+            tracks.retain(|track| &track.id != track_id);
+            self.track_ctx.set_saved_tracks(tracks);
+        }
+    }
+
+    pub fn save_album(&mut self, album: Album) {
+        if let Promise::Resolved(albums) = &mut self.library.saved_albums {
+            albums.push_front(album);
+        }
+    }
+
+    pub fn unsave_album(&mut self, album_id: &Arc<str>) {
+        if let Promise::Resolved(albums) = &mut self.library.saved_albums {
+            albums.retain(|album| &album.id != album_id)
+        }
     }
 }
 

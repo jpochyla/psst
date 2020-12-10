@@ -45,9 +45,9 @@ pub const UPDATE_SAVED_ALBUMS: Selector<Result<Vector<Album>, Error>> =
     Selector::new("app.update-saved-albums");
 pub const UPDATE_SAVED_TRACKS: Selector<Result<Vector<Arc<Track>>, Error>> =
     Selector::new("app.update-saved-tracks");
-pub const SAVE_TRACK: Selector<TrackId> = Selector::new("app.save-track");
-pub const UNSAVE_TRACK: Selector<TrackId> = Selector::new("app.unsave-track");
-pub const SAVE_ALBUM: Selector<Arc<str>> = Selector::new("app.save-album");
+pub const SAVE_TRACK: Selector<Arc<Track>> = Selector::new("app.save-track");
+pub const UNSAVE_TRACK: Selector<Arc<Track>> = Selector::new("app.unsave-track");
+pub const SAVE_ALBUM: Selector<Album> = Selector::new("app.save-album");
 pub const UNSAVE_ALBUM: Selector<Arc<str>> = Selector::new("app.unsave-album");
 
 // Album detail
