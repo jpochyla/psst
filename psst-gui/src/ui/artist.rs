@@ -1,3 +1,4 @@
+use crate::widget::Clip;
 use crate::{
     cmd,
     data::{Artist, ArtistAlbums, ArtistDetail, Ctx, Navigation, State},
@@ -9,6 +10,7 @@ use crate::{
     },
     widget::{HoverExt, Promised, RemoteImage},
 };
+use druid::kurbo::Circle;
 use druid::{
     im::Vector,
     widget::{CrossAxisAlignment, Flex, Label, List},
@@ -53,10 +55,11 @@ pub fn make_detail() -> impl Widget<State> {
 }
 
 pub fn make_cover(width: f64, height: f64) -> impl Widget<Artist> {
-    RemoteImage::new(make_placeholder(), move |artist: &Artist, _| {
+    let image = RemoteImage::new(make_placeholder(), move |artist: &Artist, _| {
         artist.image(width, height).map(|image| image.url.clone())
     })
-    .fix_size(width, height)
+    .fix_size(width, height);
+    Clip::new(Circle::new((width / 2.0, height / 2.0), width / 2.0), image)
 }
 
 pub fn make_artist() -> impl Widget<Artist> {
