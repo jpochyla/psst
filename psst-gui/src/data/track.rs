@@ -1,10 +1,37 @@
-use crate::data::{Album, Artist, AudioDuration};
+use crate::data::{Album, Artist, AudioDuration, Navigation};
 use druid::{
     im::{HashSet, Vector},
     Data, Lens,
 };
 use psst_core::item_id::{ItemId, ItemIdType};
 use std::{ops::Deref, str::FromStr, sync::Arc};
+
+#[derive(Clone, Debug, Data)]
+pub enum TrackOrigin {
+    Library,
+    Album(Arc<str>),
+    Artist(Arc<str>),
+    Playlist(Arc<str>),
+    Search(String),
+}
+
+impl TrackOrigin {
+    pub fn as_nav(&self) -> Navigation {
+        match &self {
+            TrackOrigin::Library => Navigation::Library,
+            TrackOrigin::Album(id) => Navigation::AlbumDetail(id.to_owned()),
+            TrackOrigin::Artist(id) => Navigation::ArtistDetail(id.to_owned()),
+            TrackOrigin::Playlist(_) => todo!(),
+            TrackOrigin::Search(_) => todo!(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Data)]
+pub struct TrackList {
+    pub origin: TrackOrigin,
+    pub tracks: Vector<Arc<Track>>,
+}
 
 #[derive(Clone, Debug, Data)]
 pub struct TrackCtx {

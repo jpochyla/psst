@@ -1,4 +1,4 @@
-use crate::data::{Artist, Image, Track};
+use crate::data::{Artist, Image, TrackList};
 use aspotify::DatePrecision;
 use chrono::NaiveDate;
 use druid::{im::Vector, Data, Lens};
@@ -19,7 +19,7 @@ pub struct Album {
     pub release_date: Option<NaiveDate>,
     #[data(same_fn = "PartialEq::eq")]
     pub release_date_precision: Option<DatePrecision>,
-    pub tracks: Vector<Arc<Track>>,
+    pub tracks: TrackList,
 }
 
 impl Album {

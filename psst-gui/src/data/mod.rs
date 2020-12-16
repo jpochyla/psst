@@ -2,6 +2,7 @@ mod album;
 mod artist;
 mod config;
 mod ctx;
+mod playback;
 mod promise;
 mod route;
 mod track;
@@ -12,9 +13,10 @@ pub use crate::data::{
     artist::Artist,
     config::{AudioQuality, Config},
     ctx::Ctx,
+    playback::{Playback, PlaybackCtx, PlaybackState},
     promise::{Promise, PromiseState},
     route::{Navigation, Route},
-    track::{Track, TrackCtx, TrackId, LOCAL_TRACK_ID},
+    track::{Track, TrackCtx, TrackId, TrackList, TrackOrigin, LOCAL_TRACK_ID},
     utils::{AudioDuration, Image},
 };
 use druid::{
@@ -45,6 +47,7 @@ impl Default for State {
             config: Config::default(),
             playback: Playback {
                 state: PlaybackState::Stopped,
+                origin: None,
                 progress: None,
                 item: None,
             },
@@ -81,15 +84,17 @@ impl Default for State {
 }
 
 impl State {
-    pub fn set_playback_loading(&mut self, item: Arc<Track>) {
+    pub fn set_playback_loading(&mut self, item: Arc<Track>, origin: TrackOrigin) {
         self.playback.state = PlaybackState::Loading;
+        self.playback.origin.replace(origin);
         self.playback.item.replace(item);
         self.playback.progress.take();
         self.track_ctx.playback_item.take();
     }
 
-    pub fn set_playback_playing(&mut self, item: Arc<Track>) {
+    pub fn set_playback_playing(&mut self, item: Arc<Track>, origin: TrackOrigin) {
         self.playback.state = PlaybackState::Playing;
+        self.playback.origin.replace(origin);
         self.playback.item.replace(item.clone());
         self.playback.progress.take();
         self.track_ctx.playback_item.replace(item);
@@ -106,6 +111,7 @@ impl State {
 
     pub fn set_playback_stopped(&mut self) {
         self.playback.state = PlaybackState::Stopped;
+        self.playback.origin.take();
         self.playback.item.take();
         self.playback.progress.take();
         self.track_ctx.playback_item.take();
@@ -114,16 +120,16 @@ impl State {
 
 impl State {
     pub fn save_track(&mut self, track: Arc<Track>) {
-        if let Promise::Resolved(tracks) = &mut self.library.saved_tracks {
-            tracks.push_front(track);
-            self.track_ctx.set_saved_tracks(tracks);
+        if let Promise::Resolved(list) = &mut self.library.saved_tracks {
+            list.tracks.push_front(track);
+            self.track_ctx.set_saved_tracks(&list.tracks);
         }
     }
 
     pub fn unsave_track(&mut self, track_id: &TrackId) {
-        if let Promise::Resolved(tracks) = &mut self.library.saved_tracks {
-            tracks.retain(|track| &track.id != track_id);
-            self.track_ctx.set_saved_tracks(tracks);
+        if let Promise::Resolved(list) = &mut self.library.saved_tracks {
+            list.tracks.retain(|track| &track.id != track_id);
+            self.track_ctx.set_saved_tracks(&list.tracks);
         }
     }
 
@@ -140,27 +146,6 @@ impl State {
     }
 }
 
-#[derive(Clone, Debug, Data)]
-pub struct PlaybackCtx {
-    pub tracks: Vector<Arc<Track>>,
-    pub position: usize,
-}
-
-#[derive(Copy, Clone, Debug, Data, Eq, PartialEq)]
-pub enum PlaybackState {
-    Loading,
-    Playing,
-    Paused,
-    Stopped,
-}
-
-#[derive(Clone, Debug, Data, Lens)]
-pub struct Playback {
-    pub state: PlaybackState,
-    pub progress: Option<AudioDuration>,
-    pub item: Option<Arc<Track>>,
-}
-
 #[derive(Clone, Debug, Data, Lens)]
 pub struct Search {
     pub input: String,
@@ -171,14 +156,14 @@ pub struct Search {
 pub struct SearchResults {
     pub artists: Vector<Artist>,
     pub albums: Vector<Album>,
-    pub tracks: Vector<Arc<Track>>,
+    pub tracks: TrackList,
 }
 
 #[derive(Clone, Debug, Data, Lens)]
 pub struct Library {
-    pub saved_albums: Promise<Vector<Album>>,
-    pub saved_tracks: Promise<Vector<Arc<Track>>>,
     pub playlists: Promise<Vector<Playlist>>,
+    pub saved_albums: Promise<Vector<Album>>,
+    pub saved_tracks: Promise<TrackList>,
 }
 
 #[derive(Clone, Debug, Data, Lens)]
@@ -192,8 +177,8 @@ pub struct ArtistDetail {
     pub id: Arc<str>,
     pub artist: Promise<Artist, Arc<str>>,
     pub albums: Promise<ArtistAlbums, Arc<str>>,
-    pub top_tracks: Promise<Vector<Arc<Track>>, Arc<str>>,
     pub related: Promise<Vector<Artist>, Arc<str>>,
+    pub top_tracks: Promise<TrackList, Arc<str>>,
 }
 
 #[derive(Clone, Debug, Data, Lens)]
@@ -206,12 +191,12 @@ pub struct ArtistAlbums {
 #[derive(Clone, Debug, Data, Lens)]
 pub struct PlaylistDetail {
     pub playlist: Promise<Playlist>,
-    pub tracks: Promise<Vector<Arc<Track>>, Arc<str>>,
+    pub tracks: Promise<TrackList, Arc<str>>,
 }
 
 #[derive(Clone, Debug, Data, Lens)]
 pub struct Playlist {
     pub id: Arc<str>,
-    pub images: Vector<Image>,
     pub name: Arc<str>,
+    pub images: Vector<Image>,
 }

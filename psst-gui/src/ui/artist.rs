@@ -1,4 +1,3 @@
-use crate::widget::Clip;
 use crate::{
     cmd,
     data::{Artist, ArtistAlbums, ArtistDetail, Ctx, Navigation, State},
@@ -8,11 +7,11 @@ use crate::{
         track::{make_tracklist, TrackDisplay},
         utils::{make_error, make_loader, make_placeholder},
     },
-    widget::{HoverExt, Promised, RemoteImage},
+    widget::{Clip, HoverExt, Promised, RemoteImage},
 };
-use druid::kurbo::Circle;
 use druid::{
     im::Vector,
+    kurbo::Circle,
     widget::{CrossAxisAlignment, Flex, Label, List},
     LensExt, Widget, WidgetExt,
 };

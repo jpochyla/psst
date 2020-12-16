@@ -16,13 +16,27 @@ use druid::{
 use std::sync::Arc;
 
 pub fn make_panel() -> impl Widget<State> {
-    Flex::row()
+    let handle = Label::new("⌃")
+        .with_text_color(theme::PLACEHOLDER_COLOR)
+        .center()
+        .padding((theme::grid(0.5), 0.0))
+        .expand_width()
+        .hover()
+        .on_click(|ctx, state: &mut State, _| {
+            if let Some(origin) = state.playback.origin.as_ref() {
+                ctx.submit_command(cmd::NAVIGATE_TO.with(origin.as_nav()));
+            }
+        });
+
+    let content = Flex::row()
         .must_fill_main_axis(true)
         .with_flex_child(make_info(), 1.0)
         .with_flex_child(make_player(), 1.0)
         .padding(theme::grid(1.0))
         .background(theme::WHITE)
-        .lens(State::playback)
+        .lens(State::playback);
+
+    Flex::column().with_child(handle).with_child(content)
 }
 
 fn make_info() -> impl Widget<Playback> {

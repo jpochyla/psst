@@ -1,7 +1,7 @@
 use crate::{
     data::{
-        Album, AlbumType, Artist, ArtistAlbums, Image, Playlist, SearchResults, Track,
-        LOCAL_TRACK_ID,
+        Album, AlbumType, Artist, ArtistAlbums, Image, Playlist, SearchResults, Track, TrackList,
+        TrackOrigin, LOCAL_TRACK_ID,
     },
     error::Error,
 };
@@ -202,8 +202,8 @@ impl Web {
         Ok(())
     }
 
-    pub async fn load_saved_tracks(&self) -> Result<Vector<Arc<Track>>, Error> {
-        let result = self
+    pub async fn load_saved_tracks(&self) -> Result<TrackList, Error> {
+        let tracks = self
             .with_paging(
                 |client, limit, offset| {
                     client
@@ -213,7 +213,11 @@ impl Web {
                 |saved| Arc::new(Track::from(saved.track)),
             )
             .await?;
-        Ok(result)
+        let list = TrackList {
+            origin: TrackOrigin::Library,
+            tracks,
+        };
+        Ok(list)
     }
 
     pub async fn save_track(&self, id: &str) -> Result<(), Error> {
@@ -236,12 +240,12 @@ impl Web {
         Ok(result)
     }
 
-    pub async fn load_playlist_tracks(&self, id: &str) -> Result<Vector<Arc<Track>>, Error> {
-        let result = self
+    pub async fn load_playlist_tracks(&self, id: Arc<str>) -> Result<TrackList, Error> {
+        let tracks = self
             .with_paging(
                 |client, limit, offset| {
                     client.playlists().get_playlists_items(
-                        id,
+                        &id,
                         limit,
                         offset,
                         Some(Market::FromToken),
@@ -253,11 +257,15 @@ impl Web {
                 },
             )
             .await?;
-        Ok(result)
+        let list = TrackList {
+            origin: TrackOrigin::Playlist(id),
+            tracks,
+        };
+        Ok(list)
     }
 
     pub async fn load_artist_albums(&self, id: &str) -> Result<ArtistAlbums, Error> {
-        let result: Vector<Album> = self
+        let items: Vector<Album> = self
             .with_paging(
                 |client, limit, offset| {
                     client.artists().get_artist_albums(
@@ -276,7 +284,7 @@ impl Web {
             singles: Vector::new(),
             compilations: Vector::new(),
         };
-        for album in result {
+        for album in items {
             match album.album_type {
                 AlbumType::Album => artist_albums.albums.push_back(album),
                 AlbumType::Single => artist_albums.singles.push_back(album),
@@ -286,22 +294,26 @@ impl Web {
         Ok(artist_albums)
     }
 
-    pub async fn load_artist_top_tracks(&self, id: &str) -> Result<Vector<Arc<Track>>, Error> {
-        let result = self
+    pub async fn load_artist_top_tracks(&self, id: Arc<str>) -> Result<TrackList, Error> {
+        let tracks = self
             .client()
             .await?
             .artists()
-            .get_artist_top(id, Market::FromToken)
+            .get_artist_top(&id, Market::FromToken)
             .await?
             .data
             .into_iter()
             .map(|track| Arc::new(Track::from(track)))
             .collect();
-        Ok(result)
+        let list = TrackList {
+            origin: TrackOrigin::Artist(id),
+            tracks,
+        };
+        Ok(list)
     }
 
     pub async fn load_related_artists(&self, id: &str) -> Result<Vector<Artist>, Error> {
-        let result = self
+        let items = self
             .client()
             .await?
             .artists()
@@ -311,7 +323,7 @@ impl Web {
             .into_iter()
             .map_into()
             .collect();
-        Ok(result)
+        Ok(items)
     }
 
     pub async fn load_image(&self, uri: &str) -> Result<image::DynamicImage, Error> {
@@ -323,7 +335,7 @@ impl Web {
     }
 
     pub async fn search(&self, query: &str) -> Result<SearchResults, Error> {
-        let results = self
+        let items = self
             .client()
             .await?
             .search()
@@ -339,24 +351,28 @@ impl Web {
             )
             .await?
             .data;
-        let artists = results
+        let artists = items
             .artists
             .map_or_else(Vec::new, |page| page.items)
             .into_iter()
             .map_into()
             .collect();
-        let albums = results
+        let albums = items
             .albums
             .map_or_else(Vec::new, |page| page.items)
             .into_iter()
             .map_into()
             .collect();
-        let tracks = results
+        let tracks = items
             .tracks
             .map_or_else(Vec::new, |page| page.items)
             .into_iter()
             .map(|track| Arc::new(Track::from(track)))
             .collect();
+        let tracks = TrackList {
+            origin: TrackOrigin::Search(query.to_owned()),
+            tracks,
+        };
         Ok(SearchResults {
             artists,
             albums,
@@ -392,19 +408,23 @@ impl From<aspotify::Artist> for Artist {
 
 impl From<aspotify::AlbumSimplified> for Album {
     fn from(album: aspotify::AlbumSimplified) -> Self {
+        let id: Arc<str> = album
+            .id
+            .map_or_else(|| LOCAL_ALBUM_ID.into(), |id| id.into());
         Self {
+            id: id.clone(),
             album_type: album.album_type.map(AlbumType::from).unwrap_or_default(),
             artists: album.artists.into_iter().map_into().collect(),
-            id: album
-                .id
-                .map_or_else(|| LOCAL_ALBUM_ID.into(), |id| id.into()),
             images: album.images.into_iter().map_into().collect(),
             name: album.name.into(),
             release_date: album.release_date,
             release_date_precision: album.release_date_precision,
             genres: Vector::new(),
             copyrights: Vector::new(),
-            tracks: Vector::new(),
+            tracks: TrackList {
+                origin: TrackOrigin::Album(id),
+                tracks: Vector::new(),
+            },
             label: "".into(),
         }
     }
@@ -412,10 +432,11 @@ impl From<aspotify::AlbumSimplified> for Album {
 
 impl From<aspotify::Album> for Album {
     fn from(album: aspotify::Album) -> Self {
+        let id: Arc<str> = album.id.into();
         Self {
+            id: id.clone(),
             album_type: album.album_type.into(),
             artists: album.artists.into_iter().map_into().collect(),
-            id: album.id.into(),
             images: album.images.into_iter().map_into().collect(),
             name: album.name.into(),
             release_date: Some(album.release_date),
@@ -432,12 +453,15 @@ impl From<aspotify::Album> for Album {
                     }
                 })
                 .collect(),
-            tracks: album
-                .tracks
-                .items
-                .into_iter()
-                .map(|track| Arc::new(Track::from(track)))
-                .collect(),
+            tracks: TrackList {
+                origin: TrackOrigin::Album(id),
+                tracks: album
+                    .tracks
+                    .items
+                    .into_iter()
+                    .map(|track| Arc::new(Track::from(track)))
+                    .collect(),
+            },
             label: album.label.into(),
         }
     }
@@ -445,17 +469,21 @@ impl From<aspotify::Album> for Album {
 
 impl From<aspotify::ArtistsAlbum> for Album {
     fn from(album: aspotify::ArtistsAlbum) -> Self {
+        let id: Arc<str> = album.id.into();
         Self {
+            id: id.clone(),
             album_type: album.album_type.into(),
             artists: album.artists.into_iter().map_into().collect(),
-            id: album.id.into(),
             images: album.images.into_iter().map_into().collect(),
             name: album.name.into(),
             release_date: Some(album.release_date),
             release_date_precision: Some(album.release_date_precision),
             genres: Vector::new(),
             copyrights: Vector::new(),
-            tracks: Vector::new(),
+            tracks: TrackList {
+                origin: TrackOrigin::Album(id),
+                tracks: Vector::new(),
+            },
             label: "".into(),
         }
     }

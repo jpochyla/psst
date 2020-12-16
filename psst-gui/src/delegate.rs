@@ -1,6 +1,8 @@
 use crate::{
     cmd,
-    data::{AudioDuration, Config, Navigation, Route, State, Track, TrackId},
+    data::{
+        AudioDuration, Config, Navigation, Route, State, Track, TrackId, TrackList, TrackOrigin,
+    },
     ui,
     web::{Web, WebCache},
     widget::remote_image,
@@ -73,8 +75,8 @@ impl SessionDelegate {
 struct PlayerDelegate {
     cdn: CdnHandle,
     session: SessionHandle,
+    player_queue: Vector<(TrackOrigin, Arc<Track>)>,
     player_sender: Sender<PlayerEvent>,
-    player_queue: Vector<Arc<Track>>,
     player_thread: JoinHandle<()>,
     audio_output_thread: JoinHandle<()>,
 }
@@ -153,22 +155,26 @@ impl PlayerDelegate {
         }
     }
 
-    fn get_track(&self, id: &TrackId) -> Option<Arc<Track>> {
+    fn get_track(&self, id: &TrackId) -> Option<(TrackOrigin, Arc<Track>)> {
         self.player_queue
             .iter()
-            .find(|track| track.id.same(id))
+            .find(|(origin, track)| track.id.same(id))
             .cloned()
     }
 
-    fn set_tracks(&mut self, tracks: Vector<Arc<Track>>) {
-        self.player_queue = tracks;
+    fn set_tracks(&mut self, list: TrackList) {
+        let TrackList { origin, tracks } = list;
+        self.player_queue = tracks
+            .into_iter()
+            .map(|track| (origin.clone(), track))
+            .collect();
     }
 
     fn play(&mut self, position: usize) {
         let items = self
             .player_queue
             .iter()
-            .map(|track| PlaybackItem { item_id: *track.id })
+            .map(|(origin, track)| PlaybackItem { item_id: *track.id })
             .collect();
         self.player_sender
             .send(PlayerEvent::Command(PlayerCommand::LoadQueue {
@@ -533,7 +539,7 @@ impl Delegate {
             data.playlist.playlist.resolve(playlist);
             data.playlist.tracks.defer(playlist_id.clone());
             self.runtime.spawn(async move {
-                let result = web.load_playlist_tracks(&playlist_id).await;
+                let result = web.load_playlist_tracks(playlist_id.clone()).await;
                 sink.submit_command(
                     cmd::UPDATE_PLAYLIST_TRACKS,
                     (playlist_id, result),
@@ -581,9 +587,9 @@ impl Delegate {
             Handled::Yes
         } else if let Some(result) = cmd.get(cmd::UPDATE_SAVED_TRACKS).cloned() {
             match result {
-                Ok(tracks) => {
-                    data.track_ctx.set_saved_tracks(&tracks);
-                    data.library.saved_tracks.resolve(tracks);
+                Ok(list) => {
+                    data.track_ctx.set_saved_tracks(&list.tracks);
+                    data.library.saved_tracks.resolve(list);
                 }
                 Err(err) => {
                     data.track_ctx.set_saved_tracks(&Vector::new());
@@ -683,7 +689,7 @@ impl Delegate {
             let web = self.web.clone();
             let sink = self.event_sink.clone();
             self.runtime.spawn(async move {
-                let result = web.load_artist_top_tracks(&id).await;
+                let result = web.load_artist_top_tracks(id.clone()).await;
                 sink.submit_command(cmd::UPDATE_ARTIST_TOP_TRACKS, (id, result), Target::Auto)
                     .unwrap();
             });
@@ -755,15 +761,15 @@ impl Delegate {
 
     fn command_playback(&mut self, _target: Target, cmd: &Command, data: &mut State) -> Handled {
         if let Some(item) = cmd.get(cmd::PLAYBACK_LOADING) {
-            if let Some(track) = self.player.get_track(item) {
-                data.set_playback_loading(track);
+            if let Some((origin, track)) = self.player.get_track(item) {
+                data.set_playback_loading(track, origin);
             } else {
                 log::warn!("loaded item not found in playback queue");
             }
             Handled::Yes
         } else if let Some(item) = cmd.get(cmd::PLAYBACK_PLAYING) {
-            if let Some(track) = self.player.get_track(item) {
-                data.set_playback_playing(track);
+            if let Some((origin, track)) = self.player.get_track(item) {
+                data.set_playback_playing(track, origin);
             } else {
                 log::warn!("played item not found in playback queue");
             }
