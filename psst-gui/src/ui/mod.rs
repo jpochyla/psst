@@ -1,7 +1,7 @@
 use crate::{
     cmd,
     data::{Navigation, Promise, Route, State},
-    widget::{button::HOVER_COLD_COLOR, icons, HoverExt, Icon, ViewDispatcher},
+    widget::{hover::HOVER_COLD_COLOR, icons, HoverExt, Icon, ViewDispatcher},
 };
 use druid::{
     widget::{CrossAxisAlignment, Flex, Label, Scroll, SizedBox, Split, ViewSwitcher},

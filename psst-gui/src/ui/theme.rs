@@ -1,7 +1,7 @@
 use crate::{
     data::State,
     widget::{
-        button::{HOVER_COLD_COLOR, HOVER_HOT_COLOR},
+        hover::{HOVER_COLD_COLOR, HOVER_HOT_COLOR},
         icons,
     },
 };
