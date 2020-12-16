@@ -1,10 +1,10 @@
 use crate::{
     cmd,
     data::{Navigation, Promise, Route, State},
-    widget::{hover::HOVER_COLD_COLOR, icons, HoverExt, Icon, ViewDispatcher},
+    widget::{icons, Empty, HoverExt, Icon, ViewDispatcher},
 };
 use druid::{
-    widget::{CrossAxisAlignment, Flex, Label, Scroll, SizedBox, Split, ViewSwitcher},
+    widget::{CrossAxisAlignment, Either, Flex, Label, Scroll, SizedBox, Split},
     Widget, WidgetExt, WindowDesc,
 };
 
@@ -92,7 +92,7 @@ fn make_nav_button(title: &str, icon: Icon, nav: Navigation) -> impl Widget<Stat
 
     Flex::row()
         .with_child(icon)
-        .with_default_spacer()
+        .with_spacer(theme::grid(0.5))
         .with_child(label)
         .padding((theme::grid(2.0), theme::grid(1.0)))
         .expand_width()
@@ -101,13 +101,13 @@ fn make_nav_button(title: &str, icon: Icon, nav: Navigation) -> impl Widget<Stat
             let nav = nav.clone();
             move |env, state: &State| {
                 if nav.as_route() == state.route {
-                    env.set(HOVER_COLD_COLOR, theme::MENU_BUTTON_BG_ACTIVE);
+                    env.set(theme::HOVER_COLD_COLOR, theme::MENU_BUTTON_BG_ACTIVE);
                     env.set(theme::LABEL_COLOR, theme::MENU_BUTTON_FG_ACTIVE);
-                    env.set(icons::ICON_COLOR, theme::MENU_BUTTON_ICON_ACTIVE);
+                    env.set(theme::ICON_COLOR, theme::MENU_BUTTON_ICON_ACTIVE);
                 } else {
-                    env.set(HOVER_COLD_COLOR, theme::MENU_BUTTON_BG_INACTIVE);
+                    env.set(theme::HOVER_COLD_COLOR, theme::MENU_BUTTON_BG_INACTIVE);
                     env.set(theme::LABEL_COLOR, theme::MENU_BUTTON_FG_INACTIVE);
-                    env.set(icons::ICON_COLOR, theme::MENU_BUTTON_ICON_INACTIVE);
+                    env.set(theme::ICON_COLOR, theme::MENU_BUTTON_ICON_INACTIVE);
                 };
             }
         })
@@ -136,43 +136,57 @@ pub fn make_route() -> impl Widget<State> {
 }
 
 pub fn make_home() -> impl Widget<State> {
-    SizedBox::empty()
+    Empty
 }
 
 pub fn make_back_button() -> impl Widget<State> {
-    ViewSwitcher::new(
+    let icon_width = 10.0;
+    let icon_height = theme::grid(2.0);
+    let empty_icon = SizedBox::empty().width(icon_width).height(icon_height);
+    let back_icon = icons::BACK
+        .scale((icon_width, icon_height))
+        .padding(theme::grid(1.0))
+        .hover()
+        .rounded(theme::BUTTON_BORDER_RADIUS)
+        .on_click(|ctx, _state, _env| {
+            ctx.submit_command(cmd::NAVIGATE_BACK);
+        });
+    Either::new(
         |state: &State, _| state.history.is_empty(),
-        |&no_nav_history, _, _| {
-            if no_nav_history {
-                SizedBox::empty()
-                    .width(10.0 + theme::grid(1.0))
-                    .height(theme::grid(2.0) + theme::grid(1.0))
-                    .boxed()
-            } else {
-                icons::BACK
-                    .scale((10.0, theme::grid(2.0)))
-                    .padding(theme::grid(1.0))
-                    .hover()
-                    .rounded(theme::BUTTON_BORDER_RADIUS)
-                    .on_click(|ctx, _state, _env| {
-                        ctx.submit_command(cmd::NAVIGATE_BACK);
-                    })
-                    .padding(theme::grid(1.0))
-                    .boxed()
-            }
-        },
+        empty_icon,
+        back_icon,
     )
+    .padding(theme::grid(1.0))
 }
 
 pub fn make_title() -> impl Widget<State> {
-    Label::dynamic(|state: &State, _| get_route_title(state)).with_font(theme::UI_FONT_MEDIUM)
+    let category = Label::dynamic(|state: &State, _| get_route_category(state))
+        .with_text_color(theme::PLACEHOLDER_COLOR)
+        .with_text_size(theme::TEXT_SIZE_SMALL);
+    let title =
+        Label::dynamic(|state: &State, _| get_route_title(state)).with_font(theme::UI_FONT_MEDIUM);
+    Flex::row()
+        .cross_axis_alignment(CrossAxisAlignment::Baseline)
+        .with_child(category)
+        .with_child(title)
+}
+
+fn get_route_category(state: &State) -> String {
+    match state.route {
+        Route::Home => "".to_string(),
+        Route::Library => "".to_string(),
+        Route::SearchResults => "Search ".to_string(),
+        Route::AlbumDetail => "Album ".to_string(),
+        Route::ArtistDetail => "Artist ".to_string(),
+        Route::PlaylistDetail => "Playlist ".to_string(),
+    }
 }
 
 fn get_route_title(state: &State) -> String {
     match state.route {
         Route::Home => "".to_string(),
         Route::Library => "Library".to_string(),
-        Route::SearchResults => format!("Search: \"{}\"", state.search.input),
+        Route::SearchResults => state.search.input.clone(),
         Route::AlbumDetail => match &state.album.album {
             Promise::Empty | Promise::Deferred(_) => "...".to_string(),
             Promise::Resolved(album) => album.name.to_string(),

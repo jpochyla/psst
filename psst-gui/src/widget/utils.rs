@@ -1,4 +1,4 @@
-use druid::{kurbo::Shape, widget::prelude::*, Data, WidgetPod};
+use druid::{kurbo::Shape, widget::prelude::*, Data};
 
 pub struct Clip<S, W> {
     shape: S,

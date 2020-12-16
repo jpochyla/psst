@@ -158,7 +158,7 @@ impl PlayerDelegate {
     fn get_track(&self, id: &TrackId) -> Option<(TrackOrigin, Arc<Track>)> {
         self.player_queue
             .iter()
-            .find(|(origin, track)| track.id.same(id))
+            .find(|(_origin, track)| track.id.same(id))
             .cloned()
     }
 
@@ -174,7 +174,7 @@ impl PlayerDelegate {
         let items = self
             .player_queue
             .iter()
-            .map(|(origin, track)| PlaybackItem { item_id: *track.id })
+            .map(|(_origin, track)| PlaybackItem { item_id: *track.id })
             .collect();
         self.player_sender
             .send(PlayerEvent::Command(PlayerCommand::LoadQueue {
@@ -608,12 +608,11 @@ impl Delegate {
                 }
             });
             Handled::Yes
-        } else if let Some(track) = cmd.get(cmd::UNSAVE_TRACK) {
+        } else if let Some(track_id) = cmd.get(cmd::UNSAVE_TRACK).cloned() {
             let web = self.web.clone();
-            let track_id = track.id.to_base62();
-            data.unsave_track(&track.id);
+            data.unsave_track(&track_id);
             self.runtime.spawn(async move {
-                let result = web.unsave_track(&track_id).await;
+                let result = web.unsave_track(&track_id.to_base62()).await;
                 if result.is_err() {
                     // TODO: Refresh saved tracks.
                 }

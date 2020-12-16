@@ -1,10 +1,4 @@
-use crate::{
-    data::State,
-    widget::{
-        hover::{HOVER_COLD_COLOR, HOVER_HOT_COLOR},
-        icons,
-    },
-};
+use crate::data::State;
 pub use druid::theme::*;
 use druid::{Color, Env, FontDescriptor, FontFamily, FontWeight, Insets, Key};
 
@@ -29,17 +23,22 @@ pub const MENU_BUTTON_BG_ACTIVE: Color = GREY_5;
 pub const MENU_BUTTON_BG_INACTIVE: Color = GREY_6;
 pub const MENU_BUTTON_FG_ACTIVE: Color = GREY_1;
 pub const MENU_BUTTON_FG_INACTIVE: Color = GREY_2;
-pub const MENU_BUTTON_ICON_ACTIVE: Color = GREY_3;
-pub const MENU_BUTTON_ICON_INACTIVE: Color = GREY_4;
+pub const MENU_BUTTON_ICON_ACTIVE: Color = GREY_4;
+pub const MENU_BUTTON_ICON_INACTIVE: Color = GREY_5;
 
 pub const UI_FONT_MEDIUM: Key<FontDescriptor> = Key::new("app.ui-font-medium");
 pub const UI_FONT_MONO: Key<FontDescriptor> = Key::new("app.ui-font-mono");
 pub const TEXT_SIZE_SMALL: Key<f64> = Key::new("app.text-size-small");
 
+pub const ICON_COLOR: Key<Color> = Key::new("app.icon-color");
+
+pub const HOVER_HOT_COLOR: Key<Color> = Key::new("app.hover-hot-color");
+pub const HOVER_COLD_COLOR: Key<Color> = Key::new("app.hover-cold-color");
+
 pub fn setup(env: &mut Env, _state: &State) {
     env.set(WINDOW_BACKGROUND_COLOR, WHITE);
     env.set(LABEL_COLOR, GREY_2);
-    env.set(icons::ICON_COLOR, GREY_2);
+    env.set(ICON_COLOR, GREY_2);
     env.set(PLACEHOLDER_COLOR, GREY_3);
     env.set(PRIMARY_LIGHT, BLUE_LIGHT);
     env.set(PRIMARY_DARK, BLUE_DARK);

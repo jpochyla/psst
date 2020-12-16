@@ -1,11 +1,9 @@
+use crate::ui::theme;
 use crate::widget::ExClick;
 use druid::{
     widget::{prelude::*, ControllerHost},
-    Color, Data, Key, KeyOrValue, MouseEvent, WidgetPod,
+    Color, Data, KeyOrValue, MouseEvent, WidgetPod,
 };
-
-pub const HOVER_HOT_COLOR: Key<Color> = Key::new("app.hover-hot-color");
-pub const HOVER_COLD_COLOR: Key<Color> = Key::new("app.hover-cold-color");
 
 pub struct Hover<T> {
     inner: WidgetPod<T, Box<dyn Widget<T>>>,
@@ -70,9 +68,9 @@ impl<T: Data> Widget<T> for Hover<T> {
 
     fn paint(&mut self, ctx: &mut PaintCtx, data: &T, env: &Env) {
         let background = if ctx.is_hot() {
-            env.get(HOVER_HOT_COLOR)
+            env.get(theme::HOVER_HOT_COLOR)
         } else {
-            env.get(HOVER_COLD_COLOR)
+            env.get(theme::HOVER_COLD_COLOR)
         };
         let border_color = self.border_color.resolve(env);
         let corner_radius = self.corner_radius.resolve(env);

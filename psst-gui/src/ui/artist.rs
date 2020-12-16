@@ -27,7 +27,7 @@ pub fn make_detail() -> impl Widget<State> {
                 album: true,
             })
         },
-        || make_error(),
+        || make_error().lens(Ctx::data()),
     )
     .lens(
         Ctx::make(
@@ -62,7 +62,7 @@ pub fn make_cover(width: f64, height: f64) -> impl Widget<Artist> {
 }
 
 pub fn make_artist() -> impl Widget<Artist> {
-    make_artist_with_cover(theme::grid(12.0), theme::grid(12.0))
+    make_artist_with_cover(theme::grid(7.0), theme::grid(7.0))
 }
 
 fn make_artist_with_cover(width: f64, height: f64) -> impl Widget<Artist> {

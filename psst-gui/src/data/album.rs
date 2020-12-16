@@ -53,6 +53,10 @@ impl Album {
             .find(|img| !img.fits(width, height))
             .or_else(|| self.images.back())
     }
+
+    pub fn link(&self) -> String {
+        format!("https://open.spotify.com/album/{id}", id = self.id)
+    }
 }
 
 #[derive(Clone, Debug, Data, Eq, PartialEq)]

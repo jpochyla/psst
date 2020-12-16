@@ -36,7 +36,7 @@ pub fn make_results() -> impl Widget<State> {
                 .with_child(make_album_results())
                 .with_child(make_track_results())
         },
-        || make_error(),
+        || make_error().lens(Ctx::data()),
     )
     .lens(Ctx::make(State::track_ctx, State::search.then(Search::results)).then(Ctx::in_promise()))
 }

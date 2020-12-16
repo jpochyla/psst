@@ -1,3 +1,4 @@
+use crate::ui::utils::make_loader;
 use crate::{
     cmd,
     data::{Album, AlbumDetail, Artist, Ctx, Navigation, State, TrackCtx},
@@ -10,14 +11,14 @@ use crate::{
 };
 use druid::{
     widget::{CrossAxisAlignment, Flex, Label, LineBreaking, List},
-    Data, LensExt, Widget, WidgetExt,
+    ContextMenu, LensExt, LocalizedString, MenuDesc, MenuItem, MouseButton, Widget, WidgetExt,
 };
 
 pub fn make_detail() -> impl Widget<State> {
     Promised::new(
-        || make_detail_loading(),
+        || make_loader(),
         || make_detail_loaded(),
-        || make_error(),
+        || make_error().lens(Ctx::data()),
     )
     .lens(
         Ctx::make(State::track_ctx, State::album.then(AlbumDetail::album)).then(Ctx::in_promise()),
@@ -101,18 +102,6 @@ fn make_detail_loaded() -> impl Widget<Ctx<TrackCtx, Album>> {
         .with_flex_child(album_tracks, 1.0)
 }
 
-fn make_detail_loading<T: Data>() -> impl Widget<T> {
-    let album_cover = make_placeholder().fix_size(theme::grid(30.0), theme::grid(30.0));
-    let album_tracks = make_placeholder()
-        .fix_height(theme::grid(6.0))
-        .expand_width();
-    Flex::row()
-        .cross_axis_alignment(CrossAxisAlignment::Start)
-        .with_child(album_cover)
-        .with_default_spacer()
-        .with_flex_child(album_tracks, 1.0)
-}
-
 pub fn make_cover(width: f64, height: f64) -> impl Widget<Album> {
     RemoteImage::new(make_placeholder(), move |album: &Album, _| {
         album.image(width, height).map(|image| image.url.clone())
@@ -149,8 +138,55 @@ pub fn make_album() -> impl Widget<Album> {
         .with_default_spacer()
         .with_flex_child(album_label, 1.0)
         .hover()
-        .on_click(|ctx, album, _| {
-            let nav = Navigation::AlbumDetail(album.id.clone());
-            ctx.submit_command(cmd::NAVIGATE_TO.with(nav));
+        .on_ex_click(move |ctx, event, album: &mut Album, _| match event.button {
+            MouseButton::Left => {
+                let nav = Navigation::AlbumDetail(album.id.clone());
+                ctx.submit_command(cmd::NAVIGATE_TO.with(nav));
+            }
+            MouseButton::Right => {
+                let menu = make_album_menu(&album);
+                ctx.show_context_menu(ContextMenu::new(menu, event.window_pos));
+            }
+            _ => {}
         })
+}
+
+fn make_album_menu(album: &Album) -> MenuDesc<State> {
+    let mut menu = MenuDesc::empty();
+
+    for artist in &album.artists {
+        let more_than_one_artist = album.artists.len() > 1;
+        let title = if more_than_one_artist {
+            LocalizedString::new("menu-item-show-artist-name")
+                .with_placeholder(format!("Go To {}", artist.name))
+        } else {
+            LocalizedString::new("menu-item-show-artist").with_placeholder("Go To Artist")
+        };
+        menu = menu.append(MenuItem::new(
+            title,
+            cmd::NAVIGATE_TO.with(Navigation::ArtistDetail(artist.id.clone())),
+        ));
+    }
+
+    menu = menu.append(MenuItem::new(
+        LocalizedString::new("menu-item-copy-link").with_placeholder("Copy Link"),
+        cmd::COPY.with(album.link()),
+    ));
+
+    menu = menu.append_separator();
+
+    // if ctx.is_album_saved(&album) {
+    //     menu = menu.append(MenuItem::new(
+    //         LocalizedString::new("menu-item-remove-from-library")
+    //             .with_placeholder("Remove from Library"),
+    //         cmd::UNSAVE_ALBUM.with(album.id.clone()),
+    //     ));
+    // } else {
+    //     menu = menu.append(MenuItem::new(
+    //         LocalizedString::new("menu-item-save-to-library").with_placeholder("
+    // Save to Library"),         cmd::SAVE_ALBUM.with(album.clone()),
+    //     ));
+    // }
+
+    menu
 }

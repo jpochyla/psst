@@ -48,7 +48,7 @@ pub fn make_detail() -> impl Widget<State> {
                 album: true,
             })
         },
-        || make_error(),
+        || make_error().lens(Ctx::data()),
     )
     .lens(
         Ctx::make(

@@ -1,4 +1,5 @@
-use crate::{ui::theme, widget::icons};
+use crate::{error::Error, ui::theme, widget::icons};
+use druid::widget::CrossAxisAlignment;
 use druid::{
     widget::{Flex, Label, SizedBox, Spinner},
     Data, Widget, WidgetExt,
@@ -15,15 +16,26 @@ pub fn make_loader<T: Data>() -> impl Widget<T> {
         .center()
 }
 
-pub fn make_error<T: Data>() -> impl Widget<T> {
-    Flex::row()
+pub fn make_error() -> impl Widget<Error> {
+    let icon = icons::ERROR
+        .scale((theme::grid(3.0), theme::grid(3.0)))
+        .with_color(theme::PLACEHOLDER_COLOR);
+    let error = Flex::column()
+        .cross_axis_alignment(CrossAxisAlignment::Start)
         .with_child(
-            icons::ERROR
-                .scale((theme::grid(2.0), theme::grid(2.0)))
-                .with_color(theme::GREY_4),
+            Label::new("Error:")
+                .with_font(theme::UI_FONT_MEDIUM)
+                .with_text_color(theme::PLACEHOLDER_COLOR),
         )
+        .with_child(
+            Label::dynamic(|err: &Error, _| err.to_string())
+                .with_text_size(theme::TEXT_SIZE_SMALL)
+                .with_text_color(theme::PLACEHOLDER_COLOR),
+        );
+    Flex::row()
+        .with_child(icon)
         .with_default_spacer()
-        .with_child(Label::new("Failed to load.").with_text_color(theme::GREY_4))
+        .with_child(error)
         .padding((0.0, theme::grid(6.0)))
         .center()
 }

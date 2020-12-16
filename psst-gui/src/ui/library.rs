@@ -36,7 +36,7 @@ fn make_saved_tracks() -> impl Widget<State> {
                 album: true,
             })
         },
-        || make_error(),
+        || make_error().lens(Ctx::data()),
     )
     .lens(
         Ctx::make(State::track_ctx, State::library.then(Library::saved_tracks))

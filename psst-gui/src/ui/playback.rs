@@ -2,12 +2,12 @@ use crate::{
     cmd,
     data::{AudioDuration, Navigation, Playback, PlaybackState, State, Track},
     ui::{album, theme},
-    widget::{icons, HoverExt, Maybe},
+    widget::{icons, Empty, HoverExt, Maybe},
 };
 use druid::{
     lens::{Identity, InArc},
     widget::{
-        Controller, CrossAxisAlignment, Flex, Label, LineBreaking, Painter, SizedBox, Spinner,
+        Controller, CrossAxisAlignment, Either, Flex, Label, LineBreaking, Painter, Spinner,
         ViewSwitcher,
     },
     Env, Event, EventCtx, MouseButton, MouseEvent, PaintCtx, Point, Rect, RenderContext, Size,
@@ -88,19 +88,13 @@ fn make_info_track() -> impl Widget<Arc<Track>> {
 }
 
 fn make_player() -> impl Widget<Playback> {
-    ViewSwitcher::new(
+    Either::new(
         |playback: &Playback, _| playback.item.is_some(),
-        |&has_item, _, _| {
-            if has_item {
-                Flex::column()
-                    .with_child(make_player_controls())
-                    .with_default_spacer()
-                    .with_child(make_player_progress())
-                    .boxed()
-            } else {
-                SizedBox::empty().boxed()
-            }
-        },
+        Flex::column()
+            .with_child(make_player_controls())
+            .with_default_spacer()
+            .with_child(make_player_progress()),
+        Empty,
     )
 }
 
@@ -136,7 +130,7 @@ fn make_player_controls() -> impl Widget<Playback> {
                 .border(theme::GREY_5)
                 .on_click(|ctx, _, _| ctx.submit_command(cmd::PLAY_RESUME))
                 .boxed(),
-            PlaybackState::Stopped => SizedBox::empty().boxed(),
+            PlaybackState::Stopped => Empty.boxed(),
         },
     );
 

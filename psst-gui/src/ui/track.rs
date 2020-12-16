@@ -152,7 +152,7 @@ fn make_track(display: TrackDisplay) -> impl Widget<TrackRow> {
             .with_text_size(theme::TEXT_SIZE_SMALL)
             .with_text_color(theme::PLACEHOLDER_COLOR);
         if display.artist {
-            minor.add_child(Label::new(": ").with_text_color(theme::GREY_5));
+            minor.add_default_spacer();
         }
         minor.add_child(track_album);
     }
@@ -182,18 +182,27 @@ fn make_track(display: TrackDisplay) -> impl Widget<TrackRow> {
 fn make_track_menu(ts: &TrackRow) -> MenuDesc<State> {
     let mut menu = MenuDesc::empty();
 
-    if let Some(artist) = ts.track.artists.front() {
+    for artist in &ts.track.artists {
+        let more_than_one_artist = ts.track.artists.len() > 1;
+        let title = if more_than_one_artist {
+            LocalizedString::new("menu-item-show-artist-name")
+                .with_placeholder(format!("Go To Artist “{}”", artist.name))
+        } else {
+            LocalizedString::new("menu-item-show-artist").with_placeholder("Go To Artist")
+        };
         menu = menu.append(MenuItem::new(
-            LocalizedString::new("menu-item-show-artist").with_placeholder("Show Artist"),
+            title,
             cmd::NAVIGATE_TO.with(Navigation::ArtistDetail(artist.id.clone())),
         ));
     }
+
     if let Some(album) = ts.track.album.as_ref() {
         menu = menu.append(MenuItem::new(
-            LocalizedString::new("menu-item-show-album").with_placeholder("Show Album"),
+            LocalizedString::new("menu-item-show-album").with_placeholder("Go To Album"),
             cmd::NAVIGATE_TO.with(Navigation::AlbumDetail(album.id.clone())),
         ))
     }
+
     menu = menu.append(MenuItem::new(
         LocalizedString::new("menu-item-copy-link").with_placeholder("Copy Link"),
         cmd::COPY.with(ts.track.link()),
@@ -205,7 +214,7 @@ fn make_track_menu(ts: &TrackRow) -> MenuDesc<State> {
         menu = menu.append(MenuItem::new(
             LocalizedString::new("menu-item-remove-from-library")
                 .with_placeholder("Remove from Library"),
-            cmd::UNSAVE_TRACK.with(ts.track.clone()),
+            cmd::UNSAVE_TRACK.with(ts.track.id.clone()),
         ));
     } else {
         menu = menu.append(MenuItem::new(
