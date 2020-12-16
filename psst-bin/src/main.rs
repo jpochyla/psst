@@ -41,11 +41,10 @@ fn play_item(
     item: PlaybackItem,
 ) -> Result<(), Error> {
     let output = AudioOutput::open()?;
-    let output_ctrl = output.controller();
+    let output_remote = output.remote();
     let config = PlaybackConfig::default();
 
-    let (mut player, player_receiver) =
-        Player::new(session, cdn, cache, config, output.controller());
+    let (mut player, player_receiver) = Player::new(session, cdn, cache, config, output.remote());
 
     let output_thread = thread::spawn({
         let player_source = player.audio_source();
@@ -104,7 +103,7 @@ fn play_item(
         player.handle(event);
     }
 
-    output_ctrl.close();
+    output_remote.close();
     output_thread.join().unwrap();
 
     Ok(())

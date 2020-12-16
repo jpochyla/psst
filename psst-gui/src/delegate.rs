@@ -94,8 +94,8 @@ impl PlayerDelegate {
         let (player, player_receiver) = {
             let session = session.clone();
             let cdn = cdn.clone();
-            let ctrl = audio_output.controller();
-            Player::new(session, cdn, cache, config, ctrl)
+            let remote = audio_output.remote();
+            Player::new(session, cdn, cache, config, remote)
         };
         let player_sender = player.event_sender();
 

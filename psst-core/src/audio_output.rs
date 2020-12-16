@@ -15,12 +15,12 @@ pub trait AudioSource: Iterator<Item = AudioSample> {
     fn sample_rate(&self) -> u32;
 }
 
-pub struct AudioOutputCtrl {
+pub struct AudioOutputRemote {
     ctx: Arc<soundio::Context>,
     event_sender: Sender<InternalEvent>,
 }
 
-impl AudioOutputCtrl {
+impl AudioOutputRemote {
     pub fn close(&self) {
         self.send(InternalEvent::Close);
     }
@@ -83,8 +83,8 @@ impl AudioOutput {
         })
     }
 
-    pub fn controller(&self) -> AudioOutputCtrl {
-        AudioOutputCtrl {
+    pub fn remote(&self) -> AudioOutputRemote {
+        AudioOutputRemote {
             ctx: self.ctx.clone(),
             event_sender: self.event_sender.clone(),
         }

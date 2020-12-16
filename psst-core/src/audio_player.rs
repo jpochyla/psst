@@ -1,7 +1,7 @@
 use crate::{
     audio_file::{AudioFile, AudioPath, FileAudioSource},
     audio_key::AudioKey,
-    audio_output::{AudioOutputCtrl, AudioSample, AudioSource},
+    audio_output::{AudioOutputRemote, AudioSample, AudioSource},
     cache::CacheHandle,
     cdn::CdnHandle,
     error::Error,
@@ -187,7 +187,7 @@ pub struct Player {
     queue: Queue,
     event_sender: Sender<PlayerEvent>,
     audio_source: Arc<Mutex<PlayerAudioSource>>,
-    audio_output_ctrl: AudioOutputCtrl,
+    audio_output_remote: AudioOutputRemote,
 }
 
 impl Player {
@@ -196,7 +196,7 @@ impl Player {
         cdn: CdnHandle,
         cache: CacheHandle,
         config: PlaybackConfig,
-        audio_output_ctrl: AudioOutputCtrl,
+        audio_output_remote: AudioOutputRemote,
     ) -> (Self, Receiver<PlayerEvent>) {
         let (event_sender, event_receiver) = mpsc::channel();
         let audio_source = {
@@ -211,7 +211,7 @@ impl Player {
                 config,
                 event_sender,
                 audio_source,
-                audio_output_ctrl,
+                audio_output_remote,
                 state: PlayerState::Stopped,
                 preload: PreloadState::None,
                 queue: Queue::new(),
@@ -373,7 +373,7 @@ impl Player {
             }
         });
         // Make sure the output is paused, so any currently playing item is stopped.
-        self.audio_output_ctrl.pause();
+        self.audio_output_remote.pause();
         self.event_sender
             .send(PlayerEvent::Loading { item })
             .expect("Failed to send PlayerEvent::Loading");
@@ -431,7 +431,7 @@ impl Player {
             .lock()
             .expect("Failed to acquire audio source lock")
             .play_now(serviced_item);
-        self.audio_output_ctrl.resume();
+        self.audio_output_remote.resume();
     }
 
     fn pause(&mut self) {
@@ -455,7 +455,7 @@ impl Player {
                     duration,
                     servicing_handle,
                 };
-                self.audio_output_ctrl.pause();
+                self.audio_output_remote.pause();
             }
             _ => {
                 log::warn!("invalid state transition");
@@ -481,7 +481,7 @@ impl Player {
                     duration,
                     servicing_handle,
                 };
-                self.audio_output_ctrl.resume();
+                self.audio_output_remote.resume();
             }
             _ => {
                 log::warn!("invalid state transition");
@@ -513,7 +513,7 @@ impl Player {
 
     fn stop(&mut self) {
         self.state = PlayerState::Stopped;
-        self.audio_output_ctrl.pause();
+        self.audio_output_remote.pause();
         self.queue.clear();
     }
 
