@@ -7,6 +7,7 @@ use crate::{
     web::{Web, WebCache},
     widget::remote_image,
 };
+use crossbeam_channel::{Receiver, Sender};
 use druid::{
     commands, im::Vector, AppDelegate, Application, Command, Data, DelegateCtx, Env, Event,
     ExtEventSink, Handled, ImageBuf, Selector, Target, WindowId,
@@ -21,15 +22,7 @@ use psst_core::{
     session::SessionHandle,
 };
 use std::{
-    collections::HashSet,
-    future::Future,
-    sync::{
-        mpsc::{Receiver, Sender},
-        Arc,
-    },
-    thread,
-    thread::JoinHandle,
-    time::Duration,
+    collections::HashSet, future::Future, sync::Arc, thread, thread::JoinHandle, time::Duration,
 };
 use tokio::runtime::Runtime;
 
