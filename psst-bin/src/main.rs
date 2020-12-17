@@ -8,12 +8,15 @@ use psst_core::{
     item_id::{ItemId, ItemIdType},
     session::SessionHandle,
 };
-use std::{io, io::BufRead, path::PathBuf, thread};
+use std::{env, io, io::BufRead, path::PathBuf, thread};
 
 fn main() {
     env_logger::init();
 
-    let login_creds = Credentials::from_username_and_password("...".into(), "...".into());
+    let login_creds = Credentials::from_username_and_password(
+        env::var("SPOTIFY_USERNAME").unwrap(),
+        env::var("SPOTIFY_PASSWORD").unwrap(),
+    );
     let session = SessionHandle::new();
 
     let connection = session.connect(login_creds).unwrap();
@@ -102,7 +105,6 @@ fn play_item(
     for event in player_receiver {
         player.handle(event);
     }
-
     output_remote.close();
     output_thread.join().unwrap();
 
