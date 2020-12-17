@@ -72,7 +72,9 @@ impl AudioFile {
             let servicing_handle = thread::spawn({
                 let streamed_file = Arc::clone(&streamed_file);
                 move || {
-                    streamed_file.service_streaming();
+                    streamed_file
+                        .service_streaming()
+                        .expect("Streaming thread failed");
                 }
             });
             Ok(Self::Streamed {
@@ -161,8 +163,14 @@ impl StreamedFile {
         while let Ok((position, length)) = self.storage.receiver().recv() {
             log::trace!("downloading {}..{}", position, position + length);
 
+            let thread_name = format!(
+                "cdn-{}-{}..{}",
+                self.path.file_id.to_base16(),
+                position,
+                position + length
+            );
             // TODO: We spawn threads here without any accounting.  Seems wrong.
-            thread::spawn({
+            thread::Builder::new().name(thread_name).spawn({
                 // TODO: Do not bury the whole servicing loop in case the URL renewal fails.
                 let url = fresh_url()?.url.clone();
                 let cdn = self.cdn.clone();
