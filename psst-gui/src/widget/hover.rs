@@ -1,7 +1,7 @@
 use crate::{ui::theme, widget::ExClick};
 use druid::{
     widget::{prelude::*, ControllerHost},
-    Color, Data, KeyOrValue, MouseEvent, WidgetPod,
+    Color, Data, KeyOrValue, MouseEvent, Point, WidgetPod,
 };
 
 pub struct Hover<T> {
@@ -61,7 +61,7 @@ impl<T: Data> Widget<T> for Hover<T> {
 
     fn layout(&mut self, ctx: &mut LayoutCtx, bc: &BoxConstraints, data: &T, env: &Env) -> Size {
         let size = self.inner.layout(ctx, bc, data, env);
-        self.inner.set_layout_rect(ctx, data, env, size.to_rect());
+        self.inner.set_origin(ctx, data, env, Point::ORIGIN);
         size
     }
 

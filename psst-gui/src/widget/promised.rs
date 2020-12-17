@@ -1,5 +1,5 @@
 use crate::data::{Promise, PromiseState};
-use druid::{widget::prelude::*, Data, WidgetExt, WidgetPod};
+use druid::{widget::prelude::*, Data, Point, WidgetExt, WidgetPod};
 
 pub struct Promised<T, D, E> {
     def_maker: Box<dyn Fn() -> Box<dyn Widget<D>>>,
@@ -130,17 +130,17 @@ impl<D: Data, T: Data, E: Data> Widget<Promise<T, D, E>> for Promised<T, D, E> {
             Promise::Empty => None,
             Promise::Deferred(d) => self.widget.with_deferred(|w| {
                 let size = w.layout(ctx, bc, d, env);
-                w.set_layout_rect(ctx, d, env, size.to_rect());
+                w.set_origin(ctx, d, env, Point::ORIGIN);
                 size
             }),
             Promise::Resolved(o) => self.widget.with_resolved(|w| {
                 let size = w.layout(ctx, bc, o, env);
-                w.set_layout_rect(ctx, o, env, size.to_rect());
+                w.set_origin(ctx, o, env, Point::ORIGIN);
                 size
             }),
             Promise::Rejected(e) => self.widget.with_rejected(|w| {
                 let size = w.layout(ctx, bc, e, env);
-                w.set_layout_rect(ctx, e, env, size.to_rect());
+                w.set_origin(ctx, e, env, Point::ORIGIN);
                 size
             }),
         }

@@ -1,4 +1,4 @@
-use druid::{widget::prelude::*, Data, WidgetPod};
+use druid::{widget::prelude::*, Data, Point, WidgetPod};
 use std::{collections::HashMap, hash::Hash};
 
 type ChildPicker<T, U> = dyn Fn(&T, &Env) -> U;
@@ -94,7 +94,7 @@ impl<T: Data, U: Data + Eq + Hash> Widget<T> for ViewDispatcher<T, U> {
         match self.active_child() {
             Some(child) => {
                 let size = child.layout(ctx, bc, data, env);
-                child.set_layout_rect(ctx, data, env, size.to_rect());
+                child.set_origin(ctx, data, env, Point::ORIGIN);
                 size
             }
             None => bc.max(),
