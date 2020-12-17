@@ -1,9 +1,9 @@
 #![allow(clippy::all)]
 
-use std::fmt::Formatter;
 use std::{
     convert::TryInto,
     error, fmt,
+    fmt::Formatter,
     io::{self, Read, Seek},
     mem,
     os::raw,

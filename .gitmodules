@@ -1,0 +1,3 @@
+[submodule "minivorbis-sys/minivorbis"]
+	path = minivorbis-sys/minivorbis
+	url = https://github.com/edubart/minivorbis.git
