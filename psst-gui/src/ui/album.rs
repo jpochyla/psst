@@ -1,11 +1,10 @@
-use crate::ui::utils::make_loader;
 use crate::{
     cmd,
     data::{Album, AlbumDetail, Artist, Ctx, Navigation, State, TrackCtx},
     ui::{
         theme,
         track::{make_tracklist, TrackDisplay},
-        utils::{make_error, make_placeholder},
+        utils::{make_error, make_loader, make_placeholder},
     },
     widget::{HoverExt, Promised, RemoteImage},
 };

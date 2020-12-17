@@ -1,5 +1,4 @@
-use crate::ui::theme;
-use crate::widget::ExClick;
+use crate::{ui::theme, widget::ExClick};
 use druid::{
     widget::{prelude::*, ControllerHost},
     Color, Data, KeyOrValue, MouseEvent, WidgetPod,

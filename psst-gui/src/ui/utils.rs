@@ -1,7 +1,6 @@
 use crate::{error::Error, ui::theme, widget::icons};
-use druid::widget::CrossAxisAlignment;
 use druid::{
-    widget::{Flex, Label, SizedBox, Spinner},
+    widget::{CrossAxisAlignment, Flex, Label, SizedBox, Spinner},
     Data, Widget, WidgetExt,
 };
 
