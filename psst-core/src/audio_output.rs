@@ -1,11 +1,8 @@
 use crate::error::Error;
+use crossbeam_channel::{unbounded, Receiver, Sender};
 use std::{
     convert::TryInto,
-    sync::{
-        mpsc,
-        mpsc::{Receiver, Sender},
-        Arc, Mutex,
-    },
+    sync::{Arc, Mutex},
 };
 
 pub type AudioSample = i16;
@@ -49,7 +46,7 @@ const WRITE_CALLBACK_LATENCY_SEC: f64 = 0.025;
 
 impl AudioOutput {
     pub fn open() -> Result<Self, Error> {
-        let (event_sender, event_receiver) = mpsc::channel();
+        let (event_sender, event_receiver) = unbounded();
 
         let error_callback = {
             let event_sender = event_sender.clone();

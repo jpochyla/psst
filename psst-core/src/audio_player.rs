@@ -10,13 +10,10 @@ use crate::{
     protocol::metadata::Track,
     session::SessionHandle,
 };
+use crossbeam_channel::{unbounded, Receiver, Sender};
 use std::{
     mem,
-    sync::{
-        mpsc,
-        mpsc::{Receiver, Sender},
-        Arc, Mutex,
-    },
+    sync::{Arc, Mutex},
     thread,
     thread::JoinHandle,
     time::Duration,
@@ -160,23 +157,6 @@ pub struct LoadedPlaybackItem {
     source: FileAudioSource,
 }
 
-impl LoadedPlaybackItem {
-    fn into_serviced(self) -> (ServicedPlaybackItem, JoinHandle<()>) {
-        let serviced_item = ServicedPlaybackItem {
-            source: self.source,
-            path: self.file.path(),
-        };
-        let servicing_handle = thread::spawn({
-            let mut file = self.file;
-            move || {
-                // TODO: Loop here with some backoff in case of error.
-                file.service_loading();
-            }
-        });
-        (serviced_item, servicing_handle)
-    }
-}
-
 pub struct Player {
     state: PlayerState,
     preload: PreloadState,
@@ -198,7 +178,7 @@ impl Player {
         config: PlaybackConfig,
         audio_output_remote: AudioOutputRemote,
     ) -> (Self, Receiver<PlayerEvent>) {
-        let (event_sender, event_receiver) = mpsc::channel();
+        let (event_sender, event_receiver) = unbounded();
         let audio_source = {
             let event_sender = event_sender.clone();
             Arc::new(Mutex::new(PlayerAudioSource::new(event_sender)))
@@ -272,8 +252,8 @@ impl Player {
                 item: requested_item,
                 ..
             } if item == requested_item => match result {
-                Ok(payload) => {
-                    self.service_and_play(payload);
+                Ok(loaded_item) => {
+                    self.play_loaded(loaded_item);
                 }
                 Err(err) => {
                     log::error!("error while opening: {}", err);
@@ -292,14 +272,9 @@ impl Player {
                 item: requested_item,
                 ..
             } if item == requested_item => match result {
-                Ok(payload) => {
+                Ok(loaded_item) => {
                     log::info!("preloaded audio file");
-                    let (serviced_item, servicing_handle) = payload.into_serviced();
-                    self.preload = PreloadState::Preloaded {
-                        item,
-                        serviced_item,
-                        servicing_handle,
-                    };
+                    self.preload = PreloadState::Preloaded { item, loaded_item };
                 }
                 Err(err) => {
                     log::error!("failed to preload audio file, error while opening: {}", err);
@@ -346,10 +321,9 @@ impl Player {
         match mem::replace(&mut self.preload, PreloadState::None) {
             PreloadState::Preloaded {
                 item: preloaded_item,
-                serviced_item,
-                servicing_handle,
+                loaded_item,
             } if preloaded_item == item => {
-                self.play_serviced(serviced_item, servicing_handle);
+                self.play_loaded(loaded_item);
                 return;
             }
             preloading_or_none => {
@@ -406,55 +380,32 @@ impl Player {
         };
     }
 
-    fn service_and_play(&mut self, payload: LoadedPlaybackItem) {
-        let (serviced_item, servicing_handle) = payload.into_serviced();
-        self.play_serviced(serviced_item, servicing_handle);
-    }
-
-    fn play_serviced(
-        &mut self,
-        serviced_item: ServicedPlaybackItem,
-        servicing_handle: JoinHandle<()>,
-    ) {
+    fn play_loaded(&mut self, loaded_item: LoadedPlaybackItem) {
         log::info!("starting playback");
         self.event_sender
             .send(PlayerEvent::Started {
-                path: serviced_item.path,
+                path: loaded_item.file.path(),
             })
             .expect("Failed to send PlayerEvent::Started");
         self.state = PlayerState::Playing {
-            path: serviced_item.path,
+            path: loaded_item.file.path(),
             duration: Duration::default(),
-            servicing_handle,
         };
         self.audio_source
             .lock()
             .expect("Failed to acquire audio source lock")
-            .play_now(serviced_item);
+            .play_now(loaded_item);
         self.audio_output_remote.resume();
     }
 
     fn pause(&mut self) {
         match mem::replace(&mut self.state, PlayerState::Invalid) {
-            PlayerState::Playing {
-                path,
-                duration,
-                servicing_handle,
-            }
-            | PlayerState::Paused {
-                path,
-                duration,
-                servicing_handle,
-            } => {
+            PlayerState::Playing { path, duration } | PlayerState::Paused { path, duration } => {
                 log::info!("pausing playback");
                 self.event_sender
                     .send(PlayerEvent::Paused { path })
                     .expect("Failed to send PlayerEvent::Paused");
-                self.state = PlayerState::Paused {
-                    path,
-                    duration,
-                    servicing_handle,
-                };
+                self.state = PlayerState::Paused { path, duration };
                 self.audio_output_remote.pause();
             }
             _ => {
@@ -465,22 +416,9 @@ impl Player {
 
     fn resume(&mut self) {
         match mem::replace(&mut self.state, PlayerState::Invalid) {
-            PlayerState::Playing {
-                path,
-                duration,
-                servicing_handle,
-            }
-            | PlayerState::Paused {
-                path,
-                duration,
-                servicing_handle,
-            } => {
+            PlayerState::Playing { path, duration } | PlayerState::Paused { path, duration } => {
                 log::info!("resuming playback");
-                self.state = PlayerState::Playing {
-                    path,
-                    duration,
-                    servicing_handle,
-                };
+                self.state = PlayerState::Playing { path, duration };
                 self.audio_output_remote.resume();
             }
             _ => {
@@ -605,12 +543,10 @@ enum PlayerState {
     Playing {
         path: AudioPath,
         duration: Duration,
-        servicing_handle: JoinHandle<()>,
     },
     Paused {
         path: AudioPath,
         duration: Duration,
-        servicing_handle: JoinHandle<()>,
     },
     Stopped,
     Invalid,
@@ -623,8 +559,7 @@ enum PreloadState {
     },
     Preloaded {
         item: PlaybackItem,
-        serviced_item: ServicedPlaybackItem,
-        servicing_handle: JoinHandle<()>,
+        loaded_item: LoadedPlaybackItem,
     },
     None,
 }
@@ -633,13 +568,8 @@ const OUTPUT_CHANNELS: u8 = 2;
 const OUTPUT_SAMPLE_RATE: u32 = 44100;
 const PROGRESS_PRECISION_SAMPLES: u64 = (OUTPUT_SAMPLE_RATE / 10) as u64;
 
-struct ServicedPlaybackItem {
-    path: AudioPath,
-    source: FileAudioSource,
-}
-
 struct PlayerAudioSource {
-    current: Option<ServicedPlaybackItem>,
+    current: Option<LoadedPlaybackItem>,
     event_sender: Sender<PlayerEvent>,
     samples: u64,
 }
@@ -663,7 +593,7 @@ impl PlayerAudioSource {
         }
     }
 
-    fn play_now(&mut self, item: ServicedPlaybackItem) {
+    fn play_now(&mut self, item: LoadedPlaybackItem) {
         self.current.replace(item);
         self.samples = 0;
     }
@@ -698,7 +628,7 @@ impl Iterator for PlayerAudioSource {
                                     / OUTPUT_SAMPLE_RATE as f64
                                     / OUTPUT_CHANNELS as f64,
                             ),
-                            path: current.path,
+                            path: current.file.path(),
                         })
                         .expect("Failed to send PlayerEvent::Playing");
                 }

@@ -5,15 +5,12 @@ use crate::{
     util::{deserialize_protobuf, serialize_protobuf, Sequence},
 };
 use byteorder::{ReadBytesExt, BE};
+use crossbeam_channel::{unbounded, Receiver, Sender};
 use std::{
     collections::HashMap,
     io,
     io::{Cursor, Read},
     net::TcpStream,
-    sync::{
-        mpsc,
-        mpsc::{Receiver, Sender},
-    },
 };
 
 pub struct MercuryDispatcher {
@@ -34,7 +31,7 @@ impl MercuryDispatcher {
         encoder: &mut ShannonEncoder<TcpStream>,
         req: MercuryRequest,
     ) -> io::Result<Receiver<Response>> {
-        let (res_sender, res_receiver) = mpsc::channel();
+        let (res_sender, res_receiver) = unbounded();
         // Save a new pending ticket.
         let seq = self.sequence.advance();
         self.pending.insert(

@@ -1,3 +1,4 @@
+use crossbeam_channel::{unbounded, Receiver, Sender};
 use iset::IntervalSet;
 use std::{
     fs::File,
@@ -5,11 +6,7 @@ use std::{
     io::{Read, Seek, SeekFrom, Write},
     ops::Range,
     path::{Path, PathBuf},
-    sync::{
-        mpsc,
-        mpsc::{Receiver, Sender},
-        Arc, Condvar, Mutex,
-    },
+    sync::{Arc, Condvar, Mutex},
 };
 use tempfile::NamedTempFile;
 
@@ -39,7 +36,7 @@ impl StreamStorage {
         tmp_file.as_file().set_len(total_size)?;
 
         // Create a channel for requesting downloads of data.
-        let (data_req_sender, data_req_receiver) = mpsc::channel();
+        let (data_req_sender, data_req_receiver) = unbounded();
 
         Ok(StreamStorage {
             file: StreamFile::Temporary(tmp_file),
@@ -60,7 +57,7 @@ impl StreamStorage {
 
         // Create the data channel even though it will not be used, as the file should
         // be complete.  We could also turn these into `Option`s.
-        let (data_req_sender, data_req_receiver) = mpsc::channel();
+        let (data_req_sender, data_req_receiver) = unbounded();
 
         // Because the file is complete, let's mark the full range of data as
         // downloaded.  We mark it as requested as well, because the downloaded set is
@@ -97,8 +94,8 @@ impl StreamStorage {
         })
     }
 
-    pub fn receiver(&mut self) -> &mut Receiver<(u64, u64)> {
-        &mut self.data_req_receiver
+    pub fn receiver(&self) -> &Receiver<(u64, u64)> {
+        &self.data_req_receiver
     }
 
     pub fn path(&self) -> &Path {
@@ -156,7 +153,7 @@ impl Seek for StreamWriter {
     }
 }
 
-const MINIMUM_READ_LENGTH: u64 = 1024 * 128;
+const MINIMUM_READ_LENGTH: u64 = 1024 * 64;
 const PREFETCH_READ_LENGTH: u64 = 1024 * 256;
 
 impl Read for StreamReader {

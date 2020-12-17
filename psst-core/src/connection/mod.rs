@@ -1,7 +1,6 @@
 pub mod codec;
 pub mod diffie_hellman;
 
-use crate::util::{HTTP_CONNECT_TIMEOUT, HTTP_IO_TIMEOUT};
 use crate::{
     connection::{
         codec::{ShannonDecoder, ShannonEncoder, ShannonMessage},
@@ -9,7 +8,7 @@ use crate::{
     },
     error::Error,
     protocol::authentication::AuthenticationType,
-    util::{deserialize_protobuf, serialize_protobuf},
+    util::{deserialize_protobuf, serialize_protobuf, HTTP_CONNECT_TIMEOUT, HTTP_IO_TIMEOUT},
 };
 use byteorder::{ReadBytesExt, BE};
 use hmac::{Hmac, Mac, NewMac};

@@ -5,16 +5,13 @@ use crate::{
     util::Sequence,
 };
 use byteorder::{ReadBytesExt, BE};
+use crossbeam_channel::{unbounded, Receiver, Sender};
 use std::{
     collections::HashMap,
     convert::TryInto,
     io,
     io::{Cursor, Read},
     net::TcpStream,
-    sync::{
-        mpsc,
-        mpsc::{Receiver, Sender},
-    },
 };
 
 #[derive(Debug, Hash, PartialEq, Eq, Copy, Clone)]
@@ -45,7 +42,7 @@ impl AudioKeyDispatcher {
         track: ItemId,
         file: FileId,
     ) -> io::Result<Receiver<Result<AudioKey, Error>>> {
-        let (res_sender, res_receiver) = mpsc::channel();
+        let (res_sender, res_receiver) = unbounded();
         let seq = self.sequence.advance();
         self.pending.insert(seq, res_sender);
         encoder.encode(self.make_key_request(seq, track, file))?;

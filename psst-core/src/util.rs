@@ -6,7 +6,8 @@ use std::{io, io::SeekFrom, mem, time::Duration};
 // See `ureq::AgentBuilder::timeout_connect`.
 pub const HTTP_CONNECT_TIMEOUT: Duration = Duration::from_millis(4 * 1000);
 
-// See `ureq::AgentBuilder::timeout_read` and `ureq::AgentBuilder::timeout_write`.
+// See `ureq::AgentBuilder::timeout_read` and
+// `ureq::AgentBuilder::timeout_write`.
 pub const HTTP_IO_TIMEOUT: Duration = Duration::from_millis(4 * 1000);
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord, Default)]

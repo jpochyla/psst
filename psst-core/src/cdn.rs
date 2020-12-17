@@ -1,5 +1,10 @@
-use crate::util::{HTTP_CONNECT_TIMEOUT, HTTP_IO_TIMEOUT};
-use crate::{access_token::TokenProvider, error::Error, item_id::FileId, session::SessionHandle};
+use crate::{
+    access_token::TokenProvider,
+    error::Error,
+    item_id::FileId,
+    session::SessionHandle,
+    util::{HTTP_CONNECT_TIMEOUT, HTTP_IO_TIMEOUT},
+};
 use serde::Deserialize;
 use std::{
     io::Read,
@@ -85,6 +90,7 @@ impl Cdn {
     }
 }
 
+#[derive(Clone)]
 pub struct CdnUrl {
     pub url: String,
     pub expires: Instant,

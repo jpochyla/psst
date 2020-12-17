@@ -14,7 +14,9 @@ use std::{
     io,
     io::{BufReader, Seek, SeekFrom},
     path::PathBuf,
+    sync::Arc,
     thread,
+    thread::JoinHandle,
     time::Duration,
 };
 
@@ -29,8 +31,13 @@ pub struct AudioPath {
 }
 
 pub enum AudioFile {
-    Streamed(StreamedFile),
-    Cached(CachedFile),
+    Streamed {
+        streamed_file: Arc<StreamedFile>,
+        servicing_handle: JoinHandle<()>,
+    },
+    Cached {
+        cached_file: CachedFile,
+    },
 }
 
 impl AudioFile {
@@ -58,37 +65,40 @@ impl AudioFile {
     pub fn open(path: AudioPath, cdn: CdnHandle, cache: CacheHandle) -> Result<Self, Error> {
         let cached_file = cache.audio_file_path(path.file_id);
         if cached_file.exists() {
-            Ok(Self::Cached(CachedFile::open(path, cached_file)?))
+            let cached_file = CachedFile::open(path, cached_file)?;
+            Ok(Self::Cached { cached_file })
         } else {
-            Ok(Self::Streamed(StreamedFile::open(path, cdn, cache)?))
+            let streamed_file = Arc::new(StreamedFile::open(path, cdn, cache)?);
+            let servicing_handle = thread::spawn({
+                let streamed_file = Arc::clone(&streamed_file);
+                move || {
+                    streamed_file.service_streaming();
+                }
+            });
+            Ok(Self::Streamed {
+                streamed_file,
+                servicing_handle,
+            })
         }
     }
 
     pub fn path(&self) -> AudioPath {
         match self {
-            Self::Streamed(streamed) => streamed.path,
-            Self::Cached(cached) => cached.path,
+            Self::Streamed { streamed_file, .. } => streamed_file.path,
+            Self::Cached { cached_file, .. } => cached_file.path,
         }
     }
 
     pub fn audio_source(&self, key: AudioKey) -> Result<FileAudioSource, Error> {
         let reader = match self {
-            Self::Streamed(streamed) => streamed.storage.reader()?,
-            Self::Cached(cached) => cached.storage.reader()?,
+            Self::Streamed { streamed_file, .. } => streamed_file.storage.reader()?,
+            Self::Cached { cached_file, .. } => cached_file.storage.reader()?,
         };
         let reader = BufReader::new(reader);
         let reader = AudioDecrypt::new(key, reader);
         let reader = OffsetFile::new(reader, self.header_length())?;
         let reader = VorbisDecoder::new(reader)?;
         Ok(reader)
-    }
-
-    pub fn service_loading(&mut self) -> Result<(), Error> {
-        if let Self::Streamed(streamed) = self {
-            streamed.service_streaming()
-        } else {
-            Ok(())
-        }
     }
 
     fn header_length(&self) -> u64 {
@@ -139,14 +149,22 @@ impl StreamedFile {
         })
     }
 
-    fn service_streaming(&mut self) -> Result<(), Error> {
+    fn service_streaming(&self) -> Result<(), Error> {
+        let mut last_url = self.url.clone();
+        let mut fresh_url = || -> Result<CdnUrl, Error> {
+            if last_url.is_expired() {
+                last_url = self.cdn.resolve_audio_file_url(self.path.file_id)?;
+            }
+            Ok(last_url.clone())
+        };
+
         while let Ok((position, length)) = self.storage.receiver().recv() {
             log::trace!("downloading {}..{}", position, position + length);
 
             // TODO: We spawn threads here without any accounting.  Seems wrong.
             thread::spawn({
                 // TODO: Do not bury the whole servicing loop in case the URL renewal fails.
-                let url = self.renew_url_if_needed()?.url.clone();
+                let url = fresh_url()?.url.clone();
                 let cdn = self.cdn.clone();
                 let cache = self.cache.clone();
                 let mut writer = self.storage.writer()?;
@@ -173,13 +191,6 @@ impl StreamedFile {
             });
         }
         Ok(())
-    }
-
-    fn renew_url_if_needed(&mut self) -> Result<&CdnUrl, Error> {
-        if self.url.is_expired() {
-            self.url = self.cdn.resolve_audio_file_url(self.path.file_id)?;
-        }
-        Ok(&self.url)
     }
 }
 
