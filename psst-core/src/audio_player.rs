@@ -382,13 +382,12 @@ impl Player {
 
     fn play_loaded(&mut self, loaded_item: LoadedPlaybackItem) {
         log::info!("starting playback");
+        let path = loaded_item.file.path();
         self.event_sender
-            .send(PlayerEvent::Started {
-                path: loaded_item.file.path(),
-            })
+            .send(PlayerEvent::Started { path })
             .expect("Failed to send PlayerEvent::Started");
         self.state = PlayerState::Playing {
-            path: loaded_item.file.path(),
+            path,
             duration: Duration::default(),
         };
         self.audio_source
