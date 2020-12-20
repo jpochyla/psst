@@ -120,6 +120,10 @@ impl Web {
         Ok(&self.spotify)
     }
 
+    // TODO: Some result sets, like very long playlists and saved tracks/albums can
+    // be very big.  Implement virtualized scrolling and lazy-loading of results.
+    const PAGED_ITEMS_LIMIT: usize = 200;
+
     async fn with_paging<'a, PerFn, PerFut, MapFn, T, U>(
         &'a self,
         iter_fn: PerFn,
@@ -139,7 +143,7 @@ impl Web {
 
             results.extend(page.items.into_iter().map(&map_fn));
 
-            if page.total > results.len() {
+            if page.total > results.len() && results.len() < Self::PAGED_ITEMS_LIMIT {
                 limit = page.limit;
                 offset = page.offset + page.limit;
             } else {

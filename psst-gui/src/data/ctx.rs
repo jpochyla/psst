@@ -1,7 +1,7 @@
 use crate::data::Promise;
-use druid::widget::ListIter;
 use druid::{
     lens::{Field, Map},
+    widget::ListIter,
     Data, Lens, LensExt,
 };
 

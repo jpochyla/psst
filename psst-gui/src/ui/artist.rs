@@ -1,7 +1,6 @@
-use crate::data::TrackCtx;
 use crate::{
     cmd,
-    data::{Artist, ArtistAlbums, ArtistDetail, Ctx, Navigation, State},
+    data::{Artist, ArtistAlbums, ArtistDetail, Ctx, Navigation, State, TrackCtx},
     ui::{
         album::make_album,
         theme,
