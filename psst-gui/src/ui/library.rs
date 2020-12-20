@@ -21,8 +21,18 @@ pub fn make_detail() -> impl Widget<State> {
 }
 
 fn make_saved_albums() -> impl Widget<State> {
-    Promised::new(|| make_loader(), || List::new(make_album), || make_error())
-        .lens(State::library.then(Library::saved_albums))
+    Promised::new(
+        || make_loader(),
+        || List::new(make_album),
+        || make_error().lens(Ctx::data()),
+    )
+    .lens(
+        Ctx::make(
+            State::track_ctx,
+            State::library.then(Library::saved_albums.in_arc()),
+        )
+        .then(Ctx::in_promise()),
+    )
 }
 
 fn make_saved_tracks() -> impl Widget<State> {
@@ -39,7 +49,10 @@ fn make_saved_tracks() -> impl Widget<State> {
         || make_error().lens(Ctx::data()),
     )
     .lens(
-        Ctx::make(State::track_ctx, State::library.then(Library::saved_tracks))
-            .then(Ctx::in_promise()),
+        Ctx::make(
+            State::track_ctx,
+            State::library.then(Library::saved_tracks.in_arc()),
+        )
+        .then(Ctx::in_promise()),
     )
 }

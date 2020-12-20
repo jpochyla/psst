@@ -1,4 +1,5 @@
 use crate::data::Promise;
+use druid::widget::ListIter;
 use druid::{
     lens::{Field, Map},
     Data, Lens, LensExt,
@@ -121,5 +122,33 @@ impl<C: Data, PT: Data, PD: Data, PE: Data> Ctx<C, Promise<PT, PD, PE>> {
                 }
             },
         )
+    }
+}
+
+impl<C: Data, T: Data, L: ListIter<T>> ListIter<Ctx<C, T>> for Ctx<C, L> {
+    fn for_each(&self, mut cb: impl FnMut(&Ctx<C, T>, usize)) {
+        self.data.for_each(|item, index| {
+            let d = Ctx::new(self.ctx.to_owned(), item.to_owned());
+            cb(&d, index);
+        });
+    }
+
+    fn for_each_mut(&mut self, mut cb: impl FnMut(&mut Ctx<C, T>, usize)) {
+        let ctx = &mut self.ctx;
+        let data = &mut self.data;
+        data.for_each_mut(|item, index| {
+            let mut d = Ctx::new(ctx.to_owned(), item.to_owned());
+            cb(&mut d, index);
+            if !ctx.same(&d.ctx) {
+                *ctx = d.ctx;
+            }
+            if !item.same(&d.data) {
+                *item = d.data;
+            }
+        });
+    }
+
+    fn data_len(&self) -> usize {
+        self.data.data_len()
     }
 }

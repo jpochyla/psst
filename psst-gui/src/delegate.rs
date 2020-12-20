@@ -515,14 +515,14 @@ impl Delegate {
     fn command_playlist(&mut self, _target: Target, cmd: &Command, data: &mut State) -> Handled {
         if cmd.is(cmd::LOAD_PLAYLISTS) {
             let web = self.web.clone();
-            data.library.playlists.defer_default();
+            data.library_mut().playlists.defer_default();
             self.submit_async(
                 cmd::UPDATE_PLAYLISTS,
                 async move { web.load_playlists().await },
             );
             Handled::Yes
         } else if let Some(result) = cmd.get(cmd::UPDATE_PLAYLISTS).cloned() {
-            data.library.playlists.resolve_or_reject(result);
+            data.library_mut().playlists.resolve_or_reject(result);
             Handled::Yes
         } else if let Some(playlist) = cmd.get(cmd::GOTO_PLAYLIST_DETAIL).cloned() {
             let web = self.web.clone();
@@ -555,7 +555,7 @@ impl Delegate {
         if cmd.is(cmd::GOTO_LIBRARY) {
             data.route = Route::Library;
             if data.library.saved_albums.is_empty() || data.library.saved_albums.is_rejected() {
-                data.library.saved_albums.defer_default();
+                data.library_mut().saved_albums.defer_default();
                 let web = self.web.clone();
                 let sink = self.event_sink.clone();
                 self.runtime.spawn(async move {
@@ -565,7 +565,7 @@ impl Delegate {
                 });
             }
             if data.library.saved_tracks.is_empty() || data.library.saved_tracks.is_rejected() {
-                data.library.saved_tracks.defer_default();
+                data.library_mut().saved_tracks.defer_default();
                 let web = self.web.clone();
                 let sink = self.event_sink.clone();
                 self.runtime.spawn(async move {
@@ -576,17 +576,26 @@ impl Delegate {
             }
             Handled::Yes
         } else if let Some(result) = cmd.get(cmd::UPDATE_SAVED_ALBUMS).cloned() {
-            data.library.saved_albums.resolve_or_reject(result);
+            match result {
+                Ok(albums) => {
+                    data.track_ctx.set_saved_albums(&albums);
+                    data.library_mut().saved_albums.resolve(albums);
+                }
+                Err(err) => {
+                    data.track_ctx.set_saved_albums(&Vector::new());
+                    data.library_mut().saved_albums.reject(err);
+                }
+            };
             Handled::Yes
         } else if let Some(result) = cmd.get(cmd::UPDATE_SAVED_TRACKS).cloned() {
             match result {
                 Ok(list) => {
                     data.track_ctx.set_saved_tracks(&list.tracks);
-                    data.library.saved_tracks.resolve(list);
+                    data.library_mut().saved_tracks.resolve(list);
                 }
                 Err(err) => {
                     data.track_ctx.set_saved_tracks(&Vector::new());
-                    data.library.saved_tracks.reject(err);
+                    data.library_mut().saved_tracks.reject(err);
                 }
             };
             Handled::Yes

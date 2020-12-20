@@ -50,7 +50,7 @@ fn make_artist_results() -> impl Widget<Ctx<TrackCtx, SearchResults>> {
 fn make_album_results() -> impl Widget<Ctx<TrackCtx, SearchResults>> {
     Flex::column()
         .with_child(List::new(make_album))
-        .lens(Ctx::data().then(SearchResults::albums))
+        .lens(Ctx::map(SearchResults::albums))
 }
 
 fn make_track_results() -> impl Widget<Ctx<TrackCtx, SearchResults>> {

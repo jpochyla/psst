@@ -1,3 +1,4 @@
+use crate::data::TrackCtx;
 use crate::{
     cmd,
     data::{Artist, ArtistAlbums, ArtistDetail, Ctx, Navigation, State},
@@ -37,9 +38,16 @@ pub fn make_detail() -> impl Widget<State> {
         .then(Ctx::in_promise()),
     );
 
-    let albums = Promised::new(|| make_loader(), || make_albums(), || make_error())
-        .lens(State::artist.then(ArtistDetail::albums))
-        .padding((theme::grid(0.8), 0.0));
+    let albums = Promised::new(
+        || make_loader(),
+        || make_albums(),
+        || make_error().lens(Ctx::data()),
+    )
+    .lens(
+        Ctx::make(State::track_ctx, State::artist.then(ArtistDetail::albums))
+            .then(Ctx::in_promise()),
+    )
+    .padding((theme::grid(0.8), 0.0));
 
     let related = Promised::new(|| make_loader(), || make_related(), || make_error())
         .lens(State::artist.then(ArtistDetail::related))
@@ -70,18 +78,17 @@ fn make_artist_with_cover(width: f64, height: f64) -> impl Widget<Artist> {
     let artist_label = Label::raw()
         .with_font(theme::UI_FONT_MEDIUM)
         .lens(Artist::name);
-    Flex::row()
+    let artist = Flex::row()
         .with_child(artist_image)
         .with_default_spacer()
-        .with_flex_child(artist_label, 1.)
-        .hover()
-        .on_click(|ctx, artist, _| {
-            let nav = Navigation::ArtistDetail(artist.id.clone());
-            ctx.submit_command(cmd::NAVIGATE_TO.with(nav));
-        })
+        .with_flex_child(artist_label, 1.);
+    artist.hover().on_click(|ctx, artist, _| {
+        let nav = Navigation::ArtistDetail(artist.id.clone());
+        ctx.submit_command(cmd::NAVIGATE_TO.with(nav));
+    })
 }
 
-fn make_albums() -> impl Widget<ArtistAlbums> {
+fn make_albums() -> impl Widget<Ctx<TrackCtx, ArtistAlbums>> {
     let label = |text| {
         Label::new(text)
             .with_font(theme::UI_FONT_MEDIUM)
@@ -92,15 +99,15 @@ fn make_albums() -> impl Widget<ArtistAlbums> {
         .cross_axis_alignment(CrossAxisAlignment::Start)
         .with_child(label("Albums"))
         .with_default_spacer()
-        .with_child(List::new(make_album).lens(ArtistAlbums::albums))
+        .with_child(List::new(make_album).lens(Ctx::map(ArtistAlbums::albums)))
         .with_default_spacer()
         .with_child(label("Singles"))
         .with_default_spacer()
-        .with_child(List::new(make_album).lens(ArtistAlbums::singles))
+        .with_child(List::new(make_album).lens(Ctx::map(ArtistAlbums::singles)))
         .with_default_spacer()
         .with_child(label("Compilations"))
         .with_default_spacer()
-        .with_child(List::new(make_album).lens(ArtistAlbums::compilations))
+        .with_child(List::new(make_album).lens(Ctx::map(ArtistAlbums::compilations)))
 }
 
 fn make_related() -> impl Widget<Vector<Artist>> {

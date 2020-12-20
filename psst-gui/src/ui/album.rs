@@ -108,7 +108,7 @@ pub fn make_cover(width: f64, height: f64) -> impl Widget<Album> {
     .fix_size(width, height)
 }
 
-pub fn make_album() -> impl Widget<Album> {
+pub fn make_album() -> impl Widget<Ctx<TrackCtx, Album>> {
     let album_cover = make_cover(theme::grid(7.0), theme::grid(7.0));
 
     let album_name = Label::raw()
@@ -132,29 +132,34 @@ pub fn make_album() -> impl Widget<Album> {
         .with_spacer(1.0)
         .with_child(album_date);
 
-    Flex::row()
+    let album = Flex::row()
         .with_child(album_cover)
         .with_default_spacer()
         .with_flex_child(album_label, 1.0)
+        .lens(Ctx::data());
+
+    album
         .hover()
-        .on_ex_click(move |ctx, event, album: &mut Album, _| match event.button {
-            MouseButton::Left => {
-                let nav = Navigation::AlbumDetail(album.id.clone());
-                ctx.submit_command(cmd::NAVIGATE_TO.with(nav));
-            }
-            MouseButton::Right => {
-                let menu = make_album_menu(&album);
-                ctx.show_context_menu(ContextMenu::new(menu, event.window_pos));
-            }
-            _ => {}
-        })
+        .on_ex_click(
+            move |ctx, event, album: &mut Ctx<TrackCtx, Album>, _| match event.button {
+                MouseButton::Left => {
+                    let nav = Navigation::AlbumDetail(album.data.id.clone());
+                    ctx.submit_command(cmd::NAVIGATE_TO.with(nav));
+                }
+                MouseButton::Right => {
+                    let menu = make_album_menu(&album);
+                    ctx.show_context_menu(ContextMenu::new(menu, event.window_pos));
+                }
+                _ => {}
+            },
+        )
 }
 
-fn make_album_menu(album: &Album) -> MenuDesc<State> {
+fn make_album_menu(album: &Ctx<TrackCtx, Album>) -> MenuDesc<State> {
     let mut menu = MenuDesc::empty();
 
-    for artist in &album.artists {
-        let more_than_one_artist = album.artists.len() > 1;
+    for artist in &album.data.artists {
+        let more_than_one_artist = album.data.artists.len() > 1;
         let title = if more_than_one_artist {
             LocalizedString::new("menu-item-show-artist-name")
                 .with_placeholder(format!("Go To {}", artist.name))
@@ -169,23 +174,23 @@ fn make_album_menu(album: &Album) -> MenuDesc<State> {
 
     menu = menu.append(MenuItem::new(
         LocalizedString::new("menu-item-copy-link").with_placeholder("Copy Link"),
-        cmd::COPY.with(album.link()),
+        cmd::COPY.with(album.data.link()),
     ));
 
     menu = menu.append_separator();
 
-    // if ctx.is_album_saved(&album) {
-    //     menu = menu.append(MenuItem::new(
-    //         LocalizedString::new("menu-item-remove-from-library")
-    //             .with_placeholder("Remove from Library"),
-    //         cmd::UNSAVE_ALBUM.with(album.id.clone()),
-    //     ));
-    // } else {
-    //     menu = menu.append(MenuItem::new(
-    //         LocalizedString::new("menu-item-save-to-library").with_placeholder("
-    // Save to Library"),         cmd::SAVE_ALBUM.with(album.clone()),
-    //     ));
-    // }
+    if album.ctx.is_album_saved(&album.data) {
+        menu = menu.append(MenuItem::new(
+            LocalizedString::new("menu-item-remove-from-library")
+                .with_placeholder("Remove from Library"),
+            cmd::UNSAVE_ALBUM.with(album.data.id.clone()),
+        ));
+    } else {
+        menu = menu.append(MenuItem::new(
+            LocalizedString::new("menu-item-save-to-library").with_placeholder("Save to Library"),
+            cmd::SAVE_ALBUM.with(album.data.clone()),
+        ));
+    }
 
     menu
 }

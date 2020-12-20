@@ -37,6 +37,7 @@ pub struct TrackList {
 pub struct TrackCtx {
     pub playback_item: Option<Arc<Track>>,
     pub saved_tracks: HashSet<TrackId>,
+    pub saved_albums: HashSet<Arc<str>>,
 }
 
 impl TrackCtx {
@@ -52,7 +53,15 @@ impl TrackCtx {
     }
 
     pub fn set_saved_tracks(&mut self, tracks: &Vector<Arc<Track>>) {
-        self.saved_tracks = tracks.iter().map(|track| track.id).collect();
+        self.saved_tracks = tracks.iter().map(|track| track.id.clone()).collect();
+    }
+
+    pub fn is_album_saved(&self, album: &Album) -> bool {
+        self.saved_albums.contains(&album.id)
+    }
+
+    pub fn set_saved_albums(&mut self, albums: &Vector<Album>) {
+        self.saved_albums = albums.iter().map(|album| album.id.clone()).collect();
     }
 }
 

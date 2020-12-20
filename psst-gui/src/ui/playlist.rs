@@ -33,8 +33,7 @@ pub fn make_list() -> impl Widget<State> {
         },
         || make_error(),
     )
-    .lens(Library::playlists)
-    .lens(State::library)
+    .lens(State::library.then(Library::playlists.in_arc()))
 }
 
 pub fn make_detail() -> impl Widget<State> {

@@ -35,7 +35,7 @@ pub struct State {
     pub album: AlbumDetail,
     pub artist: ArtistDetail,
     pub playlist: PlaylistDetail,
-    pub library: Library,
+    pub library: Arc<Library>,
     pub track_ctx: TrackCtx,
 }
 
@@ -70,14 +70,15 @@ impl Default for State {
                 playlist: Promise::Empty,
                 tracks: Promise::Empty,
             },
-            library: Library {
+            library: Arc::new(Library {
                 saved_albums: Promise::Empty,
                 saved_tracks: Promise::Empty,
                 playlists: Promise::Empty,
-            },
+            }),
             track_ctx: TrackCtx {
                 playback_item: None,
                 saved_tracks: HashSet::new(),
+                saved_albums: HashSet::new(),
             },
         }
     }
@@ -120,29 +121,37 @@ impl State {
 
 impl State {
     pub fn save_track(&mut self, track: Arc<Track>) {
-        if let Promise::Resolved(list) = &mut self.library.saved_tracks {
+        if let Promise::Resolved(list) = &mut self.library_mut().saved_tracks {
             list.tracks.push_front(track);
+        }
+        if let Promise::Resolved(list) = &self.library.saved_tracks {
             self.track_ctx.set_saved_tracks(&list.tracks);
         }
     }
 
     pub fn unsave_track(&mut self, track_id: &TrackId) {
-        if let Promise::Resolved(list) = &mut self.library.saved_tracks {
+        if let Promise::Resolved(list) = &mut self.library_mut().saved_tracks {
             list.tracks.retain(|track| &track.id != track_id);
+        }
+        if let Promise::Resolved(list) = &self.library.saved_tracks {
             self.track_ctx.set_saved_tracks(&list.tracks);
         }
     }
 
     pub fn save_album(&mut self, album: Album) {
-        if let Promise::Resolved(albums) = &mut self.library.saved_albums {
+        if let Promise::Resolved(albums) = &mut self.library_mut().saved_albums {
             albums.push_front(album);
         }
     }
 
     pub fn unsave_album(&mut self, album_id: &Arc<str>) {
-        if let Promise::Resolved(albums) = &mut self.library.saved_albums {
+        if let Promise::Resolved(albums) = &mut self.library_mut().saved_albums {
             albums.retain(|album| &album.id != album_id)
         }
+    }
+
+    pub fn library_mut(&mut self) -> &mut Library {
+        Arc::make_mut(&mut self.library)
     }
 }
 

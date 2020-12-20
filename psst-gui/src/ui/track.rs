@@ -37,7 +37,7 @@ impl TrackRow {
     fn is_playing() -> impl Lens<TrackRow, bool> {
         Map::new(
             |tr: &TrackRow| tr.ctx.is_track_playing(&tr.track),
-            |tr: &mut TrackRow, is_playing| {
+            |_tr: &mut TrackRow, _is_playing| {
                 // Ignore mutation.
             },
         )
