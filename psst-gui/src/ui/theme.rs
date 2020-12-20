@@ -1,6 +1,6 @@
 use crate::data::State;
 pub use druid::theme::*;
-use druid::{Color, Env, FontDescriptor, FontFamily, FontWeight, Insets, Key};
+use druid::{Color, Env, FontDescriptor, FontFamily, FontWeight, Insets, Key, Size};
 
 pub fn grid(m: f64) -> f64 {
     GRID * m
@@ -23,8 +23,9 @@ pub const MENU_BUTTON_BG_ACTIVE: Color = GREY_5;
 pub const MENU_BUTTON_BG_INACTIVE: Color = GREY_6;
 pub const MENU_BUTTON_FG_ACTIVE: Color = GREY_1;
 pub const MENU_BUTTON_FG_INACTIVE: Color = GREY_2;
-pub const MENU_BUTTON_ICON_ACTIVE: Color = GREY_4;
-pub const MENU_BUTTON_ICON_INACTIVE: Color = GREY_5;
+pub const MENU_BUTTON_ICON_ACTIVE: Color = GREY_2;
+pub const MENU_BUTTON_ICON_INACTIVE: Color = GREY_3;
+pub const MENU_BUTTON_ICON_SIZE: Size = Size::new(12.0, 12.0);
 
 pub const UI_FONT_MEDIUM: Key<FontDescriptor> = Key::new("app.ui-font-medium");
 pub const UI_FONT_MONO: Key<FontDescriptor> = Key::new("app.ui-font-mono");

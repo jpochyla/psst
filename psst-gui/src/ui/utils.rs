@@ -16,7 +16,7 @@ pub fn make_loader<T: Data>() -> impl Widget<T> {
 }
 
 pub fn make_error() -> impl Widget<Error> {
-    let icon = icons::ERROR
+    let icon = icons::SAD_FACE
         .scale((theme::grid(3.0), theme::grid(3.0)))
         .with_color(theme::PLACEHOLDER_COLOR);
     let error = Flex::column()

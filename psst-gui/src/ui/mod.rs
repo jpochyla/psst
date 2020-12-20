@@ -76,12 +76,12 @@ pub fn make_nav() -> impl Widget<State> {
         .with_default_spacer()
         .with_child(make_nav_button(
             "Home",
-            icons::HOME.scale((theme::grid(2.0), theme::grid(2.0))),
+            icons::TIME.scale(theme::MENU_BUTTON_ICON_SIZE),
             Navigation::Home,
         ))
         .with_child(make_nav_button(
             "Library",
-            icons::LIBRARY.scale((theme::grid(2.0), theme::grid(2.0))),
+            icons::HEART.scale(theme::MENU_BUTTON_ICON_SIZE),
             Navigation::Library,
         ))
         .with_child(make_nav_search())
