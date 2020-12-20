@@ -6,6 +6,7 @@ use crate::{
 };
 use druid::{
     kurbo::Line,
+    lens::Map,
     piet::StrokeStyle,
     widget::{Controller, CrossAxisAlignment, Flex, Label, List, ListIter, Painter},
     ContextMenu, Data, Env, Event, EventCtx, Lens, LensExt, LocalizedString, MenuDesc, MenuItem,
@@ -30,6 +31,17 @@ struct TrackRow {
     ctx: TrackCtx,
     track: Arc<Track>,
     position: usize,
+}
+
+impl TrackRow {
+    fn is_playing() -> impl Lens<TrackRow, bool> {
+        Map::new(
+            |tr: &TrackRow| tr.ctx.is_track_playing(&tr.track),
+            |tr: &mut TrackRow, is_playing| {
+                // Ignore mutation.
+            },
+        )
+    }
 }
 
 impl ListIter<TrackRow> for Ctx<TrackCtx, TrackList> {
@@ -100,13 +112,13 @@ where
 
 fn make_track(display: TrackDisplay) -> impl Widget<TrackRow> {
     let track_duration =
-        Label::dynamic(|ts: &TrackRow, _| ts.track.duration.as_minutes_and_seconds())
+        Label::dynamic(|tr: &TrackRow, _| tr.track.duration.as_minutes_and_seconds())
             .with_text_size(theme::TEXT_SIZE_SMALL)
             .with_text_color(theme::PLACEHOLDER_COLOR);
 
-    let line_painter = Painter::new(move |ctx, ts: &TrackRow, _| {
+    let line_painter = Painter::new(move |ctx, is_playing: &bool, _| {
         let line = Line::new((0.0, 0.0), (ctx.size().width, 0.0));
-        let color = if ts.ctx.is_track_playing(&ts.track) {
+        let color = if *is_playing {
             theme::BLACK
         } else {
             theme::GREY_5
@@ -123,13 +135,14 @@ fn make_track(display: TrackDisplay) -> impl Widget<TrackRow> {
             },
         );
     })
+    .lens(TrackRow::is_playing())
     .fix_height(1.0);
 
     let mut major = Flex::row();
     let mut minor = Flex::row();
 
     if display.number {
-        let track_number = Label::dynamic(|ts: &TrackRow, _| ts.track.track_number.to_string())
+        let track_number = Label::dynamic(|tr: &TrackRow, _| tr.track.track_number.to_string())
             .with_font(theme::UI_FONT_MONO)
             .with_text_size(theme::TEXT_SIZE_SMALL)
             .with_text_color(theme::PLACEHOLDER_COLOR);
@@ -143,12 +156,12 @@ fn make_track(display: TrackDisplay) -> impl Widget<TrackRow> {
         major.add_child(track_name);
     }
     if display.artist {
-        let track_artist = Label::dynamic(|ts: &TrackRow, _| ts.track.artist_name())
+        let track_artist = Label::dynamic(|tr: &TrackRow, _| tr.track.artist_name())
             .with_text_size(theme::TEXT_SIZE_SMALL);
         minor.add_child(track_artist);
     }
     if display.album {
-        let track_album = Label::dynamic(|ts: &TrackRow, _| ts.track.album_name())
+        let track_album = Label::dynamic(|tr: &TrackRow, _| tr.track.album_name())
             .with_text_size(theme::TEXT_SIZE_SMALL)
             .with_text_color(theme::PLACEHOLDER_COLOR);
         if display.artist {
@@ -167,23 +180,23 @@ fn make_track(display: TrackDisplay) -> impl Widget<TrackRow> {
         .with_child(minor)
         .padding(theme::grid(0.8))
         .hover()
-        .on_ex_click(move |ctx, event, ts: &mut TrackRow, _| match event.button {
+        .on_ex_click(move |ctx, event, tr: &mut TrackRow, _| match event.button {
             MouseButton::Left => {
-                ctx.submit_notification(cmd::PLAY_TRACK_AT.with(ts.position));
+                ctx.submit_notification(cmd::PLAY_TRACK_AT.with(tr.position));
             }
             MouseButton::Right => {
-                let menu = make_track_menu(ts);
+                let menu = make_track_menu(tr);
                 ctx.show_context_menu(ContextMenu::new(menu, event.window_pos));
             }
             _ => {}
         })
 }
 
-fn make_track_menu(ts: &TrackRow) -> MenuDesc<State> {
+fn make_track_menu(tr: &TrackRow) -> MenuDesc<State> {
     let mut menu = MenuDesc::empty();
 
-    for artist in &ts.track.artists {
-        let more_than_one_artist = ts.track.artists.len() > 1;
+    for artist in &tr.track.artists {
+        let more_than_one_artist = tr.track.artists.len() > 1;
         let title = if more_than_one_artist {
             LocalizedString::new("menu-item-show-artist-name")
                 .with_placeholder(format!("Go To Artist “{}”", artist.name))
@@ -196,7 +209,7 @@ fn make_track_menu(ts: &TrackRow) -> MenuDesc<State> {
         ));
     }
 
-    if let Some(album) = ts.track.album.as_ref() {
+    if let Some(album) = tr.track.album.as_ref() {
         menu = menu.append(MenuItem::new(
             LocalizedString::new("menu-item-show-album").with_placeholder("Go To Album"),
             cmd::NAVIGATE_TO.with(Navigation::AlbumDetail(album.id.clone())),
@@ -205,21 +218,21 @@ fn make_track_menu(ts: &TrackRow) -> MenuDesc<State> {
 
     menu = menu.append(MenuItem::new(
         LocalizedString::new("menu-item-copy-link").with_placeholder("Copy Link"),
-        cmd::COPY.with(ts.track.link()),
+        cmd::COPY.with(tr.track.link()),
     ));
 
     menu = menu.append_separator();
 
-    if ts.ctx.is_track_saved(&ts.track) {
+    if tr.ctx.is_track_saved(&tr.track) {
         menu = menu.append(MenuItem::new(
             LocalizedString::new("menu-item-remove-from-library")
                 .with_placeholder("Remove from Library"),
-            cmd::UNSAVE_TRACK.with(ts.track.id.clone()),
+            cmd::UNSAVE_TRACK.with(tr.track.id.clone()),
         ));
     } else {
         menu = menu.append(MenuItem::new(
             LocalizedString::new("menu-item-save-to-library").with_placeholder("Save to Library"),
-            cmd::SAVE_TRACK.with(ts.track.clone()),
+            cmd::SAVE_TRACK.with(tr.track.clone()),
         ));
     }
 
