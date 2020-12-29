@@ -1,7 +1,7 @@
 use crate::{
     data::{
-        Album, AlbumLink, Artist, ArtistAlbums, ArtistLink, AudioDuration, Navigation,
-        PlaybackPayload, Playlist, PlaylistLink, SearchResults, Track, TrackId,
+        Album, AlbumLink, Artist, ArtistAlbums, ArtistLink, AudioDuration, Nav, PlaybackPayload,
+        Playlist, PlaylistLink, SearchResults, Track, TrackId,
     },
     error::Error,
 };
@@ -26,7 +26,7 @@ pub const SESSION_LOST: Selector = Selector::new("app.session-lost");
 
 // Navigation
 
-pub const NAVIGATE_TO: Selector<Navigation> = Selector::new("app.navigate-to");
+pub const NAVIGATE_TO: Selector<Nav> = Selector::new("app.navigate-to");
 pub const NAVIGATE_BACK: Selector = Selector::new("app.navigate-back");
 
 // Search

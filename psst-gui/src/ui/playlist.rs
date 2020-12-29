@@ -1,6 +1,6 @@
 use crate::{
     cmd,
-    data::{Ctx, Library, Navigation, Playlist, PlaylistDetail, State},
+    data::{Ctx, Library, Nav, Playlist, PlaylistDetail, State},
     ui::{
         theme,
         track::{make_tracklist, TrackDisplay},
@@ -26,7 +26,7 @@ pub fn make_list() -> impl Widget<State> {
                     .padding(Insets::uniform_xy(theme::grid(2.0), theme::grid(0.6)))
                     .hover()
                     .on_click(|ctx, playlist, _| {
-                        let nav = Navigation::PlaylistDetail(playlist.link());
+                        let nav = Nav::PlaylistDetail(playlist.link());
                         ctx.submit_command(cmd::NAVIGATE_TO.with(nav));
                     })
             })

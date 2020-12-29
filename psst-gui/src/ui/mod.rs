@@ -1,6 +1,6 @@
 use crate::{
     cmd,
-    data::{Navigation, State},
+    data::{Nav, State},
     widget::{icons, Empty, HoverExt, ViewDispatcher},
 };
 use druid::{
@@ -78,12 +78,12 @@ pub fn make_root() -> impl Widget<State> {
 pub fn make_nav() -> impl Widget<State> {
     Flex::column()
         .with_default_spacer()
-        .with_child(make_nav_button("Home", Navigation::Home))
-        .with_child(make_nav_button("Library", Navigation::Library))
+        .with_child(make_nav_button("Home", Nav::Home))
+        .with_child(make_nav_button("Library", Nav::Library))
         .with_child(make_nav_search())
 }
 
-fn make_nav_button(title: &str, nav: Navigation) -> impl Widget<State> {
+fn make_nav_button(title: &str, nav: Nav) -> impl Widget<State> {
     Label::new(title)
         .padding((theme::grid(2.0), theme::grid(1.0)))
         .expand_width()
@@ -110,13 +110,13 @@ fn make_nav_search() -> impl Widget<State> {
 pub fn make_route() -> impl Widget<State> {
     let switcher = ViewDispatcher::new(
         |state: &State, _| state.route.clone(),
-        |route: &Navigation, _, _| match route {
-            Navigation::Home => make_home().boxed(),
-            Navigation::SearchResults(_) => search::make_results().boxed(),
-            Navigation::AlbumDetail(_) => album::make_detail().boxed(),
-            Navigation::ArtistDetail(_) => artist::make_detail().boxed(),
-            Navigation::PlaylistDetail(_) => playlist::make_detail().boxed(),
-            Navigation::Library => library::make_detail().boxed(),
+        |route: &Nav, _, _| match route {
+            Nav::Home => make_home().boxed(),
+            Nav::SearchResults(_) => search::make_results().boxed(),
+            Nav::AlbumDetail(_) => album::make_detail().boxed(),
+            Nav::ArtistDetail(_) => artist::make_detail().boxed(),
+            Nav::PlaylistDetail(_) => playlist::make_detail().boxed(),
+            Nav::Library => library::make_detail().boxed(),
         },
     )
     .padding(theme::grid(1.0));
@@ -159,15 +159,15 @@ pub fn make_title() -> impl Widget<State> {
 fn make_route_icon() -> impl Widget<State> {
     ViewSwitcher::new(
         |state: &State, _| state.route.clone(),
-        |route: &Navigation, _, _| {
+        |route: &Nav, _, _| {
             let icon = |icon: &SvgIcon| icon.scale(theme::ICON_SIZE);
             match &route {
-                Navigation::Home => Empty.boxed(),
-                Navigation::Library => Empty.boxed(),
-                Navigation::SearchResults(_) => icon(&icons::SEARCH).boxed(),
-                Navigation::AlbumDetail(_) => icon(&icons::ALBUM).boxed(),
-                Navigation::ArtistDetail(_) => icon(&icons::ARTIST).boxed(),
-                Navigation::PlaylistDetail(_) => icon(&icons::PLAYLIST).boxed(),
+                Nav::Home => Empty.boxed(),
+                Nav::Library => Empty.boxed(),
+                Nav::SearchResults(_) => icon(&icons::SEARCH).boxed(),
+                Nav::AlbumDetail(_) => icon(&icons::ALBUM).boxed(),
+                Nav::ArtistDetail(_) => icon(&icons::ARTIST).boxed(),
+                Nav::PlaylistDetail(_) => icon(&icons::PLAYLIST).boxed(),
             }
         },
     )
@@ -175,12 +175,12 @@ fn make_route_icon() -> impl Widget<State> {
 
 fn make_route_title() -> impl Widget<State> {
     Label::dynamic(|state: &State, _| match &state.route {
-        Navigation::Home => "".to_string(),
-        Navigation::Library => "Library".to_string(),
-        Navigation::SearchResults(query) => query.clone(),
-        Navigation::AlbumDetail(link) => link.name.to_string(),
-        Navigation::ArtistDetail(link) => link.name.to_string(),
-        Navigation::PlaylistDetail(link) => link.name.to_string(),
+        Nav::Home => "".to_string(),
+        Nav::Library => "Library".to_string(),
+        Nav::SearchResults(query) => query.clone(),
+        Nav::AlbumDetail(link) => link.name.to_string(),
+        Nav::ArtistDetail(link) => link.name.to_string(),
+        Nav::PlaylistDetail(link) => link.name.to_string(),
     })
     .with_font(theme::UI_FONT_MEDIUM)
 }

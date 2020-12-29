@@ -1,8 +1,8 @@
 use crate::{
     cmd,
     data::{
-        ArtistTracks, AudioDuration, Config, Navigation, PlaybackOrigin, PlaylistTracks,
-        SavedTracks, State, Track, TrackId,
+        ArtistTracks, AudioDuration, Config, Nav, PlaybackOrigin, PlaylistTracks, SavedTracks,
+        State, Track, TrackId,
     },
     ui,
     web::{Web, WebCache},
@@ -359,45 +359,42 @@ impl Delegate {
         }
     }
 
-    fn navigate_to(&mut self, data: &mut State, nav: Navigation) {
+    fn navigate_to(&mut self, data: &mut State, nav: Nav) {
         data.history.push_back(nav.clone());
         self.navigate(data, nav);
     }
 
     fn navigate_back(&mut self, data: &mut State) {
         data.history.pop_back();
-        self.navigate(
-            data,
-            data.history.last().cloned().unwrap_or(Navigation::Home),
-        );
+        self.navigate(data, data.history.last().cloned().unwrap_or(Nav::Home));
     }
 
-    fn navigate(&mut self, data: &mut State, nav: Navigation) {
+    fn navigate(&mut self, data: &mut State, nav: Nav) {
         match nav {
-            Navigation::Home => {
-                data.route = Navigation::Home;
+            Nav::Home => {
+                data.route = Nav::Home;
             }
-            Navigation::SearchResults(query) => {
+            Nav::SearchResults(query) => {
                 self.event_sink
                     .submit_command(cmd::GOTO_SEARCH_RESULTS, query, Target::Auto)
                     .unwrap();
             }
-            Navigation::AlbumDetail(link) => {
+            Nav::AlbumDetail(link) => {
                 self.event_sink
                     .submit_command(cmd::GOTO_ALBUM_DETAIL, link, Target::Auto)
                     .unwrap();
             }
-            Navigation::ArtistDetail(link) => {
+            Nav::ArtistDetail(link) => {
                 self.event_sink
                     .submit_command(cmd::GOTO_ARTIST_DETAIL, link, Target::Auto)
                     .unwrap();
             }
-            Navigation::PlaylistDetail(link) => {
+            Nav::PlaylistDetail(link) => {
                 self.event_sink
                     .submit_command(cmd::GOTO_PLAYLIST_DETAIL, link, Target::Auto)
                     .unwrap();
             }
-            Navigation::Library => {
+            Nav::Library => {
                 self.event_sink
                     .submit_command(cmd::GOTO_LIBRARY, (), Target::Auto)
                     .unwrap();
@@ -527,7 +524,7 @@ impl Delegate {
         } else if let Some(link) = cmd.get(cmd::GOTO_PLAYLIST_DETAIL).cloned() {
             let web = self.web.clone();
             let sink = self.event_sink.clone();
-            data.route = Navigation::PlaylistDetail(link.clone());
+            data.route = Nav::PlaylistDetail(link.clone());
             data.playlist.playlist.defer(link.clone());
             data.playlist.tracks.defer(link.clone());
             self.runtime.spawn(async move {
@@ -554,7 +551,7 @@ impl Delegate {
 
     fn command_library(&mut self, _target: Target, cmd: &Command, data: &mut State) -> Handled {
         if cmd.is(cmd::GOTO_LIBRARY) {
-            data.route = Navigation::Library;
+            data.route = Nav::Library;
             if data.library.saved_albums.is_empty() || data.library.saved_albums.is_rejected() {
                 data.library_mut().saved_albums.defer_default();
                 let web = self.web.clone();
@@ -651,7 +648,7 @@ impl Delegate {
 
     fn command_album(&mut self, _target: Target, cmd: &Command, data: &mut State) -> Handled {
         if let Some(link) = cmd.get(cmd::GOTO_ALBUM_DETAIL).cloned() {
-            data.route = Navigation::AlbumDetail(link.clone());
+            data.route = Nav::AlbumDetail(link.clone());
             data.album.album.defer(link.clone());
             let web = self.web.clone();
             let sink = self.event_sink.clone();
@@ -673,7 +670,7 @@ impl Delegate {
 
     fn command_artist(&mut self, _target: Target, cmd: &Command, data: &mut State) -> Handled {
         if let Some(album_link) = cmd.get(cmd::GOTO_ARTIST_DETAIL) {
-            data.route = Navigation::ArtistDetail(album_link.clone());
+            data.route = Nav::ArtistDetail(album_link.clone());
             // Load artist detail
             data.artist.artist.defer(album_link.clone());
             let link = album_link.clone();
@@ -750,7 +747,7 @@ impl Delegate {
         if let Some(query) = cmd.get(cmd::GOTO_SEARCH_RESULTS).cloned() {
             let web = self.web.clone();
             let sink = self.event_sink.clone();
-            data.route = Navigation::SearchResults(query.clone());
+            data.route = Nav::SearchResults(query.clone());
             data.search.results.defer(query.clone());
             self.runtime.spawn(async move {
                 let result = web.search(&query).await;

@@ -68,7 +68,7 @@ fn make_current_playback_info() -> impl Widget<CurrentPlayback> {
         .expand_width()
         .hover()
         .on_ex_click(|ctx, _event, current: &mut CurrentPlayback, _| {
-            let nav = current.origin.as_navigation();
+            let nav = current.origin.as_nav();
             ctx.submit_command(cmd::NAVIGATE_TO.with(nav));
         })
 }

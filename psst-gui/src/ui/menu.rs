@@ -1,6 +1,6 @@
 use crate::{
     cmd,
-    data::{Navigation, State},
+    data::{Nav, State},
 };
 use druid::{commands, platform_menus, LocalizedString, MenuDesc, MenuItem, SysMods};
 
@@ -42,14 +42,14 @@ fn make_view_menu() -> MenuDesc<State> {
         .append(
             MenuItem::new(
                 LocalizedString::new("menu-item-home").with_placeholder("Home"),
-                cmd::NAVIGATE_TO.with(Navigation::Home),
+                cmd::NAVIGATE_TO.with(Nav::Home),
             )
             .hotkey(SysMods::Cmd, "1"),
         )
         .append(
             MenuItem::new(
                 LocalizedString::new("menu-item-library").with_placeholder("Library"),
-                cmd::NAVIGATE_TO.with(Navigation::Library),
+                cmd::NAVIGATE_TO.with(Nav::Library),
             )
             .hotkey(SysMods::Cmd, "2"),
         )

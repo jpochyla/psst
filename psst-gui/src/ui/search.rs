@@ -1,6 +1,6 @@
 use crate::{
     cmd,
-    data::{CommonCtx, Ctx, Navigation, Search, SearchResults, State},
+    data::{CommonCtx, Ctx, Nav, Search, SearchResults, State},
     ui::{
         album::make_album,
         artist::make_artist,
@@ -18,7 +18,7 @@ pub fn make_input() -> impl Widget<State> {
     TextBox::new()
         .with_placeholder("Search")
         .controller(InputController::new().on_submit(|ctx, query, _env| {
-            let nav = Navigation::SearchResults(query.clone());
+            let nav = Nav::SearchResults(query.clone());
             ctx.submit_command(cmd::NAVIGATE_TO.with(nav));
         }))
         .with_id(cmd::WIDGET_SEARCH_INPUT)

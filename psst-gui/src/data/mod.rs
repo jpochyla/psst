@@ -2,10 +2,10 @@ mod album;
 mod artist;
 mod config;
 mod ctx;
+mod nav;
 mod playback;
 mod playlist;
 mod promise;
-mod route;
 mod search;
 mod track;
 mod utils;
@@ -15,10 +15,10 @@ pub use crate::data::{
     artist::{Artist, ArtistAlbums, ArtistDetail, ArtistLink, ArtistTracks},
     config::{AudioQuality, Config},
     ctx::Ctx,
+    nav::Nav,
     playback::{CurrentPlayback, Playback, PlaybackOrigin, PlaybackPayload, PlaybackState},
     playlist::{Playlist, PlaylistDetail, PlaylistLink, PlaylistTracks},
     promise::{Promise, PromiseState},
-    route::Navigation,
     search::{Search, SearchResults},
     track::{Track, TrackId, LOCAL_TRACK_ID},
     utils::{AudioDuration, Image},
@@ -31,8 +31,8 @@ use std::sync::Arc;
 
 #[derive(Clone, Debug, Data, Lens)]
 pub struct State {
-    pub route: Navigation,
-    pub history: Vector<Navigation>,
+    pub route: Nav,
+    pub history: Vector<Nav>,
     pub config: Config,
     pub playback: Playback,
     pub search: Search,
@@ -46,7 +46,7 @@ pub struct State {
 impl Default for State {
     fn default() -> Self {
         Self {
-            route: Navigation::Home,
+            route: Nav::Home,
             history: Vector::new(),
             config: Config::default(),
             playback: Playback {

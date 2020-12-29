@@ -1,4 +1,4 @@
-use crate::data::{AlbumLink, ArtistLink, AudioDuration, Navigation, PlaylistLink, Track};
+use crate::data::{AlbumLink, ArtistLink, AudioDuration, Nav, PlaylistLink, Track};
 use druid::{im::Vector, Data, Lens};
 use std::sync::Arc;
 
@@ -33,13 +33,13 @@ pub enum PlaybackOrigin {
 }
 
 impl PlaybackOrigin {
-    pub fn as_navigation(&self) -> Navigation {
+    pub fn as_nav(&self) -> Nav {
         match &self {
-            PlaybackOrigin::Library => Navigation::Library,
-            PlaybackOrigin::Album(link) => Navigation::AlbumDetail(link.clone()),
-            PlaybackOrigin::Artist(link) => Navigation::ArtistDetail(link.clone()),
-            PlaybackOrigin::Playlist(link) => Navigation::PlaylistDetail(link.clone()),
-            PlaybackOrigin::Search(query) => Navigation::SearchResults(query.clone()),
+            PlaybackOrigin::Library => Nav::Library,
+            PlaybackOrigin::Album(link) => Nav::AlbumDetail(link.clone()),
+            PlaybackOrigin::Artist(link) => Nav::ArtistDetail(link.clone()),
+            PlaybackOrigin::Playlist(link) => Nav::PlaylistDetail(link.clone()),
+            PlaybackOrigin::Search(query) => Nav::SearchResults(query.clone()),
         }
     }
 

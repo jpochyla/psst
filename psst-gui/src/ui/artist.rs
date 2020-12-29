@@ -1,6 +1,6 @@
 use crate::{
     cmd,
-    data::{Artist, ArtistAlbums, ArtistDetail, CommonCtx, Ctx, Navigation, State},
+    data::{Artist, ArtistAlbums, ArtistDetail, CommonCtx, Ctx, Nav, State},
     ui::{
         album::make_album,
         theme,
@@ -82,7 +82,7 @@ fn make_artist_with_cover(width: f64, height: f64) -> impl Widget<Artist> {
         .with_default_spacer()
         .with_flex_child(artist_label, 1.);
     artist.hover().on_click(|ctx, artist, _| {
-        let nav = Navigation::ArtistDetail(artist.link());
+        let nav = Nav::ArtistDetail(artist.link());
         ctx.submit_command(cmd::NAVIGATE_TO.with(nav));
     })
 }

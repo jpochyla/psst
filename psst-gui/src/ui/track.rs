@@ -1,8 +1,8 @@
 use crate::{
     cmd,
     data::{
-        Album, ArtistTracks, CommonCtx, Ctx, Navigation, PlaybackOrigin, PlaybackPayload,
-        PlaylistTracks, SavedTracks, SearchResults, State, Track,
+        Album, ArtistTracks, CommonCtx, Ctx, Nav, PlaybackOrigin, PlaybackPayload, PlaylistTracks,
+        SavedTracks, SearchResults, State, Track,
     },
     ui::theme,
     widget::HoverExt,
@@ -276,14 +276,14 @@ fn make_track_menu(tr: &TrackRow) -> MenuDesc<State> {
         };
         menu = menu.append(MenuItem::new(
             title,
-            cmd::NAVIGATE_TO.with(Navigation::ArtistDetail(artist.link())),
+            cmd::NAVIGATE_TO.with(Nav::ArtistDetail(artist.link())),
         ));
     }
 
     if let Some(album) = tr.track.album.as_ref() {
         menu = menu.append(MenuItem::new(
             LocalizedString::new("menu-item-show-album").with_placeholder("Go To Album"),
-            cmd::NAVIGATE_TO.with(Navigation::AlbumDetail(album.link())),
+            cmd::NAVIGATE_TO.with(Nav::AlbumDetail(album.link())),
         ))
     }
 

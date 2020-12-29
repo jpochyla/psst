@@ -1,6 +1,6 @@
 use crate::{
     cmd,
-    data::{Album, AlbumDetail, Artist, CommonCtx, Ctx, Navigation, State},
+    data::{Album, AlbumDetail, Artist, CommonCtx, Ctx, Nav, State},
     ui::{
         theme,
         track::{make_tracklist, TrackDisplay},
@@ -38,7 +38,7 @@ fn make_detail_loaded() -> impl Widget<Ctx<CommonCtx, Album>> {
             .hover()
             .lens(Artist::name)
             .on_click(|ctx, artist: &mut Artist, _| {
-                let nav = Navigation::ArtistDetail(artist.link());
+                let nav = Nav::ArtistDetail(artist.link());
                 ctx.submit_command(cmd::NAVIGATE_TO.with(nav));
             })
     })
@@ -133,7 +133,7 @@ pub fn make_album() -> impl Widget<Ctx<CommonCtx, Album>> {
         .on_ex_click(
             move |ctx, event, album: &mut Ctx<CommonCtx, Album>, _| match event.button {
                 MouseButton::Left => {
-                    let nav = Navigation::AlbumDetail(album.data.link());
+                    let nav = Nav::AlbumDetail(album.data.link());
                     ctx.submit_command(cmd::NAVIGATE_TO.with(nav));
                 }
                 MouseButton::Right => {
@@ -158,7 +158,7 @@ fn make_album_menu(album: &Ctx<CommonCtx, Album>) -> MenuDesc<State> {
         };
         menu = menu.append(MenuItem::new(
             title,
-            cmd::NAVIGATE_TO.with(Navigation::ArtistDetail(artist.link())),
+            cmd::NAVIGATE_TO.with(Nav::ArtistDetail(artist.link())),
         ));
     }
 
