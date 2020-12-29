@@ -3,20 +3,24 @@ mod artist;
 mod config;
 mod ctx;
 mod playback;
+mod playlist;
 mod promise;
 mod route;
+mod search;
 mod track;
 mod utils;
 
 pub use crate::data::{
-    album::{Album, AlbumType},
-    artist::Artist,
+    album::{Album, AlbumDetail, AlbumLink, AlbumType},
+    artist::{Artist, ArtistAlbums, ArtistDetail, ArtistLink, ArtistTracks},
     config::{AudioQuality, Config},
     ctx::Ctx,
-    playback::{Playback, PlaybackCtx, PlaybackState},
+    playback::{CurrentPlayback, Playback, PlaybackOrigin, PlaybackPayload, PlaybackState},
+    playlist::{Playlist, PlaylistDetail, PlaylistLink, PlaylistTracks},
     promise::{Promise, PromiseState},
-    route::{Navigation, Route},
-    track::{Track, TrackCtx, TrackId, TrackList, TrackOrigin, LOCAL_TRACK_ID},
+    route::Navigation,
+    search::{Search, SearchResults},
+    track::{Track, TrackId, LOCAL_TRACK_ID},
     utils::{AudioDuration, Image},
 };
 use druid::{
@@ -27,7 +31,7 @@ use std::sync::Arc;
 
 #[derive(Clone, Debug, Data, Lens)]
 pub struct State {
-    pub route: Route,
+    pub route: Navigation,
     pub history: Vector<Navigation>,
     pub config: Config,
     pub playback: Playback,
@@ -36,35 +40,31 @@ pub struct State {
     pub artist: ArtistDetail,
     pub playlist: PlaylistDetail,
     pub library: Arc<Library>,
-    pub track_ctx: TrackCtx,
+    pub common_ctx: CommonCtx,
 }
 
 impl Default for State {
     fn default() -> Self {
         Self {
-            route: Route::Home,
+            route: Navigation::Home,
             history: Vector::new(),
             config: Config::default(),
             playback: Playback {
                 state: PlaybackState::Stopped,
-                origin: None,
-                progress: None,
-                item: None,
+                current: None,
             },
             search: Search {
                 input: "".into(),
                 results: Promise::Empty,
             },
             album: AlbumDetail {
-                id: "".into(),
                 album: Promise::Empty,
             },
             artist: ArtistDetail {
-                id: "".into(),
                 artist: Promise::Empty,
                 albums: Promise::Empty,
                 top_tracks: Promise::Empty,
-                related: Promise::Empty,
+                related_artists: Promise::Empty,
             },
             playlist: PlaylistDetail {
                 playlist: Promise::Empty,
@@ -75,7 +75,7 @@ impl Default for State {
                 saved_tracks: Promise::Empty,
                 playlists: Promise::Empty,
             }),
-            track_ctx: TrackCtx {
+            common_ctx: CommonCtx {
                 playback_item: None,
                 saved_tracks: HashSet::new(),
                 saved_albums: HashSet::new(),
@@ -85,25 +85,31 @@ impl Default for State {
 }
 
 impl State {
-    pub fn set_playback_loading(&mut self, item: Arc<Track>, origin: TrackOrigin) {
+    pub fn set_playback_loading(&mut self, item: Arc<Track>, origin: PlaybackOrigin) {
+        self.common_ctx.playback_item.take();
         self.playback.state = PlaybackState::Loading;
-        self.playback.origin.replace(origin);
-        self.playback.item.replace(item);
-        self.playback.progress.take();
-        self.track_ctx.playback_item.take();
+        self.playback.current.replace(CurrentPlayback {
+            item,
+            origin,
+            progress: Default::default(),
+        });
     }
 
-    pub fn set_playback_playing(&mut self, item: Arc<Track>, origin: TrackOrigin) {
+    pub fn set_playback_playing(&mut self, item: Arc<Track>, origin: PlaybackOrigin) {
+        self.common_ctx.playback_item.replace(item.clone());
         self.playback.state = PlaybackState::Playing;
-        self.playback.origin.replace(origin);
-        self.playback.item.replace(item.clone());
-        self.playback.progress.take();
-        self.track_ctx.playback_item.replace(item);
+        self.playback.current.replace(CurrentPlayback {
+            item,
+            origin,
+            progress: Default::default(),
+        });
     }
 
     pub fn set_playback_progress(&mut self, progress: AudioDuration) {
         self.playback.state = PlaybackState::Playing;
-        self.playback.progress.replace(progress);
+        self.playback.current.as_mut().map(|current| {
+            current.progress = progress;
+        });
     }
 
     pub fn set_playback_paused(&mut self) {
@@ -112,29 +118,27 @@ impl State {
 
     pub fn set_playback_stopped(&mut self) {
         self.playback.state = PlaybackState::Stopped;
-        self.playback.origin.take();
-        self.playback.item.take();
-        self.playback.progress.take();
-        self.track_ctx.playback_item.take();
+        self.playback.current.take();
+        self.common_ctx.playback_item.take();
     }
 }
 
 impl State {
     pub fn save_track(&mut self, track: Arc<Track>) {
-        if let Promise::Resolved(list) = &mut self.library_mut().saved_tracks {
-            list.tracks.push_front(track);
+        if let Promise::Resolved(saved) = &mut self.library_mut().saved_tracks {
+            saved.tracks.push_front(track);
         }
-        if let Promise::Resolved(list) = &self.library.saved_tracks {
-            self.track_ctx.set_saved_tracks(&list.tracks);
+        if let Promise::Resolved(saved) = &self.library.saved_tracks {
+            self.common_ctx.set_saved_tracks(&saved.tracks);
         }
     }
 
     pub fn unsave_track(&mut self, track_id: &TrackId) {
-        if let Promise::Resolved(list) = &mut self.library_mut().saved_tracks {
-            list.tracks.retain(|track| &track.id != track_id);
+        if let Promise::Resolved(saved) = &mut self.library_mut().saved_tracks {
+            saved.tracks.retain(|track| &track.id != track_id);
         }
-        if let Promise::Resolved(list) = &self.library.saved_tracks {
-            self.track_ctx.set_saved_tracks(&list.tracks);
+        if let Promise::Resolved(saved) = &self.library.saved_tracks {
+            self.common_ctx.set_saved_tracks(&saved.tracks);
         }
     }
 
@@ -156,56 +160,45 @@ impl State {
 }
 
 #[derive(Clone, Debug, Data, Lens)]
-pub struct Search {
-    pub input: String,
-    pub results: Promise<SearchResults, String>,
-}
-
-#[derive(Clone, Debug, Data, Lens)]
-pub struct SearchResults {
-    pub artists: Vector<Artist>,
-    pub albums: Vector<Album>,
-    pub tracks: TrackList,
-}
-
-#[derive(Clone, Debug, Data, Lens)]
 pub struct Library {
     pub playlists: Promise<Vector<Playlist>>,
     pub saved_albums: Promise<Vector<Album>>,
-    pub saved_tracks: Promise<TrackList>,
+    pub saved_tracks: Promise<SavedTracks>,
 }
 
 #[derive(Clone, Debug, Data, Lens)]
-pub struct AlbumDetail {
-    pub id: Arc<str>,
-    pub album: Promise<Album, Arc<str>>,
+pub struct SavedTracks {
+    pub tracks: Vector<Arc<Track>>,
 }
 
-#[derive(Clone, Debug, Data, Lens)]
-pub struct ArtistDetail {
-    pub id: Arc<str>,
-    pub artist: Promise<Artist, Arc<str>>,
-    pub albums: Promise<ArtistAlbums, Arc<str>>,
-    pub related: Promise<Vector<Artist>, Arc<str>>,
-    pub top_tracks: Promise<TrackList, Arc<str>>,
+#[derive(Clone, Debug, Data)]
+pub struct CommonCtx {
+    pub playback_item: Option<Arc<Track>>,
+    pub saved_tracks: HashSet<TrackId>,
+    pub saved_albums: HashSet<Arc<str>>,
 }
 
-#[derive(Clone, Debug, Data, Lens)]
-pub struct ArtistAlbums {
-    pub albums: Vector<Album>,
-    pub singles: Vector<Album>,
-    pub compilations: Vector<Album>,
-}
+impl CommonCtx {
+    pub fn is_track_playing(&self, track: &Track) -> bool {
+        self.playback_item
+            .as_ref()
+            .map(|t| t.id.same(&track.id))
+            .unwrap_or(false)
+    }
 
-#[derive(Clone, Debug, Data, Lens)]
-pub struct PlaylistDetail {
-    pub playlist: Promise<Playlist>,
-    pub tracks: Promise<TrackList, Arc<str>>,
-}
+    pub fn is_track_saved(&self, track: &Track) -> bool {
+        self.saved_tracks.contains(&track.id)
+    }
 
-#[derive(Clone, Debug, Data, Lens)]
-pub struct Playlist {
-    pub id: Arc<str>,
-    pub name: Arc<str>,
-    pub images: Vector<Image>,
+    pub fn set_saved_tracks(&mut self, tracks: &Vector<Arc<Track>>) {
+        self.saved_tracks = tracks.iter().map(|track| track.id.clone()).collect();
+    }
+
+    pub fn is_album_saved(&self, album: &Album) -> bool {
+        self.saved_albums.contains(&album.id)
+    }
+
+    pub fn set_saved_albums(&mut self, albums: &Vector<Album>) {
+        self.saved_albums = albums.iter().map(|album| album.id.clone()).collect();
+    }
 }

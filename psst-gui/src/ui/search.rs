@@ -1,13 +1,13 @@
 use crate::{
     cmd,
-    data::{Ctx, Navigation, Search, SearchResults, State, TrackCtx},
+    data::{CommonCtx, Ctx, Navigation, Search, SearchResults, State},
     ui::{
         album::make_album,
         artist::make_artist,
         track::{make_tracklist, TrackDisplay},
         utils::{make_error, make_loader},
     },
-    widget::{InputController, Promised},
+    widget::{Async, InputController},
 };
 use druid::{
     widget::{Flex, List, TextBox},
@@ -23,12 +23,11 @@ pub fn make_input() -> impl Widget<State> {
         }))
         .with_id(cmd::WIDGET_SEARCH_INPUT)
         .expand_width()
-        .lens(Search::input)
-        .lens(State::search)
+        .lens(State::search.then(Search::input))
 }
 
 pub fn make_results() -> impl Widget<State> {
-    Promised::new(
+    Async::new(
         || make_loader(),
         || {
             Flex::column()
@@ -38,28 +37,22 @@ pub fn make_results() -> impl Widget<State> {
         },
         || make_error().lens(Ctx::data()),
     )
-    .lens(Ctx::make(State::track_ctx, State::search.then(Search::results)).then(Ctx::in_promise()))
+    .lens(Ctx::make(State::common_ctx, State::search.then(Search::results)).then(Ctx::in_promise()))
 }
 
-fn make_artist_results() -> impl Widget<Ctx<TrackCtx, SearchResults>> {
-    Flex::column()
-        .with_child(List::new(make_artist))
-        .lens(Ctx::data().then(SearchResults::artists))
+fn make_artist_results() -> impl Widget<Ctx<CommonCtx, SearchResults>> {
+    List::new(make_artist).lens(Ctx::data().then(SearchResults::artists))
 }
 
-fn make_album_results() -> impl Widget<Ctx<TrackCtx, SearchResults>> {
-    Flex::column()
-        .with_child(List::new(make_album))
-        .lens(Ctx::map(SearchResults::albums))
+fn make_album_results() -> impl Widget<Ctx<CommonCtx, SearchResults>> {
+    List::new(make_album).lens(Ctx::map(SearchResults::albums))
 }
 
-fn make_track_results() -> impl Widget<Ctx<TrackCtx, SearchResults>> {
-    Flex::column()
-        .with_child(make_tracklist(TrackDisplay {
-            number: false,
-            title: true,
-            artist: true,
-            album: true,
-        }))
-        .lens(Ctx::map(SearchResults::tracks))
+fn make_track_results() -> impl Widget<Ctx<CommonCtx, SearchResults>> {
+    make_tracklist(TrackDisplay {
+        number: false,
+        title: true,
+        artist: true,
+        album: true,
+    })
 }

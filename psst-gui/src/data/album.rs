@@ -1,4 +1,4 @@
-use crate::data::{Artist, Image, TrackList};
+use crate::data::{Artist, Image, Promise, Track};
 use aspotify::DatePrecision;
 use chrono::NaiveDate;
 use druid::{im::Vector, Data, Lens};
@@ -6,20 +6,25 @@ use itertools::Itertools;
 use std::sync::Arc;
 
 #[derive(Clone, Debug, Data, Lens)]
+pub struct AlbumDetail {
+    pub album: Promise<Album, AlbumLink>,
+}
+
+#[derive(Clone, Debug, Data, Lens)]
 pub struct Album {
-    pub album_type: AlbumType,
-    pub artists: Vector<Artist>,
     pub id: Arc<str>,
+    pub name: Arc<str>,
+    pub album_type: AlbumType,
+    pub tracks: Vector<Arc<Track>>,
+    pub artists: Vector<Artist>,
     pub images: Vector<Image>,
     pub genres: Vector<Arc<str>>,
     pub copyrights: Vector<Arc<str>>,
     pub label: Arc<str>,
-    pub name: Arc<str>,
     #[data(same_fn = "PartialEq::eq")]
     pub release_date: Option<NaiveDate>,
     #[data(same_fn = "PartialEq::eq")]
     pub release_date_precision: Option<DatePrecision>,
-    pub tracks: TrackList,
 }
 
 impl Album {
@@ -28,18 +33,18 @@ impl Album {
     }
 
     pub fn release(&self) -> String {
-        self.format_release_date(match self.release_date_precision {
+        self.release_with_format(match self.release_date_precision {
             Some(DatePrecision::Year) | None => "%Y",
             Some(DatePrecision::Month) => "%B %Y",
-            Some(DatePrecision::Day) => "%v",
+            Some(DatePrecision::Day) => "%d. %B %Y",
         })
     }
 
     pub fn release_year(&self) -> String {
-        self.format_release_date("%Y")
+        self.release_with_format("%Y")
     }
 
-    fn format_release_date(&self, format: &str) -> String {
+    fn release_with_format(&self, format: &str) -> String {
         self.release_date
             .as_ref()
             .map(|date| date.format(format).to_string())
@@ -54,9 +59,22 @@ impl Album {
             .or_else(|| self.images.back())
     }
 
-    pub fn link(&self) -> String {
+    pub fn url(&self) -> String {
         format!("https://open.spotify.com/album/{id}", id = self.id)
     }
+
+    pub fn link(&self) -> AlbumLink {
+        AlbumLink {
+            id: self.id.clone(),
+            name: self.name.clone(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Data, Lens, Eq, PartialEq, Hash)]
+pub struct AlbumLink {
+    pub id: Arc<str>,
+    pub name: Arc<str>,
 }
 
 #[derive(Clone, Debug, Data, Eq, PartialEq)]

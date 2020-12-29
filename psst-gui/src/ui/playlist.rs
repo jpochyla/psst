@@ -6,7 +6,7 @@ use crate::{
         track::{make_tracklist, TrackDisplay},
         utils::{make_error, make_loader},
     },
-    widget::{HoverExt, Promised},
+    widget::{Async, HoverExt},
 };
 use druid::{
     widget::{Label, LineBreaking, List},
@@ -14,7 +14,7 @@ use druid::{
 };
 
 pub fn make_list() -> impl Widget<State> {
-    Promised::new(
+    Async::new(
         || make_loader(),
         || {
             List::new(|| {
@@ -26,7 +26,7 @@ pub fn make_list() -> impl Widget<State> {
                     .padding(Insets::uniform_xy(theme::grid(2.0), theme::grid(0.6)))
                     .hover()
                     .on_click(|ctx, playlist, _| {
-                        let nav = Navigation::PlaylistDetail(playlist.clone());
+                        let nav = Navigation::PlaylistDetail(playlist.link());
                         ctx.submit_command(cmd::NAVIGATE_TO.with(nav));
                     })
             })
@@ -37,7 +37,7 @@ pub fn make_list() -> impl Widget<State> {
 }
 
 pub fn make_detail() -> impl Widget<State> {
-    Promised::new(
+    Async::new(
         || make_loader(),
         || {
             make_tracklist(TrackDisplay {
@@ -51,7 +51,7 @@ pub fn make_detail() -> impl Widget<State> {
     )
     .lens(
         Ctx::make(
-            State::track_ctx,
+            State::common_ctx,
             State::playlist.then(PlaylistDetail::tracks),
         )
         .then(Ctx::in_promise()),

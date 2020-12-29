@@ -1,22 +1,22 @@
 use crate::data::{Promise, PromiseState};
 use druid::{widget::prelude::*, Data, Point, WidgetExt, WidgetPod};
 
-pub struct Promised<T, D, E> {
+pub struct Async<T, D, E> {
     def_maker: Box<dyn Fn() -> Box<dyn Widget<D>>>,
     res_maker: Box<dyn Fn() -> Box<dyn Widget<T>>>,
     err_maker: Box<dyn Fn() -> Box<dyn Widget<E>>>,
-    widget: DefWidget<T, D, E>,
+    widget: PromiseWidget<T, D, E>,
 }
 
 #[allow(clippy::large_enum_variant)]
-enum DefWidget<T, D, E> {
+enum PromiseWidget<T, D, E> {
     Empty,
     Deferred(WidgetPod<D, Box<dyn Widget<D>>>),
     Resolved(WidgetPod<T, Box<dyn Widget<T>>>),
     Rejected(WidgetPod<E, Box<dyn Widget<E>>>),
 }
 
-impl<D: Data, T: Data, E: Data> Promised<T, D, E> {
+impl<D: Data, T: Data, E: Data> Async<T, D, E> {
     pub fn new<WD, WT, WE>(
         def_maker: impl Fn() -> WD + 'static,
         res_maker: impl Fn() -> WT + 'static,
@@ -31,21 +31,21 @@ impl<D: Data, T: Data, E: Data> Promised<T, D, E> {
             def_maker: Box::new(move || def_maker().boxed()),
             res_maker: Box::new(move || res_maker().boxed()),
             err_maker: Box::new(move || err_maker().boxed()),
-            widget: DefWidget::Empty,
+            widget: PromiseWidget::Empty,
         }
     }
 
     fn rebuild_widget(&mut self, state: PromiseState) {
         self.widget = match state {
-            PromiseState::Empty => DefWidget::Empty,
-            PromiseState::Deferred => DefWidget::Deferred(WidgetPod::new((self.def_maker)())),
-            PromiseState::Resolved => DefWidget::Resolved(WidgetPod::new((self.res_maker)())),
-            PromiseState::Rejected => DefWidget::Rejected(WidgetPod::new((self.err_maker)())),
+            PromiseState::Empty => PromiseWidget::Empty,
+            PromiseState::Deferred => PromiseWidget::Deferred(WidgetPod::new((self.def_maker)())),
+            PromiseState::Resolved => PromiseWidget::Resolved(WidgetPod::new((self.res_maker)())),
+            PromiseState::Rejected => PromiseWidget::Rejected(WidgetPod::new((self.err_maker)())),
         };
     }
 }
 
-impl<D: Data, T: Data, E: Data> Widget<Promise<T, D, E>> for Promised<T, D, E> {
+impl<D: Data, T: Data, E: Data> Widget<Promise<T, D, E>> for Async<T, D, E> {
     fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut Promise<T, D, E>, env: &Env) {
         if data.state() == self.widget.state() {
             match data {
@@ -163,7 +163,7 @@ impl<D: Data, T: Data, E: Data> Widget<Promise<T, D, E>> for Promised<T, D, E> {
     }
 }
 
-impl<T, D, E> DefWidget<T, D, E> {
+impl<T, D, E> PromiseWidget<T, D, E> {
     fn state(&self) -> PromiseState {
         match self {
             Self::Empty => PromiseState::Empty,

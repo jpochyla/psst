@@ -1,101 +1,84 @@
 use crate::{
     cmd,
-    data::{AudioDuration, Navigation, Playback, PlaybackState, State, Track},
-    ui::{album, theme},
+    data::{AudioDuration, CurrentPlayback, Playback, PlaybackOrigin, PlaybackState, State, Track},
+    ui::theme,
     widget::{icons, Empty, HoverExt, Maybe},
 };
 use druid::{
-    lens::{Identity, InArc},
-    widget::{
-        Controller, CrossAxisAlignment, Either, Flex, Label, LineBreaking, Painter, Spinner,
-        ViewSwitcher,
-    },
-    Env, Event, EventCtx, MouseButton, MouseEvent, PaintCtx, Point, Rect, RenderContext, Size,
+    widget::{CrossAxisAlignment, Either, Flex, Label, LineBreaking, Spinner, ViewSwitcher},
+    Data, Env, Event, EventCtx, LensExt, MouseButton, PaintCtx, Point, Rect, RenderContext, Size,
     Widget, WidgetExt,
 };
 use std::sync::Arc;
 
 pub fn make_panel() -> impl Widget<State> {
-    let handle = Label::new("⌃")
-        .with_text_color(theme::PLACEHOLDER_COLOR)
-        .center()
-        .padding((theme::grid(0.5), 0.0))
-        .expand_width()
-        .hover()
-        .on_click(|ctx, state: &mut State, _| {
-            if let Some(origin) = state.playback.origin.as_ref() {
-                ctx.submit_command(cmd::NAVIGATE_TO.with(origin.as_nav()));
-            }
-        });
-
-    let content = Flex::row()
+    Flex::row()
         .must_fill_main_axis(true)
-        .with_flex_child(make_info(), 1.0)
+        .with_flex_child(make_playback_info(), 1.0)
         .with_flex_child(make_player(), 1.0)
-        .padding(theme::grid(1.0))
-        .background(theme::WHITE)
-        .lens(State::playback);
-
-    Flex::column().with_child(handle).with_child(content)
+        .lens(State::playback)
 }
 
-fn make_info() -> impl Widget<Playback> {
-    Maybe::or_empty(make_info_track).lens(Playback::item)
+fn make_playback_info() -> impl Widget<Playback> {
+    Maybe::or_empty(make_current_playback_info).lens(Playback::current)
 }
 
-fn make_info_track() -> impl Widget<Arc<Track>> {
-    let album_cover = Maybe::or_empty(|| album::make_cover(theme::grid(7.0), theme::grid(7.0)))
-        .lens(Track::album);
-
+fn make_current_playback_info() -> impl Widget<CurrentPlayback> {
     let track_name = Label::raw()
         .with_line_break_mode(LineBreaking::Clip)
         .with_font(theme::UI_FONT_MEDIUM)
-        .lens(Track::name);
+        .lens(CurrentPlayback::item.then(Track::name.in_arc()));
 
-    let track_artist = Label::dynamic(|track: &Track, _| track.artist_name())
+    let track_artist = Label::dynamic(|track: &Arc<Track>, _| track.artist_name())
         .with_line_break_mode(LineBreaking::Clip)
         .with_text_size(theme::TEXT_SIZE_SMALL)
-        .hover()
-        .on_click(|ctx: &mut EventCtx, track: &mut Track, _| {
-            if let Some(artist) = track.artists.front() {
-                let nav = Navigation::ArtistDetail(artist.id.clone());
-                ctx.submit_command(cmd::NAVIGATE_TO.with(nav));
-            }
-        });
+        .lens(CurrentPlayback::item);
 
-    let track_album = Label::dynamic(|track: &Track, _| track.album_name())
-        .with_line_break_mode(LineBreaking::Clip)
-        .with_text_size(theme::TEXT_SIZE_SMALL)
-        .hover()
-        .on_click(|ctx, track: &mut Track, _| {
-            if let Some(album) = track.album.as_ref() {
-                let nav = Navigation::AlbumDetail(album.id.clone());
-                ctx.submit_command(cmd::NAVIGATE_TO.with(nav));
-            }
-        });
+    let track_origin = ViewSwitcher::new(
+        |current: &CurrentPlayback, _| current.origin.clone(),
+        |origin, _, _| {
+            Flex::row()
+                .cross_axis_alignment(CrossAxisAlignment::Center)
+                .with_child(
+                    Label::dynamic(|current: &CurrentPlayback, _| current.origin.as_string())
+                        .with_line_break_mode(LineBreaking::Clip)
+                        .with_text_size(theme::TEXT_SIZE_SMALL),
+                )
+                .with_spacer(theme::grid(0.25))
+                .with_child(
+                    match origin {
+                        PlaybackOrigin::Library => &icons::HEART,
+                        PlaybackOrigin::Album { .. } => &icons::ALBUM,
+                        PlaybackOrigin::Artist { .. } => &icons::ARTIST,
+                        PlaybackOrigin::Playlist { .. } => &icons::PLAYLIST,
+                        PlaybackOrigin::Search { .. } => &icons::SEARCH,
+                    }
+                    .scale(theme::ICON_SIZE),
+                )
+                .boxed()
+        },
+    );
 
-    let track_info = Flex::column()
+    Flex::column()
         .cross_axis_alignment(CrossAxisAlignment::Start)
         .with_child(track_name)
         .with_child(track_artist)
-        .with_child(track_album);
-
-    Flex::row()
-        .with_child(album_cover)
-        .with_default_spacer()
-        .with_flex_child(track_info, 1.0)
-        .lens(InArc::new::<Arc<Track>, Arc<Track>>(Identity))
+        .with_child(track_origin)
+        .padding(theme::grid(1.8))
+        .expand_width()
+        .hover()
+        .on_ex_click(|ctx, _event, current: &mut CurrentPlayback, _| {
+            let nav = current.origin.as_navigation();
+            ctx.submit_command(cmd::NAVIGATE_TO.with(nav));
+        })
 }
 
 fn make_player() -> impl Widget<Playback> {
-    Either::new(
-        |playback: &Playback, _| playback.item.is_some(),
-        Flex::column()
-            .with_child(make_player_controls())
-            .with_default_spacer()
-            .with_child(make_player_progress()),
-        Empty,
-    )
+    Flex::column()
+        .with_child(make_player_controls())
+        .with_default_spacer()
+        .with_child(Maybe::or_empty(make_player_progress).lens(Playback::current))
+        .padding(theme::grid(1.0))
 }
 
 fn make_player_controls() -> impl Widget<Playback> {
@@ -106,6 +89,11 @@ fn make_player_controls() -> impl Widget<Playback> {
         .hover()
         .rounded(theme::BUTTON_BORDER_RADIUS)
         .on_click(|ctx, _, _| ctx.submit_command(cmd::PLAY_PREVIOUS));
+    let play_previous = Either::new(
+        |playback: &Playback, _| playback.current.is_some(),
+        play_previous,
+        Empty,
+    );
 
     let play_pause = ViewSwitcher::new(
         |playback: &Playback, _| playback.state,
@@ -119,7 +107,7 @@ fn make_player_controls() -> impl Widget<Playback> {
                 .padding(theme::grid(1.0))
                 .hover()
                 .circle()
-                .border(theme::GREY_5)
+                .border(theme::GREY_5, 1.0)
                 .on_click(|ctx, _, _| ctx.submit_command(cmd::PLAY_PAUSE))
                 .boxed(),
             PlaybackState::Paused => icons::PLAY
@@ -127,7 +115,7 @@ fn make_player_controls() -> impl Widget<Playback> {
                 .padding(theme::grid(1.0))
                 .hover()
                 .circle()
-                .border(theme::GREY_5)
+                .border(theme::GREY_5, 1.0)
                 .on_click(|ctx, _, _| ctx.submit_command(cmd::PLAY_RESUME))
                 .boxed(),
             PlaybackState::Stopped => Empty.boxed(),
@@ -141,6 +129,11 @@ fn make_player_controls() -> impl Widget<Playback> {
         .hover()
         .rounded(theme::BUTTON_BORDER_RADIUS)
         .on_click(|ctx, _, _| ctx.submit_command(cmd::PLAY_NEXT));
+    let play_next = Either::new(
+        |playback: &Playback, _| playback.current.is_some(),
+        play_next,
+        Empty,
+    );
 
     Flex::row()
         .with_child(play_previous)
@@ -150,96 +143,108 @@ fn make_player_controls() -> impl Widget<Playback> {
         .with_child(play_next)
 }
 
-fn make_player_progress() -> impl Widget<Playback> {
-    let current_time = Maybe::or_empty(|| {
+fn make_player_progress() -> impl Widget<CurrentPlayback> {
+    let current_time =
         Label::dynamic(|progress: &AudioDuration, _| progress.as_minutes_and_seconds())
             .with_text_size(theme::TEXT_SIZE_SMALL)
             .align_right()
             .fix_width(theme::grid(4.0))
-    })
-    .lens(Playback::progress);
-    let total_time = Maybe::or_empty(|| {
-        Label::dynamic(|track: &Track, _| track.duration.as_minutes_and_seconds())
+            .lens(CurrentPlayback::progress);
+    let total_time =
+        Label::dynamic(|track: &Arc<Track>, _| track.duration.as_minutes_and_seconds())
             .with_text_size(theme::TEXT_SIZE_SMALL)
             .align_left()
             .fix_width(theme::grid(4.0))
-            .lens(InArc::new::<Arc<Track>, _>(Identity))
-    })
-    .lens(Playback::item);
+            .lens(CurrentPlayback::item);
     Flex::row()
         .with_child(current_time)
         .with_default_spacer()
-        .with_flex_child(make_progress(), 1.0)
+        .with_flex_child(SeekBar, 1.0)
         .with_default_spacer()
         .with_child(total_time)
 }
 
-fn make_progress() -> impl Widget<Playback> {
-    Painter::new(|ctx, playback: &Playback, env| {
-        paint_progress(ctx, &playback, env);
-    })
-    .controller(SeekController)
-    .fix_height(theme::grid(1.0))
-}
+struct SeekBar;
 
-fn paint_progress(ctx: &mut PaintCtx, playback: &Playback, env: &Env) {
-    let elapsed_time = playback
-        .progress
-        .map(|progress| progress.as_secs_f32())
-        .unwrap_or(0.0);
-    let total_time = playback
-        .item
-        .as_ref()
-        .map(|track| track.duration.as_secs_f32())
-        .unwrap_or(0.0);
-
-    let elapsed_color = env.get(theme::PRIMARY_DARK);
-    let remaining_color = env.get(theme::PRIMARY_LIGHT).with_alpha(0.5);
-    let bounds = ctx.size();
-
-    const HEIGHT: f64 = 2.0;
-    let elapsed_frac = elapsed_time / total_time;
-    let elapsed_width = bounds.width * elapsed_frac as f64;
-    let remaining_width = bounds.width - elapsed_width;
-    let elapsed = Size::new(elapsed_width, HEIGHT).round();
-    let remaining = Size::new(remaining_width, HEIGHT).round();
-
-    let vertical_center = bounds.height / 2.0 - HEIGHT / 2.0;
-    ctx.fill(
-        &Rect::from_origin_size(Point::new(0.0, vertical_center), elapsed),
-        &elapsed_color,
-    );
-    ctx.fill(
-        &Rect::from_origin_size(Point::new(elapsed.width, vertical_center), remaining),
-        &remaining_color,
-    );
-}
-
-struct SeekController;
-
-impl<T, W: Widget<T>> Controller<T, W> for SeekController {
-    fn event(&mut self, child: &mut W, ctx: &mut EventCtx, event: &Event, data: &mut T, env: &Env) {
-        let seek_to_mouse_pos = |ctx: &mut EventCtx, mouse_event: &MouseEvent| {
-            let frac = mouse_event.pos.x / ctx.size().width;
-            ctx.submit_command(cmd::SEEK_TO_FRACTION.with(frac));
-        };
-
+impl Widget<CurrentPlayback> for SeekBar {
+    fn event(
+        &mut self,
+        ctx: &mut EventCtx,
+        event: &Event,
+        _data: &mut CurrentPlayback,
+        _env: &Env,
+    ) {
         match event {
-            Event::MouseDown(mouse_event) => {
-                if mouse_event.button == MouseButton::Left {
+            Event::MouseDown(mouse) => {
+                if mouse.button == MouseButton::Left {
                     ctx.set_active(true);
                 }
             }
-            Event::MouseUp(mouse_event) => {
-                if ctx.is_active() && mouse_event.button == MouseButton::Left {
+            Event::MouseUp(mouse) => {
+                if ctx.is_active() && mouse.button == MouseButton::Left {
                     if ctx.is_hot() {
-                        seek_to_mouse_pos(ctx, mouse_event);
+                        let fraction = mouse.pos.x / ctx.size().width;
+                        ctx.submit_command(cmd::SEEK_TO_FRACTION.with(fraction));
                     }
                     ctx.set_active(false);
                 }
             }
             _ => {}
         }
-        child.event(ctx, event, data, env);
+    }
+
+    fn lifecycle(
+        &mut self,
+        _ctx: &mut druid::LifeCycleCtx,
+        _event: &druid::LifeCycle,
+        _data: &CurrentPlayback,
+        _env: &Env,
+    ) {
+    }
+
+    fn update(
+        &mut self,
+        ctx: &mut druid::UpdateCtx,
+        old_data: &CurrentPlayback,
+        data: &CurrentPlayback,
+        _env: &Env,
+    ) {
+        if !old_data.same(data) {
+            ctx.request_paint();
+        }
+    }
+
+    fn layout(
+        &mut self,
+        _ctx: &mut druid::LayoutCtx,
+        bc: &druid::BoxConstraints,
+        _data: &CurrentPlayback,
+        _env: &Env,
+    ) -> Size {
+        Size::new(bc.max().width, 4.0)
+    }
+
+    fn paint(&mut self, ctx: &mut PaintCtx, data: &CurrentPlayback, env: &Env) {
+        let elapsed_time = data.progress.as_secs_f32();
+        let total_time = data.item.duration.as_secs_f32();
+
+        let elapsed_color = env.get(theme::PRIMARY_DARK);
+        let remaining_color = env.get(theme::PRIMARY_LIGHT).with_alpha(0.5);
+        let bounds = ctx.size();
+
+        let elapsed_frac = elapsed_time / total_time;
+        let elapsed_width = bounds.width * elapsed_frac as f64;
+        let remaining_width = bounds.width - elapsed_width;
+        let elapsed = Size::new(elapsed_width, bounds.height).round();
+        let remaining = Size::new(remaining_width, bounds.height).round();
+
+        ctx.fill(
+            &Rect::from_origin_size(Point::ORIGIN, elapsed),
+            &elapsed_color,
+        );
+        ctx.fill(
+            &Rect::from_origin_size(Point::new(elapsed.width, 0.0), remaining),
+            &remaining_color,
+        );
     }
 }

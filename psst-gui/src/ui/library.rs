@@ -5,7 +5,7 @@ use crate::{
         track::{make_tracklist, TrackDisplay},
         utils::{make_error, make_loader},
     },
-    widget::Promised,
+    widget::Async,
 };
 use druid::{
     widget::{CrossAxisAlignment, Flex, List},
@@ -21,14 +21,14 @@ pub fn make_detail() -> impl Widget<State> {
 }
 
 fn make_saved_albums() -> impl Widget<State> {
-    Promised::new(
+    Async::new(
         || make_loader(),
         || List::new(make_album),
         || make_error().lens(Ctx::data()),
     )
     .lens(
         Ctx::make(
-            State::track_ctx,
+            State::common_ctx,
             State::library.then(Library::saved_albums.in_arc()),
         )
         .then(Ctx::in_promise()),
@@ -36,7 +36,7 @@ fn make_saved_albums() -> impl Widget<State> {
 }
 
 fn make_saved_tracks() -> impl Widget<State> {
-    Promised::new(
+    Async::new(
         || make_loader(),
         || {
             make_tracklist(TrackDisplay {
@@ -50,7 +50,7 @@ fn make_saved_tracks() -> impl Widget<State> {
     )
     .lens(
         Ctx::make(
-            State::track_ctx,
+            State::common_ctx,
             State::library.then(Library::saved_tracks.in_arc()),
         )
         .then(Ctx::in_promise()),

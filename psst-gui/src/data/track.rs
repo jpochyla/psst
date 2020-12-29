@@ -1,83 +1,21 @@
-use crate::data::{Album, Artist, AudioDuration, Navigation};
-use druid::{
-    im::{HashSet, Vector},
-    Data, Lens,
-};
+use crate::data::{Album, Artist, AudioDuration};
+use druid::{im::Vector, Data, Lens};
 use psst_core::item_id::{ItemId, ItemIdType};
 use std::{ops::Deref, str::FromStr, sync::Arc};
-
-#[derive(Clone, Debug, Data)]
-pub enum TrackOrigin {
-    Library,
-    Album(Arc<str>),
-    Artist(Arc<str>),
-    Playlist(Arc<str>),
-    Search(String),
-}
-
-impl TrackOrigin {
-    pub fn as_nav(&self) -> Navigation {
-        match &self {
-            TrackOrigin::Library => Navigation::Library,
-            TrackOrigin::Album(id) => Navigation::AlbumDetail(id.to_owned()),
-            TrackOrigin::Artist(id) => Navigation::ArtistDetail(id.to_owned()),
-            TrackOrigin::Playlist(_) => todo!(),
-            TrackOrigin::Search(_) => todo!(),
-        }
-    }
-}
-
-#[derive(Clone, Debug, Data)]
-pub struct TrackList {
-    pub origin: TrackOrigin,
-    pub tracks: Vector<Arc<Track>>,
-}
-
-#[derive(Clone, Debug, Data)]
-pub struct TrackCtx {
-    pub playback_item: Option<Arc<Track>>,
-    pub saved_tracks: HashSet<TrackId>,
-    pub saved_albums: HashSet<Arc<str>>,
-}
-
-impl TrackCtx {
-    pub fn is_track_playing(&self, track: &Track) -> bool {
-        self.playback_item
-            .as_ref()
-            .map(|t| t.id.same(&track.id))
-            .unwrap_or(false)
-    }
-
-    pub fn is_track_saved(&self, track: &Track) -> bool {
-        self.saved_tracks.contains(&track.id)
-    }
-
-    pub fn set_saved_tracks(&mut self, tracks: &Vector<Arc<Track>>) {
-        self.saved_tracks = tracks.iter().map(|track| track.id.clone()).collect();
-    }
-
-    pub fn is_album_saved(&self, album: &Album) -> bool {
-        self.saved_albums.contains(&album.id)
-    }
-
-    pub fn set_saved_albums(&mut self, albums: &Vector<Album>) {
-        self.saved_albums = albums.iter().map(|album| album.id.clone()).collect();
-    }
-}
 
 #[derive(Clone, Debug, Data, Lens)]
 pub struct Track {
     pub id: TrackId,
+    pub name: Arc<str>,
     pub album: Option<Album>,
     pub artists: Vector<Artist>,
-    pub disc_number: usize,
     pub duration: AudioDuration,
+    pub disc_number: usize,
+    pub track_number: usize,
     pub explicit: bool,
     pub is_local: bool,
     pub is_playable: Option<bool>,
-    pub name: Arc<str>,
     pub popularity: Option<u32>,
-    pub track_number: usize,
 }
 
 impl Track {
@@ -95,7 +33,7 @@ impl Track {
             .unwrap_or_else(|| "Unknown".to_string())
     }
 
-    pub fn link(&self) -> String {
+    pub fn url(&self) -> String {
         format!(
             "https://open.spotify.com/track/{id}",
             id = self.id.to_base62()

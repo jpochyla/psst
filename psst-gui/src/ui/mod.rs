@@ -1,12 +1,13 @@
 use crate::{
     cmd,
-    data::{Navigation, Promise, Route, State},
-    widget::{icons, Empty, HoverExt, Icon, ViewDispatcher},
+    data::{Navigation, State},
+    widget::{icons, Empty, HoverExt, ViewDispatcher},
 };
 use druid::{
-    widget::{CrossAxisAlignment, Either, Flex, Label, Scroll, SizedBox, Split},
+    widget::{CrossAxisAlignment, Either, Flex, Label, Scroll, SizedBox, Split, ViewSwitcher},
     Widget, WidgetExt, WindowDesc,
 };
+use icons::SvgIcon;
 
 pub mod album;
 pub mod artist;
@@ -69,45 +70,33 @@ pub fn make_root() -> impl Widget<State> {
         .min_size(150.0, 0.0)
         .min_bar_area(1.0)
         .solid_bar(true)
+    // .debug_invalidation()
+    // .debug_widget_id()
+    // .debug_paint_layout()
 }
 
 pub fn make_nav() -> impl Widget<State> {
     Flex::column()
         .with_default_spacer()
-        .with_child(make_nav_button(
-            "Home",
-            icons::TIME.scale(theme::MENU_BUTTON_ICON_SIZE),
-            Navigation::Home,
-        ))
-        .with_child(make_nav_button(
-            "Library",
-            icons::HEART.scale(theme::MENU_BUTTON_ICON_SIZE),
-            Navigation::Library,
-        ))
+        .with_child(make_nav_button("Home", Navigation::Home))
+        .with_child(make_nav_button("Library", Navigation::Library))
         .with_child(make_nav_search())
 }
 
-fn make_nav_button(title: &str, icon: Icon, nav: Navigation) -> impl Widget<State> {
-    let label = Label::new(title);
-
-    Flex::row()
-        .with_child(icon)
-        .with_spacer(theme::grid(0.5))
-        .with_child(label)
+fn make_nav_button(title: &str, nav: Navigation) -> impl Widget<State> {
+    Label::new(title)
         .padding((theme::grid(2.0), theme::grid(1.0)))
         .expand_width()
         .hover()
         .env_scope({
             let nav = nav.clone();
             move |env, state: &State| {
-                if nav.as_route() == state.route {
+                if nav == state.route {
                     env.set(theme::HOVER_COLD_COLOR, theme::MENU_BUTTON_BG_ACTIVE);
                     env.set(theme::LABEL_COLOR, theme::MENU_BUTTON_FG_ACTIVE);
-                    env.set(theme::ICON_COLOR, theme::MENU_BUTTON_ICON_ACTIVE);
                 } else {
                     env.set(theme::HOVER_COLD_COLOR, theme::MENU_BUTTON_BG_INACTIVE);
                     env.set(theme::LABEL_COLOR, theme::MENU_BUTTON_FG_INACTIVE);
-                    env.set(theme::ICON_COLOR, theme::MENU_BUTTON_ICON_INACTIVE);
                 };
             }
         })
@@ -121,13 +110,13 @@ fn make_nav_search() -> impl Widget<State> {
 pub fn make_route() -> impl Widget<State> {
     let switcher = ViewDispatcher::new(
         |state: &State, _| state.route.clone(),
-        |route: &Route, _, _| match route {
-            Route::Home => make_home().boxed(),
-            Route::SearchResults => search::make_results().boxed(),
-            Route::AlbumDetail => album::make_detail().boxed(),
-            Route::ArtistDetail => artist::make_detail().boxed(),
-            Route::PlaylistDetail => playlist::make_detail().boxed(),
-            Route::Library => library::make_detail().boxed(),
+        |route: &Navigation, _, _| match route {
+            Navigation::Home => make_home().boxed(),
+            Navigation::SearchResults(_) => search::make_results().boxed(),
+            Navigation::AlbumDetail(_) => album::make_detail().boxed(),
+            Navigation::ArtistDetail(_) => artist::make_detail().boxed(),
+            Navigation::PlaylistDetail(_) => playlist::make_detail().boxed(),
+            Navigation::Library => library::make_detail().boxed(),
         },
     )
     .padding(theme::grid(1.0));
@@ -160,47 +149,38 @@ pub fn make_back_button() -> impl Widget<State> {
 }
 
 pub fn make_title() -> impl Widget<State> {
-    let category = Label::dynamic(|state: &State, _| get_route_category(state))
-        .with_text_color(theme::PLACEHOLDER_COLOR)
-        .with_text_size(theme::TEXT_SIZE_SMALL);
-    let title =
-        Label::dynamic(|state: &State, _| get_route_title(state)).with_font(theme::UI_FONT_MEDIUM);
     Flex::row()
-        .cross_axis_alignment(CrossAxisAlignment::Baseline)
-        .with_child(category)
-        .with_child(title)
+        .cross_axis_alignment(CrossAxisAlignment::Center)
+        .with_child(make_route_title())
+        .with_spacer(theme::grid(0.5))
+        .with_child(make_route_icon())
 }
 
-fn get_route_category(state: &State) -> String {
-    match state.route {
-        Route::Home => "".to_string(),
-        Route::Library => "".to_string(),
-        Route::SearchResults => "Search ".to_string(),
-        Route::AlbumDetail => "Album ".to_string(),
-        Route::ArtistDetail => "Artist ".to_string(),
-        Route::PlaylistDetail => "Playlist ".to_string(),
-    }
+fn make_route_icon() -> impl Widget<State> {
+    ViewSwitcher::new(
+        |state: &State, _| state.route.clone(),
+        |route: &Navigation, _, _| {
+            let icon = |icon: &SvgIcon| icon.scale(theme::ICON_SIZE);
+            match &route {
+                Navigation::Home => Empty.boxed(),
+                Navigation::Library => Empty.boxed(),
+                Navigation::SearchResults(_) => icon(&icons::SEARCH).boxed(),
+                Navigation::AlbumDetail(_) => icon(&icons::ALBUM).boxed(),
+                Navigation::ArtistDetail(_) => icon(&icons::ARTIST).boxed(),
+                Navigation::PlaylistDetail(_) => icon(&icons::PLAYLIST).boxed(),
+            }
+        },
+    )
 }
 
-fn get_route_title(state: &State) -> String {
-    match state.route {
-        Route::Home => "".to_string(),
-        Route::Library => "Library".to_string(),
-        Route::SearchResults => state.search.input.clone(),
-        Route::AlbumDetail => match &state.album.album {
-            Promise::Empty | Promise::Deferred(_) => "...".to_string(),
-            Promise::Resolved(album) => album.name.to_string(),
-            Promise::Rejected(err) => err.to_string(),
-        },
-        Route::ArtistDetail => match &state.artist.artist {
-            Promise::Empty | Promise::Deferred(_) => "...".to_string(),
-            Promise::Resolved(artist) => artist.name.to_string(),
-            Promise::Rejected(err) => err.to_string(),
-        },
-        Route::PlaylistDetail => match &state.playlist.playlist {
-            Promise::Empty | Promise::Deferred(_) => "...".to_string(),
-            Promise::Resolved(playlist) => playlist.name.to_string(),
-            Promise::Rejected(err) => err.to_string(),
-        },
-    }
+fn make_route_title() -> impl Widget<State> {
+    Label::dynamic(|state: &State, _| match &state.route {
+        Navigation::Home => "".to_string(),
+        Navigation::Library => "Library".to_string(),
+        Navigation::SearchResults(query) => query.clone(),
+        Navigation::AlbumDetail(link) => link.name.to_string(),
+        Navigation::ArtistDetail(link) => link.name.to_string(),
+        Navigation::PlaylistDetail(link) => link.name.to_string(),
+    })
+    .with_font(theme::UI_FONT_MEDIUM)
 }

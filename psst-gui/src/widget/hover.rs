@@ -7,6 +7,7 @@ use druid::{
 pub struct Hover<T> {
     inner: WidgetPod<T, Box<dyn Widget<T>>>,
     border_color: KeyOrValue<Color>,
+    border_width: KeyOrValue<f64>,
     corner_radius: KeyOrValue<f64>,
 }
 
@@ -14,18 +15,28 @@ impl<T: Data> Hover<T> {
     pub fn new(inner: impl Widget<T> + 'static) -> Self {
         Self {
             inner: WidgetPod::new(inner).boxed(),
-            border_color: Color::rgba8(0, 0, 0, 0).into(),
+            border_color: theme::HOVER_HOT_COLOR.into(),
+            border_width: 0.0.into(),
             corner_radius: 0.0.into(),
         }
     }
 
-    pub fn border(mut self, color: impl Into<KeyOrValue<Color>>) -> Self {
-        self.set_border(color);
+    pub fn border(
+        mut self,
+        color: impl Into<KeyOrValue<Color>>,
+        width: impl Into<KeyOrValue<f64>>,
+    ) -> Self {
+        self.set_border(color, width);
         self
     }
 
-    pub fn set_border(&mut self, color: impl Into<KeyOrValue<Color>>) {
+    pub fn set_border(
+        &mut self,
+        color: impl Into<KeyOrValue<Color>>,
+        width: impl Into<KeyOrValue<f64>>,
+    ) {
         self.border_color = color.into();
+        self.border_width = width.into();
     }
 
     pub fn circle(mut self) -> Self {
@@ -71,10 +82,17 @@ impl<T: Data> Widget<T> for Hover<T> {
         } else {
             env.get(theme::HOVER_COLD_COLOR)
         };
-        let border_color = self.border_color.resolve(env);
+        let (border_color, border_width) = if ctx.is_active() {
+            (env.get(theme::PRIMARY_LIGHT), 2.0)
+        } else {
+            (
+                self.border_color.resolve(env),
+                self.border_width.resolve(env),
+            )
+        };
         let corner_radius = self.corner_radius.resolve(env);
         let rounded_rect = ctx.size().to_rounded_rect(corner_radius);
-        ctx.stroke(rounded_rect, &border_color, 1.0);
+        ctx.stroke(rounded_rect, &border_color, border_width);
         ctx.fill(rounded_rect, &background);
         self.inner.paint(ctx, data, env);
     }

@@ -1,7 +1,8 @@
 use crate::{
     cmd,
     data::{
-        AudioDuration, Config, Navigation, Route, State, Track, TrackId, TrackList, TrackOrigin,
+        ArtistTracks, AudioDuration, Config, Navigation, PlaybackOrigin, PlaylistTracks,
+        SavedTracks, State, Track, TrackId,
     },
     ui,
     web::{Web, WebCache},
@@ -68,7 +69,7 @@ impl SessionDelegate {
 struct PlayerDelegate {
     cdn: CdnHandle,
     session: SessionHandle,
-    player_queue: Vector<(TrackOrigin, Arc<Track>)>,
+    player_queue: Vector<(PlaybackOrigin, Arc<Track>)>,
     player_sender: Sender<PlayerEvent>,
     player_thread: JoinHandle<()>,
     audio_output_thread: JoinHandle<()>,
@@ -148,15 +149,14 @@ impl PlayerDelegate {
         }
     }
 
-    fn get_track(&self, id: &TrackId) -> Option<(TrackOrigin, Arc<Track>)> {
+    fn get_track(&self, id: &TrackId) -> Option<(PlaybackOrigin, Arc<Track>)> {
         self.player_queue
             .iter()
             .find(|(_origin, track)| track.id.same(id))
             .cloned()
     }
 
-    fn set_tracks(&mut self, list: TrackList) {
-        let TrackList { origin, tracks } = list;
+    fn set_tracks(&mut self, origin: PlaybackOrigin, tracks: Vector<Arc<Track>>) {
         self.player_queue = tracks
             .into_iter()
             .map(|track| (origin.clone(), track))
@@ -375,26 +375,26 @@ impl Delegate {
     fn navigate(&mut self, data: &mut State, nav: Navigation) {
         match nav {
             Navigation::Home => {
-                data.route = Route::Home;
+                data.route = Navigation::Home;
             }
             Navigation::SearchResults(query) => {
                 self.event_sink
                     .submit_command(cmd::GOTO_SEARCH_RESULTS, query, Target::Auto)
                     .unwrap();
             }
-            Navigation::AlbumDetail(id) => {
+            Navigation::AlbumDetail(link) => {
                 self.event_sink
-                    .submit_command(cmd::GOTO_ALBUM_DETAIL, id, Target::Auto)
+                    .submit_command(cmd::GOTO_ALBUM_DETAIL, link, Target::Auto)
                     .unwrap();
             }
-            Navigation::ArtistDetail(id) => {
+            Navigation::ArtistDetail(link) => {
                 self.event_sink
-                    .submit_command(cmd::GOTO_ARTIST_DETAIL, id, Target::Auto)
+                    .submit_command(cmd::GOTO_ARTIST_DETAIL, link, Target::Auto)
                     .unwrap();
             }
-            Navigation::PlaylistDetail(playlist) => {
+            Navigation::PlaylistDetail(link) => {
                 self.event_sink
-                    .submit_command(cmd::GOTO_PLAYLIST_DETAIL, playlist, Target::Auto)
+                    .submit_command(cmd::GOTO_PLAYLIST_DETAIL, link, Target::Auto)
                     .unwrap();
             }
             Navigation::Library => {
@@ -524,26 +524,27 @@ impl Delegate {
         } else if let Some(result) = cmd.get(cmd::UPDATE_PLAYLISTS).cloned() {
             data.library_mut().playlists.resolve_or_reject(result);
             Handled::Yes
-        } else if let Some(playlist) = cmd.get(cmd::GOTO_PLAYLIST_DETAIL).cloned() {
+        } else if let Some(link) = cmd.get(cmd::GOTO_PLAYLIST_DETAIL).cloned() {
             let web = self.web.clone();
             let sink = self.event_sink.clone();
-            let playlist_id = playlist.id.clone();
-            data.route = Route::PlaylistDetail;
-            data.playlist.playlist.resolve(playlist);
-            data.playlist.tracks.defer(playlist_id.clone());
+            data.route = Navigation::PlaylistDetail(link.clone());
+            data.playlist.playlist.defer(link.clone());
+            data.playlist.tracks.defer(link.clone());
             self.runtime.spawn(async move {
-                let result = web.load_playlist_tracks(playlist_id.clone()).await;
-                sink.submit_command(
-                    cmd::UPDATE_PLAYLIST_TRACKS,
-                    (playlist_id, result),
-                    Target::Auto,
-                )
-                .unwrap();
+                let result = web.load_playlist_tracks(&link.id).await;
+                sink.submit_command(cmd::UPDATE_PLAYLIST_TRACKS, (link, result), Target::Auto)
+                    .unwrap();
             });
             Handled::Yes
-        } else if let Some((playlist_id, result)) = cmd.get(cmd::UPDATE_PLAYLIST_TRACKS).cloned() {
-            if data.playlist.tracks.is_deferred(&playlist_id) {
-                data.playlist.tracks.resolve_or_reject(result);
+        } else if let Some((link, result)) = cmd.get(cmd::UPDATE_PLAYLIST_TRACKS).cloned() {
+            if data.playlist.tracks.is_deferred(&link) {
+                data.playlist
+                    .tracks
+                    .resolve_or_reject(result.map(|tracks| PlaylistTracks {
+                        id: link.id,
+                        name: link.name,
+                        tracks,
+                    }));
             }
             Handled::Yes
         } else {
@@ -553,7 +554,7 @@ impl Delegate {
 
     fn command_library(&mut self, _target: Target, cmd: &Command, data: &mut State) -> Handled {
         if cmd.is(cmd::GOTO_LIBRARY) {
-            data.route = Route::Library;
+            data.route = Navigation::Library;
             if data.library.saved_albums.is_empty() || data.library.saved_albums.is_rejected() {
                 data.library_mut().saved_albums.defer_default();
                 let web = self.web.clone();
@@ -578,23 +579,25 @@ impl Delegate {
         } else if let Some(result) = cmd.get(cmd::UPDATE_SAVED_ALBUMS).cloned() {
             match result {
                 Ok(albums) => {
-                    data.track_ctx.set_saved_albums(&albums);
+                    data.common_ctx.set_saved_albums(&albums);
                     data.library_mut().saved_albums.resolve(albums);
                 }
                 Err(err) => {
-                    data.track_ctx.set_saved_albums(&Vector::new());
+                    data.common_ctx.set_saved_albums(&Vector::new());
                     data.library_mut().saved_albums.reject(err);
                 }
             };
             Handled::Yes
         } else if let Some(result) = cmd.get(cmd::UPDATE_SAVED_TRACKS).cloned() {
             match result {
-                Ok(list) => {
-                    data.track_ctx.set_saved_tracks(&list.tracks);
-                    data.library_mut().saved_tracks.resolve(list);
+                Ok(tracks) => {
+                    data.common_ctx.set_saved_tracks(&tracks);
+                    data.library_mut()
+                        .saved_tracks
+                        .resolve(SavedTracks { tracks });
                 }
                 Err(err) => {
-                    data.track_ctx.set_saved_tracks(&Vector::new());
+                    data.common_ctx.set_saved_tracks(&Vector::new());
                     data.library_mut().saved_tracks.reject(err);
                 }
             };
@@ -631,12 +634,11 @@ impl Delegate {
                 }
             });
             Handled::Yes
-        } else if let Some(album_id) = cmd.get(cmd::UNSAVE_ALBUM) {
-            let album_id = album_id.clone();
+        } else if let Some(link) = cmd.get(cmd::UNSAVE_ALBUM).cloned() {
             let web = self.web.clone();
-            data.unsave_album(&album_id);
+            data.unsave_album(&link.id);
             self.runtime.spawn(async move {
-                let result = web.unsave_album(&album_id).await;
+                let result = web.unsave_album(&link.id).await;
                 if result.is_err() {
                     // TODO: Refresh saved albums.
                 }
@@ -648,20 +650,19 @@ impl Delegate {
     }
 
     fn command_album(&mut self, _target: Target, cmd: &Command, data: &mut State) -> Handled {
-        if let Some(album_id) = cmd.get(cmd::GOTO_ALBUM_DETAIL).cloned() {
-            data.route = Route::AlbumDetail;
-            data.album.id = album_id.clone();
-            data.album.album.defer(album_id.clone());
+        if let Some(link) = cmd.get(cmd::GOTO_ALBUM_DETAIL).cloned() {
+            data.route = Navigation::AlbumDetail(link.clone());
+            data.album.album.defer(link.clone());
             let web = self.web.clone();
             let sink = self.event_sink.clone();
             self.runtime.spawn(async move {
-                let result = web.load_album(&album_id).await;
-                sink.submit_command(cmd::UPDATE_ALBUM_DETAIL, (album_id, result), Target::Auto)
+                let result = web.load_album(&link.id).await;
+                sink.submit_command(cmd::UPDATE_ALBUM_DETAIL, (link, result), Target::Auto)
                     .unwrap();
             });
             Handled::Yes
-        } else if let Some((album_id, result)) = cmd.get(cmd::UPDATE_ALBUM_DETAIL).cloned() {
-            if data.album.album.is_deferred(&album_id) {
+        } else if let Some((link, result)) = cmd.get(cmd::UPDATE_ALBUM_DETAIL).cloned() {
+            if data.album.album.is_deferred(&link) {
                 data.album.album.resolve_or_reject(result);
             }
             Handled::Yes
@@ -671,68 +672,73 @@ impl Delegate {
     }
 
     fn command_artist(&mut self, _target: Target, cmd: &Command, data: &mut State) -> Handled {
-        if let Some(artist_id) = cmd.get(cmd::GOTO_ARTIST_DETAIL) {
-            data.route = Route::ArtistDetail;
-            data.artist.id = artist_id.clone();
+        if let Some(album_link) = cmd.get(cmd::GOTO_ARTIST_DETAIL) {
+            data.route = Navigation::ArtistDetail(album_link.clone());
             // Load artist detail
-            data.artist.artist.defer(artist_id.clone());
-            let id = artist_id.clone();
+            data.artist.artist.defer(album_link.clone());
+            let link = album_link.clone();
             let web = self.web.clone();
             let sink = self.event_sink.clone();
             self.runtime.spawn(async move {
-                let result = web.load_artist(&id).await;
-                sink.submit_command(cmd::UPDATE_ARTIST_DETAIL, (id, result), Target::Auto)
+                let result = web.load_artist(&link.id).await;
+                sink.submit_command(cmd::UPDATE_ARTIST_DETAIL, (link, result), Target::Auto)
                     .unwrap();
             });
             // Load artist top tracks
-            data.artist.top_tracks.defer(artist_id.clone());
-            let id = artist_id.clone();
+            data.artist.top_tracks.defer(album_link.clone());
+            let link = album_link.clone();
             let web = self.web.clone();
             let sink = self.event_sink.clone();
             self.runtime.spawn(async move {
-                let result = web.load_artist_top_tracks(id.clone()).await;
-                sink.submit_command(cmd::UPDATE_ARTIST_TOP_TRACKS, (id, result), Target::Auto)
+                let result = web.load_artist_top_tracks(&link.id).await;
+                sink.submit_command(cmd::UPDATE_ARTIST_TOP_TRACKS, (link, result), Target::Auto)
                     .unwrap();
             });
             // Load artist's related artists
-            data.artist.related.defer(artist_id.clone());
-            let id = artist_id.clone();
+            data.artist.related_artists.defer(album_link.clone());
+            let link = album_link.clone();
             let web = self.web.clone();
             let sink = self.event_sink.clone();
             self.runtime.spawn(async move {
-                let result = web.load_related_artists(&id).await;
-                sink.submit_command(cmd::UPDATE_ARTIST_RELATED, (id, result), Target::Auto)
+                let result = web.load_related_artists(&link.id).await;
+                sink.submit_command(cmd::UPDATE_ARTIST_RELATED, (link, result), Target::Auto)
                     .unwrap();
             });
             // Load artist albums
-            data.artist.albums.defer(artist_id.clone());
-            let id = artist_id.clone();
+            data.artist.albums.defer(album_link.clone());
+            let link = album_link.clone();
             let web = self.web.clone();
             let sink = self.event_sink.clone();
             self.runtime.spawn(async move {
-                let result = web.load_artist_albums(&id).await;
-                sink.submit_command(cmd::UPDATE_ARTIST_ALBUMS, (id, result), Target::Auto)
+                let result = web.load_artist_albums(&link.id).await;
+                sink.submit_command(cmd::UPDATE_ARTIST_ALBUMS, (link, result), Target::Auto)
                     .unwrap();
             });
             Handled::Yes
-        } else if let Some((artist_id, result)) = cmd.get(cmd::UPDATE_ARTIST_DETAIL).cloned() {
-            if data.artist.artist.is_deferred(&artist_id) {
+        } else if let Some((link, result)) = cmd.get(cmd::UPDATE_ARTIST_DETAIL).cloned() {
+            if data.artist.artist.is_deferred(&link) {
                 data.artist.artist.resolve_or_reject(result);
             }
             Handled::Yes
-        } else if let Some((artist_id, result)) = cmd.get(cmd::UPDATE_ARTIST_ALBUMS).cloned() {
-            if data.artist.albums.is_deferred(&artist_id) {
+        } else if let Some((link, result)) = cmd.get(cmd::UPDATE_ARTIST_ALBUMS).cloned() {
+            if data.artist.albums.is_deferred(&link) {
                 data.artist.albums.resolve_or_reject(result);
             }
             Handled::Yes
-        } else if let Some((artist_id, result)) = cmd.get(cmd::UPDATE_ARTIST_TOP_TRACKS).cloned() {
-            if data.artist.top_tracks.is_deferred(&artist_id) {
-                data.artist.top_tracks.resolve_or_reject(result);
+        } else if let Some((link, result)) = cmd.get(cmd::UPDATE_ARTIST_TOP_TRACKS).cloned() {
+            if data.artist.top_tracks.is_deferred(&link) {
+                data.artist
+                    .top_tracks
+                    .resolve_or_reject(result.map(|tracks| ArtistTracks {
+                        id: link.id,
+                        name: link.name,
+                        tracks,
+                    }));
             }
             Handled::Yes
-        } else if let Some((artist_id, result)) = cmd.get(cmd::UPDATE_ARTIST_RELATED).cloned() {
-            if data.artist.related.is_deferred(&artist_id) {
-                data.artist.related.resolve_or_reject(result);
+        } else if let Some((link, result)) = cmd.get(cmd::UPDATE_ARTIST_RELATED).cloned() {
+            if data.artist.related_artists.is_deferred(&link) {
+                data.artist.related_artists.resolve_or_reject(result);
             }
             Handled::Yes
         } else {
@@ -744,7 +750,7 @@ impl Delegate {
         if let Some(query) = cmd.get(cmd::GOTO_SEARCH_RESULTS).cloned() {
             let web = self.web.clone();
             let sink = self.event_sink.clone();
-            data.route = Route::SearchResults;
+            data.route = Navigation::SearchResults(query.clone());
             data.search.results.defer(query.clone());
             self.runtime.spawn(async move {
                 let result = web.search(&query).await;
@@ -795,9 +801,9 @@ impl Delegate {
         cmd: &Command,
         data: &mut State,
     ) -> Handled {
-        if let Some(pb_ctx) = cmd.get(cmd::PLAY_TRACKS).cloned() {
-            self.player.set_tracks(pb_ctx.tracks);
-            self.player.play(pb_ctx.position);
+        if let Some(payload) = cmd.get(cmd::PLAY_TRACKS).cloned() {
+            self.player.set_tracks(payload.origin, payload.tracks);
+            self.player.play(payload.position);
             Handled::Yes
         } else if cmd.is(cmd::PLAY_PAUSE) {
             self.player.pause();
@@ -811,12 +817,12 @@ impl Delegate {
         } else if cmd.is(cmd::PLAY_NEXT) {
             self.player.next();
             Handled::Yes
-        } else if let Some(frac) = cmd.get(cmd::SEEK_TO_FRACTION) {
-            if let Some(track) = &data.playback.item {
-                log::info!("seeking to {}", frac);
-                let position = Duration::from_secs_f64(track.duration.as_secs_f64() * frac);
+        } else if let Some(fraction) = cmd.get(cmd::SEEK_TO_FRACTION) {
+            data.playback.current.as_ref().map(|current| {
+                let position =
+                    Duration::from_secs_f64(current.item.duration.as_secs_f64() * fraction);
                 self.player.seek(position);
-            }
+            });
             Handled::Yes
         } else {
             Handled::No

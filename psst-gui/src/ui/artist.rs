@@ -1,13 +1,13 @@
 use crate::{
     cmd,
-    data::{Artist, ArtistAlbums, ArtistDetail, Ctx, Navigation, State, TrackCtx},
+    data::{Artist, ArtistAlbums, ArtistDetail, CommonCtx, Ctx, Navigation, State},
     ui::{
         album::make_album,
         theme,
         track::{make_tracklist, TrackDisplay},
         utils::{make_error, make_loader, make_placeholder},
     },
-    widget::{Clip, HoverExt, Promised, RemoteImage},
+    widget::{Async, Clip, HoverExt, RemoteImage},
 };
 use druid::{
     im::Vector,
@@ -17,7 +17,7 @@ use druid::{
 };
 
 pub fn make_detail() -> impl Widget<State> {
-    let top_tracks = Promised::new(
+    let top_tracks = Async::new(
         || make_loader(),
         || {
             make_tracklist(TrackDisplay {
@@ -31,25 +31,25 @@ pub fn make_detail() -> impl Widget<State> {
     )
     .lens(
         Ctx::make(
-            State::track_ctx,
+            State::common_ctx,
             State::artist.then(ArtistDetail::top_tracks),
         )
         .then(Ctx::in_promise()),
     );
 
-    let albums = Promised::new(
+    let albums = Async::new(
         || make_loader(),
         || make_albums(),
         || make_error().lens(Ctx::data()),
     )
     .lens(
-        Ctx::make(State::track_ctx, State::artist.then(ArtistDetail::albums))
+        Ctx::make(State::common_ctx, State::artist.then(ArtistDetail::albums))
             .then(Ctx::in_promise()),
     )
     .padding((theme::grid(0.8), 0.0));
 
-    let related = Promised::new(|| make_loader(), || make_related(), || make_error())
-        .lens(State::artist.then(ArtistDetail::related))
+    let related_artists = Async::new(|| make_loader(), || make_related(), || make_error())
+        .lens(State::artist.then(ArtistDetail::related_artists))
         .padding((theme::grid(0.8), 0.0));
 
     Flex::column()
@@ -57,7 +57,7 @@ pub fn make_detail() -> impl Widget<State> {
         .with_default_spacer()
         .with_child(albums)
         .with_default_spacer()
-        .with_child(related)
+        .with_child(related_artists)
 }
 
 pub fn make_cover(width: f64, height: f64) -> impl Widget<Artist> {
@@ -82,12 +82,12 @@ fn make_artist_with_cover(width: f64, height: f64) -> impl Widget<Artist> {
         .with_default_spacer()
         .with_flex_child(artist_label, 1.);
     artist.hover().on_click(|ctx, artist, _| {
-        let nav = Navigation::ArtistDetail(artist.id.clone());
+        let nav = Navigation::ArtistDetail(artist.link());
         ctx.submit_command(cmd::NAVIGATE_TO.with(nav));
     })
 }
 
-fn make_albums() -> impl Widget<Ctx<TrackCtx, ArtistAlbums>> {
+fn make_albums() -> impl Widget<Ctx<CommonCtx, ArtistAlbums>> {
     let label = |text| {
         Label::new(text)
             .with_font(theme::UI_FONT_MEDIUM)

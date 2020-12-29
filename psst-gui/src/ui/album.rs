@@ -1,12 +1,12 @@
 use crate::{
     cmd,
-    data::{Album, AlbumDetail, Artist, Ctx, Navigation, State, TrackCtx},
+    data::{Album, AlbumDetail, Artist, CommonCtx, Ctx, Navigation, State},
     ui::{
         theme,
         track::{make_tracklist, TrackDisplay},
         utils::{make_error, make_loader, make_placeholder},
     },
-    widget::{HoverExt, Promised, RemoteImage},
+    widget::{Async, HoverExt, RemoteImage},
 };
 use druid::{
     widget::{CrossAxisAlignment, Flex, Label, LineBreaking, List},
@@ -14,22 +14,22 @@ use druid::{
 };
 
 pub fn make_detail() -> impl Widget<State> {
-    Promised::new(
+    Async::new(
         || make_loader(),
         || make_detail_loaded(),
         || make_error().lens(Ctx::data()),
     )
     .lens(
-        Ctx::make(State::track_ctx, State::album.then(AlbumDetail::album)).then(Ctx::in_promise()),
+        Ctx::make(State::common_ctx, State::album.then(AlbumDetail::album)).then(Ctx::in_promise()),
     )
 }
 
-fn make_detail_loaded() -> impl Widget<Ctx<TrackCtx, Album>> {
+fn make_detail_loaded() -> impl Widget<Ctx<CommonCtx, Album>> {
     let album_cover = make_cover(theme::grid(30.0), theme::grid(30.0));
 
     let album_name = Label::raw()
-        .with_font(theme::UI_FONT_MEDIUM)
         .with_line_break_mode(LineBreaking::WordWrap)
+        .with_font(theme::UI_FONT_MEDIUM)
         .lens(Album::name);
 
     let album_artists = List::new(|| {
@@ -38,7 +38,7 @@ fn make_detail_loaded() -> impl Widget<Ctx<TrackCtx, Album>> {
             .hover()
             .lens(Artist::name)
             .on_click(|ctx, artist: &mut Artist, _| {
-                let nav = Navigation::ArtistDetail(artist.id.clone());
+                let nav = Navigation::ArtistDetail(artist.link());
                 ctx.submit_command(cmd::NAVIGATE_TO.with(nav));
             })
     })
@@ -46,43 +46,33 @@ fn make_detail_loaded() -> impl Widget<Ctx<TrackCtx, Album>> {
 
     let album_date = Label::dynamic(|album: &Album, _| album.release());
 
-    let album_genres = List::new(|| Label::raw()).lens(Album::genres);
-
     let album_label = Label::raw()
+        .with_line_break_mode(LineBreaking::WordWrap)
         .with_text_size(theme::TEXT_SIZE_SMALL)
         .with_text_color(theme::PLACEHOLDER_COLOR)
         .lens(Album::label);
 
     let album_copyrights = List::new(|| {
-        Flex::row()
-            .with_child(
-                Label::new("© ")
-                    .with_text_size(theme::TEXT_SIZE_SMALL)
-                    .with_text_color(theme::PLACEHOLDER_COLOR),
-            )
-            .with_child(
-                Label::raw()
-                    .with_text_size(theme::TEXT_SIZE_SMALL)
-                    .with_text_color(theme::PLACEHOLDER_COLOR),
-            )
+        Label::raw()
+            .with_line_break_mode(LineBreaking::WordWrap)
+            .with_text_size(theme::TEXT_SIZE_SMALL)
+            .with_text_color(theme::PLACEHOLDER_COLOR)
     })
     .lens(Album::copyrights);
 
     let album_info = Flex::column()
         .cross_axis_alignment(CrossAxisAlignment::Start)
         .with_child(album_cover)
-        .with_default_spacer()
+        .with_spacer(theme::grid(2.0))
         .with_child(album_name)
-        .with_spacer(theme::grid(0.2))
+        .with_spacer(theme::grid(0.5))
         .with_child(album_artists)
-        .with_spacer(theme::grid(0.2))
+        .with_spacer(theme::grid(0.5))
         .with_child(album_date)
-        .with_spacer(theme::grid(0.2))
+        .with_default_spacer()
         .with_child(album_label)
-        .with_spacer(theme::grid(0.2))
+        .with_spacer(theme::grid(0.5))
         .with_child(album_copyrights)
-        .with_spacer(theme::grid(0.2))
-        .with_child(album_genres)
         .fix_width(theme::grid(30.0))
         .lens(Ctx::data());
 
@@ -91,14 +81,14 @@ fn make_detail_loaded() -> impl Widget<Ctx<TrackCtx, Album>> {
         title: true,
         artist: false,
         album: false,
-    })
-    .lens(Ctx::map(Album::tracks));
+    });
 
     Flex::row()
         .cross_axis_alignment(CrossAxisAlignment::Start)
         .with_child(album_info)
         .with_default_spacer()
         .with_flex_child(album_tracks, 1.0)
+        .padding((theme::grid(1.0), 0.0))
 }
 
 pub fn make_cover(width: f64, height: f64) -> impl Widget<Album> {
@@ -108,7 +98,7 @@ pub fn make_cover(width: f64, height: f64) -> impl Widget<Album> {
     .fix_size(width, height)
 }
 
-pub fn make_album() -> impl Widget<Ctx<TrackCtx, Album>> {
+pub fn make_album() -> impl Widget<Ctx<CommonCtx, Album>> {
     let album_cover = make_cover(theme::grid(7.0), theme::grid(7.0));
 
     let album_name = Label::raw()
@@ -141,9 +131,9 @@ pub fn make_album() -> impl Widget<Ctx<TrackCtx, Album>> {
     album
         .hover()
         .on_ex_click(
-            move |ctx, event, album: &mut Ctx<TrackCtx, Album>, _| match event.button {
+            move |ctx, event, album: &mut Ctx<CommonCtx, Album>, _| match event.button {
                 MouseButton::Left => {
-                    let nav = Navigation::AlbumDetail(album.data.id.clone());
+                    let nav = Navigation::AlbumDetail(album.data.link());
                     ctx.submit_command(cmd::NAVIGATE_TO.with(nav));
                 }
                 MouseButton::Right => {
@@ -155,7 +145,7 @@ pub fn make_album() -> impl Widget<Ctx<TrackCtx, Album>> {
         )
 }
 
-fn make_album_menu(album: &Ctx<TrackCtx, Album>) -> MenuDesc<State> {
+fn make_album_menu(album: &Ctx<CommonCtx, Album>) -> MenuDesc<State> {
     let mut menu = MenuDesc::empty();
 
     for artist in &album.data.artists {
@@ -168,13 +158,13 @@ fn make_album_menu(album: &Ctx<TrackCtx, Album>) -> MenuDesc<State> {
         };
         menu = menu.append(MenuItem::new(
             title,
-            cmd::NAVIGATE_TO.with(Navigation::ArtistDetail(artist.id.clone())),
+            cmd::NAVIGATE_TO.with(Navigation::ArtistDetail(artist.link())),
         ));
     }
 
     menu = menu.append(MenuItem::new(
         LocalizedString::new("menu-item-copy-link").with_placeholder("Copy Link"),
-        cmd::COPY.with(album.data.link()),
+        cmd::COPY.with(album.data.url()),
     ));
 
     menu = menu.append_separator();
@@ -183,7 +173,7 @@ fn make_album_menu(album: &Ctx<TrackCtx, Album>) -> MenuDesc<State> {
         menu = menu.append(MenuItem::new(
             LocalizedString::new("menu-item-remove-from-library")
                 .with_placeholder("Remove from Library"),
-            cmd::UNSAVE_ALBUM.with(album.data.id.clone()),
+            cmd::UNSAVE_ALBUM.with(album.data.link()),
         ));
     } else {
         menu = menu.append(MenuItem::new(

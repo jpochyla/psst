@@ -1,7 +1,7 @@
 use crate::{
     data::{
-        Album, AlbumType, Artist, ArtistAlbums, Image, Playlist, SearchResults, Track, TrackList,
-        TrackOrigin, LOCAL_TRACK_ID,
+        Album, AlbumType, Artist, ArtistAlbums, Image, Playlist, SearchResults, Track,
+        LOCAL_TRACK_ID,
     },
     error::Error,
 };
@@ -152,24 +152,9 @@ impl Web {
         }
         Ok(results)
     }
+}
 
-    pub async fn load_album(&self, id: &str) -> Result<Album, Error> {
-        Ok(self
-            .cache
-            .album(id)
-            .load_or_store(async {
-                Ok(self
-                    .client()
-                    .await?
-                    .albums()
-                    .get_album(id, Some(Market::FromToken))
-                    .await?
-                    .data)
-            })
-            .await?
-            .into())
-    }
-
+impl Web {
     pub async fn load_artist(&self, id: &str) -> Result<Artist, Error> {
         let result = self
             .client()
@@ -180,92 +165,6 @@ impl Web {
             .data
             .into();
         Ok(result)
-    }
-
-    pub async fn load_saved_albums(&self) -> Result<Vector<Album>, Error> {
-        let result = self
-            .with_paging(
-                |client, limit, offset| {
-                    client
-                        .library()
-                        .get_saved_albums(limit, offset, Some(Market::FromToken))
-                },
-                |saved| saved.album.into(),
-            )
-            .await?;
-        Ok(result)
-    }
-
-    pub async fn save_album(&self, id: &str) -> Result<(), Error> {
-        self.client().await?.library().save_albums(&[id]).await?;
-        Ok(())
-    }
-
-    pub async fn unsave_album(&self, id: &str) -> Result<(), Error> {
-        self.client().await?.library().unsave_albums(&[id]).await?;
-        Ok(())
-    }
-
-    pub async fn load_saved_tracks(&self) -> Result<TrackList, Error> {
-        let tracks = self
-            .with_paging(
-                |client, limit, offset| {
-                    client
-                        .library()
-                        .get_saved_tracks(limit, offset, Some(Market::FromToken))
-                },
-                |saved| Arc::new(Track::from(saved.track)),
-            )
-            .await?;
-        let list = TrackList {
-            origin: TrackOrigin::Library,
-            tracks,
-        };
-        Ok(list)
-    }
-
-    pub async fn save_track(&self, id: &str) -> Result<(), Error> {
-        self.client().await?.library().save_tracks(&[id]).await?;
-        Ok(())
-    }
-
-    pub async fn unsave_track(&self, id: &str) -> Result<(), Error> {
-        self.client().await?.library().unsave_tracks(&[id]).await?;
-        Ok(())
-    }
-
-    pub async fn load_playlists(&self) -> Result<Vector<Playlist>, Error> {
-        let result = self
-            .with_paging(
-                |client, limit, offset| client.playlists().current_users_playlists(limit, offset),
-                |playlist| playlist.into(),
-            )
-            .await?;
-        Ok(result)
-    }
-
-    pub async fn load_playlist_tracks(&self, id: Arc<str>) -> Result<TrackList, Error> {
-        let tracks = self
-            .with_paging(
-                |client, limit, offset| {
-                    client.playlists().get_playlists_items(
-                        &id,
-                        limit,
-                        offset,
-                        Some(Market::FromToken),
-                    )
-                },
-                |item| match item.item {
-                    PlaylistItemType::Track(track) => Arc::new(Track::from(track)),
-                    PlaylistItemType::Episode(_) => unimplemented!(),
-                },
-            )
-            .await?;
-        let list = TrackList {
-            origin: TrackOrigin::Playlist(id),
-            tracks,
-        };
-        Ok(list)
     }
 
     pub async fn load_artist_albums(&self, id: &str) -> Result<ArtistAlbums, Error> {
@@ -298,22 +197,18 @@ impl Web {
         Ok(artist_albums)
     }
 
-    pub async fn load_artist_top_tracks(&self, id: Arc<str>) -> Result<TrackList, Error> {
+    pub async fn load_artist_top_tracks(&self, id: &str) -> Result<Vector<Arc<Track>>, Error> {
         let tracks = self
             .client()
             .await?
             .artists()
-            .get_artist_top(&id, Market::FromToken)
+            .get_artist_top(id, Market::FromToken)
             .await?
             .data
             .into_iter()
             .map(|track| Arc::new(Track::from(track)))
             .collect();
-        let list = TrackList {
-            origin: TrackOrigin::Artist(id),
-            tracks,
-        };
-        Ok(list)
+        Ok(tracks)
     }
 
     pub async fn load_related_artists(&self, id: &str) -> Result<Vector<Artist>, Error> {
@@ -328,6 +223,103 @@ impl Web {
             .map_into()
             .collect();
         Ok(items)
+    }
+}
+
+impl Web {
+    pub async fn load_saved_albums(&self) -> Result<Vector<Album>, Error> {
+        let result = self
+            .with_paging(
+                |client, limit, offset| {
+                    client
+                        .library()
+                        .get_saved_albums(limit, offset, Some(Market::FromToken))
+                },
+                |saved| saved.album.into(),
+            )
+            .await?;
+        Ok(result)
+    }
+
+    pub async fn load_album(&self, id: &str) -> Result<Album, Error> {
+        Ok(self
+            .cache
+            .album(id)
+            .load_or_store(async {
+                Ok(self
+                    .client()
+                    .await?
+                    .albums()
+                    .get_album(id, Some(Market::FromToken))
+                    .await?
+                    .data)
+            })
+            .await?
+            .into())
+    }
+
+    pub async fn save_album(&self, id: &str) -> Result<(), Error> {
+        self.client().await?.library().save_albums(&[id]).await?;
+        Ok(())
+    }
+
+    pub async fn unsave_album(&self, id: &str) -> Result<(), Error> {
+        self.client().await?.library().unsave_albums(&[id]).await?;
+        Ok(())
+    }
+
+    pub async fn load_saved_tracks(&self) -> Result<Vector<Arc<Track>>, Error> {
+        let tracks = self
+            .with_paging(
+                |client, limit, offset| {
+                    client
+                        .library()
+                        .get_saved_tracks(limit, offset, Some(Market::FromToken))
+                },
+                |saved| Arc::new(Track::from(saved.track)),
+            )
+            .await?;
+        Ok(tracks)
+    }
+
+    pub async fn save_track(&self, id: &str) -> Result<(), Error> {
+        self.client().await?.library().save_tracks(&[id]).await?;
+        Ok(())
+    }
+
+    pub async fn unsave_track(&self, id: &str) -> Result<(), Error> {
+        self.client().await?.library().unsave_tracks(&[id]).await?;
+        Ok(())
+    }
+
+    pub async fn load_playlists(&self) -> Result<Vector<Playlist>, Error> {
+        let result = self
+            .with_paging(
+                |client, limit, offset| client.playlists().current_users_playlists(limit, offset),
+                |playlist| playlist.into(),
+            )
+            .await?;
+        Ok(result)
+    }
+
+    pub async fn load_playlist_tracks(&self, id: &str) -> Result<Vector<Arc<Track>>, Error> {
+        let tracks = self
+            .with_paging(
+                |client, limit, offset| {
+                    client.playlists().get_playlists_items(
+                        &id,
+                        limit,
+                        offset,
+                        Some(Market::FromToken),
+                    )
+                },
+                |item| match item.item {
+                    PlaylistItemType::Track(track) => Arc::new(Track::from(track)),
+                    PlaylistItemType::Episode(_) => unimplemented!(),
+                },
+            )
+            .await?;
+        Ok(tracks)
     }
 
     pub async fn load_image(&self, uri: &str) -> Result<image::DynamicImage, Error> {
@@ -373,11 +365,8 @@ impl Web {
             .into_iter()
             .map(|track| Arc::new(Track::from(track)))
             .collect();
-        let tracks = TrackList {
-            origin: TrackOrigin::Search(query.to_owned()),
-            tracks,
-        };
         Ok(SearchResults {
+            query: query.to_string(),
             artists,
             albums,
             tracks,
@@ -412,23 +401,21 @@ impl From<aspotify::Artist> for Artist {
 
 impl From<aspotify::AlbumSimplified> for Album {
     fn from(album: aspotify::AlbumSimplified) -> Self {
+        let name: Arc<str> = album.name.into();
         let id: Arc<str> = album
             .id
             .map_or_else(|| LOCAL_ALBUM_ID.into(), |id| id.into());
         Self {
             id: id.clone(),
+            name: name.clone(),
             album_type: album.album_type.map(AlbumType::from).unwrap_or_default(),
             artists: album.artists.into_iter().map_into().collect(),
             images: album.images.into_iter().map_into().collect(),
-            name: album.name.into(),
             release_date: album.release_date,
             release_date_precision: album.release_date_precision,
             genres: Vector::new(),
             copyrights: Vector::new(),
-            tracks: TrackList {
-                origin: TrackOrigin::Album(id),
-                tracks: Vector::new(),
-            },
+            tracks: Vector::new(),
             label: "".into(),
         }
     }
@@ -436,13 +423,14 @@ impl From<aspotify::AlbumSimplified> for Album {
 
 impl From<aspotify::Album> for Album {
     fn from(album: aspotify::Album) -> Self {
+        let name: Arc<str> = album.name.into();
         let id: Arc<str> = album.id.into();
         Self {
             id: id.clone(),
+            name: name.clone(),
             album_type: album.album_type.into(),
             artists: album.artists.into_iter().map_into().collect(),
             images: album.images.into_iter().map_into().collect(),
-            name: album.name.into(),
             release_date: Some(album.release_date),
             release_date_precision: Some(album.release_date_precision),
             genres: album.genres.into_iter().map_into().collect(),
@@ -457,15 +445,12 @@ impl From<aspotify::Album> for Album {
                     }
                 })
                 .collect(),
-            tracks: TrackList {
-                origin: TrackOrigin::Album(id),
-                tracks: album
-                    .tracks
-                    .items
-                    .into_iter()
-                    .map(|track| Arc::new(Track::from(track)))
-                    .collect(),
-            },
+            tracks: album
+                .tracks
+                .items
+                .into_iter()
+                .map(|track| Arc::new(Track::from(track)))
+                .collect(),
             label: album.label.into(),
         }
     }
@@ -473,21 +458,19 @@ impl From<aspotify::Album> for Album {
 
 impl From<aspotify::ArtistsAlbum> for Album {
     fn from(album: aspotify::ArtistsAlbum) -> Self {
+        let name: Arc<str> = album.name.into();
         let id: Arc<str> = album.id.into();
         Self {
             id: id.clone(),
+            name: name.clone(),
             album_type: album.album_type.into(),
             artists: album.artists.into_iter().map_into().collect(),
             images: album.images.into_iter().map_into().collect(),
-            name: album.name.into(),
             release_date: Some(album.release_date),
             release_date_precision: Some(album.release_date_precision),
             genres: Vector::new(),
             copyrights: Vector::new(),
-            tracks: TrackList {
-                origin: TrackOrigin::Album(id),
-                tracks: Vector::new(),
-            },
+            tracks: Vector::new(),
             label: "".into(),
         }
     }
