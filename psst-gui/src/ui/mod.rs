@@ -1,3 +1,4 @@
+use crate::ui::utils::Border;
 use crate::{
     cmd,
     data::{Nav, State},
@@ -54,9 +55,11 @@ pub fn make_root() -> impl Widget<State> {
         .background(theme::BACKGROUND_DARK);
 
     let topbar = Flex::row()
+        .must_fill_main_axis(true)
         .with_child(make_back_button())
         .with_default_spacer()
-        .with_child(make_title());
+        .with_child(make_title())
+        .background(Border::Bottom.widget());
 
     let main = Flex::column()
         .cross_axis_alignment(CrossAxisAlignment::Start)

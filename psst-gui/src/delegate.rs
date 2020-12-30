@@ -774,6 +774,17 @@ impl Delegate {
         } else if let Some(item) = cmd.get(cmd::PLAYBACK_PLAYING) {
             if let Some((origin, track)) = self.player.get_track(item) {
                 data.set_playback_playing(track, origin);
+                data.playback.current.as_mut().map(|current| {
+                    current.analysis.defer(item.clone());
+                });
+                let item = item.clone();
+                let web = self.web.clone();
+                let sink = self.event_sink.clone();
+                self.runtime.spawn(async move {
+                    let result = web.load_audio_analysis(&item.to_base62()).await;
+                    sink.submit_command(cmd::UPDATE_AUDIO_ANALYSIS, (item, result), Target::Auto)
+                        .unwrap();
+                });
             } else {
                 log::warn!("played item not found in playback queue");
             }
@@ -786,6 +797,13 @@ impl Delegate {
             Handled::Yes
         } else if cmd.is(cmd::PLAYBACK_STOPPED) {
             data.set_playback_stopped();
+            Handled::Yes
+        } else if let Some((track_id, result)) = cmd.get(cmd::UPDATE_AUDIO_ANALYSIS).cloned() {
+            data.playback.current.as_mut().map(|current| {
+                if current.analysis.is_deferred(&track_id) {
+                    current.analysis.resolve_or_reject(result);
+                }
+            });
             Handled::Yes
         } else {
             Handled::No

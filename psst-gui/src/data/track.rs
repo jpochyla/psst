@@ -77,3 +77,23 @@ impl FromStr for TrackId {
         }
     }
 }
+
+#[derive(Clone, Data, Debug)]
+pub struct AudioAnalysis {
+    pub segments: Vector<AudioSegment>,
+}
+
+#[derive(Clone, Data, Debug)]
+pub struct AudioSegment {
+    pub interval: TimeInterval,
+    pub loudness_start: f64,
+    pub loudness_max: f64,
+    pub loudness_max_time: f64,
+}
+
+#[derive(Clone, Data, Debug)]
+pub struct TimeInterval {
+    pub start: AudioDuration,
+    pub duration: AudioDuration,
+    pub confidence: f64,
+}

@@ -1,7 +1,7 @@
 use crate::{
     data::{
-        Album, AlbumType, Artist, ArtistAlbums, Image, Playlist, SearchResults, Track,
-        LOCAL_TRACK_ID,
+        Album, AlbumType, Artist, ArtistAlbums, AudioAnalysis, AudioSegment, Image, Playlist,
+        SearchResults, TimeInterval, Track, LOCAL_TRACK_ID,
     },
     error::Error,
 };
@@ -372,6 +372,18 @@ impl Web {
             tracks,
         })
     }
+
+    pub async fn load_audio_analysis(&self, track_id: &str) -> Result<AudioAnalysis, Error> {
+        let result = self
+            .client()
+            .await?
+            .tracks()
+            .get_analysis(track_id)
+            .await?
+            .data
+            .into();
+        Ok(result)
+    }
 }
 
 const LOCAL_ARTIST_ID: &str = "local_artist";
@@ -528,6 +540,35 @@ impl From<aspotify::PlaylistSimplified> for Playlist {
             id: playlist.id.into(),
             images: playlist.images.into_iter().map_into().collect(),
             name: playlist.name.into(),
+        }
+    }
+}
+
+impl From<aspotify::AudioAnalysis> for AudioAnalysis {
+    fn from(analysis: aspotify::AudioAnalysis) -> Self {
+        Self {
+            segments: analysis.segments.into_iter().map_into().collect(),
+        }
+    }
+}
+
+impl From<aspotify::Segment> for AudioSegment {
+    fn from(segment: aspotify::Segment) -> Self {
+        Self {
+            interval: segment.interval.into(),
+            loudness_start: segment.loudness_start,
+            loudness_max: segment.loudness_max,
+            loudness_max_time: segment.loudness_max_time,
+        }
+    }
+}
+
+impl From<aspotify::TimeInterval> for TimeInterval {
+    fn from(interval: aspotify::TimeInterval) -> Self {
+        Self {
+            start: interval.start.into(),
+            duration: interval.duration.into(),
+            confidence: interval.confidence,
         }
     }
 }

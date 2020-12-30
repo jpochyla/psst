@@ -1,8 +1,28 @@
 use crate::{error::Error, ui::theme, widget::icons};
 use druid::{
-    widget::{CrossAxisAlignment, Flex, Label, SizedBox, Spinner},
-    Data, Widget, WidgetExt,
+    kurbo::Line,
+    widget::{BackgroundBrush, CrossAxisAlignment, Flex, Label, Painter, SizedBox, Spinner},
+    Data, RenderContext, Widget, WidgetExt,
 };
+
+pub enum Border {
+    Top,
+    Bottom,
+}
+
+impl Border {
+    pub fn widget<T: Data>(self) -> impl Into<BackgroundBrush<T>> {
+        Painter::new(move |ctx, _, _| {
+            let h = 1.0;
+            let y = match self {
+                Self::Top => 0.0,
+                Self::Bottom => ctx.size().height - h,
+            };
+            let line = Line::new((0.0, y), (ctx.size().width, y));
+            ctx.stroke(line, &theme::GREY_6, h);
+        })
+    }
+}
 
 pub fn make_placeholder<T: Data>() -> impl Widget<T> {
     SizedBox::empty().background(theme::BACKGROUND_DARK)

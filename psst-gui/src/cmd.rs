@@ -1,7 +1,7 @@
 use crate::{
     data::{
-        Album, AlbumLink, Artist, ArtistAlbums, ArtistLink, AudioDuration, Nav, PlaybackPayload,
-        Playlist, PlaylistLink, SearchResults, Track, TrackId,
+        Album, AlbumLink, Artist, ArtistAlbums, ArtistLink, AudioAnalysis, AudioDuration, Nav,
+        PlaybackPayload, Playlist, PlaylistLink, SearchResults, Track, TrackId,
     },
     error::Error,
 };
@@ -81,6 +81,8 @@ pub const PLAYBACK_PLAYING: Selector<TrackId> = Selector::new("app.playback-play
 pub const PLAYBACK_PROGRESS: Selector<AudioDuration> = Selector::new("app.playback-progress");
 pub const PLAYBACK_PAUSED: Selector = Selector::new("app.playback-paused");
 pub const PLAYBACK_STOPPED: Selector = Selector::new("app.playback-stopped");
+pub const UPDATE_AUDIO_ANALYSIS: Selector<(TrackId, Result<AudioAnalysis, Error>)> =
+    Selector::new("app.update-audio-analysis");
 
 // Playback control
 

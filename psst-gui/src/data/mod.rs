@@ -20,7 +20,7 @@ pub use crate::data::{
     playlist::{Playlist, PlaylistDetail, PlaylistLink, PlaylistTracks},
     promise::{Promise, PromiseState},
     search::{Search, SearchResults},
-    track::{Track, TrackId, LOCAL_TRACK_ID},
+    track::{AudioAnalysis, AudioSegment, TimeInterval, Track, TrackId, LOCAL_TRACK_ID},
     utils::{AudioDuration, Image},
 };
 use druid::{
@@ -92,6 +92,7 @@ impl State {
             item,
             origin,
             progress: Default::default(),
+            analysis: Promise::Empty,
         });
     }
 
@@ -102,6 +103,7 @@ impl State {
             item,
             origin,
             progress: Default::default(),
+            analysis: Promise::Empty,
         });
     }
 

@@ -1,4 +1,6 @@
-use crate::data::{AlbumLink, ArtistLink, AudioDuration, Nav, PlaylistLink, Track};
+use crate::data::{
+    AlbumLink, ArtistLink, AudioAnalysis, AudioDuration, Nav, PlaylistLink, Promise, Track, TrackId,
+};
 use druid::{im::Vector, Data, Lens};
 use std::sync::Arc;
 
@@ -21,6 +23,7 @@ pub struct CurrentPlayback {
     pub item: Arc<Track>,
     pub origin: PlaybackOrigin,
     pub progress: AudioDuration,
+    pub analysis: Promise<AudioAnalysis, TrackId>,
 }
 
 #[derive(Clone, Debug, Data)]
