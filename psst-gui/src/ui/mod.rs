@@ -1,7 +1,7 @@
-use crate::ui::utils::Border;
 use crate::{
     cmd,
     data::{Nav, State},
+    ui::utils::Border,
     widget::{icons, Empty, HoverExt, ViewDispatcher},
 };
 use druid::{

@@ -8,10 +8,10 @@ use crate::{
     widget::{icons, Empty, HoverExt, Maybe},
 };
 use druid::{
-    kurbo::BezPath,
+    kurbo::{Affine, BezPath},
     widget::{CrossAxisAlignment, Either, Flex, Label, LineBreaking, Spinner, ViewSwitcher},
     BoxConstraints, Data, Env, Event, EventCtx, LayoutCtx, LensExt, LifeCycle, LifeCycleCtx,
-    MouseButton, PaintCtx, Point, Rect, RenderContext, Size, UpdateCtx, Widget, WidgetExt,
+    MouseButton, PaintCtx, Point, Rect, RenderContext, Size, UpdateCtx, Vec2, Widget, WidgetExt,
 };
 use itertools::Itertools;
 use std::sync::Arc;
@@ -211,13 +211,19 @@ impl Widget<CurrentPlayback> for SeekBar {
 
     fn lifecycle(
         &mut self,
-        _ctx: &mut LifeCycleCtx,
+        ctx: &mut LifeCycleCtx,
         event: &LifeCycle,
         data: &CurrentPlayback,
         _env: &Env,
     ) {
-        if let LifeCycle::Size(bounds) = &event {
-            self.loudness_path = compute_loudness_path(bounds, &data);
+        match &event {
+            LifeCycle::Size(bounds) => {
+                self.loudness_path = compute_loudness_path(bounds, &data);
+            }
+            LifeCycle::HotChanged(_) => {
+                ctx.request_paint();
+            }
+            _ => {}
         }
     }
 
@@ -255,49 +261,6 @@ impl Widget<CurrentPlayback> for SeekBar {
     }
 }
 
-fn paint_progress_bar(ctx: &mut PaintCtx, data: &CurrentPlayback, env: &Env) {
-    let elapsed_time = data.progress.as_secs_f64();
-    let total_time = data.item.duration.as_secs_f64();
-
-    let elapsed_color = env.get(theme::PRIMARY_DARK);
-    let remaining_color = env.get(theme::PRIMARY_LIGHT).with_alpha(0.5);
-    let bounds = ctx.size();
-
-    let elapsed_frac = elapsed_time / total_time;
-    let elapsed_width = bounds.width * elapsed_frac;
-    let remaining_width = bounds.width - elapsed_width;
-    let elapsed = Size::new(elapsed_width, bounds.height).round();
-    let remaining = Size::new(remaining_width, bounds.height).round();
-
-    ctx.fill(
-        &Rect::from_origin_size(Point::ORIGIN, elapsed),
-        &elapsed_color,
-    );
-    ctx.fill(
-        &Rect::from_origin_size(Point::new(elapsed.width, 0.0), remaining),
-        &remaining_color,
-    );
-}
-
-fn paint_audio_analysis(ctx: &mut PaintCtx, data: &CurrentPlayback, path: &BezPath, env: &Env) {
-    let bounds = ctx.size();
-
-    let elapsed_time = data.progress.as_secs_f64();
-    let total_time = data.item.duration.as_secs_f64();
-    let elapsed_frac = elapsed_time / total_time;
-    let elapsed_width = bounds.width * elapsed_frac;
-    let elapsed = Size::new(elapsed_width, bounds.height).to_rect();
-
-    let elapsed_color = env.get(theme::PRIMARY_DARK);
-    let remaining_color = env.get(theme::PRIMARY_LIGHT).with_alpha(0.5);
-
-    ctx.fill(&path, &remaining_color);
-    ctx.with_save(|ctx| {
-        ctx.clip(&elapsed);
-        ctx.fill(&path, &elapsed_color);
-    });
-}
-
 fn compute_loudness_path(bounds: &Size, data: &CurrentPlayback) -> BezPath {
     if let Promise::Resolved(analysis) = &data.analysis {
         compute_loudness_path_from_analysis(&bounds, &data.item.duration, &analysis)
@@ -322,7 +285,15 @@ fn compute_loudness_path_from_analysis(
 
     let mut path = BezPath::new();
 
-    path.move_to((0.0, bounds.height));
+    // TODO: Downsample the path and draw with curves.
+
+    // We start in the middle of the vertical space and first draw the upper half of
+    // the curve, then take what we have drawn, flip the y-axis and append it
+    // underneath.
+    let origin_y = bounds.height / 2.0;
+
+    // Start at the origin.
+    path.move_to((0.0, origin_y));
 
     for seg in &analysis.segments {
         let t = seg.interval.start.as_secs_f64() + seg.loudness_max_time;
@@ -333,10 +304,67 @@ fn compute_loudness_path_from_analysis(
         let l_f = l / total_loudness;
         let h = bounds.height * l_f;
 
-        path.line_to((w, bounds.height - h));
+        // Down-scale the height, because we will be drawing also the inverted half.
+        path.line_to((w, origin_y - h / 2.0));
     }
 
-    path.line_to((bounds.width, bounds.height));
+    // Land back at the vertical origin.
+    path.line_to((bounds.width, origin_y));
+
+    // Flip the y-axis, translate just under the origin, and append.
+    let mut inverted_path = path.clone();
+    let inversion_tx = Affine::FLIP_Y * Affine::translate(Vec2::new(0.0, -bounds.height));
+    inverted_path.apply_affine(inversion_tx);
+    path.extend(inverted_path);
 
     path
+}
+
+fn paint_audio_analysis(ctx: &mut PaintCtx, data: &CurrentPlayback, path: &BezPath, _env: &Env) {
+    let bounds = ctx.size();
+
+    let elapsed_time = data.progress.as_secs_f64();
+    let total_time = data.item.duration.as_secs_f64();
+    let elapsed_frac = elapsed_time / total_time;
+    let elapsed_width = bounds.width * elapsed_frac;
+    let elapsed = Size::new(elapsed_width, bounds.height).to_rect();
+
+    let (elapsed_color, remaining_color) = if ctx.is_hot() {
+        (theme::GREY_2, theme::GREY_5)
+    } else {
+        (theme::GREY_3, theme::GREY_6)
+    };
+
+    ctx.with_save(|ctx| {
+        ctx.fill(&path, &remaining_color);
+        ctx.clip(&elapsed);
+        ctx.fill(&path, &elapsed_color);
+    });
+}
+
+fn paint_progress_bar(ctx: &mut PaintCtx, data: &CurrentPlayback, _env: &Env) {
+    let elapsed_time = data.progress.as_secs_f64();
+    let total_time = data.item.duration.as_secs_f64();
+
+    let (elapsed_color, remaining_color) = if ctx.is_hot() {
+        (theme::GREY_2, theme::GREY_5)
+    } else {
+        (theme::GREY_3, theme::GREY_6)
+    };
+    let bounds = ctx.size();
+
+    let elapsed_frac = elapsed_time / total_time;
+    let elapsed_width = bounds.width * elapsed_frac;
+    let remaining_width = bounds.width - elapsed_width;
+    let elapsed = Size::new(elapsed_width, bounds.height).round();
+    let remaining = Size::new(remaining_width, bounds.height).round();
+
+    ctx.fill(
+        &Rect::from_origin_size(Point::ORIGIN, elapsed),
+        &elapsed_color,
+    );
+    ctx.fill(
+        &Rect::from_origin_size(Point::new(elapsed.width, 0.0), remaining),
+        &remaining_color,
+    );
 }
