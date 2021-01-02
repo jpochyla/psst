@@ -1,6 +1,8 @@
 # Psst
 
-Fast and multi-platform Spotify client with native GUI, without Electron, built in Rust. Very early in development, lacking in features, stability, and general user experience. So far, tested only on Mac.
+Fast Spotify client with native GUI, without Electron, built in Rust. Very early in development, lacking in features, stability, and general user experience. It is being tested only on Mac so far, but aims for full Windows and Linux support. Contributions welcome!
+
+![Screenshot](./psst-gui/assets/screenshot.png)
 
 ##### Building
 
@@ -55,6 +57,9 @@ $ cargo run
 - [ ] OS-specific application bundles
 - [ ] Podcast support
 - UI
+    - [ ] Rethink current design, consider a two-pane layout
+        - Left pane for browsing
+        - Right pane for current playback
     - [ ] Dark theme
         - OS theme correspondence
     - [ ] Icon

@@ -112,17 +112,20 @@ fn make_menu_search() -> impl Widget<State> {
 }
 
 pub fn make_route() -> impl Widget<State> {
-    Scroll::new(ViewDispatcher::new(
-        |state: &State, _| state.route.clone(),
-        |route: &Nav, _, _| match route {
-            Nav::Home => make_home().boxed(),
-            Nav::SearchResults(_) => search::make_results().boxed(),
-            Nav::AlbumDetail(_) => album::make_detail().boxed(),
-            Nav::ArtistDetail(_) => artist::make_detail().boxed(),
-            Nav::PlaylistDetail(_) => playlist::make_detail().boxed(),
-            Nav::Library => library::make_detail().boxed(),
-        },
-    ))
+    Scroll::new(
+        ViewDispatcher::new(
+            |state: &State, _| state.route.clone(),
+            |route: &Nav, _, _| match route {
+                Nav::Home => make_home().boxed(),
+                Nav::SearchResults(_) => search::make_results().boxed(),
+                Nav::AlbumDetail(_) => album::make_detail().boxed(),
+                Nav::ArtistDetail(_) => artist::make_detail().boxed(),
+                Nav::PlaylistDetail(_) => playlist::make_detail().boxed(),
+                Nav::Library => library::make_detail().boxed(),
+            },
+        )
+        .padding(theme::grid(1.0)),
+    )
     .vertical()
     .expand()
 }
