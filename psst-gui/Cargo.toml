@@ -11,9 +11,8 @@ aspotify = { git = "https://github.com/KaiJewson/aspotify", default_features = f
 chrono = "0.4"
 crossbeam-channel = "0.5"
 platform-dirs = "0.3.0"
-druid = { git = "https://github.com/linebender/druid", features = ["im", "image", "jpeg", "jpeg_rayon"] }
+druid = { git = "https://github.com/linebender/druid", features = ["im", "image", "jpeg", "jpeg_rayon", "png"] }
 env_logger = "0.8"
-image = { version = "0.23", default_features = false }
 itertools = "0.9"
 open = "1.4.0"
 log = "0.4"

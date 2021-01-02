@@ -486,12 +486,16 @@ impl Delegate {
         }
     }
 
-    fn command_session(&mut self, _target: Target, cmd: &Command, _data: &mut State) -> Handled {
+    fn command_session(&mut self, _target: Target, cmd: &Command, data: &mut State) -> Handled {
         if cmd.is(cmd::SESSION_CONNECTED) {
+            data.is_online = true;
             self.event_sink
                 .submit_command(cmd::LOAD_PLAYLISTS, (), Target::Auto)
                 .unwrap();
-            Handled::No
+            Handled::Yes
+        } else if cmd.is(cmd::SESSION_LOST) {
+            data.is_online = false;
+            Handled::Yes
         } else {
             Handled::No
         }

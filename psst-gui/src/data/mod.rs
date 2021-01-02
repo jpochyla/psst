@@ -31,6 +31,7 @@ use std::sync::Arc;
 
 #[derive(Clone, Debug, Data, Lens)]
 pub struct State {
+    pub is_online: bool,
     pub route: Nav,
     pub history: Vector<Nav>,
     pub config: Config,
@@ -46,6 +47,7 @@ pub struct State {
 impl Default for State {
     fn default() -> Self {
         Self {
+            is_online: false,
             route: Nav::Home,
             history: Vector::new(),
             config: Config::default(),

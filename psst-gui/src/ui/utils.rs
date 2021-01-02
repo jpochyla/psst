@@ -1,9 +1,14 @@
 use crate::{error::Error, ui::theme, widget::icons};
 use druid::{
+    image,
     kurbo::Line,
-    widget::{BackgroundBrush, CrossAxisAlignment, Flex, Label, Painter, SizedBox, Spinner},
-    Data, RenderContext, Widget, WidgetExt,
+    widget::{
+        prelude::*, BackgroundBrush, CrossAxisAlignment, FillStrat, Flex, Image, Label, Painter,
+        SizedBox,
+    },
+    Affine, Data, ImageBuf, RenderContext, Widget, WidgetExt,
 };
+use std::f64::consts::TAU;
 
 pub enum Border {
     Top,
@@ -24,14 +29,71 @@ impl Border {
     }
 }
 
+struct WashingMachine<W> {
+    inner: W,
+    t: f64,
+}
+
+impl<W> WashingMachine<W> {
+    pub fn new(inner: W) -> Self {
+        Self { inner, t: 0.0 }
+    }
+}
+
+impl<T: Data, W: Widget<T>> Widget<T> for WashingMachine<W> {
+    fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut T, env: &Env) {
+        if let Event::AnimFrame(interval) = event {
+            self.t += (*interval as f64) * 1e-9;
+            if self.t >= 1.0 {
+                self.t = 0.0;
+            }
+            ctx.request_anim_frame();
+            ctx.request_paint();
+        }
+        self.inner.event(ctx, event, data, env);
+    }
+
+    fn lifecycle(&mut self, ctx: &mut LifeCycleCtx, event: &LifeCycle, data: &T, env: &Env) {
+        if let LifeCycle::WidgetAdded = event {
+            ctx.request_anim_frame();
+            ctx.request_paint();
+        }
+        self.inner.lifecycle(ctx, event, data, env);
+    }
+
+    fn update(&mut self, ctx: &mut UpdateCtx, old_data: &T, data: &T, env: &Env) {
+        self.inner.update(ctx, old_data, data, env);
+    }
+
+    fn layout(&mut self, ctx: &mut LayoutCtx, bc: &BoxConstraints, data: &T, env: &Env) -> Size {
+        self.inner.layout(ctx, bc, data, env)
+    }
+
+    fn paint(&mut self, ctx: &mut PaintCtx, data: &T, env: &Env) {
+        ctx.with_save(|ctx| {
+            let s = ctx.size();
+            let tx = Affine::translate((s.width / 2.0, s.height / 2.0))
+                * Affine::rotate(TAU * self.t)
+                * Affine::translate((-s.width / 2.0, -s.height / 2.0));
+            ctx.transform(tx);
+            self.inner.paint(ctx, data, env);
+        });
+    }
+}
+
 pub fn make_placeholder<T: Data>() -> impl Widget<T> {
     SizedBox::empty().background(theme::BACKGROUND_DARK)
 }
 
 pub fn make_loader<T: Data>() -> impl Widget<T> {
-    Spinner::new()
-        .with_color(theme::GREY_4)
-        .padding((0.0, theme::grid(6.0)))
+    let bytes = include_bytes!("../../assets/loader.png");
+    let img = image::load_from_memory_with_format(&bytes[..], image::ImageFormat::Png).unwrap();
+    let buf = ImageBuf::from_dynamic_image_with_alpha(img);
+    let loader = Image::new(buf).fill_mode(FillStrat::None);
+    let rotating = WashingMachine::new(loader);
+    rotating
+        .fix_size(theme::grid(4.0), theme::grid(4.0))
+        .padding((0.0, theme::grid(10.0)))
         .center()
 }
 

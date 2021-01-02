@@ -55,7 +55,7 @@ pub fn setup(env: &mut Env, _state: &State) {
     env.set(BUTTON_BORDER_WIDTH, 1.0);
 
     env.set(BORDER_DARK, GREY_5);
-    env.set(BORDER_LIGHT, GREY_6);
+    env.set(BORDER_LIGHT, GREY_4);
 
     env.set(SELECTION_COLOR, BLUE_LIGHT);
     env.set(SELECTION_TEXT_COLOR, BLACK);
@@ -64,21 +64,21 @@ pub fn setup(env: &mut Env, _state: &State) {
 
     env.set(
         UI_FONT,
-        FontDescriptor::new(FontFamily::SYSTEM_UI).with_size(14.0),
+        FontDescriptor::new(FontFamily::SYSTEM_UI).with_size(13.0),
     );
     env.set(
         UI_FONT_MEDIUM,
         FontDescriptor::new(FontFamily::SYSTEM_UI)
-            .with_size(14.0)
+            .with_size(13.0)
             .with_weight(FontWeight::MEDIUM),
     );
     env.set(
         UI_FONT_MONO,
-        FontDescriptor::new(FontFamily::MONOSPACE).with_size(14.0),
+        FontDescriptor::new(FontFamily::MONOSPACE).with_size(13.0),
     );
     env.set(TEXT_SIZE_SMALL, 12.0);
-    env.set(TEXT_SIZE_NORMAL, 14.0);
-    env.set(TEXT_SIZE_LARGE, 18.0);
+    env.set(TEXT_SIZE_NORMAL, 13.0);
+    env.set(TEXT_SIZE_LARGE, 16.0);
 
     env.set(BASIC_WIDGET_HEIGHT, grid(3.0));
     env.set(WIDE_WIDGET_WIDTH, grid(12.0));
@@ -97,7 +97,7 @@ pub fn setup(env: &mut Env, _state: &State) {
     env.set(SCROLLBAR_RADIUS, 5.0);
     env.set(SCROLLBAR_EDGE_WIDTH, 1.0);
 
-    env.set(WIDGET_PADDING_VERTICAL, grid(1.0));
+    env.set(WIDGET_PADDING_VERTICAL, grid(0.5));
     env.set(WIDGET_PADDING_HORIZONTAL, grid(1.0));
     env.set(WIDGET_CONTROL_COMPONENT_PADDING, grid(1.0));
 

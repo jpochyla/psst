@@ -4,13 +4,14 @@ use crate::{
     ui::{
         album::make_album,
         artist::make_artist,
+        theme,
         track::{make_tracklist, TrackDisplay},
         utils::{make_error, make_loader},
     },
     widget::{Async, InputController},
 };
 use druid::{
-    widget::{Flex, List, TextBox},
+    widget::{Flex, Label, List, TextBox},
     LensExt, Widget, WidgetExt,
 };
 
@@ -30,9 +31,18 @@ pub fn make_results() -> impl Widget<State> {
     Async::new(
         || make_loader(),
         || {
+            let label = |text| {
+                Label::new(text)
+                    .with_font(theme::UI_FONT_MEDIUM)
+                    .with_text_color(theme::PLACEHOLDER_COLOR)
+                    .with_text_size(theme::TEXT_SIZE_SMALL)
+            };
             Flex::column()
+                .with_child(label("Artists"))
                 .with_child(make_artist_results())
+                .with_child(label("Albums"))
                 .with_child(make_album_results())
+                .with_child(label("Tracks"))
                 .with_child(make_track_results())
         },
         || make_error().lens(Ctx::data()),

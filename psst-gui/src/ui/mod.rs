@@ -49,7 +49,7 @@ pub fn make_root() -> impl Widget<State> {
     let playlists = Scroll::new(playlist::make_list()).vertical();
     let sidebar = Flex::column()
         .must_fill_main_axis(true)
-        .with_child(make_nav())
+        .with_child(make_menu())
         .with_default_spacer()
         .with_flex_child(playlists, 1.0)
         .background(theme::BACKGROUND_DARK);
@@ -59,6 +59,7 @@ pub fn make_root() -> impl Widget<State> {
         .with_child(make_back_button())
         .with_default_spacer()
         .with_child(make_title())
+        .with_flex_child(make_session_icon().align_right(), 1.0)
         .background(Border::Bottom.widget());
 
     let main = Flex::column()
@@ -78,15 +79,15 @@ pub fn make_root() -> impl Widget<State> {
     // .debug_paint_layout()
 }
 
-pub fn make_nav() -> impl Widget<State> {
+pub fn make_menu() -> impl Widget<State> {
     Flex::column()
         .with_default_spacer()
-        .with_child(make_nav_button("Home", Nav::Home))
-        .with_child(make_nav_button("Library", Nav::Library))
-        .with_child(make_nav_search())
+        .with_child(make_menu_button("Home", Nav::Home))
+        .with_child(make_menu_button("Library", Nav::Library))
+        .with_child(make_menu_search())
 }
 
-fn make_nav_button(title: &str, nav: Nav) -> impl Widget<State> {
+fn make_menu_button(title: &str, nav: Nav) -> impl Widget<State> {
     Label::new(title)
         .padding((theme::grid(2.0), theme::grid(1.0)))
         .expand_width()
@@ -100,18 +101,18 @@ fn make_nav_button(title: &str, nav: Nav) -> impl Widget<State> {
                 } else {
                     env.set(theme::HOVER_COLD_COLOR, theme::MENU_BUTTON_BG_INACTIVE);
                     env.set(theme::LABEL_COLOR, theme::MENU_BUTTON_FG_INACTIVE);
-                };
+                }
             }
         })
         .on_click(move |ctx, _, _| ctx.submit_command(cmd::NAVIGATE_TO.with(nav.clone())))
 }
 
-fn make_nav_search() -> impl Widget<State> {
+fn make_menu_search() -> impl Widget<State> {
     search::make_input().padding((theme::grid(1.0), theme::grid(1.0)))
 }
 
 pub fn make_route() -> impl Widget<State> {
-    let switcher = ViewDispatcher::new(
+    Scroll::new(ViewDispatcher::new(
         |state: &State, _| state.route.clone(),
         |route: &Nav, _, _| match route {
             Nav::Home => make_home().boxed(),
@@ -121,10 +122,9 @@ pub fn make_route() -> impl Widget<State> {
             Nav::PlaylistDetail(_) => playlist::make_detail().boxed(),
             Nav::Library => library::make_detail().boxed(),
         },
-    )
-    .padding(theme::grid(1.0));
-
-    Scroll::new(switcher).vertical().expand()
+    ))
+    .vertical()
+    .expand()
 }
 
 pub fn make_home() -> impl Widget<State> {
@@ -186,4 +186,17 @@ fn make_route_title() -> impl Widget<State> {
         Nav::PlaylistDetail(link) => link.name.to_string(),
     })
     .with_font(theme::UI_FONT_MEDIUM)
+}
+
+fn make_session_icon() -> impl Widget<State> {
+    Either::new(
+        |state: &State, _| state.is_online,
+        icons::CLOUD_ONLINE
+            .scale((theme::grid(2.0), theme::grid(2.0)))
+            .with_color(theme::PLACEHOLDER_COLOR),
+        icons::CLOUD_OFFLINE
+            .scale((theme::grid(2.0), theme::grid(2.0)))
+            .with_color(theme::PLACEHOLDER_COLOR),
+    )
+    .padding((theme::grid(2.0), theme::grid(1.0)))
 }

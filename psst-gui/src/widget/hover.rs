@@ -82,16 +82,14 @@ impl<T: Data> Widget<T> for Hover<T> {
         } else {
             env.get(theme::HOVER_COLD_COLOR)
         };
-        let (border_color, border_width) = if ctx.is_active() {
-            (env.get(theme::PRIMARY_LIGHT), 2.0)
-        } else {
-            (
-                self.border_color.resolve(env),
-                self.border_width.resolve(env),
-            )
-        };
+        let border_color = self.border_color.resolve(env);
+        let border_width = self.border_width.resolve(env);
         let corner_radius = self.corner_radius.resolve(env);
-        let rounded_rect = ctx.size().to_rounded_rect(corner_radius);
+        let rounded_rect = ctx
+            .size()
+            .to_rect()
+            .inset(-border_width / 2.0)
+            .to_rounded_rect(corner_radius);
         ctx.stroke(rounded_rect, &border_color, border_width);
         ctx.fill(rounded_rect, &background);
         self.inner.paint(ctx, data, env);

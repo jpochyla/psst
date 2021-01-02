@@ -6,7 +6,7 @@ use crate::{
     error::Error,
 };
 use aspotify::{ItemType, Market, Page, PlaylistItemType, Response};
-use druid::im::Vector;
+use druid::{im::Vector, image};
 use itertools::Itertools;
 use psst_core::{access_token::TokenProvider, cache::mkdir_if_not_exists, session::SessionHandle};
 use serde::{de::DeserializeOwned, Serialize};
