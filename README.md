@@ -8,11 +8,13 @@ Fast Spotify client with native GUI, without Electron, built in Rust. Very early
 
 Development build:
 ```
+$ git submodule update --recursive --init
 $ cargo build
 ```
 
 Release build:
 ```
+$ git submodule update --recursive --init
 $ cargo build --release
 ```
 
