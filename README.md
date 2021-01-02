@@ -22,6 +22,51 @@ $ cargo run
 # Use cargo run --release for the release build.
 ```
 
+##### Roadmap
+
+- [x] Vorbis track playback
+- [x] Browsing saved albums and tracks
+- [x] Save / unsave albums and tracks
+- [x] Browsing followed playlists
+- [x] Search for artist, albums, and tracks
+- [ ] Resilience to network errors
+- [ ] Managing playlists
+    - Follow / unfollow
+    - Add / remove track
+    - Reorder tracks
+    - Rename playlist
+- [ ] Playback queue
+- [ ] Audio volume control
+- [ ] Audio loudness normalization
+- [ ] React to audio output device events
+    - Pause after disconnecting headphones
+    - Transfer playback after connecting headphones
+- [ ] Better caching
+    - Cache as much as possibly of WebAPI responses
+    - Visualize cache utilization
+        - Total cache usage in the config dialog
+        - Show time origin of cached data, allow to refresh
+- [ ] Media keys control
+- [ ] Open Spotify links
+- [ ] Trivia on the artist page, Wikipedia links
+- [ ] Genre playlists and "For You" content
+- [ ] Downloading encrypted tracks
+- [ ] Reporting played tracks to Spotify servers
+- [ ] OS-specific application bundles
+- [ ] Podcast support
+- UI
+    - [ ] Dark theme
+        - OS theme correspondence
+    - [ ] Icon
+    - [ ] Robust error states, ideally with retry button
+    - [ ] Correct playback highlight
+        - Highlight now-playing track only in the correct album / playlist
+        - Keep highlighted track in viewport
+    - [ ] Paging or virtualized lists for albums and tracks
+    - [ ] Grid for albums and artists
+    - [ ] Robust active/inactive menu visualization
+    - [ ] Save last route and the last playback state
+
 ##### Development
 
 Contributions are very welcome! Project structure:
