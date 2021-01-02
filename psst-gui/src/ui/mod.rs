@@ -34,7 +34,7 @@ pub fn make_config_window() -> WindowDesc<State> {
     WindowDesc::new(make_config)
         .title("Preferences")
         .menu(menu::make_menu())
-        .window_size((theme::grid(45.0), theme::grid(50.0)))
+        .window_size((theme::grid(45.0), theme::grid(46.0)))
         .resizable(false)
 }
 

@@ -65,13 +65,15 @@ pub fn make_config() -> impl Widget<State> {
         // Save
         .with_spacer(theme::grid(3.0))
         .with_child(
-            Button::new("Save").on_click(move |ctx, config: &mut Config, _env| {
-                config.save();
-                ctx.submit_command(cmd::CONFIGURE);
-                ctx.submit_command(cmd::SHOW_MAIN);
-                ctx.submit_command(commands::CLOSE_WINDOW);
-            }),
+            Button::new("Save")
+                .on_click(move |ctx, config: &mut Config, _env| {
+                    config.save();
+                    ctx.submit_command(cmd::CONFIGURE);
+                    ctx.submit_command(cmd::SHOW_MAIN);
+                    ctx.submit_command(commands::CLOSE_WINDOW);
+                })
+                .center(),
         )
-        .padding(theme::grid(2.0))
+        .padding((theme::grid(2.0), theme::grid(0.0)))
         .lens(State::config)
 }
