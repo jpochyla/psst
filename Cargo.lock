@@ -302,19 +302,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "cmake"
-version = "0.1.45"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eb6210b637171dfba4cda12e579ac6dc73f5165ad56133e5d72ef3131f320855"
-dependencies = [
- "cc",
-]
-
-[[package]]
 name = "cocoa"
-version = "0.23.0"
+version = "0.24.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c54201c07dcf3a5ca33fececb8042aed767ee4bfd5a0235a8ceabcda956044b2"
+checksum = "6f63902e9223530efb4e26ccd0cf55ec30d592d3b42e21a28defc42a9586e832"
 dependencies = [
  "bitflags",
  "block",
@@ -544,8 +535,8 @@ checksum = "212d0f5754cb6769937f4501cc0e67f4f4483c8d2c3e1e922ee9edbe4ab4c7c0"
 
 [[package]]
 name = "druid"
-version = "0.6.0"
-source = "git+https://github.com/linebender/druid#e9f14300ad916330fa55369644da8a9e66ab8908"
+version = "0.7.0"
+source = "git+https://github.com/linebender/druid#ed4f9ef0e763d8396ef2fb7facd8ea4ba541c41e"
 dependencies = [
  "console_log",
  "druid-derive",
@@ -560,13 +551,13 @@ dependencies = [
  "simple_logger",
  "unic-langid",
  "unicode-segmentation",
- "xi-unicode 0.2.1",
+ "xi-unicode 0.3.0",
 ]
 
 [[package]]
 name = "druid-derive"
-version = "0.3.1"
-source = "git+https://github.com/linebender/druid#e9f14300ad916330fa55369644da8a9e66ab8908"
+version = "0.4.0"
+source = "git+https://github.com/linebender/druid#ed4f9ef0e763d8396ef2fb7facd8ea4ba541c41e"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -575,14 +566,14 @@ dependencies = [
 
 [[package]]
 name = "druid-shell"
-version = "0.6.0"
-source = "git+https://github.com/linebender/druid#e9f14300ad916330fa55369644da8a9e66ab8908"
+version = "0.7.0"
+source = "git+https://github.com/linebender/druid#ed4f9ef0e763d8396ef2fb7facd8ea4ba541c41e"
 dependencies = [
  "anyhow",
  "bitflags",
  "block",
  "cairo-rs",
- "cfg-if 0.1.10",
+ "cfg-if 1.0.0",
  "cocoa",
  "core-graphics",
  "foreign-types",
@@ -662,6 +653,16 @@ dependencies = [
  "log",
  "regex",
  "termcolor",
+]
+
+[[package]]
+name = "ep-miniaudio-sys"
+version = "2.3.1"
+source = "git+https://github.com/jpochyla/miniaudio-rs.git#d405a68efe251708cdced05472b61c4c4d47d9ff"
+dependencies = [
+ "bitflags",
+ "cc",
+ "libc",
 ]
 
 [[package]]
@@ -1435,16 +1436,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1482821306169ec4d07f6aca392a4681f66c75c9918aa49641a2595db64053cb"
 
 [[package]]
-name = "libsoundio-sys"
-version = "0.3.0"
-source = "git+https://github.com/jpochyla/soundio-rs?branch=static-callbacks#5000df22e5472179b193bbebe8032de16004ae21"
-dependencies = [
- "cc",
- "cmake",
- "pkg-config",
-]
-
-[[package]]
 name = "linked-hash-map"
 version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1512,6 +1503,15 @@ checksum = "2684d4c2e97d99848d30b324b00c8fcc7e5c897b7cbb5819b09e7c90e8baf212"
 dependencies = [
  "mime",
  "unicase",
+]
+
+[[package]]
+name = "miniaudio"
+version = "0.8.1"
+source = "git+https://github.com/jpochyla/miniaudio-rs.git#d405a68efe251708cdced05472b61c4c4d47d9ff"
+dependencies = [
+ "bitflags",
+ "ep-miniaudio-sys",
 ]
 
 [[package]]
@@ -2021,6 +2021,7 @@ dependencies = [
  "hmac",
  "iset",
  "log",
+ "miniaudio",
  "minivorbis",
  "num-bigint",
  "num-traits",
@@ -2031,7 +2032,6 @@ dependencies = [
  "serde_json",
  "sha-1",
  "shannon",
- "soundio",
  "tempfile",
  "ureq",
 ]
@@ -2502,14 +2502,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "soundio"
-version = "0.2.1"
-source = "git+https://github.com/jpochyla/soundio-rs?branch=static-callbacks#5000df22e5472179b193bbebe8032de16004ae21"
-dependencies = [
- "libsoundio-sys",
-]
-
-[[package]]
 name = "spin"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2605,9 +2597,9 @@ checksum = "1e81da0851ada1f3e9d4312c704aa4f8806f0f9d69faaf8df2f3464b4a9437c2"
 
 [[package]]
 name = "syn"
-version = "1.0.56"
+version = "1.0.57"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a9802ddde94170d186eeee5005b798d9c159fa970403f1be19976d0cfb939b72"
+checksum = "4211ce9909eb971f111059df92c45640aad50a619cf55cd76476be803c4c68e6"
 dependencies = [
  "proc-macro2",
  "quote",
