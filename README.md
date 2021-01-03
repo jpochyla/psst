@@ -94,4 +94,3 @@ This project would not exist without:
 - [`druid`](https://github.com/linebender/druid) native GUI library for Rust.
 - [`aspotify`](https://github.com/KaiJewson/aspotify) asynchronous client library for the Spotify Web API.
 - [`ncspot`](https://github.com/hrkfdn/ncspot) cross-platform ncurses Spotify client written in Rust, using `librespot`.
-- [`soundio`](http://libsound.io) by Andrew Kelley.
