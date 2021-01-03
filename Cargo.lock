@@ -657,8 +657,8 @@ dependencies = [
 
 [[package]]
 name = "ep-miniaudio-sys"
-version = "2.3.1"
-source = "git+https://github.com/jpochyla/miniaudio-rs.git#d405a68efe251708cdced05472b61c4c4d47d9ff"
+version = "2.4.0"
+source = "git+https://github.com/jpochyla/miniaudio-rs#1ff94282092d5a3854f928818f807b3fc327c0f0"
 dependencies = [
  "bitflags",
  "cc",
@@ -1507,8 +1507,8 @@ dependencies = [
 
 [[package]]
 name = "miniaudio"
-version = "0.8.1"
-source = "git+https://github.com/jpochyla/miniaudio-rs.git#d405a68efe251708cdced05472b61c4c4d47d9ff"
+version = "0.10.0"
+source = "git+https://github.com/jpochyla/miniaudio-rs#1ff94282092d5a3854f928818f807b3fc327c0f0"
 dependencies = [
  "bitflags",
  "ep-miniaudio-sys",
