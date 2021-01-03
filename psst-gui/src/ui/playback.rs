@@ -11,7 +11,7 @@ use druid::{
     kurbo::{Affine, BezPath},
     widget::{CrossAxisAlignment, Either, Flex, Label, LineBreaking, Spinner, ViewSwitcher},
     BoxConstraints, Data, Env, Event, EventCtx, LayoutCtx, LensExt, LifeCycle, LifeCycleCtx,
-    MouseButton, PaintCtx, Point, Rect, RenderContext, Size, UpdateCtx, Vec2, Widget, WidgetExt,
+    MouseButton, PaintCtx, Point, Rect, RenderContext, Size, UpdateCtx, Widget, WidgetExt,
 };
 use itertools::Itertools;
 use std::sync::Arc;
@@ -285,8 +285,6 @@ fn compute_loudness_path_from_analysis(
 
     let mut path = BezPath::new();
 
-    // TODO: Downsample the path and draw with curves.
-
     // We start in the middle of the vertical space and first draw the upper half of
     // the curve, then take what we have drawn, flip the y-axis and append it
     // underneath.
@@ -295,17 +293,29 @@ fn compute_loudness_path_from_analysis(
     // Start at the origin.
     path.move_to((0.0, origin_y));
 
+    // Because the size of the seekbar is quite small, but the number of the
+    // segments can be large, we down-sample the loudness spectrum in a very
+    // primitive way and only add a vertex after crossing `WIDTH_PRECISION` of
+    // pixels horizontally.
+    const WIDTH_PRECISION: f64 = 2.0;
+    let mut last_width = 0.0;
+
     for seg in &analysis.segments {
-        let t = seg.interval.start.as_secs_f64() + seg.loudness_max_time;
-        let t_f = t / total_duration.as_secs_f64();
-        let w = bounds.width * t_f;
+        let time = seg.interval.start.as_secs_f64() + seg.loudness_max_time;
+        let tfrac = time / total_duration.as_secs_f64();
+        let width = bounds.width * tfrac;
 
-        let l = seg.loudness_max - loudness_min;
-        let l_f = l / total_loudness;
-        let h = bounds.height * l_f;
+        let loud = seg.loudness_max - loudness_min;
+        let lfrac = loud / total_loudness;
+        let height = bounds.height * lfrac;
 
-        // Down-scale the height, because we will be drawing also the inverted half.
-        path.line_to((w, origin_y - h / 2.0));
+        if width - last_width >= WIDTH_PRECISION {
+            // Down-scale the height, because we will be drawing also the inverted half.
+            path.line_to((width, origin_y - height / 2.0));
+
+            // Save the X-coordinate of this vertex.
+            last_width = width;
+        }
     }
 
     // Land back at the vertical origin.
@@ -313,7 +323,7 @@ fn compute_loudness_path_from_analysis(
 
     // Flip the y-axis, translate just under the origin, and append.
     let mut inverted_path = path.clone();
-    let inversion_tx = Affine::FLIP_Y * Affine::translate(Vec2::new(0.0, -bounds.height));
+    let inversion_tx = Affine::FLIP_Y * Affine::translate((0.0, -bounds.height));
     inverted_path.apply_affine(inversion_tx);
     path.extend(inverted_path);
 
