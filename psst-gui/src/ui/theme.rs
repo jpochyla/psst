@@ -9,13 +9,17 @@ pub fn grid(m: f64) -> f64 {
 pub const GRID: f64 = 8.0;
 
 pub const WHITE: Color = Color::WHITE;
+pub const DARK_WHITE: Color = Color::rgb8(34, 40, 49);
+pub const DARK_SELECTED: Color = Color::rgb8(57, 62, 70);
 pub const BLACK: Color = Color::BLACK;
 pub const GREY_1: Color = Color::grey8(0x33);
 pub const GREY_2: Color = Color::grey8(0x4f);
+pub const DARK_GREY_2: Color = Color::grey8(0xef);
 pub const GREY_3: Color = Color::grey8(0x82);
 pub const GREY_4: Color = Color::grey8(0xbd);
 pub const GREY_5: Color = Color::grey8(0xe0);
 pub const GREY_6: Color = Color::grey8(0xf2);
+pub const DARK_GREY_6: Color = Color::grey8(0x32);
 pub const BLUE_LIGHT: Color = Color::rgb8(0x5c, 0xc4, 0xff);
 pub const BLUE_DARK: Color = Color::rgb8(0x00, 0x8d, 0xdd);
 
@@ -35,8 +39,40 @@ pub const HOVER_HOT_COLOR: Key<Color> = Key::new("app.hover-hot-color");
 pub const HOVER_COLD_COLOR: Key<Color> = Key::new("app.hover-cold-color");
 
 pub fn setup(env: &mut Env, _state: &State) {
-    env.set(WINDOW_BACKGROUND_COLOR, WHITE);
-    env.set(LABEL_COLOR, GREY_2);
+    let dark_theme = true;
+
+    if dark_theme {
+        env.set(WINDOW_BACKGROUND_COLOR, DARK_WHITE);
+        env.set(LABEL_COLOR, DARK_GREY_2);
+        env.set(SELECTION_TEXT_COLOR, DARK_SELECTED);
+
+        env.set(SELECTION_COLOR, BLUE_LIGHT);
+        env.set(BACKGROUND_DARK, DARK_GREY_6);
+        env.set(BUTTON_DARK, DARK_GREY_6);
+
+        env.set(BUTTON_LIGHT, DARK_WHITE);
+
+        env.set(HOVER_COLD_COLOR, MENU_BUTTON_BG_ACTIVE);
+        env.set(LABEL_COLOR, DARK_GREY_2);
+
+        env.set(BACKGROUND_LIGHT, DARK_WHITE);
+
+        env.set(CURSOR_COLOR, GREY_3);
+    } else {
+        env.set(WINDOW_BACKGROUND_COLOR, WHITE);
+        env.set(LABEL_COLOR, GREY_2);
+        env.set(SELECTION_TEXT_COLOR, BLACK);
+
+        env.set(SELECTION_COLOR, BLUE_LIGHT);
+        env.set(BACKGROUND_DARK, GREY_6);
+        env.set(BUTTON_DARK, GREY_6);
+
+        env.set(BUTTON_LIGHT, WHITE);
+        env.set(BACKGROUND_LIGHT, WHITE);
+
+        env.set(CURSOR_COLOR, BLACK);
+    }
+
     env.set(ICON_COLOR, GREY_3);
     env.set(PLACEHOLDER_COLOR, GREY_3);
     env.set(PRIMARY_LIGHT, BLUE_LIGHT);
@@ -44,23 +80,14 @@ pub fn setup(env: &mut Env, _state: &State) {
 
     env.set(PROGRESS_BAR_RADIUS, 4.0);
 
-    env.set(BACKGROUND_LIGHT, WHITE);
-    env.set(BACKGROUND_DARK, GREY_6);
     env.set(FOREGROUND_LIGHT, GREY_1);
     env.set(FOREGROUND_DARK, BLACK);
 
-    env.set(BUTTON_DARK, GREY_6);
-    env.set(BUTTON_LIGHT, WHITE);
     env.set(BUTTON_BORDER_RADIUS, 4.0);
     env.set(BUTTON_BORDER_WIDTH, 1.0);
 
     env.set(BORDER_DARK, GREY_5);
     env.set(BORDER_LIGHT, GREY_4);
-
-    env.set(SELECTION_COLOR, BLUE_LIGHT);
-    env.set(SELECTION_TEXT_COLOR, BLACK);
-
-    env.set(CURSOR_COLOR, BLACK);
 
     env.set(
         UI_FONT,
