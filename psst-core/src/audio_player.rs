@@ -627,7 +627,6 @@ impl PlayerAudioSource {
                 self.samples += 1;
             } else {
                 self.samples = 0;
-                self.current.take();
             }
             sample
         } else {
@@ -670,11 +669,17 @@ impl Iterator for PlayerAudioSource {
     fn next(&mut self) -> Option<Self::Item> {
         let sample = self.next_sample();
         if sample.is_some() {
+            // Report audio progress.
             if self.samples % PROGRESS_PRECISION_SAMPLES == 0 {
                 self.report_audio_position()
             }
         } else {
+            // We're at the end of track.  If we still have the source, drop it and report.
+            // Player will pause the audio output and we will stop getting polled
+            // eventually.
+            if self.current.take().is_some() {
             self.report_audio_end();
+        }
         }
         sample
     }
