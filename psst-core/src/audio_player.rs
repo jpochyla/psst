@@ -229,6 +229,7 @@ impl Player {
             PlayerEvent::Playing { .. } => {}
             PlayerEvent::Pausing { .. } => {}
             PlayerEvent::Resuming { .. } => {}
+            PlayerEvent::Stopped { .. } => {}
         };
     }
 
@@ -455,6 +456,9 @@ impl Player {
     }
 
     fn stop(&mut self) {
+        self.event_sender
+            .send(PlayerEvent::Stopped)
+            .expect("Failed to send PlayerEvent::Stopped");
         self.state = PlayerState::Stopped;
         self.audio_output_remote.pause();
         self.queue.clear();
@@ -552,8 +556,10 @@ pub enum PlayerEvent {
         duration: Duration,
     },
     /// Player has finished playing a track.  `Loading` or `Playing` might
-    /// follow if the queue is not empty.
+    /// follow if the queue is not empty, `Stopped` will follow if it is.
     Finished,
+    /// The queue is empty.
+    Stopped,
 }
 
 enum PlayerState {
@@ -678,8 +684,8 @@ impl Iterator for PlayerAudioSource {
             // Player will pause the audio output and we will stop getting polled
             // eventually.
             if self.current.take().is_some() {
-            self.report_audio_end();
-        }
+                self.report_audio_end();
+            }
         }
         sample
     }

@@ -143,10 +143,9 @@ impl PlayerDelegate {
                     sink.submit_command(cmd::PLAYBACK_PROGRESS, progress, Target::Auto)
                         .unwrap();
                 }
-                PlayerEvent::Finished => {
-                    // TODO:
-                    //  We should clear current playback, but only at the end
-                    //  of the queue.
+                PlayerEvent::Stopped => {
+                    sink.submit_command(cmd::PLAYBACK_STOPPED, (), Target::Auto)
+                        .unwrap();
                 }
                 _ => {}
             }
