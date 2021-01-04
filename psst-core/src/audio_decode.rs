@@ -31,6 +31,20 @@ where
             .seek_to_pcm(pcm_frame)
             .expect("Failed to set current OGG stream position")
     }
+
+    fn read_next_packet(&mut self) -> Result<usize, minivorbis::Error> {
+        loop {
+            match self.vorbis.read_packet(&mut self.packet) {
+                Err(minivorbis::Error::Hole) => {
+                    // Skip holes in decoding.
+                    continue;
+                }
+                other_result => {
+                    return other_result;
+                }
+            }
+        }
+    }
 }
 
 impl<R> Iterator for VorbisDecoder<R>
@@ -42,12 +56,12 @@ where
     fn next(&mut self) -> Option<i16> {
         if self.pos >= self.packet.len() {
             // We have reached the end of the packet, try to read the next one.
-            match self.vorbis.read_packet(&mut self.packet) {
+            match self.read_next_packet() {
                 Err(err) => {
                     log::error!("error while decoding: {:?}", err);
                     return None; // Signal an end of stream.
                 }
-                Ok(n) if n == 0 => {
+                Ok(0) => {
                     return None; // End of stream.
                 }
                 Ok(_) => {
