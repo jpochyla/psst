@@ -124,18 +124,23 @@ impl PlayerDelegate {
                     sink.submit_command(cmd::PLAYBACK_LOADING, item, Target::Auto)
                         .unwrap();
                 }
-                PlayerEvent::Started { path } => {
+                PlayerEvent::Playing { path, duration } => {
                     let item: TrackId = path.item_id.into();
-                    sink.submit_command(cmd::PLAYBACK_PLAYING, item, Target::Auto)
+                    let progress: AudioDuration = duration.to_owned().into();
+                    sink.submit_command(cmd::PLAYBACK_PLAYING, (item, progress), Target::Auto)
                         .unwrap();
                 }
-                PlayerEvent::Playing { duration, .. } => {
+                PlayerEvent::Pausing { .. } => {
+                    sink.submit_command(cmd::PLAYBACK_PAUSING, (), Target::Auto)
+                        .unwrap();
+                }
+                PlayerEvent::Resuming { .. } => {
+                    sink.submit_command(cmd::PLAYBACK_RESUMING, (), Target::Auto)
+                        .unwrap();
+                }
+                PlayerEvent::Progress { duration, .. } => {
                     let progress: AudioDuration = duration.to_owned().into();
                     sink.submit_command(cmd::PLAYBACK_PROGRESS, progress, Target::Auto)
-                        .unwrap();
-                }
-                PlayerEvent::Paused { .. } => {
-                    sink.submit_command(cmd::PLAYBACK_PAUSED, (), Target::Auto)
                         .unwrap();
                 }
                 PlayerEvent::Finished => {
@@ -770,14 +775,14 @@ impl Delegate {
     fn command_playback(&mut self, _target: Target, cmd: &Command, data: &mut State) -> Handled {
         if let Some(item) = cmd.get(cmd::PLAYBACK_LOADING) {
             if let Some((origin, track)) = self.player.get_track(item) {
-                data.set_playback_loading(track, origin);
+                data.loading_playback(track, origin);
             } else {
                 log::warn!("loaded item not found in playback queue");
             }
             Handled::Yes
-        } else if let Some(item) = cmd.get(cmd::PLAYBACK_PLAYING) {
+        } else if let Some((item, progress)) = cmd.get(cmd::PLAYBACK_PLAYING) {
             if let Some((origin, track)) = self.player.get_track(item) {
-                data.set_playback_playing(track, origin);
+                data.start_playback(track, origin, progress.to_owned());
                 data.playback.current.as_mut().map(|current| {
                     current.analysis.defer(item.clone());
                 });
@@ -794,13 +799,16 @@ impl Delegate {
             }
             Handled::Yes
         } else if let Some(progress) = cmd.get(cmd::PLAYBACK_PROGRESS).cloned() {
-            data.set_playback_progress(progress);
+            data.progress_playback(progress);
             Handled::Yes
-        } else if cmd.is(cmd::PLAYBACK_PAUSED) {
-            data.set_playback_paused();
+        } else if cmd.is(cmd::PLAYBACK_PAUSING) {
+            data.pause_playback();
+            Handled::Yes
+        } else if cmd.is(cmd::PLAYBACK_RESUMING) {
+            data.resume_playback();
             Handled::Yes
         } else if cmd.is(cmd::PLAYBACK_STOPPED) {
-            data.set_playback_stopped();
+            data.stop_playback();
             Handled::Yes
         } else if let Some((track_id, result)) = cmd.get(cmd::UPDATE_AUDIO_ANALYSIS).cloned() {
             data.playback.current.as_mut().map(|current| {

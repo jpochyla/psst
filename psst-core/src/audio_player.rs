@@ -219,15 +219,16 @@ impl Player {
             PlayerEvent::Preloaded { item, result } => {
                 self.handle_preloaded(item, result);
             }
-            PlayerEvent::Playing { duration, path } => {
-                self.handle_playing(duration, path);
+            PlayerEvent::Progress { duration, path } => {
+                self.handle_progress(duration, path);
             }
             PlayerEvent::Finished { .. } => {
                 self.handle_finished();
             }
-            PlayerEvent::Paused { .. } => {}
-            PlayerEvent::Started { .. } => {}
             PlayerEvent::Loading { .. } => {}
+            PlayerEvent::Playing { .. } => {}
+            PlayerEvent::Pausing { .. } => {}
+            PlayerEvent::Resuming { .. } => {}
         };
     }
 
@@ -287,12 +288,16 @@ impl Player {
         }
     }
 
-    fn handle_playing(&mut self, progress: Duration, path: AudioPath) {
-        const PRELOAD_BEFORE_END_OF_TRACK: Duration = Duration::from_secs(30);
-
-        if let PlayerState::Playing { duration, .. } = &mut self.state {
-            *duration = progress;
+    fn handle_progress(&mut self, progress: Duration, path: AudioPath) {
+        match &mut self.state {
+            PlayerState::Playing { duration, .. } | PlayerState::Paused { duration, .. } => {
+                *duration = progress;
+            }
+            _ => {
+                log::warn!("received unexpected progress report");
+            }
         }
+        const PRELOAD_BEFORE_END_OF_TRACK: Duration = Duration::from_secs(30);
         if let Some(&item_to_preload) = self.queue.get_next() {
             let time_until_end_of_track = path.duration.checked_sub(progress).unwrap_or_default();
             if time_until_end_of_track <= PRELOAD_BEFORE_END_OF_TRACK {
@@ -383,13 +388,11 @@ impl Player {
     fn play_loaded(&mut self, loaded_item: LoadedPlaybackItem) {
         log::info!("starting playback");
         let path = loaded_item.file.path();
+        let duration = Duration::default();
         self.event_sender
-            .send(PlayerEvent::Started { path })
-            .expect("Failed to send PlayerEvent::Started");
-        self.state = PlayerState::Playing {
-            path,
-            duration: Duration::default(),
-        };
+            .send(PlayerEvent::Playing { path, duration })
+            .expect("Failed to send PlayerEvent::Playing");
+        self.state = PlayerState::Playing { path, duration };
         self.audio_source
             .lock()
             .expect("Failed to acquire audio source lock")
@@ -402,7 +405,7 @@ impl Player {
             PlayerState::Playing { path, duration } | PlayerState::Paused { path, duration } => {
                 log::info!("pausing playback");
                 self.event_sender
-                    .send(PlayerEvent::Paused { path })
+                    .send(PlayerEvent::Pausing { path, duration })
                     .expect("Failed to send PlayerEvent::Paused");
                 self.state = PlayerState::Paused { path, duration };
                 self.audio_output_remote.pause();
@@ -417,6 +420,9 @@ impl Player {
         match mem::replace(&mut self.state, PlayerState::Invalid) {
             PlayerState::Playing { path, duration } | PlayerState::Paused { path, duration } => {
                 log::info!("resuming playback");
+                self.event_sender
+                    .send(PlayerEvent::Resuming { path, duration })
+                    .expect("Failed to send PlayerEvent::Resuming");
                 self.state = PlayerState::Playing { path, duration };
                 self.audio_output_remote.resume();
             }
@@ -455,7 +461,6 @@ impl Player {
     }
 
     fn seek(&mut self, position: Duration) {
-        // TODO: Clear audio output buffer.
         self.audio_source
             .lock()
             .expect("Failed to acquire audio source lock")
@@ -510,27 +515,44 @@ pub enum PlayerCommand {
 
 pub enum PlayerEvent {
     Command(PlayerCommand),
+    /// Track has started loading.  `Loaded` follows.
     Loading {
         item: PlaybackItem,
     },
+    /// Track loading either succeeded or failed.  `Playing` follows in case of
+    /// success.
     Loaded {
         item: PlaybackItem,
         result: Result<LoadedPlaybackItem, Error>,
     },
+    /// Next item in queue has been successfully preloaded.
     Preloaded {
         item: PlaybackItem,
         result: Result<LoadedPlaybackItem, Error>,
     },
-    Started {
-        path: AudioPath,
-    },
+    /// Player has started playing new track.  `Progress` events will follow.
     Playing {
         path: AudioPath,
         duration: Duration,
     },
-    Paused {
+    /// Player is in a paused state.  `Resuming` might follow.
+    Pausing {
         path: AudioPath,
+        duration: Duration,
     },
+    /// Player is resuming playback of a track
+    Resuming {
+        path: AudioPath,
+        duration: Duration,
+    },
+    /// Player is either reacting to a seek event in a paused or playing state,
+    /// or track is naturally progressing during playback.
+    Progress {
+        path: AudioPath,
+        duration: Duration,
+    },
+    /// Player has finished playing a track.  `Loading` or `Playing` might
+    /// follow if the queue is not empty.
     Finished,
 }
 
@@ -584,17 +606,51 @@ impl PlayerAudioSource {
 
     fn seek(&mut self, position: Duration) {
         if let Some(current) = &mut self.current {
-            let pos_secs = position.as_secs_f64();
-            let pcm_frame = pos_secs * OUTPUT_SAMPLE_RATE as f64;
-            let samples = pcm_frame * OUTPUT_CHANNELS as f64;
-            current.source.seek(pcm_frame as u64);
+            let seconds = position.as_secs_f64();
+            let frames = seconds * OUTPUT_SAMPLE_RATE as f64;
+            let samples = frames * OUTPUT_CHANNELS as f64;
+            current.source.seek(frames as u64);
             self.samples = samples as u64;
+            self.report_audio_position();
         }
     }
 
     fn play_now(&mut self, item: LoadedPlaybackItem) {
         self.current.replace(item);
         self.samples = 0;
+    }
+
+    fn next_sample(&mut self) -> Option<AudioSample> {
+        if let Some(current) = self.current.as_mut() {
+            let sample = current.source.next();
+            if sample.is_some() {
+                self.samples += 1;
+            } else {
+                self.samples = 0;
+                self.current.take();
+            }
+            sample
+        } else {
+            None
+        }
+    }
+
+    fn report_audio_position(&self) {
+        if let Some(current) = self.current.as_ref() {
+            let duration = Duration::from_secs_f64(
+                self.samples as f64 / OUTPUT_SAMPLE_RATE as f64 / OUTPUT_CHANNELS as f64,
+            );
+            let path = current.file.path();
+            self.event_sender
+                .send(PlayerEvent::Progress { duration, path })
+                .expect("Failed to send PlayerEvent::Progress");
+        }
+    }
+
+    fn report_audio_end(&self) {
+        self.event_sender
+            .send(PlayerEvent::Finished)
+            .expect("Failed to send PlayerEvent::Finished");
     }
 }
 
@@ -612,39 +668,15 @@ impl Iterator for PlayerAudioSource {
     type Item = AudioSample;
 
     fn next(&mut self) -> Option<Self::Item> {
-        // TODO:
-        //  We could move all this into the decoder struct, use position information
-        //  from the decoding and do all this work only per-packet, not per-sample.
-        if let Some(current) = &mut self.current {
-            let sample = current.source.next();
-            if sample.is_some() {
-                // We report playback progress every `PROGRESS_PRECISION_SAMPLES`th sample.
-                if self.samples % PROGRESS_PRECISION_SAMPLES == 0 {
-                    self.event_sender
-                        .send(PlayerEvent::Playing {
-                            duration: Duration::from_secs_f64(
-                                self.samples as f64
-                                    / OUTPUT_SAMPLE_RATE as f64
-                                    / OUTPUT_CHANNELS as f64,
-                            ),
-                            path: current.file.path(),
-                        })
-                        .expect("Failed to send PlayerEvent::Playing");
-                }
-                self.samples += 1;
-                sample
-            } else {
-                // Current source ended, report audio end.
-                self.event_sender
-                    .send(PlayerEvent::Finished)
-                    .expect("Failed to send PlayerEvent::Finished");
-                self.current.take();
-                self.samples = 0;
-                None
+        let sample = self.next_sample();
+        if sample.is_some() {
+            if self.samples % PROGRESS_PRECISION_SAMPLES == 0 {
+                self.report_audio_position()
             }
         } else {
-            None
+            self.report_audio_end();
         }
+        sample
     }
 }
 

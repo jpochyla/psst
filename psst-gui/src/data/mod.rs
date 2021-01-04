@@ -87,40 +87,48 @@ impl Default for State {
 }
 
 impl State {
-    pub fn set_playback_loading(&mut self, item: Arc<Track>, origin: PlaybackOrigin) {
+    pub fn loading_playback(&mut self, item: Arc<Track>, origin: PlaybackOrigin) {
         self.common_ctx.playback_item.take();
         self.playback.state = PlaybackState::Loading;
         self.playback.current.replace(CurrentPlayback {
             item,
             origin,
-            progress: Default::default(),
-            analysis: Promise::Empty,
+            progress: AudioDuration::default(),
+            analysis: Promise::default(),
         });
     }
 
-    pub fn set_playback_playing(&mut self, item: Arc<Track>, origin: PlaybackOrigin) {
+    pub fn start_playback(
+        &mut self,
+        item: Arc<Track>,
+        origin: PlaybackOrigin,
+        progress: AudioDuration,
+    ) {
         self.common_ctx.playback_item.replace(item.clone());
         self.playback.state = PlaybackState::Playing;
         self.playback.current.replace(CurrentPlayback {
             item,
             origin,
-            progress: Default::default(),
-            analysis: Promise::Empty,
+            progress,
+            analysis: Promise::default(),
         });
     }
 
-    pub fn set_playback_progress(&mut self, progress: AudioDuration) {
-        self.playback.state = PlaybackState::Playing;
+    pub fn progress_playback(&mut self, progress: AudioDuration) {
         self.playback.current.as_mut().map(|current| {
             current.progress = progress;
         });
     }
 
-    pub fn set_playback_paused(&mut self) {
+    pub fn pause_playback(&mut self) {
         self.playback.state = PlaybackState::Paused;
     }
 
-    pub fn set_playback_stopped(&mut self) {
+    pub fn resume_playback(&mut self) {
+        self.playback.state = PlaybackState::Playing;
+    }
+
+    pub fn stop_playback(&mut self) {
         self.playback.state = PlaybackState::Stopped;
         self.playback.current.take();
         self.common_ctx.playback_item.take();
