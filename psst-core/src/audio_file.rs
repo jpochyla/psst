@@ -125,16 +125,12 @@ impl StreamedFile {
         let url = cdn.resolve_audio_file_url(path.file_id)?;
         log::debug!("resolved file URL: {:?}", url.url);
 
-        // How many bytes we request in the first chunk.  Lower amount means lower
-        // initial latency, but should be high enough that the audio decoder can
-        // initialize without further reads, otherwise `AudioFile::audio_source` will
-        // get stuck, as the loading routine is not started yet.
+        // How many bytes we request in the first chunk.
         const INITIAL_REQUEST_LENGTH: u64 = 1024 * 6;
 
         // Send the initial request, that gives us the total file length and the
-        // beginning of the contents.  The initial data should be big enough for the
-        // audio decoder to bootstrap, without waiting.  Use the total length for
-        // creating the backing data storage.
+        // beginning of the contents.  Use the total length for creating the backing
+        // data storage.
         let (total_length, mut initial_data) =
             cdn.fetch_file_range(&url.url, 0, INITIAL_REQUEST_LENGTH)?;
         let storage = StreamStorage::new(total_length)?;
