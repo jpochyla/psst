@@ -7,6 +7,5 @@ edition = "2018"
 [dependencies]
 psst-core = { path = "../psst-core" }
 
-env_logger = "0.7.1"
-log = "0.4.8"
-quick-protobuf = "0.8.0"
+env_logger = "0.8"
+log = "0.4"

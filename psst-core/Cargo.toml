@@ -24,4 +24,4 @@ sha-1 = "0.9"
 shannon = "0.2"
 miniaudio = { git = "https://github.com/jpochyla/miniaudio-rs", default-features = false, features = ["ma-log-level-error", "ma-no-flac", "ma-no-mp3", "ma-no-wav"] }
 tempfile = "3.1"
-ureq = { version = "2.0.0-rc2", features = ["json"] }
+ureq = { version = "2.0.0", features = ["json"] }

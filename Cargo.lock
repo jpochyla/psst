@@ -83,13 +83,13 @@ dependencies = [
  "futures-util",
  "isocountry",
  "isolanguage-1",
- "itertools",
+ "itertools 0.9.0",
  "reqwest",
  "serde",
  "serde_json",
  "serde_millis",
  "tokio 0.3.6",
- "tokio-compat-02",
+ "tokio-compat-02 0.1.2",
  "url",
 ]
 
@@ -536,7 +536,7 @@ checksum = "212d0f5754cb6769937f4501cc0e67f4f4483c8d2c3e1e922ee9edbe4ab4c7c0"
 [[package]]
 name = "druid"
 version = "0.7.0"
-source = "git+https://github.com/linebender/druid#ed4f9ef0e763d8396ef2fb7facd8ea4ba541c41e"
+source = "git+https://github.com/linebender/druid#69a8bcf74dd9e5298fece69481e892f530b5414a"
 dependencies = [
  "console_log",
  "druid-derive",
@@ -557,7 +557,7 @@ dependencies = [
 [[package]]
 name = "druid-derive"
 version = "0.4.0"
-source = "git+https://github.com/linebender/druid#ed4f9ef0e763d8396ef2fb7facd8ea4ba541c41e"
+source = "git+https://github.com/linebender/druid#69a8bcf74dd9e5298fece69481e892f530b5414a"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -567,7 +567,7 @@ dependencies = [
 [[package]]
 name = "druid-shell"
 version = "0.7.0"
-source = "git+https://github.com/linebender/druid#ed4f9ef0e763d8396ef2fb7facd8ea4ba541c41e"
+source = "git+https://github.com/linebender/druid#69a8bcf74dd9e5298fece69481e892f530b5414a"
 dependencies = [
  "anyhow",
  "bitflags",
@@ -631,25 +631,12 @@ dependencies = [
 
 [[package]]
 name = "env_logger"
-version = "0.7.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "44533bbbb3bb3c1fa17d9f2e4e38bbbaf8396ba82193c4cb1b6445d711445d36"
-dependencies = [
- "atty",
- "humantime 1.3.0",
- "log",
- "regex",
- "termcolor",
-]
-
-[[package]]
-name = "env_logger"
 version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f26ecb66b4bdca6c1409b40fb255eefc2bd4f6d135dab3c3124f80ffa2a9661e"
 dependencies = [
  "atty",
- "humantime 2.0.1",
+ "humantime",
  "log",
  "regex",
  "termcolor",
@@ -852,7 +839,7 @@ dependencies = [
  "futures-sink",
  "futures-task",
  "memchr",
- "pin-project 1.0.2",
+ "pin-project 1.0.3",
  "pin-utils",
  "proc-macro-hack",
  "proc-macro-nested",
@@ -1021,7 +1008,7 @@ checksum = "41486a26d1366a8032b160b59065a59fb528530a46a49f627e7048fb8c064039"
 dependencies = [
  "anyhow",
  "heck",
- "itertools",
+ "itertools 0.9.0",
  "proc-macro-crate",
  "proc-macro-error",
  "proc-macro2",
@@ -1185,15 +1172,6 @@ checksum = "494b4d60369511e7dea41cf646832512a94e542f68bb9c49e54518e0f468eb47"
 
 [[package]]
 name = "humantime"
-version = "1.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "df004cfca50ef23c36850aaaa59ad52cc70d0e90243c3c7737a4dd32dc7a3c4f"
-dependencies = [
- "quick-error",
-]
-
-[[package]]
-name = "humantime"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3c1ad908cc71012b7bea4d0c53ba96a8cba9962f048fa68d143376143d863b7a"
@@ -1214,7 +1192,7 @@ dependencies = [
  "httparse",
  "httpdate",
  "itoa",
- "pin-project 1.0.2",
+ "pin-project 1.0.3",
  "socket2",
  "tokio 0.2.24",
  "tower-service",
@@ -1366,6 +1344,15 @@ name = "itertools"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "284f18f85651fe11e8a991b2adb42cb078325c996ed026d994719efcfca1d54b"
+dependencies = [
+ "either",
+]
+
+[[package]]
+name = "itertools"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "37d572918e350e82412fe766d24b15e6682fb2ed2bbe018280caa810397cb319"
 dependencies = [
  "either",
 ]
@@ -1867,11 +1854,11 @@ dependencies = [
 
 [[package]]
 name = "pin-project"
-version = "1.0.2"
+version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9ccc2237c2c489783abd8c4c80e5450fc0e98644555b1364da68cc29aa151ca7"
+checksum = "5a83804639aad6ba65345661744708855f9fbcb71176ea8d28d05aeb11d975e7"
 dependencies = [
- "pin-project-internal 1.0.2",
+ "pin-project-internal 1.0.3",
 ]
 
 [[package]]
@@ -1887,9 +1874,9 @@ dependencies = [
 
 [[package]]
 name = "pin-project-internal"
-version = "1.0.2"
+version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f8e8d2bf0b23038a4424865103a4df472855692821aab4e4f5c3312d461d9e5f"
+checksum = "b7bcc46b8f73443d15bc1c5fecbb315718491fa9187fa483f0e359323cde8b3a"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2005,10 +1992,9 @@ dependencies = [
 name = "psst-bin"
 version = "0.1.0"
 dependencies = [
- "env_logger 0.7.1",
+ "env_logger",
  "log",
  "psst-core",
- "quick-protobuf",
 ]
 
 [[package]]
@@ -2044,8 +2030,8 @@ dependencies = [
  "chrono",
  "crossbeam-channel",
  "druid",
- "env_logger 0.8.2",
- "itertools",
+ "env_logger",
+ "itertools 0.10.0",
  "log",
  "lru-cache",
  "open",
@@ -2055,7 +2041,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tokio 1.0.1",
- "tokio-compat-02",
+ "tokio-compat-02 0.2.0",
 ]
 
 [[package]]
@@ -2064,12 +2050,6 @@ version = "0.1.0"
 dependencies = [
  "quick-protobuf",
 ]
-
-[[package]]
-name = "quick-error"
-version = "1.2.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a1d01941d82fa2ab50be1e79e6714289dd7cde78eba4c074bc5a4374f650dfe0"
 
 [[package]]
 name = "quick-protobuf"
@@ -2810,6 +2790,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "tokio-compat-02"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e7d4237822b7be8fff0a7a27927462fad435dcb6650f95cea9e946bf6bdc7e07"
+dependencies = [
+ "bytes",
+ "once_cell",
+ "pin-project-lite 0.2.0",
+ "tokio 0.2.24",
+ "tokio 1.0.1",
+ "tokio-stream",
+]
+
+[[package]]
 name = "tokio-macros"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2818,6 +2812,17 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "tokio-stream"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e4cdeb73537e63f98adcd73138af75e3f368ccaecffaa29d7eb61b9f5a440457"
+dependencies = [
+ "futures-core",
+ "pin-project-lite 0.2.0",
+ "tokio 1.0.1",
 ]
 
 [[package]]
@@ -3027,9 +3032,9 @@ checksum = "a156c684c91ea7d62626509bce3cb4e1d9ed5c4d978f7b4352658f96a4c26b4a"
 
 [[package]]
 name = "ureq"
-version = "2.0.0-rc4"
+version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d7f9e63dbf673db6a0769e59bdd522e7038a29594ca02bce56213d19024e933a"
+checksum = "e562326b32e3766fee6a4890b62489b4b095e94ac07232cfea631668002c19d7"
 dependencies = [
  "base64",
  "chunked_transfer",
