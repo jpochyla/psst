@@ -3,7 +3,7 @@
 members = [
     "psst-protocol",
     "psst-core",
-    "psst-bin",
+    "psst-cli",
     "psst-gui",
     "minivorbis-sys",
     "minivorbis",
