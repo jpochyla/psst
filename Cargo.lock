@@ -1989,7 +1989,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "psst-bin"
+name = "psst-cli"
 version = "0.1.0"
 dependencies = [
  "env_logger",

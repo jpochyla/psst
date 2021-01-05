@@ -76,13 +76,13 @@ impl Cdn {
     pub fn fetch_file_range(
         &self,
         uri: &str,
-        position: u64,
+        offset: u64,
         length: u64,
     ) -> Result<(u64, impl Read), Error> {
         let response = self
             .agent
             .get(uri)
-            .set("Range", &range_header(position, length))
+            .set("Range", &range_header(offset, length))
             .call()?;
         let total_length = parse_total_content_length(&response);
         let data_reader = response.into_reader();
@@ -124,9 +124,9 @@ impl From<ureq::Error> for Error {
 }
 
 /// Constructs a Range header value for given offset and length.
-fn range_header(position: u64, length: u64) -> String {
-    let last_byte = position + length - 1; // Offset of the last byte of the range is inclusive.
-    format!("bytes={}-{}", position, last_byte)
+fn range_header(offfset: u64, length: u64) -> String {
+    let last_byte = offfset + length - 1; // Offset of the last byte of the range is inclusive.
+    format!("bytes={}-{}", offfset, last_byte)
 }
 
 /// Parses a total content length from a Content-Range response header.

@@ -7,7 +7,7 @@ use crate::{
     error::Error,
     item_id::{FileId, ItemId},
     protocol::metadata::mod_AudioFile::Format,
-    stream_storage::{StreamReader, StreamStorage, StreamWriter},
+    stream_storage::{StreamReader, StreamRequest, StreamStorage, StreamWriter},
     util::OffsetFile,
 };
 use std::{
@@ -155,15 +155,14 @@ impl StreamedFile {
             }
             Ok(last_url.clone())
         };
-
-        while let Ok((position, length)) = self.storage.receiver().recv() {
-            log::trace!("downloading {}..{}", position, position + length);
+        let mut download_range = |offset, length| -> Result<(), Error> {
+            log::trace!("downloading {}..{}", offset, offset + length);
 
             let thread_name = format!(
                 "cdn-{}-{}..{}",
                 self.path.file_id.to_base16(),
-                position,
-                position + length
+                offset,
+                offset + length
             );
             // TODO: We spawn threads here without any accounting.  Seems wrong.
             thread::Builder::new().name(thread_name).spawn({
@@ -175,7 +174,7 @@ impl StreamedFile {
                 let file_path = self.storage.path().to_path_buf();
                 let file_id = self.path.file_id;
                 move || {
-                    match load_range(&mut writer, cdn, &url, position, length) {
+                    match load_range(&mut writer, cdn, &url, offset, length) {
                         Ok(_) => {
                             // If the file is completely downloaded, copy it to cache.
                             if writer.is_complete() && !cache.audio_file_path(file_id).exists() {
@@ -188,11 +187,24 @@ impl StreamedFile {
                         Err(err) => {
                             log::error!("failed to download: {}", err);
                             // Range failed to download, remove it from the requested set.
-                            writer.mark_as_not_requested(position, length);
+                            writer.mark_as_not_requested(offset, length);
                         }
                     }
                 }
-            });
+            })?;
+
+            Ok(())
+        };
+
+        while let Ok(req) = self.storage.receiver().recv() {
+            match req {
+                StreamRequest::Preload { offset, length } => {
+                    download_range(offset, length)?;
+                }
+                StreamRequest::Blocked { offset } => {
+                    log::info!("blocked at {}", offset);
+                }
+            }
         }
         Ok(())
     }
@@ -216,16 +228,16 @@ fn load_range(
     writer: &mut StreamWriter,
     cdn: CdnHandle,
     url: &str,
-    position: u64,
+    offset: u64,
     length: u64,
 ) -> Result<(), Error> {
     // Download range of data from the CDN.  Block until we a have reader of the
     // request body.
-    let (_total_length, mut reader) = cdn.fetch_file_range(url, position, length)?;
+    let (_total_length, mut reader) = cdn.fetch_file_range(url, offset, length)?;
 
     // Pipe it into storage. Blocks until fully written, but readers sleeping on
     // this file should be notified as soon as their offset is covered.
-    writer.seek(SeekFrom::Start(position))?;
+    writer.seek(SeekFrom::Start(offset))?;
     io::copy(&mut reader, writer)?;
 
     Ok(())

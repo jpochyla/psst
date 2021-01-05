@@ -10,17 +10,22 @@ use std::{
 };
 use tempfile::NamedTempFile;
 
+pub enum StreamRequest {
+    Preload { offset: u64, length: u64 },
+    Blocked { offset: u64 },
+}
+
 pub struct StreamStorage {
     file: StreamFile,
     data_map: Arc<StreamDataMap>,
-    data_req_receiver: Receiver<(u64, u64)>,
-    data_req_sender: Sender<(u64, u64)>,
+    req_receiver: Receiver<StreamRequest>,
+    req_sender: Sender<StreamRequest>,
 }
 
 pub struct StreamReader {
     reader: File,
     data_map: Arc<StreamDataMap>,
-    data_req_sender: Sender<(u64, u64)>,
+    req_sender: Sender<StreamRequest>,
 }
 
 pub struct StreamWriter {
@@ -40,8 +45,8 @@ impl StreamStorage {
 
         Ok(StreamStorage {
             file: StreamFile::Temporary(tmp_file),
-            data_req_receiver,
-            data_req_sender,
+            req_receiver: data_req_receiver,
+            req_sender: data_req_sender,
             data_map: Arc::new(StreamDataMap {
                 total_size,
                 downloaded: Mutex::new(IntervalSet::new()),
@@ -68,8 +73,8 @@ impl StreamStorage {
 
         Ok(StreamStorage {
             file: StreamFile::Persisted(path),
-            data_req_receiver,
-            data_req_sender,
+            req_receiver: data_req_receiver,
+            req_sender: data_req_sender,
             data_map: Arc::new(StreamDataMap {
                 total_size,
                 downloaded: Mutex::new(downloaded_set),
@@ -83,7 +88,7 @@ impl StreamStorage {
         Ok(StreamReader {
             reader: self.file.reopen()?, // Re-opened files have a starting seek position.
             data_map: self.data_map.clone(),
-            data_req_sender: self.data_req_sender.clone(),
+            req_sender: self.req_sender.clone(),
         })
     }
 
@@ -94,8 +99,8 @@ impl StreamStorage {
         })
     }
 
-    pub fn receiver(&self) -> &Receiver<(u64, u64)> {
-        &self.data_req_receiver
+    pub fn receiver(&self) -> &Receiver<StreamRequest> {
+        &self.req_receiver
     }
 
     pub fn path(&self) -> &Path {
@@ -172,13 +177,20 @@ impl Read for StreamReader {
             let req_pos = round_down_to_multiple(pos, 4);
             let req_len = round_up_to_multiple(len, 4).max(MINIMUM_READ_LENGTH);
             self.data_map.mark_as_requested(req_pos, req_len);
-            self.data_req_sender
-                .send((req_pos, req_len))
+            self.req_sender
+                .send(StreamRequest::Preload {
+                    offset: req_pos,
+                    length: req_len,
+                })
                 .expect("Data request channel was closed");
         }
 
         // Block and wait until at least a part of the range is available, and read it.
-        let ready_to_read_len = self.data_map.wait_for(position);
+        let ready_to_read_len = self.data_map.wait_for(position, |offset| {
+            self.req_sender
+                .send(StreamRequest::Blocked { offset })
+                .expect("Data request channel was closed");
+        });
         assert!(ready_to_read_len > 0);
         self.reader
             .read(&mut buf[..ready_to_read_len.min(needed_len) as usize])
@@ -264,8 +276,8 @@ impl StreamDataMap {
 
     /// Block, waiting until at least some data at given offset is downloaded.
     /// Returns length that is available.  See `self.mark_as_downloaded`.
-    fn wait_for(&self, offset: u64) -> u64 {
-        let mut printed_warning = false;
+    fn wait_for(&self, offset: u64, mut blocking_callback: impl FnMut(u64)) -> u64 {
+        let mut called_callback = false;
         let mut available_len = 0; // Resulting length.
 
         let downloaded = self
@@ -283,10 +295,10 @@ impl StreamDataMap {
                     // There is `available_len` bytes of data downloaded, stop waiting.
                     false
                 } else {
-                    // Log we are waiting for the network, but only the first time.
-                    if !printed_warning {
-                        log::info!("blocked at {}", offset);
-                        printed_warning = true;
+                    // Call the blocking callback, but only the first time we are waiting.
+                    if !called_callback {
+                        called_callback = true;
+                        blocking_callback(offset);
                     }
                     // There are no overlaps, wait.
                     true
