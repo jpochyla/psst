@@ -82,6 +82,7 @@ pub const PLAYBACK_PLAYING: Selector<(TrackId, AudioDuration)> =
 pub const PLAYBACK_PROGRESS: Selector<AudioDuration> = Selector::new("app.playback-progress");
 pub const PLAYBACK_PAUSING: Selector = Selector::new("app.playback-pausing");
 pub const PLAYBACK_RESUMING: Selector = Selector::new("app.playback-resuming");
+pub const PLAYBACK_BLOCKED: Selector = Selector::new("app.playback-blocked");
 pub const PLAYBACK_STOPPED: Selector = Selector::new("app.playback-stopped");
 pub const UPDATE_AUDIO_ANALYSIS: Selector<(TrackId, Result<AudioAnalysis, Error>)> =
     Selector::new("app.update-audio-analysis");
@@ -94,4 +95,5 @@ pub const PLAY_PREVIOUS: Selector = Selector::new("app.play-previous");
 pub const PLAY_PAUSE: Selector = Selector::new("app.play-pause");
 pub const PLAY_RESUME: Selector = Selector::new("app.play-resume");
 pub const PLAY_NEXT: Selector = Selector::new("app.play-next");
+pub const PLAY_STOP: Selector = Selector::new("app.play-stop");
 pub const SEEK_TO_FRACTION: Selector<f64> = Selector::new("app.seek-to-fraction");

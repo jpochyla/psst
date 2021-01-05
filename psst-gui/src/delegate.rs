@@ -143,6 +143,10 @@ impl PlayerDelegate {
                     sink.submit_command(cmd::PLAYBACK_PROGRESS, progress, Target::Auto)
                         .unwrap();
                 }
+                PlayerEvent::Blocked => {
+                    sink.submit_command(cmd::PLAYBACK_BLOCKED, (), Target::Auto)
+                        .unwrap();
+                }
                 PlayerEvent::Stopped => {
                     sink.submit_command(cmd::PLAYBACK_STOPPED, (), Target::Auto)
                         .unwrap();
@@ -202,6 +206,12 @@ impl PlayerDelegate {
     fn next(&mut self) {
         self.player_sender
             .send(PlayerEvent::Command(PlayerCommand::Next))
+            .unwrap();
+    }
+
+    fn stop(&mut self) {
+        self.player_sender
+            .send(PlayerEvent::Command(PlayerCommand::Stop))
             .unwrap();
     }
 
@@ -806,6 +816,9 @@ impl Delegate {
         } else if cmd.is(cmd::PLAYBACK_RESUMING) {
             data.resume_playback();
             Handled::Yes
+        } else if cmd.is(cmd::PLAYBACK_BLOCKED) {
+            data.block_playback();
+            Handled::Yes
         } else if cmd.is(cmd::PLAYBACK_STOPPED) {
             data.stop_playback();
             Handled::Yes
@@ -842,6 +855,9 @@ impl Delegate {
             Handled::Yes
         } else if cmd.is(cmd::PLAY_NEXT) {
             self.player.next();
+            Handled::Yes
+        } else if cmd.is(cmd::PLAY_STOP) {
+            self.player.stop();
             Handled::Yes
         } else if let Some(fraction) = cmd.get(cmd::SEEK_TO_FRACTION) {
             data.playback.current.as_ref().map(|current| {

@@ -107,6 +107,10 @@ fn make_player_controls() -> impl Widget<Playback> {
             PlaybackState::Loading => Spinner::new()
                 .with_color(theme::GREY_4)
                 .padding(theme::grid(1.0))
+                .hover()
+                .circle()
+                .border(theme::GREY_6, 1.0)
+                .on_click(|ctx, _, _| ctx.submit_command(cmd::PLAY_STOP))
                 .boxed(),
             PlaybackState::Playing => icons::PAUSE
                 .scale((theme::grid(3.0), theme::grid(3.0)))

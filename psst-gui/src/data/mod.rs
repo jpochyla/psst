@@ -128,6 +128,10 @@ impl State {
         self.playback.state = PlaybackState::Playing;
     }
 
+    pub fn block_playback(&mut self) {
+        self.playback.state = PlaybackState::Loading;
+    }
+
     pub fn stop_playback(&mut self) {
         self.playback.state = PlaybackState::Stopped;
         self.playback.current.take();
