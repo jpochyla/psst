@@ -1,5 +1,5 @@
 [package]
-name = "psst-bin"
+name = "psst-cli"
 version = "0.1.0"
 authors = ["Jan Pochyla <jpochyla@gmail.com>"]
 edition = "2018"
