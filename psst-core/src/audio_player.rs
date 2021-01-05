@@ -48,8 +48,7 @@ impl PlaybackItem {
         let path = load_audio_path(self.item_id, &session, &cache, &config)?;
         let key = load_audio_key(&path, &session, &cache)?;
         let file = AudioFile::open(path, cdn, cache)?;
-        let source = file.audio_source(key)?;
-        Ok(LoadedPlaybackItem { file, source })
+        Ok(LoadedPlaybackItem { key, file })
     }
 }
 
@@ -153,8 +152,8 @@ fn load_audio_key(
 }
 
 pub struct LoadedPlaybackItem {
+    key: AudioKey,
     file: AudioFile,
-    source: FileAudioSource,
 }
 
 pub struct Player {
@@ -230,6 +229,7 @@ impl Player {
             PlayerEvent::Pausing { .. } => {}
             PlayerEvent::Resuming { .. } => {}
             PlayerEvent::Stopped { .. } => {}
+            PlayerEvent::Blocked => {}
         };
     }
 
@@ -390,15 +390,24 @@ impl Player {
         log::info!("starting playback");
         let path = loaded_item.file.path();
         let duration = Duration::default();
-        self.event_sender
-            .send(PlayerEvent::Playing { path, duration })
-            .expect("Failed to send PlayerEvent::Playing");
-        self.state = PlayerState::Playing { path, duration };
-        self.audio_source
+        let play_res = self
+            .audio_source
             .lock()
             .expect("Failed to acquire audio source lock")
             .play_now(loaded_item);
-        self.audio_output_remote.resume();
+        match play_res {
+            Ok(_) => {
+                self.event_sender
+                    .send(PlayerEvent::Playing { path, duration })
+                    .expect("Failed to send PlayerEvent::Playing");
+                self.state = PlayerState::Playing { path, duration };
+                self.audio_output_remote.resume();
+            }
+            Err(err) => {
+                log::error!("error while creating audio source: {}", err);
+                self.stop();
+            }
+        }
     }
 
     fn pause(&mut self) {
@@ -555,6 +564,8 @@ pub enum PlayerEvent {
         path: AudioPath,
         duration: Duration,
     },
+    /// Player would like to continue playing, but is blocked, waiting for I/O.
+    Blocked,
     /// Player has finished playing a track.  `Loading` or `Playing` might
     /// follow if the queue is not empty, `Stopped` will follow if it is.
     Finished,
@@ -595,8 +606,13 @@ const OUTPUT_CHANNELS: u8 = 2;
 const OUTPUT_SAMPLE_RATE: u32 = 44100;
 const PROGRESS_PRECISION_SAMPLES: u64 = (OUTPUT_SAMPLE_RATE / 10) as u64;
 
+struct CurrentPlaybackItem {
+    file: AudioFile,
+    source: FileAudioSource,
+}
+
 struct PlayerAudioSource {
-    current: Option<LoadedPlaybackItem>,
+    current: Option<CurrentPlaybackItem>,
     event_sender: Sender<PlayerEvent>,
     samples: u64,
 }
@@ -621,9 +637,20 @@ impl PlayerAudioSource {
         }
     }
 
-    fn play_now(&mut self, item: LoadedPlaybackItem) {
-        self.current.replace(item);
+    fn play_now(&mut self, item: LoadedPlaybackItem) -> Result<(), Error> {
+        self.current.replace(CurrentPlaybackItem {
+            source: item.file.audio_source(item.key, {
+                let event_sender = self.event_sender.clone();
+                move |_| {
+                    event_sender
+                        .send(PlayerEvent::Blocked)
+                        .expect("Failed to send PlayerEvent::Blocked");
+                }
+            })?,
+            file: item.file,
+        });
         self.samples = 0;
+        Ok(())
     }
 
     fn next_sample(&mut self) -> Option<AudioSample> {

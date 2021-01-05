@@ -91,10 +91,13 @@ impl AudioFile {
         }
     }
 
-    pub fn audio_source(&self, key: AudioKey) -> Result<FileAudioSource, Error> {
+    pub fn audio_source<T>(&self, key: AudioKey, on_blocking: T) -> Result<FileAudioSource, Error>
+    where
+        T: Fn(u64) + Send + 'static,
+    {
         let reader = match self {
-            Self::Streamed { streamed_file, .. } => streamed_file.storage.reader()?,
-            Self::Cached { cached_file, .. } => cached_file.storage.reader()?,
+            Self::Streamed { streamed_file, .. } => streamed_file.storage.reader(on_blocking)?,
+            Self::Cached { cached_file, .. } => cached_file.storage.reader(on_blocking)?,
         };
         let reader = BufReader::new(reader);
         let reader = AudioDecrypt::new(key, reader);
