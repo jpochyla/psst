@@ -18,7 +18,6 @@ use std::{
     path::{Path, PathBuf},
     sync::Arc,
 };
-use tokio_compat_02::FutureExt;
 
 struct CacheEntry<T> {
     path: PathBuf,
@@ -324,7 +323,7 @@ impl Web {
 
     pub async fn load_image(&self, uri: &str) -> Result<image::DynamicImage, Error> {
         let req = self.image_client.get(uri).build()?;
-        let res = self.image_client.execute(req).compat().await?;
+        let res = self.image_client.execute(req).await?;
         let img_bytes = res.bytes().await?;
         let img = image::load_from_memory(&img_bytes)?;
         Ok(img)
