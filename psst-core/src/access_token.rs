@@ -51,10 +51,6 @@ impl AccessToken {
     }
 
     fn is_expired(&self) -> bool {
-        dbg!(
-            &self.expires,
-            self.expires.saturating_duration_since(Instant::now())
-        );
         self.expires.saturating_duration_since(Instant::now()) < EXPIRATION_TIME_THRESHOLD
     }
 }
