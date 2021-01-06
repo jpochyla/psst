@@ -1,6 +1,6 @@
 use crate::error::Error;
 use crossbeam_channel::{unbounded, Receiver, Sender};
-use miniaudio::{Device, DeviceConfig, DeviceType, Format};
+use miniaudio::{Context, Device, DeviceConfig, DeviceType, Format};
 use std::sync::{Arc, Mutex};
 
 pub type AudioSample = i16;
@@ -33,14 +33,22 @@ impl AudioOutputRemote {
 }
 
 pub struct AudioOutput {
+    context: Context,
     event_sender: Sender<InternalEvent>,
     event_receiver: Receiver<InternalEvent>,
 }
 
 impl AudioOutput {
     pub fn open() -> Result<Self, Error> {
+        let backends = &[]; // Use default backend order.
+        let config = None; // Use default context config.
+        let context = Context::new(backends, config)?;
+
+        // Channel used for controlling the audio output.
         let (event_sender, event_receiver) = unbounded();
+
         Ok(Self {
+            context,
             event_sender,
             event_receiver,
         })
@@ -56,23 +64,32 @@ impl AudioOutput {
     where
         T: AudioSource + Send + 'static,
     {
-        let config = {
+        // Create a device config that describes the kind of device we want to use.
+        let mut config = DeviceConfig::new(DeviceType::Playback);
+
+        {
+            // Setup the device config for playback with the channel count and sample rate
+            // from the audio source.
             let source = source.lock().expect("Failed to acquire audio source lock");
-            let mut config = DeviceConfig::new(DeviceType::Playback);
             config.playback_mut().set_format(Format::S16);
             config.playback_mut().set_channels(source.channels().into());
             config.set_sample_rate(source.sample_rate());
-            config
         };
 
-        let mut device = Device::new(None, &config)?;
-
-        device.set_data_callback(move |_device, output, _frames| {
+        // Move the source into the config's data callback.  Callback will get cloned
+        // for each device we create.
+        config.set_data_callback(move |_device, output, _frames| {
             let mut source = source.lock().expect("Failed to acquire audio source lock");
             for sample in output.as_samples_mut() {
-                *sample = source.next().unwrap_or(0);
+                *sample = source.next().unwrap_or(0); // Use silence in case the
+                                                      // source has finished.
             }
         });
+
+        let device = {
+            let context = self.context.clone();
+            Device::new(Some(context), &config)?
+        };
 
         for event in self.event_receiver.iter() {
             match event {
