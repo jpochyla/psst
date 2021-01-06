@@ -6,7 +6,7 @@ use druid::{
         prelude::*, BackgroundBrush, CrossAxisAlignment, FillStrat, Flex, Image, Label, Painter,
         SizedBox,
     },
-    Affine, Data, ImageBuf, RenderContext, Widget, WidgetExt,
+    Affine, Color, Data, ImageBuf, KeyOrValue, RenderContext, Widget, WidgetExt,
 };
 use std::f64::consts::TAU;
 
@@ -16,15 +16,21 @@ pub enum Border {
 }
 
 impl Border {
-    pub fn widget<T: Data>(self) -> impl Into<BackgroundBrush<T>> {
-        Painter::new(move |ctx, _, _| {
+    pub fn widget<T: Data>(
+        self,
+        color: impl Into<KeyOrValue<Color>>,
+    ) -> impl Into<BackgroundBrush<T>> {
+        let color = color.into();
+
+        Painter::new(move |ctx, _, env| {
             let h = 1.0;
             let y = match self {
                 Self::Top => 0.0,
                 Self::Bottom => ctx.size().height - h,
             };
+            let color = color.resolve(&env);
             let line = Line::new((0.0, y), (ctx.size().width, y));
-            ctx.stroke(line, &theme::GREY_6, h);
+            ctx.stroke(line, &color, h);
         })
     }
 }

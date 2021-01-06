@@ -13,6 +13,7 @@ crossbeam-channel = "0.5"
 platform-dirs = "0.3.0"
 druid = { git = "https://github.com/linebender/druid", features = ["im", "image", "jpeg", "jpeg_rayon", "png"] }
 env_logger = "0.8"
+fs_extra = "1.2"
 itertools = "0.10"
 open = "1.4.0"
 log = "0.4"

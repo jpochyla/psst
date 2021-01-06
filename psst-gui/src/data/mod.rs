@@ -13,7 +13,7 @@ mod utils;
 pub use crate::data::{
     album::{Album, AlbumDetail, AlbumLink, AlbumType},
     artist::{Artist, ArtistAlbums, ArtistDetail, ArtistLink, ArtistTracks},
-    config::{AudioQuality, Config},
+    config::{AudioQuality, Config, Preferences, PreferencesTab},
     ctx::Ctx,
     nav::Nav,
     playback::{CurrentPlayback, Playback, PlaybackOrigin, PlaybackPayload, PlaybackState},
@@ -35,6 +35,7 @@ pub struct State {
     pub route: Nav,
     pub history: Vector<Nav>,
     pub config: Config,
+    pub preferences: Preferences,
     pub playback: Playback,
     pub search: Search,
     pub album: AlbumDetail,
@@ -51,6 +52,10 @@ impl Default for State {
             route: Nav::Home,
             history: Vector::new(),
             config: Config::default(),
+            preferences: Preferences {
+                active: PreferencesTab::General,
+                cache_size: None,
+            },
             playback: Playback {
                 state: PlaybackState::Stopped,
                 current: None,

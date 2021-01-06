@@ -34,7 +34,7 @@ pub fn make_config_window() -> WindowDesc<State> {
     WindowDesc::new(make_config)
         .title("Preferences")
         .menu(menu::make_menu())
-        .window_size((theme::grid(45.0), theme::grid(46.0)))
+        .window_size((theme::grid(50.0), theme::grid(58.0)))
         .resizable(false)
 }
 
@@ -60,7 +60,7 @@ pub fn make_root() -> impl Widget<State> {
         .with_default_spacer()
         .with_child(make_title())
         .with_flex_child(make_session_icon().align_right(), 1.0)
-        .background(Border::Bottom.widget());
+        .background(Border::Bottom.widget(theme::BACKGROUND_DARK));
 
     let main = Flex::column()
         .cross_axis_alignment(CrossAxisAlignment::Start)

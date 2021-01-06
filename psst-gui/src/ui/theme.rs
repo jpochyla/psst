@@ -29,7 +29,7 @@ pub const UI_FONT_MONO: Key<FontDescriptor> = Key::new("app.ui-font-mono");
 pub const TEXT_SIZE_SMALL: Key<f64> = Key::new("app.text-size-small");
 
 pub const ICON_COLOR: Key<Color> = Key::new("app.icon-color");
-pub const ICON_SIZE: Size = Size::new(12.0, 12.0);
+pub const ICON_SIZE: Size = Size::new(GRID * 2.0, GRID * 2.0);
 
 pub const HOVER_HOT_COLOR: Key<Color> = Key::new("app.hover-hot-color");
 pub const HOVER_COLD_COLOR: Key<Color> = Key::new("app.hover-cold-color");

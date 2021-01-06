@@ -21,7 +21,7 @@ pub fn make_panel() -> impl Widget<State> {
         .must_fill_main_axis(true)
         .with_flex_child(make_playback_info(), 1.0)
         .with_flex_child(make_player(), 1.0)
-        .background(Border::Top.widget())
+        .background(Border::Top.widget(theme::BACKGROUND_DARK))
         .lens(State::playback)
 }
 

@@ -6,6 +6,24 @@ use psst_core::{
 use serde::{Deserialize, Serialize};
 use std::{fs::File, path::PathBuf};
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Data)]
+pub enum PreferencesTab {
+    General,
+    Cache,
+}
+
+#[derive(Clone, Debug, Data, Lens)]
+pub struct Preferences {
+    pub active: PreferencesTab,
+    pub cache_size: Option<u64>,
+}
+
+impl Preferences {
+    pub fn measure_cache_usage() -> Option<u64> {
+        Config::cache_dir().and_then(|path| fs_extra::dir::get_size(&path).ok())
+    }
+}
+
 const APP_NAME: &str = "Psst";
 const CONFIG_FILENAME: &str = "config.json";
 

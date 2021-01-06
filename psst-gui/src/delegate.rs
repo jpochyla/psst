@@ -443,6 +443,10 @@ impl AppDelegate<State> for Delegate {
             Handled::Yes
         } else if let Handled::Yes = self.command_image(target, cmd, data) {
             Handled::Yes
+        } else if let Handled::Yes = self.command_playback(target, cmd, data) {
+            Handled::Yes
+        } else if let Handled::Yes = self.command_playback_ctrl(target, cmd, data) {
+            Handled::Yes
         } else if let Handled::Yes = self.command_session(target, cmd, data) {
             Handled::Yes
         } else if let Handled::Yes = self.command_nav(target, cmd, data) {
@@ -456,10 +460,6 @@ impl AppDelegate<State> for Delegate {
         } else if let Handled::Yes = self.command_artist(target, cmd, data) {
             Handled::Yes
         } else if let Handled::Yes = self.command_search(target, cmd, data) {
-            Handled::Yes
-        } else if let Handled::Yes = self.command_playback(target, cmd, data) {
-            Handled::Yes
-        } else if let Handled::Yes = self.command_playback_ctrl(target, cmd, data) {
             Handled::Yes
         } else {
             Handled::No
