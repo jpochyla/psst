@@ -27,7 +27,7 @@ pub fn make_main_window() -> WindowDesc<State> {
         .title("Psst")
         .menu(menu::make_menu())
         .with_min_size((theme::grid(25.0), theme::grid(25.0)))
-        .window_size((theme::grid(125.0), theme::grid(100.0)))
+        .window_size((theme::grid(100.0), theme::grid(100.0)))
 }
 
 pub fn make_config_window() -> WindowDesc<State> {
