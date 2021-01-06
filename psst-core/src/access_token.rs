@@ -11,8 +11,10 @@ const CLIENT_ID: &str = "65b708073fc0480ea92a077233ca87bd";
 // All scopes we could possibly require.
 const ACCESS_SCOPES: &str = "streaming,user-read-email,user-read-private,playlist-read-private,playlist-read-collaborative,playlist-modify-public,playlist-modify-private,user-follow-modify,user-follow-read,user-library-read,user-library-modify,user-top-read,user-read-recently-played";
 
-// Consider token expired even before the official expiration time.
-const EXPIRATION_TIME_THRESHOLD: Duration = Duration::from_secs(5);
+// Consider token expired even before the official expiration time.  Spotify
+// seems to be reporting excessive token TTLs so let's cut it down by 30
+// minutes.
+const EXPIRATION_TIME_THRESHOLD: Duration = Duration::from_secs(60 * 30);
 
 #[derive(Clone)]
 pub struct AccessToken {
@@ -49,6 +51,10 @@ impl AccessToken {
     }
 
     fn is_expired(&self) -> bool {
+        dbg!(
+            &self.expires,
+            self.expires.saturating_duration_since(Instant::now())
+        );
         self.expires.saturating_duration_since(Instant::now()) < EXPIRATION_TIME_THRESHOLD
     }
 }
