@@ -131,7 +131,7 @@ impl Web {
     where
         PerFn: Fn(&'a aspotify::Client, usize, usize) -> PerFut,
         PerFut: Future<Output = Result<Response<Page<U>>, aspotify::Error>> + 'a,
-        MapFn: Fn(U) -> T,
+        MapFn: Fn(U) -> Option<T>,
         T: Clone,
     {
         let mut results = Vector::new();
@@ -140,7 +140,7 @@ impl Web {
         loop {
             let page = iter_fn(self.client().await?, limit, offset).await?.data;
 
-            results.extend(page.items.into_iter().map(&map_fn));
+            results.extend(page.items.into_iter().filter_map(&map_fn));
 
             if page.total > results.len() && results.len() < Self::PAGED_ITEMS_LIMIT {
                 limit = page.limit;
@@ -178,7 +178,7 @@ impl Web {
                         Some(Market::FromToken),
                     )
                 },
-                |artists_album| artists_album.into(),
+                |artists_album| Some(artists_album.into()),
             )
             .await?;
         let mut artist_albums = ArtistAlbums {
@@ -234,7 +234,7 @@ impl Web {
                         .library()
                         .get_saved_albums(limit, offset, Some(Market::FromToken))
                 },
-                |saved| saved.album.into(),
+                |saved| Some(saved.album.into()),
             )
             .await?;
         Ok(result)
@@ -275,7 +275,7 @@ impl Web {
                         .library()
                         .get_saved_tracks(limit, offset, Some(Market::FromToken))
                 },
-                |saved| Arc::new(Track::from(saved.track)),
+                |saved| Some(Arc::new(Track::from(saved.track))),
             )
             .await?;
         Ok(tracks)
@@ -295,7 +295,7 @@ impl Web {
         let result = self
             .with_paging(
                 |client, limit, offset| client.playlists().current_users_playlists(limit, offset),
-                |playlist| playlist.into(),
+                |playlist| Some(playlist.into()),
             )
             .await?;
         Ok(result)
@@ -313,8 +313,8 @@ impl Web {
                     )
                 },
                 |item| match item.item {
-                    PlaylistItemType::Track(track) => Arc::new(Track::from(track)),
-                    PlaylistItemType::Episode(_) => unimplemented!(),
+                    Some(PlaylistItemType::Track(track)) => Some(Arc::new(Track::from(track))),
+                    _ => None,
                 },
             )
             .await?;
