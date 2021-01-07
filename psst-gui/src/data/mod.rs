@@ -134,7 +134,7 @@ impl State {
     }
 
     pub fn block_playback(&mut self) {
-        self.playback.state = PlaybackState::Loading;
+        // TODO: Figure out how to signal blocked playback properly.
     }
 
     pub fn stop_playback(&mut self) {
