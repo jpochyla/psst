@@ -5,7 +5,7 @@ use crate::{
     widget::{icons, Empty, HoverExt, ViewDispatcher},
 };
 use druid::{
-    widget::{CrossAxisAlignment, Either, Flex, Label, Scroll, SizedBox, Split, ViewSwitcher},
+    widget::{CrossAxisAlignment, Either, Flex, Label, Scroll, Split, ViewSwitcher},
     Insets, Widget, WidgetExt, WindowDesc,
 };
 use icons::SvgIcon;
@@ -60,7 +60,7 @@ pub fn make_root() -> impl Widget<State> {
         .with_child(make_back_button())
         .with_default_spacer()
         .with_child(make_title())
-        .with_flex_child(make_session_icon().align_right(), 1.0)
+        .with_flex_child(make_is_online().align_right(), 1.0)
         .background(Border::Bottom.widget(theme::BACKGROUND_DARK));
 
     let main = Flex::column()
@@ -201,15 +201,8 @@ fn make_route_title() -> impl Widget<State> {
     .with_font(theme::UI_FONT_MEDIUM)
 }
 
-fn make_session_icon() -> impl Widget<State> {
-    Either::new(
-        |state: &State, _| state.is_online,
-        icons::CLOUD_ONLINE
-            .scale((theme::grid(2.0), theme::grid(2.0)))
-            .with_color(theme::PLACEHOLDER_COLOR),
-        icons::CLOUD_OFFLINE
-            .scale((theme::grid(2.0), theme::grid(2.0)))
-            .with_color(theme::PLACEHOLDER_COLOR),
-    )
-    .padding((theme::grid(2.0), theme::grid(1.0)))
+fn make_is_online() -> impl Widget<State> {
+    Label::dynamic(|is_online: &bool, _| if *is_online { "" } else { "Offline" }.to_string())
+        .padding(theme::grid(1.0))
+        .lens(State::is_online)
 }
