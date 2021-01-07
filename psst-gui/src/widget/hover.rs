@@ -88,7 +88,7 @@ impl<T: Data> Widget<T> for Hover<T> {
         let rounded_rect = ctx
             .size()
             .to_rect()
-            .inset(-border_width / 2.0)
+            .inset(-border_width)
             .to_rounded_rect(corner_radius);
         ctx.stroke(rounded_rect, &border_color, border_width);
         ctx.fill(rounded_rect, &background);
