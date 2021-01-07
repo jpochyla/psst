@@ -6,7 +6,7 @@ use crate::{
 };
 use druid::{
     widget::{CrossAxisAlignment, Either, Flex, Label, Scroll, SizedBox, Split, ViewSwitcher},
-    Widget, WidgetExt, WindowDesc,
+    Insets, Widget, WidgetExt, WindowDesc,
 };
 use icons::SvgIcon;
 
@@ -49,6 +49,7 @@ pub fn make_root() -> impl Widget<State> {
     let playlists = Scroll::new(playlist::make_list()).vertical();
     let sidebar = Flex::column()
         .must_fill_main_axis(true)
+        .with_child(make_logo())
         .with_child(make_menu())
         .with_default_spacer()
         .with_flex_child(playlists, 1.0)
@@ -77,6 +78,14 @@ pub fn make_root() -> impl Widget<State> {
     // .debug_invalidation()
     // .debug_widget_id()
     // .debug_paint_layout()
+}
+
+pub fn make_logo() -> impl Widget<State> {
+    icons::LOGO
+        .scale((29.0, 32.0))
+        .with_color(theme::GREY_5)
+        .padding(Insets::new(0.0, theme::grid(2.0), 0.0, theme::grid(1.0)))
+        .center()
 }
 
 pub fn make_menu() -> impl Widget<State> {
@@ -135,11 +144,12 @@ pub fn make_home() -> impl Widget<State> {
 }
 
 pub fn make_back_button() -> impl Widget<State> {
-    let icon_width = 10.0;
-    let icon_height = theme::grid(2.0);
-    let empty_icon = SizedBox::empty().width(icon_width).height(icon_height);
-    let back_icon = icons::BACK
-        .scale((icon_width, icon_height))
+    let icon = icons::BACK.scale((10.0, theme::grid(2.0)));
+    let disabled = icon
+        .clone()
+        .with_color(theme::GREY_6)
+        .padding(theme::grid(1.0));
+    let enabled = icon
         .padding(theme::grid(1.0))
         .hover()
         .rounded(theme::BUTTON_BORDER_RADIUS)
@@ -148,8 +158,8 @@ pub fn make_back_button() -> impl Widget<State> {
         });
     Either::new(
         |state: &State, _| state.history.is_empty(),
-        empty_icon,
-        back_icon,
+        disabled,
+        enabled,
     )
     .padding(theme::grid(1.0))
 }
@@ -181,7 +191,7 @@ fn make_route_icon() -> impl Widget<State> {
 
 fn make_route_title() -> impl Widget<State> {
     Label::dynamic(|state: &State, _| match &state.route {
-        Nav::Home => "".to_string(),
+        Nav::Home => "Home".to_string(),
         Nav::Library => "Library".to_string(),
         Nav::SearchResults(query) => query.clone(),
         Nav::AlbumDetail(link) => link.name.to_string(),
