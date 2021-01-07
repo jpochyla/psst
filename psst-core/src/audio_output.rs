@@ -84,7 +84,9 @@ impl AudioOutput {
             // Apply correct normalization factor before each audio packet.
             if let Some(norm_factor) = source.normalization_factor() {
                 // TODO: Add a global master volume to the calculation.
-                device.set_master_volume(norm_factor);
+                if let Err(err) = device.set_master_volume(norm_factor) {
+                    log::error!("failed to set master volume: {}", err);
+                }
             }
             // Fill the buffer with audio samples from the source.
             for sample in output.as_samples_mut() {
