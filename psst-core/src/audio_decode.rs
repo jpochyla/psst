@@ -1,4 +1,4 @@
-use crate::{audio_output::AudioSource, error::Error};
+use crate::error::Error;
 use std::io;
 
 pub struct VorbisDecoder<R>
@@ -45,6 +45,14 @@ where
             }
         }
     }
+
+    fn channels(&self) -> u8 {
+        self.vorbis.channels
+    }
+
+    fn sample_rate(&self) -> u32 {
+        self.vorbis.sample_rate
+    }
 }
 
 impl<R> Iterator for VorbisDecoder<R>
@@ -78,19 +86,6 @@ where
 
     fn size_hint(&self) -> (usize, Option<usize>) {
         (self.packet.len() - self.pos, None)
-    }
-}
-
-impl<R> AudioSource for VorbisDecoder<R>
-where
-    R: io::Read + io::Seek,
-{
-    fn channels(&self) -> u8 {
-        self.vorbis.channels
-    }
-
-    fn sample_rate(&self) -> u32 {
-        self.vorbis.sample_rate
     }
 }
 

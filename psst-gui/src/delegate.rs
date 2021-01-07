@@ -15,6 +15,7 @@ use druid::{
 };
 use lru_cache::LruCache;
 use psst_core::{
+    audio_normalize::NormalizationLevel,
     audio_output::AudioOutput,
     audio_player::{PlaybackConfig, PlaybackItem, Player, PlayerCommand, PlayerEvent},
     cache::Cache,
@@ -175,7 +176,13 @@ impl PlayerDelegate {
         let items = self
             .player_queue
             .iter()
-            .map(|(_origin, track)| PlaybackItem { item_id: *track.id })
+            .map(|(origin, track)| PlaybackItem {
+                item_id: *track.id,
+                norm_level: match origin {
+                    PlaybackOrigin::Album(_) => NormalizationLevel::Album,
+                    _ => NormalizationLevel::Track,
+                },
+            })
             .collect();
         self.player_sender
             .send(PlayerEvent::Command(PlayerCommand::LoadQueue {

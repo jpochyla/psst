@@ -1,6 +1,7 @@
 use crate::{
     audio_file::{AudioFile, AudioPath, FileAudioSource},
     audio_key::AudioKey,
+    audio_normalize::NormalizationLevel,
     audio_output::{AudioOutputRemote, AudioSample, AudioSource},
     cache::CacheHandle,
     cdn::CdnHandle,
@@ -24,17 +25,22 @@ const PREVIOUS_TRACK_THRESHOLD: Duration = Duration::from_secs(3);
 #[derive(Clone)]
 pub struct PlaybackConfig {
     pub bitrate: usize,
+    pub pregain: f32,
 }
 
 impl Default for PlaybackConfig {
     fn default() -> Self {
-        Self { bitrate: 320 }
+        Self {
+            bitrate: 320,
+            pregain: 3.0,
+        }
     }
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub struct PlaybackItem {
     pub item_id: ItemId,
+    pub norm_level: NormalizationLevel,
 }
 
 impl PlaybackItem {
@@ -48,7 +54,12 @@ impl PlaybackItem {
         let path = load_audio_path(self.item_id, &session, &cache, &config)?;
         let key = load_audio_key(&path, &session, &cache)?;
         let file = AudioFile::open(path, cdn, cache)?;
-        Ok(LoadedPlaybackItem { key, file })
+        Ok(LoadedPlaybackItem {
+            key,
+            file,
+            norm_level: self.norm_level,
+            norm_pregain: config.pregain,
+        })
     }
 }
 
@@ -154,6 +165,8 @@ fn load_audio_key(
 pub struct LoadedPlaybackItem {
     key: AudioKey,
     file: AudioFile,
+    norm_level: NormalizationLevel,
+    norm_pregain: f32,
 }
 
 pub struct Player {
@@ -609,6 +622,7 @@ const PROGRESS_PRECISION_SAMPLES: u64 = (OUTPUT_SAMPLE_RATE / 10) as u64;
 struct CurrentPlaybackItem {
     file: AudioFile,
     source: FileAudioSource,
+    norm_factor: f32,
 }
 
 struct PlayerAudioSource {
@@ -638,15 +652,18 @@ impl PlayerAudioSource {
     }
 
     fn play_now(&mut self, item: LoadedPlaybackItem) -> Result<(), Error> {
+        let (source, normalization) = item.file.audio_source(item.key, {
+            let event_sender = self.event_sender.clone();
+            move |_| {
+                event_sender
+                    .send(PlayerEvent::Blocked)
+                    .expect("Failed to send PlayerEvent::Blocked");
+            }
+        })?;
+        let norm_factor = normalization.factor_for_level(item.norm_level, item.norm_pregain);
         self.current.replace(CurrentPlaybackItem {
-            source: item.file.audio_source(item.key, {
-                let event_sender = self.event_sender.clone();
-                move |_| {
-                    event_sender
-                        .send(PlayerEvent::Blocked)
-                        .expect("Failed to send PlayerEvent::Blocked");
-                }
-            })?,
+            source,
+            norm_factor,
             file: item.file,
         });
         self.samples = 0;
@@ -693,6 +710,10 @@ impl AudioSource for PlayerAudioSource {
 
     fn sample_rate(&self) -> u32 {
         OUTPUT_SAMPLE_RATE
+    }
+
+    fn normalization_factor(&self) -> Option<f32> {
+        self.current.as_ref().map(|current| current.norm_factor)
     }
 }
 

@@ -90,6 +90,7 @@ impl Config {
     pub fn playback(&self) -> PlaybackConfig {
         PlaybackConfig {
             bitrate: self.audio_quality.as_bitrate(),
+            ..PlaybackConfig::default()
         }
     }
 }

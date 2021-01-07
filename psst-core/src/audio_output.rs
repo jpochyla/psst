@@ -8,6 +8,7 @@ pub type AudioSample = i16;
 pub trait AudioSource: Iterator<Item = AudioSample> {
     fn channels(&self) -> u8;
     fn sample_rate(&self) -> u32;
+    fn normalization_factor(&self) -> Option<f32>;
 }
 
 pub struct AudioOutputRemote {
@@ -78,8 +79,14 @@ impl AudioOutput {
 
         // Move the source into the config's data callback.  Callback will get cloned
         // for each device we create.
-        config.set_data_callback(move |_device, output, _frames| {
+        config.set_data_callback(move |device, output, _frames| {
             let mut source = source.lock().expect("Failed to acquire audio source lock");
+            // Apply correct normalization factor before each audio packet.
+            if let Some(norm_factor) = source.normalization_factor() {
+                // TODO: Add a global master volume to the calculation.
+                device.set_master_volume(norm_factor);
+            }
+            // Fill the buffer with audio samples from the source.
             for sample in output.as_samples_mut() {
                 *sample = source.next().unwrap_or(0); // Use silence in case the
                                                       // source has finished.

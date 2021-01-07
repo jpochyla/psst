@@ -2,6 +2,7 @@ use crate::{
     audio_decode::VorbisDecoder,
     audio_decrypt::AudioDecrypt,
     audio_key::AudioKey,
+    audio_normalize::NormalizationData,
     cache::CacheHandle,
     cdn::{CdnHandle, CdnUrl},
     error::Error,
@@ -91,7 +92,11 @@ impl AudioFile {
         }
     }
 
-    pub fn audio_source<T>(&self, key: AudioKey, on_blocking: T) -> Result<FileAudioSource, Error>
+    pub fn audio_source<T>(
+        &self,
+        key: AudioKey,
+        on_blocking: T,
+    ) -> Result<(FileAudioSource, NormalizationData), Error>
     where
         T: Fn(u64) + Send + 'static,
     {
@@ -100,10 +105,11 @@ impl AudioFile {
             Self::Cached { cached_file, .. } => cached_file.storage.reader(on_blocking)?,
         };
         let reader = BufReader::new(reader);
-        let reader = AudioDecrypt::new(key, reader);
+        let mut reader = AudioDecrypt::new(key, reader);
+        let normalization = NormalizationData::parse(&mut reader)?;
         let reader = OffsetFile::new(reader, self.header_length())?;
         let reader = VorbisDecoder::new(reader)?;
-        Ok(reader)
+        Ok((reader, normalization))
     }
 
     fn header_length(&self) -> u64 {

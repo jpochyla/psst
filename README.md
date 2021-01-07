@@ -41,7 +41,7 @@ $ cargo run
     - Rename playlist
 - [ ] Playback queue
 - [ ] Audio volume control
-- [ ] Audio loudness normalization
+- [x] Audio loudness normalization
 - [ ] React to audio output device events
     - Pause after disconnecting headphones
     - Transfer playback after connecting headphones

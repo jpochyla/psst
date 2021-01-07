@@ -3,6 +3,7 @@ pub mod audio_decode;
 pub mod audio_decrypt;
 pub mod audio_file;
 pub mod audio_key;
+pub mod audio_normalize;
 pub mod audio_output;
 pub mod audio_player;
 pub mod cache;

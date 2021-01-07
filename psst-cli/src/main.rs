@@ -1,4 +1,5 @@
 use psst_core::{
+    audio_normalize::NormalizationLevel,
     audio_output::AudioOutput,
     audio_player::{PlaybackConfig, PlaybackItem, Player, PlayerCommand, PlayerEvent},
     cache::{Cache, CacheHandle},
@@ -34,7 +35,15 @@ fn start(session: SessionHandle) -> Result<(), Error> {
     let cdn = Cdn::connect(session.clone());
     let cache = Cache::new(PathBuf::from("cache"))?;
     let item_id = ItemId::from_base62("6UCFZ9ZOFRxK8oak7MdPZu", ItemIdType::Track).unwrap();
-    play_item(session, cdn, cache, PlaybackItem { item_id })
+    play_item(
+        session,
+        cdn,
+        cache,
+        PlaybackItem {
+            item_id,
+            norm_level: NormalizationLevel::Track,
+        },
+    )
 }
 
 fn play_item(
