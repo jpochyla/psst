@@ -45,10 +45,11 @@ fn make_current_playback_info() -> impl Widget<CurrentPlayback> {
         |origin, _, _| {
             Flex::row()
                 .cross_axis_alignment(CrossAxisAlignment::Center)
-                .with_child(
+                .with_flex_child(
                     Label::dynamic(|current: &CurrentPlayback, _| current.origin.as_string())
                         .with_line_break_mode(LineBreaking::Clip)
                         .with_text_size(theme::TEXT_SIZE_SMALL),
+                    1.0,
                 )
                 .with_spacer(theme::grid(0.25))
                 .with_child(
