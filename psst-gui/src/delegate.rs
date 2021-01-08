@@ -10,7 +10,7 @@ use crate::{
 };
 use crossbeam_channel::{Receiver, Sender};
 use druid::{
-    commands, im::Vector, AppDelegate, Application, Command, Data, DelegateCtx, Env, Event,
+    commands, im::Vector, image, AppDelegate, Application, Command, Data, DelegateCtx, Env, Event,
     ExtEventSink, Handled, ImageBuf, Selector, Target, WindowId,
 };
 use lru_cache::LruCache;
@@ -347,11 +347,8 @@ pub struct Delegate {
     image_cache: LruCache<Arc<str>, ImageBuf>,
 }
 
-const IMAGE_CACHE_SIZE: usize = 2048;
-
 impl Delegate {
     pub fn new(config: &Config, event_sink: ExtEventSink) -> Self {
-        let runtime = Runtime::new().unwrap();
         let session = {
             let sink = event_sink.clone();
             let creds = config.credentials().expect("Missing session credentials");
@@ -368,6 +365,17 @@ impl Delegate {
             let cache = WebCache::new(path).expect("Failed to create web API cache");
             Arc::new(Web::new(session, cache))
         };
+
+        // Default is 512, but because we can spam the runtime with lot of blocking
+        // operations at once, let's turn it down.
+        const MAX_BLOCKING_THREADS: usize = 32;
+        let runtime = tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .max_blocking_threads(MAX_BLOCKING_THREADS)
+            .build()
+            .unwrap();
+
+        const IMAGE_CACHE_SIZE: usize = 512;
         let image_cache = LruCache::new(IMAGE_CACHE_SIZE);
 
         Self {
@@ -488,7 +496,10 @@ impl Delegate {
             } else {
                 let web = self.web.clone();
                 self.runtime.spawn(async move {
-                    let dyn_image = web.load_image(&location).await.unwrap();
+                    let dyn_image = web
+                        .load_image(&location, image::ImageFormat::Jpeg)
+                        .await
+                        .unwrap();
                     let image_buf = ImageBuf::from_dynamic_image(dyn_image);
                     let payload = remote_image::ImagePayload {
                         location,
