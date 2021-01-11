@@ -26,6 +26,6 @@ jobs:
     - name: Install OpenSSL
       run: sudo apt-get install -y libssl-dev
     - name: Run tests
-      run: cargo test --verbose
+      run: cargo test
     - name: Build
-      run: cargo build --verbose --release
+      run: cargo build --release
