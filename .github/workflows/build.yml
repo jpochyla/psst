@@ -27,7 +27,9 @@ jobs:
       run: cargo test
     - name: Build
       run: cargo build --release
+    - name: Make it executable
+      run: chmod +x target/release/psst-gui
     - uses: actions/upload-artifact@v2
       with:
-        name: my-artifact
-        path: target # or path/to/artifact
+        name: psst-gui-ubuntu
+        path: target/release/psst-gui # or path/to/artifact
