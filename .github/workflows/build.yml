@@ -8,10 +8,8 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build:
-
+  ubuntu:
     runs-on: ubuntu-latest
-
     steps:
     - uses: actions/checkout@v2
     - uses: actions-rs/toolchain@v1
@@ -29,3 +27,7 @@ jobs:
       run: cargo test
     - name: Build
       run: cargo build --release
+    - uses: actions/upload-artifact@v2
+      with:
+        name: my-artifact
+        path: target # or path/to/artifact
