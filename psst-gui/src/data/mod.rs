@@ -13,7 +13,7 @@ mod utils;
 pub use crate::data::{
     album::{Album, AlbumDetail, AlbumLink, AlbumType},
     artist::{Artist, ArtistAlbums, ArtistDetail, ArtistLink, ArtistTracks},
-    config::{AudioQuality, Config, Preferences, PreferencesTab},
+    config::{AudioQuality, Config, Preferences, PreferencesTab, Theme},
     ctx::Ctx,
     nav::Nav,
     playback::{CurrentPlayback, Playback, PlaybackOrigin, PlaybackPayload, PlaybackState},

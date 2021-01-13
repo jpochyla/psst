@@ -82,7 +82,7 @@ pub fn setup(env: &mut Env, state: &State) {
     env.set(TEXT_SIZE_NORMAL, 13.0);
     env.set(TEXT_SIZE_LARGE, 16.0);
 
-    env.set(BASIC_WIDGET_HEIGHT, grid(3.0));
+    env.set(BASIC_WIDGET_HEIGHT, 22.0);
     env.set(WIDE_WIDGET_WIDTH, grid(12.0));
     env.set(BORDERED_WIDGET_HEIGHT, grid(4.0));
 

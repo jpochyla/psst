@@ -33,6 +33,7 @@ pub struct Config {
     pub username: String,
     pub password: String,
     pub audio_quality: AudioQuality,
+    pub theme: Theme,
 }
 
 impl Config {
@@ -115,5 +116,17 @@ impl AudioQuality {
 impl Default for AudioQuality {
     fn default() -> Self {
         Self::High
+    }
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Data, Serialize, Deserialize)]
+pub enum Theme {
+    Light,
+    Dark,
+}
+
+impl Default for Theme {
+    fn default() -> Self {
+        Self::Light
     }
 }

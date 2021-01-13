@@ -2,7 +2,7 @@ use std::thread::{self, JoinHandle};
 
 use crate::{
     cmd,
-    data::{AudioQuality, Config, Preferences, PreferencesTab, State},
+    data::{AudioQuality, Config, Preferences, PreferencesTab, State, Theme},
     ui::{icons::SvgIcon, theme, utils::Border},
     widget::{icons, HoverExt},
 };
@@ -77,8 +77,18 @@ fn make_config_tabs() -> impl Widget<State> {
 fn make_config_general() -> impl Widget<State> {
     let mut col = Flex::column().cross_axis_alignment(CrossAxisAlignment::Start);
 
+    // Theme
+    col = col
+        .with_child(Label::new("Theme").with_font(theme::UI_FONT_MEDIUM))
+        .with_spacer(theme::grid(2.0))
+        .with_child(
+            RadioGroup::new(vec![("Light", Theme::Light), ("Dark", Theme::Dark)])
+                .lens(Config::theme),
+        );
+
     // Credentials
     col = col
+        .with_spacer(theme::grid(3.0))
         .with_child(Label::new("Device credentials").with_font(theme::UI_FONT_MEDIUM))
         .with_spacer(theme::grid(2.0))
         .with_child(
