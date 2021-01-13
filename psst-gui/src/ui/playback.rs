@@ -106,11 +106,11 @@ fn make_player_controls() -> impl Widget<Playback> {
         |playback: &Playback, _| playback.state,
         |&state, _, _| match state {
             PlaybackState::Loading => Spinner::new()
-                .with_color(theme::GREY_4)
+                .with_color(theme::GREY_400)
                 .padding(theme::grid(1.0))
                 .hover()
                 .circle()
-                .border(theme::GREY_6, 1.0)
+                .border(theme::GREY_600, 1.0)
                 .on_click(|ctx, _, _| ctx.submit_command(cmd::PLAY_STOP))
                 .boxed(),
             PlaybackState::Playing => icons::PAUSE
@@ -118,7 +118,7 @@ fn make_player_controls() -> impl Widget<Playback> {
                 .padding(theme::grid(1.0))
                 .hover()
                 .circle()
-                .border(theme::GREY_5, 1.0)
+                .border(theme::GREY_500, 1.0)
                 .on_click(|ctx, _, _| ctx.submit_command(cmd::PLAY_PAUSE))
                 .boxed(),
             PlaybackState::Paused => icons::PLAY
@@ -126,7 +126,7 @@ fn make_player_controls() -> impl Widget<Playback> {
                 .padding(theme::grid(1.0))
                 .hover()
                 .circle()
-                .border(theme::GREY_5, 1.0)
+                .border(theme::GREY_500, 1.0)
                 .on_click(|ctx, _, _| ctx.submit_command(cmd::PLAY_RESUME))
                 .boxed(),
             PlaybackState::Stopped => Empty.boxed(),
@@ -335,7 +335,7 @@ fn compute_loudness_path_from_analysis(
     path
 }
 
-fn paint_audio_analysis(ctx: &mut PaintCtx, data: &CurrentPlayback, path: &BezPath, _env: &Env) {
+fn paint_audio_analysis(ctx: &mut PaintCtx, data: &CurrentPlayback, path: &BezPath, env: &Env) {
     let bounds = ctx.size();
 
     let elapsed_time = data.progress.as_secs_f64();
@@ -345,9 +345,9 @@ fn paint_audio_analysis(ctx: &mut PaintCtx, data: &CurrentPlayback, path: &BezPa
     let elapsed = Size::new(elapsed_width, bounds.height).to_rect();
 
     let (elapsed_color, remaining_color) = if ctx.is_hot() {
-        (theme::GREY_2, theme::GREY_5)
+        (env.get(theme::GREY_200), env.get(theme::GREY_500))
     } else {
-        (theme::GREY_3, theme::GREY_6)
+        (env.get(theme::GREY_300), env.get(theme::GREY_600))
     };
 
     ctx.with_save(|ctx| {
@@ -357,14 +357,14 @@ fn paint_audio_analysis(ctx: &mut PaintCtx, data: &CurrentPlayback, path: &BezPa
     });
 }
 
-fn paint_progress_bar(ctx: &mut PaintCtx, data: &CurrentPlayback, _env: &Env) {
+fn paint_progress_bar(ctx: &mut PaintCtx, data: &CurrentPlayback, env: &Env) {
     let elapsed_time = data.progress.as_secs_f64();
     let total_time = data.item.duration.as_secs_f64();
 
     let (elapsed_color, remaining_color) = if ctx.is_hot() {
-        (theme::GREY_2, theme::GREY_5)
+        (env.get(theme::GREY_200), env.get(theme::GREY_500))
     } else {
-        (theme::GREY_3, theme::GREY_6)
+        (env.get(theme::GREY_300), env.get(theme::GREY_600))
     };
     let bounds = ctx.size();
 

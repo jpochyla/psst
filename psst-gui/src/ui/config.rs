@@ -29,7 +29,7 @@ pub fn make_config() -> impl Widget<State> {
     )
     .padding((theme::grid(4.0), theme::grid(4.0)))
     .expand_width()
-    .background(Border::Top.widget(theme::GREY_5));
+    .background(Border::Top.widget(theme::GREY_500));
 
     Flex::column()
         .must_fill_main_axis(true)

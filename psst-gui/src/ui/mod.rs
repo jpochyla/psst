@@ -83,7 +83,7 @@ pub fn make_root() -> impl Widget<State> {
 pub fn make_logo() -> impl Widget<State> {
     icons::LOGO
         .scale((29.0, 32.0))
-        .with_color(theme::GREY_5)
+        .with_color(theme::GREY_500)
         .padding(Insets::new(0.0, theme::grid(2.0), 0.0, theme::grid(1.0)))
         .center()
 }
@@ -105,11 +105,17 @@ fn make_menu_button(title: &str, nav: Nav) -> impl Widget<State> {
             let nav = nav.clone();
             move |env, state: &State| {
                 if nav == state.route {
-                    env.set(theme::HOVER_COLD_COLOR, theme::MENU_BUTTON_BG_ACTIVE);
-                    env.set(theme::LABEL_COLOR, theme::MENU_BUTTON_FG_ACTIVE);
+                    env.set(
+                        theme::HOVER_COLD_COLOR,
+                        env.get(theme::MENU_BUTTON_BG_ACTIVE),
+                    );
+                    env.set(theme::LABEL_COLOR, env.get(theme::MENU_BUTTON_FG_ACTIVE));
                 } else {
-                    env.set(theme::HOVER_COLD_COLOR, theme::MENU_BUTTON_BG_INACTIVE);
-                    env.set(theme::LABEL_COLOR, theme::MENU_BUTTON_FG_INACTIVE);
+                    env.set(
+                        theme::HOVER_COLD_COLOR,
+                        env.get(theme::MENU_BUTTON_BG_INACTIVE),
+                    );
+                    env.set(theme::LABEL_COLOR, env.get(theme::MENU_BUTTON_FG_INACTIVE));
                 }
             }
         })
@@ -147,7 +153,7 @@ pub fn make_back_button() -> impl Widget<State> {
     let icon = icons::BACK.scale((10.0, theme::grid(2.0)));
     let disabled = icon
         .clone()
-        .with_color(theme::GREY_6)
+        .with_color(theme::GREY_600)
         .padding(theme::grid(1.0));
     let enabled = icon
         .padding(theme::grid(1.0))

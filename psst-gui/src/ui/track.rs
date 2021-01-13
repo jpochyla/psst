@@ -186,12 +186,12 @@ fn make_track(display: TrackDisplay) -> impl Widget<TrackRow> {
             .with_text_size(theme::TEXT_SIZE_SMALL)
             .with_text_color(theme::PLACEHOLDER_COLOR);
 
-    let line_painter = Painter::new(move |ctx, is_playing: &bool, _| {
+    let line_painter = Painter::new(move |ctx, is_playing: &bool, env| {
         let line = Line::new((0.0, 0.0), (ctx.size().width, 0.0));
         let color = if *is_playing {
-            theme::BLACK
+            env.get(theme::GREY_700)
         } else {
-            theme::GREY_5
+            env.get(theme::GREY_500)
         };
         ctx.stroke_styled(
             line,
