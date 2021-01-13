@@ -1,0 +1,35 @@
+name: Rust
+
+on:
+  push:
+    branches: [ master ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  ubuntu:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: stable
+    - uses: Swatinem/rust-cache@v1
+    - name: Submodule
+      run: git submodule update --recursive --init
+    - name: Install GTK
+      run: sudo apt-get install -y libgtk-3-dev
+    - name: Install OpenSSL
+      run: sudo apt-get install -y libssl-dev
+    - name: Run tests
+      run: cargo test
+    - name: Build
+      run: cargo build --release
+    - name: Make it executable
+      run: chmod +x target/release/psst-gui
+    - uses: actions/upload-artifact@v2
+      with:
+        name: psst-gui-ubuntu
+        path: target/release/psst-gui # or path/to/artifact
