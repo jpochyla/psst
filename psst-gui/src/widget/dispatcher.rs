@@ -102,7 +102,7 @@ impl<T: Data, U: Data + Eq + Hash> Widget<T> for ViewDispatcher<T, U> {
     }
 
     fn paint(&mut self, ctx: &mut PaintCtx, data: &T, env: &Env) {
-        if let Some(ref mut child) = self.active_child() {
+        if let Some(child) = self.active_child() {
             child.paint_raw(ctx, data, env);
         }
     }
