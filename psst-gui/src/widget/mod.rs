@@ -7,6 +7,7 @@ mod input;
 mod maybe;
 mod promise;
 pub mod remote_image;
+mod theme;
 mod utils;
 
 pub use dispatcher::ViewDispatcher;
@@ -18,4 +19,5 @@ pub use input::InputController;
 pub use maybe::Maybe;
 pub use promise::Async;
 pub use remote_image::RemoteImage;
+pub use theme::ThemeScope;
 pub use utils::Clip;

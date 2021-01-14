@@ -2,7 +2,7 @@ use crate::{
     cmd,
     data::{Nav, State},
     ui::utils::Border,
-    widget::{icons, Empty, HoverExt, ViewDispatcher},
+    widget::{icons, Empty, HoverExt, ThemeScope, ViewDispatcher},
 };
 use druid::{
     widget::{CrossAxisAlignment, Either, Flex, Label, Scroll, Split, ViewSwitcher},
@@ -39,10 +39,12 @@ pub fn make_config_window() -> WindowDesc<State> {
 }
 
 fn make_config() -> impl Widget<State> {
-    config::make_config()
-        .center()
-        .background(theme::BACKGROUND_DARK)
-        .expand()
+    ThemeScope::new(
+        config::make_config()
+            .center()
+            .background(theme::BACKGROUND_DARK)
+            .expand(),
+    )
 }
 
 pub fn make_root() -> impl Widget<State> {
@@ -67,14 +69,19 @@ pub fn make_root() -> impl Widget<State> {
         .cross_axis_alignment(CrossAxisAlignment::Start)
         .with_child(topbar)
         .with_flex_child(make_route(), 1.0)
-        .with_child(playback::make_panel());
+        .with_child(playback::make_panel())
+        .background(theme::BACKGROUND_LIGHT);
 
-    Split::columns(sidebar, main)
+    let split = Split::columns(sidebar, main)
         .split_point(0.2)
         .bar_size(1.0)
         .min_size(150.0, 0.0)
         .min_bar_area(1.0)
-        .solid_bar(true)
+        .solid_bar(true);
+
+    let themed = ThemeScope::new(split);
+
+    themed
     // .debug_invalidation()
     // .debug_widget_id()
     // .debug_paint_layout()
