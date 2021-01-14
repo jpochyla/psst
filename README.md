@@ -62,8 +62,8 @@ $ cargo run
     - [ ] Rethink current design, consider a two-pane layout
         - Left pane for browsing
         - Right pane for current playback
-    - [ ] Dark theme
-        - OS theme correspondence
+    - [x] Dark theme
+    - [ ] Detect light/dark OS theme
     - [ ] Icon
     - [ ] Robust error states, ideally with retry button
     - [ ] Correct playback highlight
