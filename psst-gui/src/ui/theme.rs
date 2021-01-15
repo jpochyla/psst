@@ -29,7 +29,8 @@ pub const UI_FONT_MONO: Key<FontDescriptor> = Key::new("app.ui-font-mono");
 pub const TEXT_SIZE_SMALL: Key<f64> = Key::new("app.text-size-small");
 
 pub const ICON_COLOR: Key<Color> = Key::new("app.icon-color");
-pub const ICON_SIZE: Size = Size::new(GRID * 2.0, GRID * 2.0);
+pub const ICON_SIZE: Size = Size::new(12.0, 12.0);
+pub const ICON_SIZE_LARGE: Size = Size::new(GRID * 2.0, GRID * 2.0);
 
 pub const HOVER_HOT_COLOR: Key<Color> = Key::new("app.hover-hot-color");
 pub const HOVER_COLD_COLOR: Key<Color> = Key::new("app.hover-cold-color");
@@ -144,7 +145,7 @@ fn setup_dark_theme(env: &mut Env) {
     env.set(GREY_400, Color::grey8(0x82));
     env.set(GREY_500, Color::grey8(0x4f));
     env.set(GREY_600, Color::grey8(0x33));
-    env.set(GREY_700, Color::grey8(0x22));
+    env.set(GREY_700, Color::grey8(0x28));
     env.set(BLUE_100, Color::rgb8(0x00, 0x8d, 0xdd));
     env.set(BLUE_200, Color::rgb8(0x5c, 0xc4, 0xff));
 

@@ -40,7 +40,7 @@ pub fn make_config() -> impl Widget<State> {
 fn make_config_tabs() -> impl Widget<State> {
     let label = |text, icon: &SvgIcon, tab: PreferencesTab| {
         Flex::column()
-            .with_child(icon.scale(theme::ICON_SIZE))
+            .with_child(icon.scale(theme::ICON_SIZE_LARGE))
             .with_default_spacer()
             .with_child(Label::new(text).with_font(theme::UI_FONT_MEDIUM))
             .padding(theme::grid(1.0))

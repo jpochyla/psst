@@ -254,7 +254,7 @@ impl Widget<CurrentPlayback> for SeekBar {
         _data: &CurrentPlayback,
         _env: &Env,
     ) -> Size {
-        Size::new(bc.max().width, theme::grid(2.0))
+        Size::new(bc.max().width, theme::grid(1.0))
     }
 
     fn paint(&mut self, ctx: &mut PaintCtx, data: &CurrentPlayback, env: &Env) {

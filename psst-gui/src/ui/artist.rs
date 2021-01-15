@@ -52,21 +52,22 @@ pub fn make_detail() -> impl Widget<State> {
 }
 
 pub fn make_artist() -> impl Widget<Artist> {
-    make_artist_with_cover(theme::grid(7.0), theme::grid(7.0))
+    make_artist_with_cover(theme::grid(7.0))
 }
 
-pub fn make_cover(width: f64, height: f64) -> impl Widget<Artist> {
+pub fn make_cover(size: f64) -> impl Widget<Artist> {
+    let radius = size / 2.0;
     Clip::new(
-        Circle::new((width / 2.0, height / 2.0), width / 2.0),
+        Circle::new((radius, radius), radius),
         RemoteImage::new(make_placeholder(), move |artist: &Artist, _| {
-            artist.image(width, height).map(|image| image.url.clone())
+            artist.image(size, size).map(|image| image.url.clone())
         })
-        .fix_size(width, height),
+        .fix_size(size, size),
     )
 }
 
-fn make_artist_with_cover(width: f64, height: f64) -> impl Widget<Artist> {
-    let artist_image = make_cover(width, height);
+fn make_artist_with_cover(width: f64) -> impl Widget<Artist> {
+    let artist_image = make_cover(width);
     let artist_label = Label::raw()
         .with_font(theme::UI_FONT_MEDIUM)
         .lens(Artist::name);

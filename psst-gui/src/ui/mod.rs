@@ -111,19 +111,16 @@ fn make_menu_button(title: &str, nav: Nav) -> impl Widget<State> {
         .env_scope({
             let nav = nav.clone();
             move |env, state: &State| {
-                if nav == state.route {
-                    env.set(
-                        theme::HOVER_COLD_COLOR,
-                        env.get(theme::MENU_BUTTON_BG_ACTIVE),
-                    );
-                    env.set(theme::LABEL_COLOR, env.get(theme::MENU_BUTTON_FG_ACTIVE));
+                let (bg, fg) = if nav == state.route {
+                    (theme::MENU_BUTTON_BG_ACTIVE, theme::MENU_BUTTON_FG_ACTIVE)
                 } else {
-                    env.set(
-                        theme::HOVER_COLD_COLOR,
-                        env.get(theme::MENU_BUTTON_BG_INACTIVE),
-                    );
-                    env.set(theme::LABEL_COLOR, env.get(theme::MENU_BUTTON_FG_INACTIVE));
-                }
+                    (
+                        theme::MENU_BUTTON_BG_INACTIVE,
+                        theme::MENU_BUTTON_FG_INACTIVE,
+                    )
+                };
+                env.set(theme::HOVER_COLD_COLOR, env.get(bg));
+                env.set(theme::LABEL_COLOR, env.get(fg));
             }
         })
         .on_click(move |ctx, _, _| ctx.submit_command(cmd::NAVIGATE_TO.with(nav.clone())))
@@ -134,21 +131,29 @@ fn make_menu_search() -> impl Widget<State> {
 }
 
 pub fn make_route() -> impl Widget<State> {
-    Scroll::new(
-        ViewDispatcher::new(
-            |state: &State, _| state.route.clone(),
-            |route: &Nav, _, _| match route {
-                Nav::Home => make_home().boxed(),
-                Nav::SearchResults(_) => search::make_results().boxed(),
-                Nav::AlbumDetail(_) => album::make_detail().boxed(),
-                Nav::ArtistDetail(_) => artist::make_detail().boxed(),
-                Nav::PlaylistDetail(_) => playlist::make_detail().boxed(),
-                Nav::Library => library::make_detail().boxed(),
-            },
-        )
-        .padding(theme::grid(1.0)),
+    ViewDispatcher::new(
+        |state: &State, _| state.route.clone(),
+        |route: &Nav, _, _| match route {
+            Nav::Home => make_home().padding(theme::grid(1.0)).boxed(),
+            Nav::SearchResults(_) => Scroll::new(search::make_results().padding(theme::grid(1.0)))
+                .vertical()
+                .boxed(),
+            Nav::AlbumDetail(_) => Scroll::new(album::make_detail().padding(theme::grid(1.0)))
+                .vertical()
+                .boxed(),
+            Nav::ArtistDetail(_) => Scroll::new(artist::make_detail().padding(theme::grid(1.0)))
+                .vertical()
+                .boxed(),
+            Nav::PlaylistDetail(_) => {
+                Scroll::new(playlist::make_detail().padding(theme::grid(1.0)))
+                    .vertical()
+                    .boxed()
+            }
+            Nav::Library => Scroll::new(library::make_detail().padding(theme::grid(1.0)))
+                .vertical()
+                .boxed(),
+        },
     )
-    .vertical()
     .expand()
 }
 

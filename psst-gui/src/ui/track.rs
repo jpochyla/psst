@@ -186,24 +186,20 @@ fn make_track(display: TrackDisplay) -> impl Widget<TrackRow> {
             .with_text_size(theme::TEXT_SIZE_SMALL)
             .with_text_color(theme::PLACEHOLDER_COLOR);
 
+    let line_style = StrokeStyle {
+        line_join: None,
+        line_cap: None,
+        dash: Some((vec![1.0, 2.0], 0.0)),
+        miter_limit: None,
+    };
     let line_painter = Painter::new(move |ctx, is_playing: &bool, env| {
         let line = Line::new((0.0, 0.0), (ctx.size().width, 0.0));
         let color = if *is_playing {
-            env.get(theme::GREY_700)
+            env.get(theme::GREY_200)
         } else {
             env.get(theme::GREY_500)
         };
-        ctx.stroke_styled(
-            line,
-            &color,
-            1.0,
-            &StrokeStyle {
-                line_join: None,
-                line_cap: None,
-                dash: Some((vec![1.0, 2.0], 0.0)),
-                miter_limit: None,
-            },
-        );
+        ctx.stroke_styled(line, &color, 1.0, &line_style);
     })
     .lens(TrackRow::is_playing())
     .fix_height(1.0);
@@ -250,6 +246,7 @@ fn make_track(display: TrackDisplay) -> impl Widget<TrackRow> {
         .with_child(minor)
         .padding(theme::grid(0.8))
         .hover()
+        .rounded(theme::BUTTON_BORDER_RADIUS)
         .on_ex_click(move |ctx, event, tr: &mut TrackRow, _| match event.button {
             MouseButton::Left => {
                 ctx.submit_notification(cmd::PLAY_TRACK_AT.with(tr.position));

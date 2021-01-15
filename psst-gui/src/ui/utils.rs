@@ -25,8 +25,8 @@ impl Border {
         Painter::new(move |ctx, _, env| {
             let h = 1.0;
             let y = match self {
-                Self::Top => 0.0,
-                Self::Bottom => ctx.size().height - h,
+                Self::Top => h / 2.0,
+                Self::Bottom => ctx.size().height - h / 2.0,
             };
             let color = color.resolve(&env);
             let line = Line::new((0.0, y), (ctx.size().width, y));
