@@ -389,8 +389,10 @@ impl Delegate {
     }
 
     fn navigate_to(&mut self, data: &mut State, nav: Nav) {
-        data.history.push_back(nav.clone());
-        self.navigate(data, nav);
+        if data.route != nav {
+            data.history.push_back(nav.clone());
+            self.navigate(data, nav);
+        }
     }
 
     fn navigate_back(&mut self, data: &mut State) {
