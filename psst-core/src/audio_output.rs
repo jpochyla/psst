@@ -83,6 +83,8 @@ impl AudioOutput {
             let mut source = source.lock().expect("Failed to acquire audio source lock");
             // Apply correct normalization factor before each audio packet.
             if let Some(norm_factor) = source.normalization_factor() {
+                // TODO: Avoid the clamping.
+                let norm_factor = norm_factor.min(1.0);
                 // TODO: Add a global master volume to the calculation.
                 if let Err(err) = device.set_master_volume(norm_factor) {
                     log::error!("failed to set master volume: {}", err);
