@@ -12,6 +12,7 @@ use crate::{
     session::SessionHandle,
 };
 use crossbeam_channel::{unbounded, Receiver, Sender};
+use rand::Rng;
 use std::{
     mem,
     sync::{Arc, Mutex},
@@ -739,37 +740,101 @@ impl Iterator for PlayerAudioSource {
     }
 }
 
+#[derive(Debug)]
+enum QueueBehavior {
+    Sequential,
+    Random,
+    LoopTrack,
+    LoopAll,
+}
+
+impl Default for QueueBehavior {
+    fn default() -> Self {
+        Self::Random
+    }
+}
+
 struct Queue {
     items: Vec<PlaybackItem>,
     position: usize,
+    behavior: QueueBehavior,
+    previous_positions: Vec<usize>,
+    next_position: Option<usize>,
 }
 
 impl Queue {
     fn new() -> Self {
         Self {
             items: Vec::new(),
+            previous_positions: Vec::new(),
             position: 0,
+            behavior: QueueBehavior::default(),
+            next_position: None,
         }
     }
 
     fn clear(&mut self) {
         self.position = 0;
         self.items.clear();
+        self.previous_positions.clear();
+        self.next_position = None;
     }
 
     fn previous(&mut self) {
-        self.position = self.position.saturating_sub(1);
+        match self.behavior {
+            QueueBehavior::Sequential | QueueBehavior::LoopAll => {
+                self.position = self.position.saturating_sub(1)
+            }
+            QueueBehavior::Random => {
+                self.position = self.previous_positions.pop().unwrap_or_default()
+            }
+            QueueBehavior::LoopTrack => self.position = self.position,
+        }
     }
 
     fn next(&mut self) {
-        self.position += 1;
+        match self.behavior {
+            QueueBehavior::Sequential => self.position = self.position.saturating_add(1),
+            QueueBehavior::Random => {
+                if let Some(next_track) = self.next_position {
+                    self.position = next_track
+                } else {
+                    let mut rng = rand::thread_rng();
+                    let cur = self.position;
+                    self.previous_positions.push(cur);
+                    let new = rng.gen_range(0, self.items.len());
+                    self.position = new;
+                }
+            }
+            QueueBehavior::LoopTrack => self.position = self.position,
+            QueueBehavior::LoopAll => {
+                self.position = if self.position >= self.items.len() - 1 {
+                    0
+                } else {
+                    self.position.saturating_add(1)
+                }
+            }
+        }
     }
 
     fn get_current(&self) -> Option<&PlaybackItem> {
         self.items.get(self.position)
     }
 
-    fn get_next(&self) -> Option<&PlaybackItem> {
-        self.items.get(self.position + 1)
+    fn get_next(&mut self) -> Option<&PlaybackItem> {
+        match self.behavior {
+            QueueBehavior::Sequential | QueueBehavior::LoopAll => self.items.get(self.position + 1),
+            QueueBehavior::Random => {
+                if let Some(next_track) = self.next_position {
+                    self.items.get(next_track)
+                } else {
+                    let mut rng = rand::thread_rng();
+                    let new = rng.gen_range(0, self.items.len());
+                    self.next_position = Some(new);
+                    self.items.get(new)
+                }
+            }
+            QueueBehavior::LoopTrack => self.items.get(self.position),
+        }
     }
 }

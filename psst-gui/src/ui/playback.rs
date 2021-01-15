@@ -146,12 +146,32 @@ fn make_player_controls() -> impl Widget<Playback> {
         Empty,
     );
 
+    let play_shuffle = icons::PLAY_SHUFFLE
+        .scale((theme::grid(2.0), theme::grid(2.0)))
+        .with_color(theme::PLACEHOLDER_COLOR)
+        .padding(theme::grid(1.0))
+        .hover()
+        .rounded(theme::BUTTON_BORDER_RADIUS)
+        .on_click(|ctx, _, _| ctx.submit_command(cmd::PLAY_SHUFFLE));
+
+    let play_loop = icons::PLAY_LOOP
+        .scale((theme::grid(2.0), theme::grid(2.0)))
+        .with_color(theme::PLACEHOLDER_COLOR)
+        .padding(theme::grid(1.0))
+        .hover()
+        .rounded(theme::BUTTON_BORDER_RADIUS)
+        .on_click(|ctx, _, _| ctx.submit_command(cmd::PLAY_LOOP));
+
     Flex::row()
+        .with_child(play_shuffle)
+        .with_default_spacer()
         .with_child(play_previous)
         .with_default_spacer()
         .with_child(play_pause)
         .with_default_spacer()
         .with_child(play_next)
+        .with_default_spacer()
+        .with_child(play_loop)
 }
 
 fn make_player_progress() -> impl Widget<CurrentPlayback> {

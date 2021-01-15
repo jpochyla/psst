@@ -96,4 +96,6 @@ pub const PLAY_PAUSE: Selector = Selector::new("app.play-pause");
 pub const PLAY_RESUME: Selector = Selector::new("app.play-resume");
 pub const PLAY_NEXT: Selector = Selector::new("app.play-next");
 pub const PLAY_STOP: Selector = Selector::new("app.play-stop");
+pub const PLAY_LOOP: Selector = Selector::new("app.play-loop");
+pub const PLAY_SHUFFLE: Selector = Selector::new("app.play-shuffle");
 pub const SEEK_TO_FRACTION: Selector<f64> = Selector::new("app.seek-to-fraction");
