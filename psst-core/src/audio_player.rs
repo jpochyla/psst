@@ -54,11 +54,12 @@ impl PlaybackItem {
         let path = load_audio_path(self.item_id, &session, &cache, &config)?;
         let key = load_audio_key(&path, &session, &cache)?;
         let file = AudioFile::open(path, cdn, cache)?;
+        let (source, norm_data) = file.audio_source(key)?;
+        let norm_factor = norm_data.factor_for_level(self.norm_level, config.pregain);
         Ok(LoadedPlaybackItem {
-            key,
             file,
-            norm_level: self.norm_level,
-            norm_pregain: config.pregain,
+            source,
+            norm_factor,
         })
     }
 }
@@ -163,10 +164,9 @@ fn load_audio_key(
 }
 
 pub struct LoadedPlaybackItem {
-    key: AudioKey,
     file: AudioFile,
-    norm_level: NormalizationLevel,
-    norm_pregain: f32,
+    source: FileAudioSource,
+    norm_factor: f32,
 }
 
 pub struct Player {
@@ -652,18 +652,9 @@ impl PlayerAudioSource {
     }
 
     fn play_now(&mut self, item: LoadedPlaybackItem) -> Result<(), Error> {
-        let (source, normalization) = item.file.audio_source(item.key, {
-            let event_sender = self.event_sender.clone();
-            move |_| {
-                event_sender
-                    .send(PlayerEvent::Blocked)
-                    .expect("Failed to send PlayerEvent::Blocked");
-            }
-        })?;
-        let norm_factor = normalization.factor_for_level(item.norm_level, item.norm_pregain);
         self.current.replace(CurrentPlaybackItem {
-            source,
-            norm_factor,
+            norm_factor: item.norm_factor,
+            source: item.source,
             file: item.file,
         });
         self.samples = 0;

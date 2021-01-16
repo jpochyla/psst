@@ -26,7 +26,6 @@ pub struct StreamReader {
     reader: File,
     data_map: Arc<StreamDataMap>,
     req_sender: Sender<StreamRequest>,
-    on_blocking: Box<dyn Fn(u64) + Send>,
 }
 
 pub struct StreamWriter {
@@ -85,15 +84,11 @@ impl StreamStorage {
         })
     }
 
-    pub fn reader<T>(&self, on_blocking: T) -> io::Result<StreamReader>
-    where
-        T: Fn(u64) + Send + 'static,
-    {
+    pub fn reader(&self) -> io::Result<StreamReader> {
         Ok(StreamReader {
             reader: self.file.reopen()?, // Re-opened files have a starting seek position.
             data_map: self.data_map.clone(),
             req_sender: self.req_sender.clone(),
-            on_blocking: Box::new(on_blocking),
         })
     }
 
@@ -197,10 +192,6 @@ impl Read for StreamReader {
             self.req_sender
                 .send(StreamRequest::Blocked { offset })
                 .expect("Data request channel was closed");
-
-            // Because not only the servicing thread, but also our caller might want to know
-            // that we're blocking, call the configured `on_blocking` fn.
-            (self.on_blocking)(offset);
         });
         assert!(ready_to_read_len > 0);
         self.reader

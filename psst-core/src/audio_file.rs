@@ -92,24 +92,20 @@ impl AudioFile {
         }
     }
 
-    pub fn audio_source<T>(
+    pub fn audio_source(
         &self,
         key: AudioKey,
-        on_blocking: T,
-    ) -> Result<(FileAudioSource, NormalizationData), Error>
-    where
-        T: Fn(u64) + Send + 'static,
-    {
+    ) -> Result<(FileAudioSource, NormalizationData), Error> {
         let reader = match self {
-            Self::Streamed { streamed_file, .. } => streamed_file.storage.reader(on_blocking)?,
-            Self::Cached { cached_file, .. } => cached_file.storage.reader(on_blocking)?,
+            Self::Streamed { streamed_file, .. } => streamed_file.storage.reader()?,
+            Self::Cached { cached_file, .. } => cached_file.storage.reader()?,
         };
-        let reader = BufReader::new(reader);
-        let mut reader = AudioDecrypt::new(key, reader);
-        let normalization = NormalizationData::parse(&mut reader)?;
-        let reader = OffsetFile::new(reader, self.header_length())?;
-        let reader = VorbisDecoder::new(reader)?;
-        Ok((reader, normalization))
+        let buffered = BufReader::new(reader);
+        let mut decrypted = AudioDecrypt::new(key, buffered);
+        let normalization = NormalizationData::parse(&mut decrypted)?;
+        let encoded = OffsetFile::new(decrypted, self.header_length())?;
+        let decoded = VorbisDecoder::new(encoded)?;
+        Ok((decoded, normalization))
     }
 
     fn header_length(&self) -> u64 {
