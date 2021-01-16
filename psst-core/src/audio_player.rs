@@ -551,7 +551,7 @@ pub enum PlayerEvent {
         item: PlaybackItem,
         result: Result<LoadedPlaybackItem, Error>,
     },
-    /// Next item in queue has been successfully preloaded.
+    /// Next item in queue has been either successfully preloaded or failed to preload.
     Preloaded {
         item: PlaybackItem,
         result: Result<LoadedPlaybackItem, Error>,
@@ -566,7 +566,7 @@ pub enum PlayerEvent {
         path: AudioPath,
         duration: Duration,
     },
-    /// Player is resuming playback of a track
+    /// Player is resuming playback of a track.  `Progress` events will follow.
     Resuming {
         path: AudioPath,
         duration: Duration,
