@@ -20,4 +20,4 @@ pub use maybe::Maybe;
 pub use promise::Async;
 pub use remote_image::RemoteImage;
 pub use theme::ThemeScope;
-pub use utils::Clip;
+pub use utils::{Clip, Logger};
