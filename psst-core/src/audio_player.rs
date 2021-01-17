@@ -741,7 +741,7 @@ impl Iterator for PlayerAudioSource {
 }
 
 #[derive(Debug)]
-enum QueueBehavior {
+pub enum QueueBehavior {
     Sequential,
     Random,
     LoopTrack,
@@ -750,7 +750,7 @@ enum QueueBehavior {
 
 impl Default for QueueBehavior {
     fn default() -> Self {
-        Self::Random
+        Self::Sequential
     }
 }
 
@@ -758,7 +758,10 @@ struct Queue {
     items: Vec<PlaybackItem>,
     position: usize,
     behavior: QueueBehavior,
+    // Keep track of what has been played so previous track with random enabled backs through
+    // played songs
     previous_positions: Vec<usize>,
+    // Keep track of the expected next track to play when shuffling
     next_position: Option<usize>,
 }
 
@@ -766,8 +769,8 @@ impl Queue {
     fn new() -> Self {
         Self {
             items: Vec::new(),
-            previous_positions: Vec::new(),
             position: 0,
+            previous_positions: Vec::new(),
             behavior: QueueBehavior::default(),
             next_position: None,
         }
@@ -794,16 +797,14 @@ impl Queue {
 
     fn next(&mut self) {
         match self.behavior {
-            QueueBehavior::Sequential => self.position = self.position.saturating_add(1),
+            QueueBehavior::Sequential => self.position += 1,
             QueueBehavior::Random => {
                 if let Some(next_track) = self.next_position {
-                    self.position = next_track
+                    self.next_position = None;
+                    self.position = next_track;
                 } else {
-                    let mut rng = rand::thread_rng();
-                    let cur = self.position;
-                    self.previous_positions.push(cur);
-                    let new = rng.gen_range(0, self.items.len());
-                    self.position = new;
+                    self.previous_positions.push(self.position);
+                    self.position = rand::thread_rng().gen_range(0, self.items.len());
                 }
             }
             QueueBehavior::LoopTrack => self.position = self.position,
@@ -811,7 +812,7 @@ impl Queue {
                 self.position = if self.position >= self.items.len() - 1 {
                     0
                 } else {
-                    self.position.saturating_add(1)
+                    self.position + 1
                 }
             }
         }
