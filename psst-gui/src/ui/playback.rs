@@ -153,6 +153,11 @@ fn make_player_controls() -> impl Widget<Playback> {
         .hover()
         .rounded(theme::BUTTON_BORDER_RADIUS)
         .on_click(|ctx, _, _| ctx.submit_command(cmd::PLAY_SHUFFLE));
+    let play_shuffle = Either::new(
+        |playback: &Playback, _| playback.current.is_some(),
+        play_shuffle,
+        Empty,
+    );
 
     let play_loop = icons::PLAY_LOOP
         .scale((theme::grid(2.0), theme::grid(2.0)))
@@ -161,6 +166,11 @@ fn make_player_controls() -> impl Widget<Playback> {
         .hover()
         .rounded(theme::BUTTON_BORDER_RADIUS)
         .on_click(|ctx, _, _| ctx.submit_command(cmd::PLAY_LOOP));
+    let play_loop = Either::new(
+        |playback: &Playback, _| playback.current.is_some(),
+        play_loop,
+        Empty,
+    );
 
     Flex::row()
         .with_child(play_shuffle)

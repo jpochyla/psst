@@ -43,13 +43,14 @@ pub static SKIP_FORWARD: SvgIcon = SvgIcon {
     svg_size: Size::new(24.0, 24.0),
     op: PaintOp::Fill,
 };
+// TODO: Get working icons
 pub static PLAY_SHUFFLE: SvgIcon = SvgIcon {
-    svg_path: "M17.7011 3.42623V11.0912L4.92623 3.42623V21.4262L17.7011 13.7612V21.4262H19.9262V3.42623H17.7011Z",
-    svg_size: Size::new(24.0, 24.0),
+    svg_path: "",
+    svg_size: Size::new(24.0, 20.0),
     op: PaintOp::Fill,
 };
 pub static PLAY_LOOP: SvgIcon = SvgIcon {
-    svg_path: "M256 256s-48-96-126-96c-54.12 0-98 43-98 96s43.88 96 98 96c30 0 56.45-13.18 78-32M256 256s48 96 126 96c54.12 0 98-43 98-96s-43.88-96-98-96c-29.37 0-56.66 13.75-78 32",
+    svg_path: "",
     svg_size: Size::new(24.0, 24.0),
     op: PaintOp::Fill,
 };

@@ -879,6 +879,10 @@ impl Delegate {
         } else if cmd.is(cmd::PLAY_STOP) {
             self.player.stop();
             Handled::Yes
+        } else if cmd.is(cmd::PLAY_SHUFFLE) {
+            Handled::Yes
+        } else if cmd.is(cmd::PLAY_LOOP) {
+            Handled::Yes
         } else if let Some(fraction) = cmd.get(cmd::SEEK_TO_FRACTION) {
             data.playback.current.as_ref().map(|current| {
                 let position =
