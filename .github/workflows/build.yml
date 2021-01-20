@@ -3,6 +3,8 @@ name: CI
 on:
   push:
     branches: [ master ]
+  pull_request:
+    branches: [ master ]
 
 env:
   CARGO_TERM_COLOR: always
@@ -27,6 +29,8 @@ jobs:
       run: cargo test
     - name: Build
       run: cargo build --release
+    - name: Format
+      run: cargo fmt --all -- --check
     - name: Make it executable
       run: chmod +x target/release/psst-gui
     - uses: actions/upload-artifact@v2
@@ -48,6 +52,8 @@ jobs:
       run: cargo test
     - name: Build
       run: cargo build --release
+    - name: Format
+      run: cargo fmt --all -- --check
     - name: Make it executable
       run: chmod +x target/release/psst-gui
     - uses: actions/upload-artifact@v2
