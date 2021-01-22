@@ -10,21 +10,24 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  ubuntu:
-    runs-on: ubuntu-latest
+  build:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macOS-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     steps:
     - uses: actions/checkout@v2
+      with:
+        submodules: recursive 
     - uses: actions-rs/toolchain@v1
       with:
         profile: minimal
         toolchain: stable
     - uses: Swatinem/rust-cache@v1
-    - name: Submodule
-      run: git submodule update --recursive --init
-    - name: Install GTK
-      run: sudo apt-get install -y libgtk-3-dev
-    - name: Install OpenSSL
-      run: sudo apt-get install -y libssl-dev
+
+    - name: Install Dependencies
+      run: sudo apt-get install -y libgtk-3-dev libssl-dev
+      if: ${{ runner.os == 'Linux' }}
     - name: Run tests
       run: cargo test
     - name: Build
@@ -33,30 +36,10 @@ jobs:
       run: cargo fmt --all -- --check
     - name: Make it executable
       run: chmod +x target/release/psst-gui
+      if: ${{ runner.os != 'Windows' }}
     - uses: actions/upload-artifact@v2
       with:
-        name: psst-gui-ubuntu
-        path: target/release/psst-gui
-  macos:
-    runs-on: macOS-latest
-    steps:
-    - uses: actions/checkout@v2
-    - uses: actions-rs/toolchain@v1
-      with:
-        profile: minimal
-        toolchain: stable
-    - uses: Swatinem/rust-cache@v1
-    - name: Submodule
-      run: git submodule update --recursive --init
-    - name: Run tests
-      run: cargo test
-    - name: Build
-      run: cargo build --release
-    - name: Format
-      run: cargo fmt --all -- --check
-    - name: Make it executable
-      run: chmod +x target/release/psst-gui
-    - uses: actions/upload-artifact@v2
-      with:
-        name: psst-gui-mac
-        path: target/release/psst-gui
+        name: psst-gui-${{ runner.os }}
+        path: |
+          target/release/psst-gui
+          target/release/psst-gui.exe
