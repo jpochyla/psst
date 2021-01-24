@@ -62,7 +62,9 @@ jobs:
       run: mkdir -p ${{runner.workspace}}/pkg/usr/share/applications/; mv .pkg/psst.desktop $_
     - name: Set permissions
       run: chmod 755 ${{runner.workspace}}/pkg/usr/bin/psst-gui
-    - name: Move control
+    - name: Move license
+      run: mkdir -p ${{runner.workspace}}/pkg/usr/share/doc/psst/; mv .pkg/copyright $_
+    - name: Move package config
       run: mkdir -p ${{runner.workspace}}/pkg/; mv .pkg/DEBIAN $_/
     - name: Set version
       run: "echo Version: $(git rev-list --count HEAD) >> ${{runner.workspace}}/pkg/DEBIAN/control"
