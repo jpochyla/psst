@@ -44,3 +44,31 @@ jobs:
         path: |
           target/release/psst-gui
           target/release/psst-gui.exe
+
+  deb:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        fetch-depth: 0
+    - uses: actions/download-artifact@v2
+      with:
+        name: psst-gui-Linux
+        path: ${{runner.workspace}}
+    - name: Move executable
+      run: mkdir -p ${{runner.workspace}}/pkg/usr/bin/; mv ${{runner.workspace}}/psst-gui $_
+    - name: Move desktop
+      run: mkdir -p ${{runner.workspace}}/pkg/usr/share/applications/; mv .pkg/psst.desktop $_
+    - name: Set permissions
+      run: chmod 755 ${{runner.workspace}}/pkg/usr/bin/psst-gui
+    - name: Move control
+      run: mkdir -p ${{runner.workspace}}/pkg/; mv .pkg/DEBIAN $_/
+    - name: Set version
+      run: "echo Version: $(git rev-list --count HEAD) >> ${{runner.workspace}}/pkg/DEBIAN/control"
+    - name: Build package
+      run: cat ${{runner.workspace}}/pkg/DEBIAN/control && dpkg-deb -b ${{runner.workspace}}/pkg/ psst_$(git rev-list --count HEAD)_amd64.deb
+    - uses: actions/upload-artifact@v2
+      with:
+        name: psst-deb
+        path: "*.deb"
