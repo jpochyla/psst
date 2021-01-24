@@ -1,0 +1,8 @@
+[Desktop Entry]
+Categories=Audio;AudioVideo
+Comment=Fast and multi-platform Spotify client with native GUI
+Exec=psst-gui
+Name=Psst
+Terminal=false
+Type=Application
+Version=1.0
