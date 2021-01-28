@@ -259,6 +259,7 @@ impl Player {
             PlayerCommand::Stop => self.stop(),
             PlayerCommand::Seek { position } => self.seek(position),
             PlayerCommand::Configure { config } => self.configure(config),
+            PlayerCommand::SetQueueBehavior { behavior } => self.queue.behavior = behavior,
         }
     }
 
@@ -458,7 +459,7 @@ impl Player {
 
     fn previous(&mut self) {
         if self.is_near_playback_start() {
-            self.queue.previous();
+            self.queue.skip_to_previous();
             if let Some(&item) = self.queue.get_current() {
                 self.load_and_play(item);
             } else {
@@ -470,7 +471,7 @@ impl Player {
     }
 
     fn next(&mut self) {
-        self.queue.next();
+        self.queue.skip_to_next();
         if let Some(&item) = self.queue.get_current() {
             self.load_and_play(item);
         } else {
@@ -537,6 +538,9 @@ pub enum PlayerCommand {
     },
     Configure {
         config: PlaybackConfig,
+    },
+    SetQueueBehavior {
+        behavior: QueueBehavior,
     },
 }
 
@@ -749,11 +753,8 @@ struct Queue {
     items: Vec<PlaybackItem>,
     position: usize,
     behavior: QueueBehavior,
-    // Keep track of what has been played so previous track with random enabled backs through
-    // played songs
-    previous_positions: Vec<usize>,
-    // Keep track of the expected next track to play when shuffling
-    next_position: Option<usize>,
+    prev_random_positions: Vec<usize>,
+    next_random_position: Option<usize>,
 }
 
 impl Queue {
@@ -761,51 +762,49 @@ impl Queue {
         Self {
             items: Vec::new(),
             position: 0,
-            previous_positions: Vec::new(),
             behavior: QueueBehavior::default(),
-            next_position: None,
+            prev_random_positions: Vec::new(),
+            next_random_position: None,
         }
     }
 
     fn clear(&mut self) {
         self.position = 0;
         self.items.clear();
-        self.previous_positions.clear();
-        self.next_position = None;
+        self.prev_random_positions.clear();
+        self.next_random_position = None;
     }
 
-    fn previous(&mut self) {
-        match self.behavior {
-            QueueBehavior::Sequential | QueueBehavior::LoopAll => {
-                self.position = self.position.saturating_sub(1)
-            }
-            QueueBehavior::Random => {
-                self.position = self.previous_positions.pop().unwrap_or_default()
-            }
-            QueueBehavior::LoopTrack => self.position = self.position,
+    fn random_position(&self) -> usize {
+        rand::thread_rng().gen_range(0, self.items.len())
+    }
+
+    fn skip_to_previous(&mut self) {
+        self.position = match self.behavior {
+            QueueBehavior::Sequential | QueueBehavior::LoopAll => self.position.saturating_sub(1),
+            QueueBehavior::Random => self
+                .prev_random_positions
+                .pop()
+                .unwrap_or_else(|| self.position.saturating_sub(1)),
+            QueueBehavior::LoopTrack => self.position,
         }
     }
 
-    fn next(&mut self) {
-        match self.behavior {
-            QueueBehavior::Sequential => self.position += 1,
+    fn skip_to_next(&mut self) {
+        self.position = match self.behavior {
+            QueueBehavior::Sequential => self.position + 1,
             QueueBehavior::Random => {
-                if let Some(next_track) = self.next_position {
-                    self.next_position = None;
-                    self.position = next_track;
+                if let Some(next_position) = self.next_random_position.take() {
+                    // If we have already committed to the next position is `self.get_next()`, use
+                    // the saved index.
+                    next_position
                 } else {
-                    self.previous_positions.push(self.position);
-                    self.position = rand::thread_rng().gen_range(0, self.items.len());
+                    self.prev_random_positions.push(self.position);
+                    self.random_position()
                 }
             }
-            QueueBehavior::LoopTrack => self.position = self.position,
-            QueueBehavior::LoopAll => {
-                self.position = if self.position >= self.items.len() - 1 {
-                    0
-                } else {
-                    self.position + 1
-                }
-            }
+            QueueBehavior::LoopTrack => self.position,
+            QueueBehavior::LoopAll => (self.position + 1) % (self.items.len() - 1),
         }
     }
 
@@ -814,19 +813,23 @@ impl Queue {
     }
 
     fn get_next(&mut self) -> Option<&PlaybackItem> {
-        match self.behavior {
-            QueueBehavior::Sequential | QueueBehavior::LoopAll => self.items.get(self.position + 1),
+        let position = match self.behavior {
+            QueueBehavior::Sequential => self.position + 1,
             QueueBehavior::Random => {
-                if let Some(next_track) = self.next_position {
-                    self.items.get(next_track)
+                if let Some(next_position) = self.next_random_position {
+                    // We have previously commited to the random position here, use it.
+                    next_position
                 } else {
-                    let mut rng = rand::thread_rng();
-                    let new = rng.gen_range(0, self.items.len());
-                    self.next_position = Some(new);
-                    self.items.get(new)
+                    // This is the first time we are getting called, generate a random position and
+                    // store it.
+                    let next_position = self.random_position();
+                    self.next_random_position.replace(next_position);
+                    next_position
                 }
             }
-            QueueBehavior::LoopTrack => self.items.get(self.position),
-        }
+            QueueBehavior::LoopTrack => self.position,
+            QueueBehavior::LoopAll => (self.position + 1) % (self.items.len() - 1),
+        };
+        self.items.get(position)
     }
 }
