@@ -2,7 +2,7 @@ use crate::{
     cmd,
     data::{
         AudioAnalysis, AudioDuration, CurrentPlayback, Playback, PlaybackOrigin, PlaybackState,
-        Promise, State, Track,
+        Promise, QueueBehavior, State, Track,
     },
     ui::{theme, utils::Border},
     widget::{icons, Empty, HoverExt, Maybe},
@@ -13,6 +13,7 @@ use druid::{
     BoxConstraints, Data, Env, Event, EventCtx, LayoutCtx, LensExt, LifeCycle, LifeCycleCtx,
     MouseButton, PaintCtx, Point, Rect, RenderContext, Size, UpdateCtx, Widget, WidgetExt,
 };
+use icons::{SvgIcon, PLAY_LOOP_ALL, PLAY_LOOP_TRACK};
 use itertools::Itertools;
 use std::sync::Arc;
 
@@ -146,42 +147,48 @@ fn make_player_controls() -> impl Widget<Playback> {
         Empty,
     );
 
-    let play_shuffle = icons::PLAY_SHUFFLE
-        .scale((theme::grid(2.0), theme::grid(2.0)))
-        .with_color(theme::PLACEHOLDER_COLOR)
-        .padding(theme::grid(1.0))
-        .hover()
-        .rounded(theme::BUTTON_BORDER_RADIUS)
-        .on_click(|ctx, _, _| ctx.submit_command(cmd::PLAY_SHUFFLE));
-    let play_shuffle = Either::new(
-        |playback: &Playback, _| playback.current.is_some(),
-        play_shuffle,
-        Empty,
+    let queue_behavior = ViewSwitcher::new(
+        |playback: &Playback, _| playback.queue_behavior.to_owned(),
+        |behavior, _, _| {
+            let icon = |svg: &SvgIcon| {
+                svg.scale((theme::grid(2.0), theme::grid(2.0)))
+                    .with_color(theme::PLACEHOLDER_COLOR)
+                    .padding(theme::grid(1.0))
+                    .hover()
+                    .rounded(theme::BUTTON_BORDER_RADIUS)
+                    .on_click(|ctx: &mut EventCtx, playback: &mut Playback, _| {
+                        let new_behavior = match playback.queue_behavior {
+                            QueueBehavior::Sequential => QueueBehavior::Random,
+                            QueueBehavior::Random => QueueBehavior::LoopTrack,
+                            QueueBehavior::LoopTrack => QueueBehavior::LoopAll,
+                            QueueBehavior::LoopAll => QueueBehavior::Sequential,
+                        };
+                        ctx.submit_command(cmd::PLAY_QUEUE_BEHAVIOR.with(new_behavior));
+                    })
+                    .boxed()
+            };
+            match behavior {
+                QueueBehavior::Sequential => icon(&icons::PLAY_SEQUENTIAL),
+                QueueBehavior::Random => icon(&icons::PLAY_SHUFFLE),
+                QueueBehavior::LoopTrack => icon(&icons::PLAY_LOOP_TRACK),
+                QueueBehavior::LoopAll => icon(&icons::PLAY_LOOP_ALL),
+            }
+        },
     );
-
-    let play_loop = icons::PLAY_LOOP
-        .scale((theme::grid(2.0), theme::grid(2.0)))
-        .with_color(theme::PLACEHOLDER_COLOR)
-        .padding(theme::grid(1.0))
-        .hover()
-        .rounded(theme::BUTTON_BORDER_RADIUS)
-        .on_click(|ctx, _, _| ctx.submit_command(cmd::PLAY_LOOP));
-    let play_loop = Either::new(
+    let queue_behavior = Either::new(
         |playback: &Playback, _| playback.current.is_some(),
-        play_loop,
+        queue_behavior,
         Empty,
     );
 
     Flex::row()
-        .with_child(play_shuffle)
-        .with_default_spacer()
         .with_child(play_previous)
         .with_default_spacer()
         .with_child(play_pause)
         .with_default_spacer()
         .with_child(play_next)
         .with_default_spacer()
-        .with_child(play_loop)
+        .with_child(queue_behavior)
 }
 
 fn make_player_progress() -> impl Widget<CurrentPlayback> {

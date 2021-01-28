@@ -16,7 +16,9 @@ pub use crate::data::{
     config::{AudioQuality, Config, Preferences, PreferencesTab, Theme},
     ctx::Ctx,
     nav::Nav,
-    playback::{CurrentPlayback, Playback, PlaybackOrigin, PlaybackPayload, PlaybackState},
+    playback::{
+        CurrentPlayback, Playback, PlaybackOrigin, PlaybackPayload, PlaybackState, QueueBehavior,
+    },
     playlist::{Playlist, PlaylistDetail, PlaylistLink, PlaylistTracks},
     promise::{Promise, PromiseState},
     search::{Search, SearchResults},
@@ -59,6 +61,7 @@ impl Default for State {
             playback: Playback {
                 state: PlaybackState::Stopped,
                 current: None,
+                queue_behavior: QueueBehavior::Sequential,
             },
             search: Search {
                 input: "".into(),

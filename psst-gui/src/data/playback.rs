@@ -8,6 +8,15 @@ use std::sync::Arc;
 pub struct Playback {
     pub state: PlaybackState,
     pub current: Option<CurrentPlayback>,
+    pub queue_behavior: QueueBehavior,
+}
+
+#[derive(Copy, Clone, Debug, Data, Eq, PartialEq)]
+pub enum QueueBehavior {
+    Sequential,
+    Random,
+    LoopTrack,
+    LoopAll,
 }
 
 #[derive(Copy, Clone, Debug, Data, Eq, PartialEq)]

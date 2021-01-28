@@ -1,8 +1,8 @@
 use crate::{
     cmd,
     data::{
-        ArtistTracks, AudioDuration, Config, Nav, PlaybackOrigin, PlaylistTracks, SavedTracks,
-        State, Track, TrackId,
+        ArtistTracks, AudioDuration, Config, Nav, PlaybackOrigin, PlaylistTracks, QueueBehavior,
+        SavedTracks, State, Track, TrackId,
     },
     ui,
     web::{Web, WebCache},
@@ -225,6 +225,19 @@ impl PlayerDelegate {
     fn seek(&mut self, position: Duration) {
         self.player_sender
             .send(PlayerEvent::Command(PlayerCommand::Seek { position }))
+            .unwrap();
+    }
+
+    fn set_queue_behavior(&mut self, behavior: QueueBehavior) {
+        self.player_sender
+            .send(PlayerEvent::Command(PlayerCommand::SetQueueBehavior {
+                behavior: match behavior {
+                    QueueBehavior::Sequential => psst_core::audio_player::QueueBehavior::Sequential,
+                    QueueBehavior::Random => psst_core::audio_player::QueueBehavior::Random,
+                    QueueBehavior::LoopTrack => psst_core::audio_player::QueueBehavior::LoopTrack,
+                    QueueBehavior::LoopAll => psst_core::audio_player::QueueBehavior::LoopAll,
+                },
+            }))
             .unwrap();
     }
 }
@@ -879,9 +892,9 @@ impl Delegate {
         } else if cmd.is(cmd::PLAY_STOP) {
             self.player.stop();
             Handled::Yes
-        } else if cmd.is(cmd::PLAY_SHUFFLE) {
-            Handled::Yes
-        } else if cmd.is(cmd::PLAY_LOOP) {
+        } else if let Some(behavior) = cmd.get(cmd::PLAY_QUEUE_BEHAVIOR) {
+            data.playback.queue_behavior = behavior.clone();
+            self.player.set_queue_behavior(behavior.clone());
             Handled::Yes
         } else if let Some(fraction) = cmd.get(cmd::SEEK_TO_FRACTION) {
             data.playback.current.as_ref().map(|current| {
