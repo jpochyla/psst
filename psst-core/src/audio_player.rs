@@ -804,7 +804,7 @@ impl Queue {
                 }
             }
             QueueBehavior::LoopTrack => self.position,
-            QueueBehavior::LoopAll => (self.position + 1) % (self.items.len() - 1),
+            QueueBehavior::LoopAll => (self.position + 1) % self.items.len(),
         }
     }
 
@@ -828,7 +828,7 @@ impl Queue {
                 }
             }
             QueueBehavior::LoopTrack => self.position,
-            QueueBehavior::LoopAll => (self.position + 1) % (self.items.len() - 1),
+            QueueBehavior::LoopAll => (self.position + 1) % self.items.len(),
         };
         self.items.get(position)
     }
