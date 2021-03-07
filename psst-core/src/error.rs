@@ -33,7 +33,11 @@ impl fmt::Display for Error {
                 15 => write!(f, "Authentication failed: extra verification required"),
                 16 => write!(f, "Authentication failed: invalid app key"),
                 17 => write!(f, "Authentication failed: application banned"),
-                _ => write!(f, "Authentication failed with error code {code}", code = code)
+                _ => write!(
+                    f,
+                    "Authentication failed with error code {code}",
+                    code = code
+                ),
             },
             Self::JsonError(err)
             | Self::AudioFetchingError(err)
