@@ -1,5 +1,6 @@
 Package: psst
 Architecture: amd64
+Maintainer: Jan Pochyla <jpochyla@gmail.com>
 Section: sound
 Priority: optional
 Homepage: https://github.com/jpochyla/psst
