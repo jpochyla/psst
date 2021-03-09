@@ -776,7 +776,7 @@ impl Queue {
     }
 
     fn random_position(&self) -> usize {
-        rand::thread_rng().gen_range(0, self.items.len())
+        rand::thread_rng().gen_range(0..self.items.len())
     }
 
     fn skip_to_previous(&mut self) {
