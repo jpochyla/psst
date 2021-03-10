@@ -40,10 +40,10 @@ fn make_saved_tracks() -> impl Widget<State> {
         || make_loader(),
         || {
             make_tracklist(TrackDisplay {
-                number: false,
                 title: true,
                 artist: true,
                 album: true,
+                ..TrackDisplay::empty()
             })
         },
         || make_error().lens(Ctx::data()),

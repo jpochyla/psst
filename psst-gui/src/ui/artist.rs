@@ -83,10 +83,10 @@ fn make_artist_with_cover(width: f64) -> impl Widget<Artist> {
 
 fn make_top_tracks() -> impl Widget<Ctx<CommonCtx, ArtistTracks>> {
     make_tracklist(TrackDisplay {
-        number: false,
         title: true,
-        artist: false,
         album: true,
+        popularity: true,
+        ..TrackDisplay::empty()
     })
 }
 

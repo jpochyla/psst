@@ -82,8 +82,7 @@ fn make_detail_loaded() -> impl Widget<Ctx<CommonCtx, Album>> {
     let album_tracks = make_tracklist(TrackDisplay {
         number: true,
         title: true,
-        artist: false,
-        album: false,
+        ..TrackDisplay::empty()
     });
 
     Flex::row()

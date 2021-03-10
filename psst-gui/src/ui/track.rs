@@ -28,6 +28,19 @@ pub struct TrackDisplay {
     pub title: bool,
     pub artist: bool,
     pub album: bool,
+    pub popularity: bool,
+}
+
+impl TrackDisplay {
+    pub fn empty() -> Self {
+        TrackDisplay {
+            number: false,
+            title: false,
+            artist: false,
+            album: false,
+            popularity: false,
+        }
+    }
 }
 
 pub fn make_tracklist<T>(mode: TrackDisplay) -> impl Widget<Ctx<CommonCtx, T>>
@@ -183,10 +196,40 @@ where
 }
 
 fn make_track(display: TrackDisplay) -> impl Widget<TrackRow> {
-    let track_duration =
-        Label::dynamic(|tr: &TrackRow, _| utils::as_minutes_and_seconds(&tr.track.duration))
+    let mut major = Flex::row();
+    let mut minor = Flex::row();
+
+    if display.number {
+        let track_number = Label::dynamic(|tr: &TrackRow, _| tr.track.track_number.to_string())
+            .with_font(theme::UI_FONT_MONO)
             .with_text_size(theme::TEXT_SIZE_SMALL)
             .with_text_color(theme::PLACEHOLDER_COLOR);
+        major.add_child(track_number);
+        major.add_default_spacer();
+    }
+
+    if display.title {
+        let track_name = Label::raw()
+            .with_font(theme::UI_FONT_MEDIUM)
+            .lens(TrackRow::track.then(Track::name.in_arc()));
+        major.add_child(track_name);
+    }
+
+    if display.artist {
+        let track_artist = Label::dynamic(|tr: &TrackRow, _| tr.track.artist_name())
+            .with_text_size(theme::TEXT_SIZE_SMALL);
+        minor.add_child(track_artist);
+    }
+
+    if display.album {
+        let track_album = Label::dynamic(|tr: &TrackRow, _| tr.track.album_name())
+            .with_text_size(theme::TEXT_SIZE_SMALL)
+            .with_text_color(theme::PLACEHOLDER_COLOR);
+        if display.artist {
+            minor.add_default_spacer();
+        }
+        minor.add_child(track_album);
+    }
 
     let line_style = StrokeStyle {
         line_join: None,
@@ -205,40 +248,26 @@ fn make_track(display: TrackDisplay) -> impl Widget<TrackRow> {
     })
     .lens(TrackRow::is_playing())
     .fix_height(1.0);
-
-    let mut major = Flex::row();
-    let mut minor = Flex::row();
-
-    if display.number {
-        let track_number = Label::dynamic(|tr: &TrackRow, _| tr.track.track_number.to_string())
-            .with_font(theme::UI_FONT_MONO)
-            .with_text_size(theme::TEXT_SIZE_SMALL)
-            .with_text_color(theme::PLACEHOLDER_COLOR);
-        major.add_child(track_number);
-        major.add_default_spacer();
-    }
-    if display.title {
-        let track_name = Label::raw()
-            .with_font(theme::UI_FONT_MEDIUM)
-            .lens(TrackRow::track.then(Track::name.in_arc()));
-        major.add_child(track_name);
-    }
-    if display.artist {
-        let track_artist = Label::dynamic(|tr: &TrackRow, _| tr.track.artist_name())
-            .with_text_size(theme::TEXT_SIZE_SMALL);
-        minor.add_child(track_artist);
-    }
-    if display.album {
-        let track_album = Label::dynamic(|tr: &TrackRow, _| tr.track.album_name())
-            .with_text_size(theme::TEXT_SIZE_SMALL)
-            .with_text_color(theme::PLACEHOLDER_COLOR);
-        if display.artist {
-            minor.add_default_spacer();
-        }
-        minor.add_child(track_album);
-    }
     major.add_default_spacer();
     major.add_flex_child(line_painter, 1.0);
+
+    if display.popularity {
+        let track_popularity = Label::dynamic(|tr: &TrackRow, _| {
+            tr.track
+                .popularity
+                .map(popularity_stars)
+                .unwrap_or_default()
+        })
+        .with_text_size(theme::TEXT_SIZE_SMALL)
+        .with_text_color(theme::PLACEHOLDER_COLOR);
+        major.add_default_spacer();
+        major.add_child(track_popularity);
+    }
+
+    let track_duration =
+        Label::dynamic(|tr: &TrackRow, _| utils::as_minutes_and_seconds(&tr.track.duration))
+            .with_text_size(theme::TEXT_SIZE_SMALL)
+            .with_text_color(theme::PLACEHOLDER_COLOR);
     major.add_default_spacer();
     major.add_child(track_duration);
 
@@ -260,6 +289,23 @@ fn make_track(display: TrackDisplay) -> impl Widget<TrackRow> {
             }
             _ => {}
         })
+}
+
+fn popularity_stars(popularity: u32) -> String {
+    const COUNT: usize = 5;
+
+    let popularity_coef = popularity as f32 / 100.0;
+    let popular = (COUNT as f32 * popularity_coef).round() as usize;
+    let unpopular = COUNT - popular;
+
+    let mut stars = String::with_capacity(COUNT);
+    for _ in 0..popular {
+        stars.push('★');
+    }
+    for _ in 0..unpopular {
+        stars.push('☆');
+    }
+    stars
 }
 
 fn make_track_menu(tr: &TrackRow) -> MenuDesc<State> {

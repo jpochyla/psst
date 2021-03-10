@@ -66,10 +66,10 @@ fn make_album_results() -> impl Widget<Ctx<CommonCtx, SearchResults>> {
 
 fn make_track_results() -> impl Widget<Ctx<CommonCtx, SearchResults>> {
     make_tracklist(TrackDisplay {
-        number: false,
         title: true,
         artist: true,
         album: true,
+        ..TrackDisplay::empty()
     })
 }
 
