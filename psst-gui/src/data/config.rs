@@ -1,10 +1,11 @@
 use druid::{Data, Lens};
+use env::VarError;
 use platform_dirs::AppDirs;
 use psst_core::{
     audio_player::PlaybackConfig, cache::mkdir_if_not_exists, connection::Credentials,
 };
 use serde::{Deserialize, Serialize};
-use std::{fs::File, path::PathBuf};
+use std::{env, fs::File, path::PathBuf};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Data)]
 pub enum PreferencesTab {
@@ -26,6 +27,7 @@ impl Preferences {
 
 const APP_NAME: &str = "Psst";
 const CONFIG_FILENAME: &str = "config.json";
+const PROXY_ENV_VAR: &str = "HTTPS_PROXY";
 
 #[derive(Clone, Debug, Default, Data, Lens, Serialize, Deserialize)]
 #[serde(default)]
@@ -93,6 +95,19 @@ impl Config {
             bitrate: self.audio_quality.as_bitrate(),
             ..PlaybackConfig::default()
         }
+    }
+
+    pub fn proxy(&self) -> Option<String> {
+        env::var(PROXY_ENV_VAR).map_or_else(
+            |err| match err {
+                VarError::NotPresent => None,
+                VarError::NotUnicode(_) => {
+                    log::error!("proxy URL is not a valid unicode");
+                    None
+                }
+            },
+            |url| Some(url),
+        )
     }
 }
 

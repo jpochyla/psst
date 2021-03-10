@@ -1,7 +1,17 @@
-use druid::Data;
-use std::{ops::Deref, sync::Arc, time::Duration};
+use chrono::NaiveDate;
+use druid::{im::Vector, Data};
+use serde::{Deserialize, Deserializer};
+use std::{sync::Arc, time::Duration};
 
-#[derive(Clone, Debug, Data)]
+#[derive(Deserialize)]
+pub struct Page<T: Clone> {
+    pub items: Vector<T>,
+    pub limit: usize,
+    pub offset: usize,
+    pub total: usize,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Hash, Data, Deserialize)]
 pub struct Image {
     pub url: Arc<str>,
     pub width: Option<usize>,
@@ -18,33 +28,58 @@ impl Image {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default, Debug)]
-pub struct AudioDuration(Duration);
-
-impl Data for AudioDuration {
-    fn same(&self, other: &Self) -> bool {
-        self.0 == other.0
-    }
+pub fn default_str() -> Arc<str> {
+    "".into()
 }
 
-impl Deref for AudioDuration {
-    type Target = Duration;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
+pub fn deserialize_secs<'de, D>(deserializer: D) -> Result<Duration, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let secs = f64::deserialize(deserializer)?;
+    let duration = Duration::from_secs_f64(secs);
+    Ok(duration)
 }
 
-impl From<Duration> for AudioDuration {
-    fn from(duration: Duration) -> Self {
-        Self(duration)
-    }
+pub fn deserialize_millis<'de, D>(deserializer: D) -> Result<Duration, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let millis = u64::deserialize(deserializer)?;
+    let duration = Duration::from_millis(millis);
+    Ok(duration)
 }
 
-impl AudioDuration {
-    pub fn as_minutes_and_seconds(&self) -> String {
-        let minutes = self.as_secs() / 60;
-        let seconds = self.as_secs() % 60;
-        format!("{}:{:02}", minutes, seconds)
-    }
+pub fn deserialize_date<'de, D>(deserializer: D) -> Result<NaiveDate, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let date = String::deserialize(deserializer)?;
+    let mut parts = date.splitn(3, '-');
+    let year = parts.next().and_then(|p| p.parse().ok()).unwrap_or(0);
+    let month = parts.next().and_then(|p| p.parse().ok()).unwrap_or(1);
+    let day = parts.next().and_then(|p| p.parse().ok()).unwrap_or(1);
+    NaiveDate::from_ymd_opt(year, month, day).ok_or(serde::de::Error::custom("Invalid date"))
+}
+
+pub(crate) fn deserialize_date_option<'de, D>(
+    deserializer: D,
+) -> Result<Option<NaiveDate>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    struct Wrapper(#[serde(deserialize_with = "deserialize_date")] NaiveDate);
+
+    Ok(Option::deserialize(deserializer)?.map(|Wrapper(val)| val))
+}
+
+pub fn deserialize_first_page<'de, D, T>(deserializer: D) -> Result<Vector<T>, D::Error>
+where
+    T: Clone,
+    T: Deserialize<'de>,
+    D: Deserializer<'de>,
+{
+    let page = Page::<T>::deserialize(deserializer)?;
+    Ok(page.items)
 }

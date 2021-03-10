@@ -15,29 +15,29 @@ use druid::{
     Env, Event, EventCtx, LifeCycle, LifeCycleCtx, Selector, Widget, WidgetExt,
 };
 
-pub fn make_config() -> impl Widget<State> {
-    let tabs = make_config_tabs()
+pub fn make_preferences() -> impl Widget<State> {
+    let tabs = make_tabs()
         .padding(theme::grid(2.0))
         .background(theme::BACKGROUND_LIGHT);
 
     let active = ViewSwitcher::new(
         |state: &State, _env| state.preferences.active,
         |active: &PreferencesTab, _state, _env| match active {
-            PreferencesTab::General => make_config_general().boxed(),
-            PreferencesTab::Cache => make_config_cache().boxed(),
+            PreferencesTab::General => make_general().boxed(),
+            PreferencesTab::Cache => make_cache().boxed(),
         },
     )
-    .padding((theme::grid(4.0), theme::grid(4.0)))
-    .expand_width()
+    .padding(theme::grid(4.0))
     .background(Border::Top.widget(theme::GREY_500));
 
     Flex::column()
         .must_fill_main_axis(true)
+        .cross_axis_alignment(CrossAxisAlignment::Fill)
         .with_child(tabs)
         .with_child(active)
 }
 
-fn make_config_tabs() -> impl Widget<State> {
+fn make_tabs() -> impl Widget<State> {
     let label = |text, icon: &SvgIcon, tab: PreferencesTab| {
         Flex::column()
             .with_child(icon.scale(theme::ICON_SIZE_LARGE))
@@ -74,7 +74,7 @@ fn make_config_tabs() -> impl Widget<State> {
         .with_child(label("Cache", &icons::STORAGE, PreferencesTab::Cache))
 }
 
-fn make_config_general() -> impl Widget<State> {
+fn make_general() -> impl Widget<State> {
     let mut col = Flex::column().cross_axis_alignment(CrossAxisAlignment::Start);
 
     // Theme
@@ -86,31 +86,11 @@ fn make_config_general() -> impl Widget<State> {
                 .lens(Config::theme),
         );
 
+    col = col.with_spacer(theme::grid(3.0));
+
     // Credentials
     col = col
-        .with_spacer(theme::grid(3.0))
-        .with_child(Label::new("Device credentials").with_font(theme::UI_FONT_MEDIUM))
-        .with_spacer(theme::grid(2.0))
-        .with_child(
-            Flex::row()
-                .with_child(
-                    Label::new("You can set these up in your ")
-                        .with_text_color(theme::PLACEHOLDER_COLOR)
-                        .with_text_size(theme::TEXT_SIZE_SMALL),
-                )
-                .with_child(
-                    Label::new("Spotify Account Settings.")
-                        .with_text_size(theme::TEXT_SIZE_SMALL)
-                        .hover()
-                        .on_click(|_ctx, _data, _env| {
-                            if let Err(err) =
-                                open::that("https://www.spotify.com/account/set-device-password")
-                            {
-                                log::error!("error while opening url: {:?}", err);
-                            }
-                        }),
-                ),
-        )
+        .with_child(Label::new("Credentials").with_font(theme::UI_FONT_MEDIUM))
         .with_spacer(theme::grid(2.0))
         .with_child(
             TextBox::new()
@@ -126,9 +106,10 @@ fn make_config_general() -> impl Widget<State> {
                 .lens(Config::password),
         );
 
+    col = col.with_spacer(theme::grid(3.0));
+
     // Audio quality
     col = col
-        .with_spacer(theme::grid(3.0))
         .with_child(Label::new("Audio quality").with_font(theme::UI_FONT_MEDIUM))
         .with_spacer(theme::grid(2.0))
         .with_child(
@@ -140,8 +121,10 @@ fn make_config_general() -> impl Widget<State> {
             .lens(Config::audio_quality),
         );
 
+    col = col.with_spacer(theme::grid(3.0));
+
     // Save
-    col = col.with_spacer(theme::grid(3.0)).with_child(
+    col = col.with_child(
         Button::new("Save")
             .on_click(move |ctx, config: &mut Config, _env| {
                 config.save();
@@ -156,7 +139,7 @@ fn make_config_general() -> impl Widget<State> {
     col.lens(State::config)
 }
 
-fn make_config_cache() -> impl Widget<State> {
+fn make_cache() -> impl Widget<State> {
     let mut col = Flex::column().cross_axis_alignment(CrossAxisAlignment::Start);
 
     col = col
@@ -171,8 +154,9 @@ fn make_config_cache() -> impl Widget<State> {
             .with_line_break_mode(LineBreaking::WordWrap),
         );
 
+    col = col.with_spacer(theme::grid(3.0));
+
     col = col
-        .with_spacer(theme::grid(3.0))
         .with_child(Label::new("Size").with_font(theme::UI_FONT_MEDIUM))
         .with_spacer(theme::grid(2.0))
         .with_child(Label::dynamic(
@@ -218,8 +202,8 @@ impl<W: Widget<Preferences>> Controller<Preferences, W> for MeasureCacheSize {
     ) {
         match &event {
             Event::Command(cmd) if cmd.is(Self::UPDATE_CACHE_SIZE) => {
-                self.thread.take();
                 data.cache_size = cmd.get_unchecked(Self::UPDATE_CACHE_SIZE).to_owned();
+                self.thread.take();
             }
             _ => {
                 child.event(ctx, event, data, env);

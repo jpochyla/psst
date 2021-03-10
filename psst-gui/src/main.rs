@@ -5,7 +5,7 @@ mod data;
 mod delegate;
 mod error;
 mod ui;
-mod web;
+mod webapi;
 mod widget;
 
 use crate::{
@@ -39,12 +39,12 @@ fn main() {
         delegate.main_window.replace(win_id);
         (launcher, delegate)
     } else {
-        let win = ui::make_config_window();
+        let win = ui::make_preferences_window();
         let win_id = win.id;
         let launcher =
-            AppLauncher::with_window(ui::make_config_window()).configure_env(ui::theme::setup);
+            AppLauncher::with_window(ui::make_preferences_window()).configure_env(ui::theme::setup);
         let mut delegate = DelegateHolder::new(launcher.get_external_handle());
-        delegate.config_window.replace(win_id);
+        delegate.preferences_window.replace(win_id);
         (launcher, delegate)
     };
 

@@ -90,7 +90,7 @@ pub fn setup(env: &mut Env, state: &State) {
         UI_FONT_MONO,
         FontDescriptor::new(FontFamily::MONOSPACE).with_size(13.0),
     );
-    env.set(TEXT_SIZE_SMALL, 12.0);
+    env.set(TEXT_SIZE_SMALL, 11.0);
     env.set(TEXT_SIZE_NORMAL, 13.0);
     env.set(TEXT_SIZE_LARGE, 16.0);
 

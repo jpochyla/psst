@@ -1,6 +1,6 @@
 use crate::{
     cmd,
-    data::{Album, AlbumDetail, Artist, CommonCtx, Ctx, Nav, State},
+    data::{Album, AlbumDetail, AlbumLink, ArtistLink, CommonCtx, Copyright, Ctx, Nav, State},
     ui::{
         theme,
         track::{make_tracklist, TrackDisplay},
@@ -37,9 +37,9 @@ fn make_detail_loaded() -> impl Widget<Ctx<CommonCtx, Album>> {
         Label::raw()
             .with_line_break_mode(LineBreaking::WordWrap)
             .hover()
-            .lens(Artist::name)
-            .on_click(|ctx, artist: &mut Artist, _| {
-                let nav = Nav::ArtistDetail(artist.link());
+            .lens(ArtistLink::name)
+            .on_click(|ctx, artist_link: &mut ArtistLink, _| {
+                let nav = Nav::ArtistDetail(artist_link.to_owned());
                 ctx.submit_command(cmd::NAVIGATE_TO.with(nav));
             })
     })
@@ -58,6 +58,7 @@ fn make_detail_loaded() -> impl Widget<Ctx<CommonCtx, Album>> {
             .with_line_break_mode(LineBreaking::WordWrap)
             .with_text_size(theme::TEXT_SIZE_SMALL)
             .with_text_color(theme::PLACEHOLDER_COLOR)
+            .lens(Copyright::text)
     })
     .lens(Album::copyrights);
 
@@ -154,17 +155,17 @@ pub fn make_album() -> impl Widget<Ctx<CommonCtx, Album>> {
 fn make_album_menu(album: &Ctx<CommonCtx, Album>) -> MenuDesc<State> {
     let mut menu = MenuDesc::empty();
 
-    for artist in &album.data.artists {
+    for artist_link in &album.data.artists {
         let more_than_one_artist = album.data.artists.len() > 1;
         let title = if more_than_one_artist {
             LocalizedString::new("menu-item-show-artist-name")
-                .with_placeholder(format!("Go To {}", artist.name))
+                .with_placeholder(format!("Go To {}", artist_link.name))
         } else {
             LocalizedString::new("menu-item-show-artist").with_placeholder("Go To Artist")
         };
         menu = menu.append(MenuItem::new(
             title,
-            cmd::NAVIGATE_TO.with(Nav::ArtistDetail(artist.link())),
+            cmd::NAVIGATE_TO.with(Nav::ArtistDetail(artist_link.to_owned())),
         ));
     }
 

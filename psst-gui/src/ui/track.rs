@@ -20,6 +20,8 @@ use druid::{
 };
 use std::sync::Arc;
 
+use super::utils;
+
 #[derive(Copy, Clone)]
 pub struct TrackDisplay {
     pub number: bool,
@@ -182,7 +184,7 @@ where
 
 fn make_track(display: TrackDisplay) -> impl Widget<TrackRow> {
     let track_duration =
-        Label::dynamic(|tr: &TrackRow, _| tr.track.duration.as_minutes_and_seconds())
+        Label::dynamic(|tr: &TrackRow, _| utils::as_minutes_and_seconds(&tr.track.duration))
             .with_text_size(theme::TEXT_SIZE_SMALL)
             .with_text_color(theme::PLACEHOLDER_COLOR);
 
@@ -263,24 +265,24 @@ fn make_track(display: TrackDisplay) -> impl Widget<TrackRow> {
 fn make_track_menu(tr: &TrackRow) -> MenuDesc<State> {
     let mut menu = MenuDesc::empty();
 
-    for artist in &tr.track.artists {
+    for artist_link in &tr.track.artists {
         let more_than_one_artist = tr.track.artists.len() > 1;
         let title = if more_than_one_artist {
             LocalizedString::new("menu-item-show-artist-name")
-                .with_placeholder(format!("Go To Artist “{}”", artist.name))
+                .with_placeholder(format!("Go To Artist “{}”", artist_link.name))
         } else {
             LocalizedString::new("menu-item-show-artist").with_placeholder("Go To Artist")
         };
         menu = menu.append(MenuItem::new(
             title,
-            cmd::NAVIGATE_TO.with(Nav::ArtistDetail(artist.link())),
+            cmd::NAVIGATE_TO.with(Nav::ArtistDetail(artist_link.to_owned())),
         ));
     }
 
-    if let Some(album) = tr.track.album.as_ref() {
+    if let Some(album_link) = tr.track.album.as_ref() {
         menu = menu.append(MenuItem::new(
             LocalizedString::new("menu-item-show-album").with_placeholder("Go To Album"),
-            cmd::NAVIGATE_TO.with(Nav::AlbumDetail(album.link())),
+            cmd::NAVIGATE_TO.with(Nav::AlbumDetail(album_link.to_owned())),
         ))
     }
 

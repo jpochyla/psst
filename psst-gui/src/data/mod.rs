@@ -11,7 +11,7 @@ mod track;
 mod utils;
 
 pub use crate::data::{
-    album::{Album, AlbumDetail, AlbumLink, AlbumType},
+    album::{Album, AlbumDetail, AlbumLink, AlbumType, Copyright, CopyrightType},
     artist::{Artist, ArtistAlbums, ArtistDetail, ArtistLink, ArtistTracks},
     config::{AudioQuality, Config, Preferences, PreferencesTab, Theme},
     ctx::Ctx,
@@ -22,14 +22,14 @@ pub use crate::data::{
     playlist::{Playlist, PlaylistDetail, PlaylistLink, PlaylistTracks},
     promise::{Promise, PromiseState},
     search::{Search, SearchResults},
-    track::{AudioAnalysis, AudioSegment, TimeInterval, Track, TrackId, LOCAL_TRACK_ID},
-    utils::{AudioDuration, Image},
+    track::{AudioAnalysis, AudioSegment, TimeInterval, Track, TrackId},
+    utils::{Image, Page},
 };
 use druid::{
     im::{HashSet, Vector},
     Data, Lens,
 };
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 #[derive(Clone, Debug, Data, Lens)]
 pub struct State {
@@ -101,17 +101,12 @@ impl State {
         self.playback.current.replace(CurrentPlayback {
             item,
             origin,
-            progress: AudioDuration::default(),
+            progress: Duration::default(),
             analysis: Promise::default(),
         });
     }
 
-    pub fn start_playback(
-        &mut self,
-        item: Arc<Track>,
-        origin: PlaybackOrigin,
-        progress: AudioDuration,
-    ) {
+    pub fn start_playback(&mut self, item: Arc<Track>, origin: PlaybackOrigin, progress: Duration) {
         self.common_ctx.playback_item.replace(item.clone());
         self.playback.state = PlaybackState::Playing;
         self.playback.current.replace(CurrentPlayback {
@@ -122,7 +117,7 @@ impl State {
         });
     }
 
-    pub fn progress_playback(&mut self, progress: AudioDuration) {
+    pub fn progress_playback(&mut self, progress: Duration) {
         self.playback.current.as_mut().map(|current| {
             current.progress = progress;
         });

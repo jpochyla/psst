@@ -1,15 +1,20 @@
-use crate::data::{Album, Artist, AudioDuration};
+use crate::data::AlbumLink;
+use crate::data::ArtistLink;
 use druid::{im::Vector, Data, Lens};
 use psst_core::item_id::{ItemId, ItemIdType};
-use std::{ops::Deref, str::FromStr, sync::Arc};
+use serde::Deserialize;
+use std::{convert::TryFrom, ops::Deref, str::FromStr, sync::Arc, time::Duration};
 
-#[derive(Clone, Debug, Data, Lens)]
+#[derive(Clone, Debug, Data, Lens, Deserialize)]
 pub struct Track {
+    #[serde(default)]
     pub id: TrackId,
     pub name: Arc<str>,
-    pub album: Option<Album>,
-    pub artists: Vector<Artist>,
-    pub duration: AudioDuration,
+    pub album: Option<AlbumLink>,
+    pub artists: Vector<ArtistLink>,
+    #[serde(rename = "duration_ms")]
+    #[serde(deserialize_with = "super::utils::deserialize_millis")]
+    pub duration: Duration,
     pub disc_number: usize,
     pub track_number: usize,
     pub explicit: bool,
@@ -34,17 +39,23 @@ impl Track {
     }
 
     pub fn url(&self) -> String {
-        format!(
-            "https://open.spotify.com/track/{id}",
-            id = self.id.to_base62()
-        )
+        format!("https://open.spotify.com/track/{}", self.id.to_base62())
     }
 }
 
-pub const LOCAL_TRACK_ID: TrackId = TrackId(ItemId::new(0u128, ItemIdType::Unknown));
-
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash, Deserialize)]
+#[serde(try_from = "String")]
 pub struct TrackId(ItemId);
+
+impl TrackId {
+    pub const INVALID: Self = Self(ItemId::new(0u128, ItemIdType::Unknown));
+}
+
+impl Default for TrackId {
+    fn default() -> Self {
+        Self::INVALID
+    }
+}
 
 impl Data for TrackId {
     fn same(&self, other: &Self) -> bool {
@@ -67,33 +78,44 @@ impl From<ItemId> for TrackId {
 }
 
 impl FromStr for TrackId {
-    type Err = ();
+    type Err = &'static str;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if let Some(id) = ItemId::from_base62(s, ItemIdType::Track) {
             Ok(Self(id))
         } else {
-            Err(())
+            Err("Invalid track ID")
         }
     }
 }
 
-#[derive(Clone, Data, Debug)]
+impl TryFrom<String> for TrackId {
+    type Error = &'static str;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        Self::from_str(&value)
+    }
+}
+
+#[derive(Clone, Data, Debug, Deserialize)]
 pub struct AudioAnalysis {
     pub segments: Vector<AudioSegment>,
 }
 
-#[derive(Clone, Data, Debug)]
+#[derive(Clone, Data, Debug, Deserialize)]
 pub struct AudioSegment {
+    #[serde(flatten)]
     pub interval: TimeInterval,
     pub loudness_start: f64,
     pub loudness_max: f64,
     pub loudness_max_time: f64,
 }
 
-#[derive(Clone, Data, Debug)]
+#[derive(Clone, Data, Debug, Deserialize)]
 pub struct TimeInterval {
-    pub start: AudioDuration,
-    pub duration: AudioDuration,
+    #[serde(deserialize_with = "super::utils::deserialize_secs")]
+    pub start: Duration,
+    #[serde(deserialize_with = "super::utils::deserialize_secs")]
+    pub duration: Duration,
     pub confidence: f64,
 }

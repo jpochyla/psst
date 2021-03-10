@@ -1,20 +1,20 @@
 use crate::error::Error;
 use druid::Data;
 
-#[derive(Eq, PartialEq, Debug)]
-pub enum PromiseState {
-    Empty,
-    Deferred,
-    Resolved,
-    Rejected,
-}
-
 #[derive(Clone, Debug, Data)]
 pub enum Promise<T: Data, D: Data = (), E: Data = Error> {
     Empty,
     Deferred(D),
     Resolved(T),
     Rejected(E),
+}
+
+#[derive(Eq, PartialEq, Debug)]
+pub enum PromiseState {
+    Empty,
+    Deferred,
+    Resolved,
+    Rejected,
 }
 
 impl<T: Data, D: Data, E: Data> Promise<T, D, E> {

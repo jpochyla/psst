@@ -6,48 +6,54 @@ use crate::{
 };
 use druid::{
     widget::{CrossAxisAlignment, Either, Flex, Label, Scroll, Split, ViewSwitcher},
-    Insets, Widget, WidgetExt, WindowDesc,
+    Insets, Widget, WidgetExt, WindowDesc, WindowLevel,
 };
 use icons::SvgIcon;
 
 pub mod album;
 pub mod artist;
-pub mod config;
 pub mod library;
 pub mod menu;
 pub mod playback;
 pub mod playlist;
+pub mod preferences;
 pub mod search;
 pub mod theme;
 pub mod track;
 pub mod utils;
 
 pub fn make_main_window() -> WindowDesc<State> {
-    WindowDesc::new(make_root)
-        .title("Psst")
-        .menu(menu::make_menu())
+    let mut win = WindowDesc::new(make_root()).title("Psst");
+    win = win
         .with_min_size((theme::grid(25.0), theme::grid(25.0)))
-        .window_size((theme::grid(100.0), theme::grid(100.0)))
+        .window_size((theme::grid(100.0), theme::grid(100.0)));
+    if cfg!(target_os = "macos") {
+        win = win.menu(menu::make_menu());
+    }
+    win
 }
 
-pub fn make_config_window() -> WindowDesc<State> {
-    WindowDesc::new(make_config)
-        .title("Preferences")
-        .menu(menu::make_menu())
-        .window_size((theme::grid(50.0), theme::grid(67.0)))
-        .resizable(false)
+pub fn make_preferences_window() -> WindowDesc<State> {
+    let mut win = WindowDesc::new(make_preferences()).title("Preferences");
+    win = win
+        .set_level(WindowLevel::Modal)
+        .window_size((theme::grid(50.0), theme::grid(64.0)))
+        .resizable(false);
+    if cfg!(target_os = "macos") {
+        win = win.menu(menu::make_menu());
+    }
+    win
 }
 
-fn make_config() -> impl Widget<State> {
+fn make_preferences() -> impl Widget<State> {
     ThemeScope::new(
-        config::make_config()
-            .center()
+        preferences::make_preferences()
             .background(theme::BACKGROUND_DARK)
             .expand(),
     )
 }
 
-pub fn make_root() -> impl Widget<State> {
+fn make_root() -> impl Widget<State> {
     let playlists = Scroll::new(playlist::make_list()).vertical();
     let sidebar = Flex::column()
         .must_fill_main_axis(true)
@@ -87,7 +93,7 @@ pub fn make_root() -> impl Widget<State> {
     // .debug_paint_layout()
 }
 
-pub fn make_logo() -> impl Widget<State> {
+fn make_logo() -> impl Widget<State> {
     icons::LOGO
         .scale((29.0, 32.0))
         .with_color(theme::GREY_500)
@@ -95,7 +101,7 @@ pub fn make_logo() -> impl Widget<State> {
         .center()
 }
 
-pub fn make_menu() -> impl Widget<State> {
+fn make_menu() -> impl Widget<State> {
     Flex::column()
         .with_default_spacer()
         .with_child(make_menu_button("Home", Nav::Home))
@@ -111,26 +117,34 @@ fn make_menu_button(title: &str, nav: Nav) -> impl Widget<State> {
         .env_scope({
             let nav = nav.clone();
             move |env, state: &State| {
-                let (bg, fg) = if nav == state.route {
-                    (theme::MENU_BUTTON_BG_ACTIVE, theme::MENU_BUTTON_FG_ACTIVE)
-                } else {
-                    (
-                        theme::MENU_BUTTON_BG_INACTIVE,
-                        theme::MENU_BUTTON_FG_INACTIVE,
-                    )
-                };
-                env.set(theme::HOVER_COLD_COLOR, env.get(bg));
-                env.set(theme::LABEL_COLOR, env.get(fg));
+                env.set(
+                    theme::HOVER_COLD_COLOR,
+                    if nav == state.route {
+                        env.get(theme::MENU_BUTTON_BG_ACTIVE)
+                    } else {
+                        env.get(theme::MENU_BUTTON_BG_INACTIVE)
+                    },
+                );
+                env.set(
+                    theme::LABEL_COLOR,
+                    if nav == state.route {
+                        env.get(theme::MENU_BUTTON_FG_ACTIVE)
+                    } else {
+                        env.get(theme::MENU_BUTTON_FG_INACTIVE)
+                    },
+                );
             }
         })
-        .on_click(move |ctx, _, _| ctx.submit_command(cmd::NAVIGATE_TO.with(nav.clone())))
+        .on_click(move |ctx, _, _| {
+            ctx.submit_command(cmd::NAVIGATE_TO.with(nav.clone()));
+        })
 }
 
 fn make_menu_search() -> impl Widget<State> {
     search::make_input().padding((theme::grid(1.0), theme::grid(1.0)))
 }
 
-pub fn make_route() -> impl Widget<State> {
+fn make_route() -> impl Widget<State> {
     ViewDispatcher::new(
         |state: &State, _| state.route.clone(),
         |route: &Nav, _, _| match route {
@@ -157,11 +171,11 @@ pub fn make_route() -> impl Widget<State> {
     .expand()
 }
 
-pub fn make_home() -> impl Widget<State> {
+fn make_home() -> impl Widget<State> {
     Empty
 }
 
-pub fn make_back_button() -> impl Widget<State> {
+fn make_back_button() -> impl Widget<State> {
     let icon = icons::BACK.scale((10.0, theme::grid(2.0)));
     let disabled = icon
         .clone()
@@ -182,7 +196,7 @@ pub fn make_back_button() -> impl Widget<State> {
     .padding(theme::grid(1.0))
 }
 
-pub fn make_title() -> impl Widget<State> {
+fn make_title() -> impl Widget<State> {
     Flex::row()
         .cross_axis_alignment(CrossAxisAlignment::Center)
         .with_child(make_route_title())
@@ -220,7 +234,7 @@ fn make_route_title() -> impl Widget<State> {
 }
 
 fn make_is_online() -> impl Widget<State> {
-    Label::dynamic(|is_online: &bool, _| if *is_online { "" } else { "Offline" }.to_string())
+    Either::new(|&is_online, _| is_online, Empty, Label::new("Offline"))
         .padding(theme::grid(1.0))
         .lens(State::is_online)
 }

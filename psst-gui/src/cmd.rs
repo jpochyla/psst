@@ -1,12 +1,12 @@
 use crate::{
     data::{
-        Album, AlbumLink, Artist, ArtistAlbums, ArtistLink, AudioAnalysis, AudioDuration, Nav,
-        PlaybackPayload, Playlist, PlaylistLink, QueueBehavior, SearchResults, Track, TrackId,
+        Album, AlbumLink, Artist, ArtistAlbums, ArtistLink, AudioAnalysis, Nav, PlaybackPayload,
+        Playlist, PlaylistLink, QueueBehavior, SearchResults, Track, TrackId,
     },
     error::Error,
 };
 use druid::{im::Vector, Selector, WidgetId};
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 // Widget IDs
 
@@ -77,9 +77,8 @@ pub const UPDATE_PLAYLIST_TRACKS: Selector<(PlaylistLink, Result<Vector<Arc<Trac
 // Playback state
 
 pub const PLAYBACK_LOADING: Selector<TrackId> = Selector::new("app.playback-loading");
-pub const PLAYBACK_PLAYING: Selector<(TrackId, AudioDuration)> =
-    Selector::new("app.playback-playing");
-pub const PLAYBACK_PROGRESS: Selector<AudioDuration> = Selector::new("app.playback-progress");
+pub const PLAYBACK_PLAYING: Selector<(TrackId, Duration)> = Selector::new("app.playback-playing");
+pub const PLAYBACK_PROGRESS: Selector<Duration> = Selector::new("app.playback-progress");
 pub const PLAYBACK_PAUSING: Selector = Selector::new("app.playback-pausing");
 pub const PLAYBACK_RESUMING: Selector = Selector::new("app.playback-resuming");
 pub const PLAYBACK_BLOCKED: Selector = Selector::new("app.playback-blocked");

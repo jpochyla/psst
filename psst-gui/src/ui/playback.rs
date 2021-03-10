@@ -1,8 +1,8 @@
 use crate::{
     cmd,
     data::{
-        AudioAnalysis, AudioDuration, CurrentPlayback, Playback, PlaybackOrigin, PlaybackState,
-        Promise, QueueBehavior, State, Track,
+        AudioAnalysis, CurrentPlayback, Playback, PlaybackOrigin, PlaybackState, Promise,
+        QueueBehavior, State, Track,
     },
     ui::{theme, utils::Border},
     widget::{icons, Empty, HoverExt, Maybe},
@@ -15,7 +15,9 @@ use druid::{
 };
 use icons::{SvgIcon, PLAY_LOOP_ALL, PLAY_LOOP_TRACK};
 use itertools::Itertools;
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
+
+use super::utils;
 
 pub fn make_panel() -> impl Widget<State> {
     Flex::row()
@@ -193,13 +195,13 @@ fn make_player_controls() -> impl Widget<Playback> {
 
 fn make_player_progress() -> impl Widget<CurrentPlayback> {
     let current_time =
-        Label::dynamic(|progress: &AudioDuration, _| progress.as_minutes_and_seconds())
+        Label::dynamic(|progress: &Duration, _| utils::as_minutes_and_seconds(progress))
             .with_text_size(theme::TEXT_SIZE_SMALL)
             .align_right()
             .fix_width(theme::grid(4.0))
             .lens(CurrentPlayback::progress);
     let total_time =
-        Label::dynamic(|track: &Arc<Track>, _| track.duration.as_minutes_and_seconds())
+        Label::dynamic(|track: &Arc<Track>, _| utils::as_minutes_and_seconds(&track.duration))
             .with_text_size(theme::TEXT_SIZE_SMALL)
             .align_left()
             .fix_width(theme::grid(4.0))
@@ -313,7 +315,7 @@ fn compute_loudness_path(bounds: &Size, data: &CurrentPlayback) -> BezPath {
 
 fn compute_loudness_path_from_analysis(
     bounds: &Size,
-    total_duration: &AudioDuration,
+    total_duration: &Duration,
     analysis: &AudioAnalysis,
 ) -> BezPath {
     let (loudness_min, loudness_max) = analysis

@@ -1,5 +1,115 @@
+use std::{
+    any::Any,
+    sync::Arc,
+    thread::{self, JoinHandle},
+};
+
 use crate::data::{Promise, PromiseState};
-use druid::{widget::prelude::*, Data, Point, WidgetExt, WidgetPod};
+use druid::{
+    widget::{prelude::*, Controller},
+    Data, ExtEventSink, Point, Selector, SingleUse, Target, WidgetExt, WidgetPod,
+};
+
+pub struct AsyncAction<T, D, E> {
+    func: Arc<dyn Fn(&D) -> Result<T, E> + Sync + Send + 'static>,
+    handle: Option<JoinHandle<()>>,
+}
+
+struct AsyncResult {
+    result: Box<dyn Any + Send>,
+    deferred: Box<dyn Any + Send>,
+}
+
+const ASYNC_RESULT: Selector<SingleUse<AsyncResult>> = Selector::new("promise.async_result");
+
+impl<T, D, E> AsyncAction<T, D, E>
+where
+    T: Send + 'static,
+    D: Send + 'static,
+    E: Send + 'static,
+{
+    pub fn new<F>(func: F) -> Self
+    where
+        F: Fn(&D) -> Result<T, E> + Sync + Send + 'static,
+    {
+        Self {
+            func: Arc::new(func),
+            handle: None,
+        }
+    }
+
+    fn spawn_action(&mut self, self_id: WidgetId, event_sink: ExtEventSink, deferred: D) {
+        self.handle.replace(thread::spawn({
+            let func = self.func.clone();
+            move || {
+                let result = AsyncResult {
+                    result: Box::new(func(&deferred)),
+                    deferred: Box::new(deferred),
+                };
+                event_sink
+                    .submit_command(
+                        ASYNC_RESULT,
+                        SingleUse::new(result),
+                        Target::Widget(self_id),
+                    )
+                    .unwrap();
+            }
+        }));
+    }
+}
+
+impl<T, D, E, W> Controller<Promise<T, D, E>, W> for AsyncAction<T, D, E>
+where
+    T: Data,
+    D: Data + PartialEq,
+    E: Data,
+    W: Widget<Promise<T, D, E>>,
+{
+    fn event(
+        &mut self,
+        child: &mut W,
+        ctx: &mut EventCtx,
+        event: &Event,
+        data: &mut Promise<T, D, E>,
+        env: &Env,
+    ) {
+        match event {
+            Event::Command(cmd) if cmd.is(ASYNC_RESULT) => {
+                let payload = cmd.get_unchecked(ASYNC_RESULT).take().unwrap();
+                let result = payload.result.downcast().unwrap();
+                let deferred = payload.deferred.downcast().unwrap();
+                if data.is_deferred(&deferred) {
+                    data.resolve_or_reject(*result);
+                }
+            }
+            _ => {
+                child.event(ctx, event, data, env);
+            }
+        }
+    }
+
+    fn lifecycle(
+        &mut self,
+        child: &mut W,
+        ctx: &mut LifeCycleCtx,
+        event: &LifeCycle,
+        data: &Promise<T, D, E>,
+        env: &Env,
+    ) {
+        child.lifecycle(ctx, event, data, env)
+    }
+
+    fn update(
+        &mut self,
+        child: &mut W,
+        ctx: &mut UpdateCtx,
+        old_data: &Promise<T, D, E>,
+        data: &Promise<T, D, E>,
+        env: &Env,
+    ) {
+        child.update(ctx, old_data, data, env)
+    }
+}
 
 pub struct Async<T, D, E> {
     def_maker: Box<dyn Fn() -> Box<dyn Widget<D>>>,

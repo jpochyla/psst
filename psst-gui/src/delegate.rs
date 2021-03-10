@@ -1,17 +1,17 @@
 use crate::{
     cmd,
     data::{
-        ArtistTracks, AudioDuration, Config, Nav, PlaybackOrigin, PlaylistTracks, QueueBehavior,
-        SavedTracks, State, Track, TrackId,
+        ArtistTracks, Config, Nav, PlaybackOrigin, PlaylistTracks, QueueBehavior, SavedTracks,
+        State, Track, TrackId,
     },
     ui,
-    web::{Web, WebCache},
+    webapi::WebApi,
     widget::remote_image,
 };
 use crossbeam_channel::{Receiver, Sender};
 use druid::{
     commands, im::Vector, image, AppDelegate, Application, Command, Data, DelegateCtx, Env, Event,
-    ExtEventSink, Handled, ImageBuf, Selector, Target, WindowId,
+    ExtEventSink, Handled, ImageBuf, Target, WindowId,
 };
 use lru_cache::LruCache;
 use psst_core::{
@@ -21,12 +21,13 @@ use psst_core::{
     cache::Cache,
     cdn::{Cdn, CdnHandle},
     connection::Credentials,
-    session::SessionHandle,
+    session::{SessionConfig, SessionHandle},
 };
-use std::{
-    collections::HashSet, future::Future, sync::Arc, thread, thread::JoinHandle, time::Duration,
-};
-use tokio::runtime::Runtime;
+use std::{collections::HashSet, env, sync::Arc, thread, thread::JoinHandle, time::Duration};
+
+fn proxy_from_env_var() -> Option<String> {
+    env::var("SOCKS_PROXY").ok()
+}
 
 struct SessionDelegate {
     handle: SessionHandle,
@@ -48,7 +49,11 @@ impl SessionDelegate {
 
     fn service(credentials: Credentials, event_sink: ExtEventSink, handle: SessionHandle) {
         let connect_and_service_single_session = || {
-            let session = handle.connect(credentials.clone())?;
+            let config = SessionConfig {
+                login_creds: credentials.clone(),
+                proxy_url: proxy_from_env_var(),
+            };
+            let session = handle.connect(config)?;
             log::info!("session connected");
             event_sink
                 .submit_command(cmd::SESSION_CONNECTED, (), Target::Auto)
@@ -78,7 +83,9 @@ struct PlayerDelegate {
 
 impl PlayerDelegate {
     fn new(config: PlaybackConfig, session: SessionHandle, event_sink: ExtEventSink) -> Self {
-        let cdn = Cdn::connect(session.clone());
+        let cdn = Cdn::connect(session.clone(), proxy_from_env_var().as_deref())
+            .expect("Failed to initialize CDN connection");
+
         let cache = {
             let dir = Config::cache_dir().expect("Failed to find cache location");
             Cache::new(dir).expect("Failed to open cache")
@@ -127,7 +134,7 @@ impl PlayerDelegate {
                 }
                 PlayerEvent::Playing { path, duration } => {
                     let item: TrackId = path.item_id.into();
-                    let progress: AudioDuration = duration.to_owned().into();
+                    let progress = duration.to_owned();
                     sink.submit_command(cmd::PLAYBACK_PLAYING, (item, progress), Target::Auto)
                         .unwrap();
                 }
@@ -140,7 +147,7 @@ impl PlayerDelegate {
                         .unwrap();
                 }
                 PlayerEvent::Progress { duration, .. } => {
-                    let progress: AudioDuration = duration.to_owned().into();
+                    let progress = duration.to_owned();
                     sink.submit_command(cmd::PLAYBACK_PROGRESS, progress, Target::Auto)
                         .unwrap();
                 }
@@ -246,7 +253,7 @@ pub struct DelegateHolder {
     event_sink: ExtEventSink,
     delegate: Option<Delegate>,
     pub main_window: Option<WindowId>,
-    pub config_window: Option<WindowId>,
+    pub preferences_window: Option<WindowId>,
     opened_windows: HashSet<WindowId>,
 }
 
@@ -256,7 +263,7 @@ impl DelegateHolder {
             event_sink,
             delegate: None,
             main_window: None,
-            config_window: None,
+            preferences_window: None,
             opened_windows: HashSet::new(),
         }
     }
@@ -305,7 +312,7 @@ impl AppDelegate<State> for DelegateHolder {
                 .map(|id| self.opened_windows.contains(id))
                 .unwrap_or(false)
             {
-                let win_id = self.config_window.unwrap();
+                let win_id = self.preferences_window.unwrap();
                 ctx.submit_command(commands::SHOW_WINDOW.to(win_id));
             } else {
                 let win = ui::make_main_window();
@@ -315,16 +322,16 @@ impl AppDelegate<State> for DelegateHolder {
             Handled::Yes
         } else if cmd.is(commands::SHOW_PREFERENCES) {
             if self
-                .config_window
+                .preferences_window
                 .as_ref()
                 .map(|id| self.opened_windows.contains(id))
                 .unwrap_or(false)
             {
-                let win_id = self.config_window.unwrap();
+                let win_id = self.preferences_window.unwrap();
                 ctx.submit_command(commands::SHOW_WINDOW.to(win_id));
             } else {
-                let win = ui::make_config_window();
-                self.config_window.replace(win.id);
+                let win = ui::make_preferences_window();
+                self.preferences_window.replace(win.id);
                 ctx.new_window(win);
             }
             Handled::Yes
@@ -355,8 +362,7 @@ pub struct Delegate {
     event_sink: ExtEventSink,
     session: SessionDelegate,
     player: PlayerDelegate,
-    web: Arc<Web>,
-    runtime: Runtime,
+    webapi: Arc<WebApi>,
     image_cache: LruCache<Arc<str>, ImageBuf>,
 }
 
@@ -372,31 +378,19 @@ impl Delegate {
             let sink = event_sink.clone();
             PlayerDelegate::new(config.playback(), session, sink)
         };
-        let web = {
+        let webapi = {
             let session = session.handle.clone();
-            let path = Config::cache_dir().expect("Failed to find cache path location");
-            let cache = WebCache::new(path).expect("Failed to create web API cache");
-            Arc::new(Web::new(session, cache))
+            Arc::new(WebApi::new(session, proxy_from_env_var().as_deref()))
         };
 
-        // Default is 512, but because we can spam the runtime with lot of blocking
-        // operations at once, let's turn it down.
-        const MAX_BLOCKING_THREADS: usize = 32;
-        let runtime = tokio::runtime::Builder::new_multi_thread()
-            .enable_all()
-            .max_blocking_threads(MAX_BLOCKING_THREADS)
-            .build()
-            .unwrap();
-
-        const IMAGE_CACHE_SIZE: usize = 512;
+        const IMAGE_CACHE_SIZE: usize = 256;
         let image_cache = LruCache::new(IMAGE_CACHE_SIZE);
 
         Self {
             event_sink,
             session,
             player,
-            web,
-            runtime,
+            webapi,
             image_cache,
         }
     }
@@ -446,16 +440,14 @@ impl Delegate {
         }
     }
 
-    fn submit_async<F>(&self, selector: Selector<F::Output>, future: F)
+    fn spawn<F, T>(&self, f: F)
     where
-        F: Future + Send + 'static,
-        F::Output: Send + 'static,
+        F: FnOnce() -> T,
+        F: Send + 'static,
+        T: Send + 'static,
     {
-        let sink = self.event_sink.clone();
-        self.runtime.spawn(async move {
-            sink.submit_command(selector, future.await, Target::Auto)
-                .unwrap();
-        });
+        // TODO: Use a thread pool.
+        thread::spawn(f);
     }
 }
 
@@ -509,12 +501,9 @@ impl Delegate {
                 sink.submit_command(remote_image::PROVIDE_DATA, payload, target)
                     .unwrap();
             } else {
-                let web = self.web.clone();
-                self.runtime.spawn(async move {
-                    let dyn_image = web
-                        .load_image(&location, image::ImageFormat::Jpeg)
-                        .await
-                        .unwrap();
+                let web = self.webapi.clone();
+                self.spawn(move || {
+                    let dyn_image = web.get_image(&location, image::ImageFormat::Jpeg).unwrap();
                     let image_buf = ImageBuf::from_dynamic_image(dyn_image);
                     let payload = remote_image::ImagePayload {
                         location,
@@ -562,24 +551,25 @@ impl Delegate {
 
     fn command_playlist(&mut self, _target: Target, cmd: &Command, data: &mut State) -> Handled {
         if cmd.is(cmd::LOAD_PLAYLISTS) {
-            let web = self.web.clone();
+            let web = self.webapi.clone();
+            let sink = self.event_sink.clone();
             data.library_mut().playlists.defer_default();
-            self.submit_async(
-                cmd::UPDATE_PLAYLISTS,
-                async move { web.load_playlists().await },
-            );
+            self.spawn(move || {
+                sink.submit_command(cmd::UPDATE_PLAYLISTS, web.get_playlists(), Target::Auto)
+                    .unwrap();
+            });
             Handled::Yes
         } else if let Some(result) = cmd.get(cmd::UPDATE_PLAYLISTS).cloned() {
             data.library_mut().playlists.resolve_or_reject(result);
             Handled::Yes
         } else if let Some(link) = cmd.get(cmd::GOTO_PLAYLIST_DETAIL).cloned() {
-            let web = self.web.clone();
+            let web = self.webapi.clone();
             let sink = self.event_sink.clone();
             data.route = Nav::PlaylistDetail(link.clone());
             data.playlist.playlist.defer(link.clone());
             data.playlist.tracks.defer(link.clone());
-            self.runtime.spawn(async move {
-                let result = web.load_playlist_tracks(&link.id).await;
+            self.spawn(move || {
+                let result = web.get_playlist_tracks(&link.id);
                 sink.submit_command(cmd::UPDATE_PLAYLIST_TRACKS, (link, result), Target::Auto)
                     .unwrap();
             });
@@ -605,20 +595,20 @@ impl Delegate {
             data.route = Nav::Library;
             if data.library.saved_albums.is_empty() || data.library.saved_albums.is_rejected() {
                 data.library_mut().saved_albums.defer_default();
-                let web = self.web.clone();
+                let web = self.webapi.clone();
                 let sink = self.event_sink.clone();
-                self.runtime.spawn(async move {
-                    let result = web.load_saved_albums().await;
+                self.spawn(move || {
+                    let result = web.get_saved_albums();
                     sink.submit_command(cmd::UPDATE_SAVED_ALBUMS, result, Target::Auto)
                         .unwrap();
                 });
             }
             if data.library.saved_tracks.is_empty() || data.library.saved_tracks.is_rejected() {
                 data.library_mut().saved_tracks.defer_default();
-                let web = self.web.clone();
+                let web = self.webapi.clone();
                 let sink = self.event_sink.clone();
-                self.runtime.spawn(async move {
-                    let result = web.load_saved_tracks().await;
+                self.spawn(move || {
+                    let result = web.get_saved_tracks();
                     sink.submit_command(cmd::UPDATE_SAVED_TRACKS, result, Target::Auto)
                         .unwrap();
                 });
@@ -651,42 +641,42 @@ impl Delegate {
             };
             Handled::Yes
         } else if let Some(track) = cmd.get(cmd::SAVE_TRACK).cloned() {
-            let web = self.web.clone();
+            let web = self.webapi.clone();
             let track_id = track.id.to_base62();
             data.save_track(track);
-            self.runtime.spawn(async move {
-                let result = web.save_track(&track_id).await;
+            self.spawn(move || {
+                let result = web.save_track(&track_id);
                 if result.is_err() {
                     // TODO: Refresh saved tracks.
                 }
             });
             Handled::Yes
         } else if let Some(track_id) = cmd.get(cmd::UNSAVE_TRACK).cloned() {
-            let web = self.web.clone();
+            let web = self.webapi.clone();
             data.unsave_track(&track_id);
-            self.runtime.spawn(async move {
-                let result = web.unsave_track(&track_id.to_base62()).await;
+            self.spawn(move || {
+                let result = web.unsave_track(&track_id.to_base62());
                 if result.is_err() {
                     // TODO: Refresh saved tracks.
                 }
             });
             Handled::Yes
         } else if let Some(album) = cmd.get(cmd::SAVE_ALBUM).cloned() {
-            let web = self.web.clone();
+            let web = self.webapi.clone();
             let album_id = album.id.clone();
             data.save_album(album);
-            self.runtime.spawn(async move {
-                let result = web.save_album(&album_id).await;
+            self.spawn(move || {
+                let result = web.save_album(&album_id);
                 if result.is_err() {
                     // TODO: Refresh saved albums.
                 }
             });
             Handled::Yes
         } else if let Some(link) = cmd.get(cmd::UNSAVE_ALBUM).cloned() {
-            let web = self.web.clone();
+            let web = self.webapi.clone();
             data.unsave_album(&link.id);
-            self.runtime.spawn(async move {
-                let result = web.unsave_album(&link.id).await;
+            self.spawn(move || {
+                let result = web.unsave_album(&link.id);
                 if result.is_err() {
                     // TODO: Refresh saved albums.
                 }
@@ -701,10 +691,10 @@ impl Delegate {
         if let Some(link) = cmd.get(cmd::GOTO_ALBUM_DETAIL).cloned() {
             data.route = Nav::AlbumDetail(link.clone());
             data.album.album.defer(link.clone());
-            let web = self.web.clone();
+            let web = self.webapi.clone();
             let sink = self.event_sink.clone();
-            self.runtime.spawn(async move {
-                let result = web.load_album(&link.id).await;
+            self.spawn(move || {
+                let result = web.get_album(&link.id);
                 sink.submit_command(cmd::UPDATE_ALBUM_DETAIL, (link, result), Target::Auto)
                     .unwrap();
             });
@@ -725,40 +715,40 @@ impl Delegate {
             // Load artist detail
             data.artist.artist.defer(album_link.clone());
             let link = album_link.clone();
-            let web = self.web.clone();
+            let web = self.webapi.clone();
             let sink = self.event_sink.clone();
-            self.runtime.spawn(async move {
-                let result = web.load_artist(&link.id).await;
+            self.spawn(move || {
+                let result = web.get_artist(&link.id);
                 sink.submit_command(cmd::UPDATE_ARTIST_DETAIL, (link, result), Target::Auto)
                     .unwrap();
             });
             // Load artist top tracks
             data.artist.top_tracks.defer(album_link.clone());
             let link = album_link.clone();
-            let web = self.web.clone();
+            let web = self.webapi.clone();
             let sink = self.event_sink.clone();
-            self.runtime.spawn(async move {
-                let result = web.load_artist_top_tracks(&link.id).await;
+            self.spawn(move || {
+                let result = web.get_artist_top_tracks(&link.id);
                 sink.submit_command(cmd::UPDATE_ARTIST_TOP_TRACKS, (link, result), Target::Auto)
                     .unwrap();
             });
             // Load artist's related artists
             data.artist.related_artists.defer(album_link.clone());
             let link = album_link.clone();
-            let web = self.web.clone();
+            let web = self.webapi.clone();
             let sink = self.event_sink.clone();
-            self.runtime.spawn(async move {
-                let result = web.load_related_artists(&link.id).await;
+            self.spawn(move || {
+                let result = web.get_related_artists(&link.id);
                 sink.submit_command(cmd::UPDATE_ARTIST_RELATED, (link, result), Target::Auto)
                     .unwrap();
             });
             // Load artist albums
             data.artist.albums.defer(album_link.clone());
             let link = album_link.clone();
-            let web = self.web.clone();
+            let web = self.webapi.clone();
             let sink = self.event_sink.clone();
-            self.runtime.spawn(async move {
-                let result = web.load_artist_albums(&link.id).await;
+            self.spawn(move || {
+                let result = web.get_artist_albums(&link.id);
                 sink.submit_command(cmd::UPDATE_ARTIST_ALBUMS, (link, result), Target::Auto)
                     .unwrap();
             });
@@ -796,12 +786,12 @@ impl Delegate {
 
     fn command_search(&mut self, _target: Target, cmd: &Command, data: &mut State) -> Handled {
         if let Some(query) = cmd.get(cmd::GOTO_SEARCH_RESULTS).cloned() {
-            let web = self.web.clone();
+            let web = self.webapi.clone();
             let sink = self.event_sink.clone();
             data.route = Nav::SearchResults(query.clone());
             data.search.results.defer(query.clone());
-            self.runtime.spawn(async move {
-                let result = web.search(&query).await;
+            self.spawn(move || {
+                let result = web.search(&query);
                 sink.submit_command(cmd::UPDATE_SEARCH_RESULTS, result, Target::Auto)
                     .unwrap();
             });
@@ -829,10 +819,10 @@ impl Delegate {
                     current.analysis.defer(item.clone());
                 });
                 let item = item.clone();
-                let web = self.web.clone();
+                let web = self.webapi.clone();
                 let sink = self.event_sink.clone();
-                self.runtime.spawn(async move {
-                    let result = web.load_audio_analysis(&item.to_base62()).await;
+                self.spawn(move || {
+                    let result = web.get_audio_analysis(&item.to_base62());
                     sink.submit_command(cmd::UPDATE_AUDIO_ANALYSIS, (item, result), Target::Auto)
                         .unwrap();
                 });

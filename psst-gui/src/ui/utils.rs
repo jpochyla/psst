@@ -8,7 +8,7 @@ use druid::{
     },
     Affine, Color, Data, ImageBuf, KeyOrValue, RenderContext, Widget, WidgetExt,
 };
-use std::f64::consts::TAU;
+use std::{f64::consts::TAU, time::Duration};
 
 pub enum Border {
     Top,
@@ -125,4 +125,10 @@ pub fn make_error() -> impl Widget<Error> {
         .with_child(error)
         .padding((0.0, theme::grid(6.0)))
         .center()
+}
+
+pub fn as_minutes_and_seconds(dur: &Duration) -> String {
+    let minutes = dur.as_secs() / 60;
+    let seconds = dur.as_secs() % 60;
+    format!("{}:{:02}", minutes, seconds)
 }

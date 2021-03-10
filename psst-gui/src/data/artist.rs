@@ -1,5 +1,6 @@
 use crate::data::{Album, Image, Promise, Track};
 use druid::{im::Vector, Data, Lens};
+use serde::Deserialize;
 use std::sync::Arc;
 
 #[derive(Clone, Debug, Data, Lens)]
@@ -10,7 +11,7 @@ pub struct ArtistDetail {
     pub related_artists: Promise<Vector<Artist>, ArtistLink>,
 }
 
-#[derive(Clone, Debug, Data, Lens)]
+#[derive(Clone, Debug, Data, Lens, Deserialize)]
 pub struct Artist {
     pub id: Arc<str>,
     pub name: Arc<str>,
@@ -57,7 +58,7 @@ impl ArtistTracks {
     }
 }
 
-#[derive(Clone, Debug, Data, Lens, Eq, PartialEq, Hash)]
+#[derive(Clone, Debug, Data, Lens, Eq, PartialEq, Hash, Deserialize)]
 pub struct ArtistLink {
     pub id: Arc<str>,
     pub name: Arc<str>,
