@@ -8,17 +8,19 @@ use crate::{
     },
     error::Error,
     protocol::authentication::AuthenticationType,
-    util::{deserialize_protobuf, serialize_protobuf, HTTP_CONNECT_TIMEOUT, HTTP_IO_TIMEOUT},
+    util::{default_ureq_agent_builder, deserialize_protobuf, serialize_protobuf},
 };
 use byteorder::{ReadBytesExt, BE};
 use hmac::{Hmac, Mac, NewMac};
 use serde::Deserialize;
 use sha1::Sha1;
+use socks::Socks5Stream;
 use std::{
     io,
     io::{Read, Write},
     net::TcpStream,
 };
+use url::Url;
 
 // Device ID used for authentication message.
 const DEVICE_ID: &str = "Psst";
@@ -47,13 +49,14 @@ impl Credentials {
 }
 
 pub struct Transport {
+    pub stream: TcpStream,
     pub encoder: ShannonEncoder<TcpStream>,
     pub decoder: ShannonDecoder<TcpStream>,
 }
 
 impl Transport {
-    pub fn resolve_ap_with_fallback() -> String {
-        match Self::resolve_ap() {
+    pub fn resolve_ap_with_fallback(proxy_url: Option<&str>) -> String {
+        match Self::resolve_ap(proxy_url) {
             Ok(ap) => ap,
             Err(err) => {
                 log::error!("using AP fallback, error while resolving: {:?}", err);
@@ -62,17 +65,13 @@ impl Transport {
         }
     }
 
-    pub fn resolve_ap() -> Result<String, Error> {
+    pub fn resolve_ap(proxy_url: Option<&str>) -> Result<String, Error> {
         #[derive(Clone, Debug, Deserialize)]
         struct APResolveData {
             ap_list: Vec<String>,
         }
 
-        let agent = ureq::AgentBuilder::new()
-            .timeout_connect(HTTP_CONNECT_TIMEOUT)
-            .timeout_read(HTTP_IO_TIMEOUT)
-            .timeout_write(HTTP_IO_TIMEOUT)
-            .build();
+        let agent = default_ureq_agent_builder(proxy_url)?.build();
         let data: APResolveData = agent.get(AP_RESOLVE_ENDPOINT).call()?.into_json()?;
         data.ap_list
             .into_iter()
@@ -80,11 +79,40 @@ impl Transport {
             .ok_or(Error::UnexpectedResponse)
     }
 
-    pub fn connect(ap: &str) -> Result<Self, Error> {
-        log::trace!("connecting to {}", ap);
-        let stream = TcpStream::connect(ap)?;
+    pub fn connect(ap: &str, proxy_url: Option<&str>) -> Result<Self, Error> {
+        log::trace!("connecting to: {:?} with proxy: {:?}", ap, proxy_url);
+        let stream = if let Some(url) = proxy_url {
+            Self::connect_with_proxy(ap, url)?
+        } else {
+            TcpStream::connect(ap)?
+        };
         log::trace!("connected");
         Self::exchange_keys(stream)
+    }
+
+    fn connect_with_proxy(ap: &str, url: &str) -> Result<TcpStream, Error> {
+        match Url::parse(url) {
+            Ok(url) if url.scheme() == "socks5" => {
+                // Currently we only support SOCKS5 proxies.
+                Self::connect_with_socks5_proxy(ap, url)
+            }
+            _ => {
+                // Proxy URL failed to parse or has unsupported scheme.
+                Err(Error::ProxyUrlInvalid)
+            }
+        }
+    }
+
+    fn connect_with_socks5_proxy(ap: &str, url: Url) -> Result<TcpStream, Error> {
+        let addrs = url.socket_addrs(|| None)?;
+        let username = url.username();
+        let password = url.password().unwrap_or("");
+        let proxy = if username.is_empty() {
+            Socks5Stream::connect(&addrs[..], ap)?
+        } else {
+            Socks5Stream::connect_with_password(&addrs[..], ap, username, password)?
+        };
+        Ok(proxy.into_inner())
     }
 
     pub fn exchange_keys(mut stream: TcpStream) -> Result<Self, Error> {
@@ -131,9 +159,13 @@ impl Transport {
 
         // Use the derived keys to make a codec, wrapping the TCP stream.
         let encoder = ShannonEncoder::new(stream.try_clone()?, &send_key);
-        let decoder = ShannonDecoder::new(stream, &recv_key);
+        let decoder = ShannonDecoder::new(stream.try_clone()?, &recv_key);
 
-        Ok(Self { encoder, decoder })
+        Ok(Self {
+            stream,
+            encoder,
+            decoder,
+        })
     }
 
     pub fn authenticate(&mut self, credentials: Credentials) -> Result<Credentials, Error> {

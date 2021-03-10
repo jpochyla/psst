@@ -3,12 +3,22 @@ use num_traits::{One, WrappingAdd};
 use quick_protobuf::{BytesReader, MessageRead, MessageWrite, Writer};
 use std::{io, io::SeekFrom, mem, time::Duration};
 
-// See `ureq::AgentBuilder::timeout_connect`.
-pub const HTTP_CONNECT_TIMEOUT: Duration = Duration::from_millis(4 * 1000);
+const HTTP_CONNECT_TIMEOUT: Duration = Duration::from_millis(4 * 1000);
 
-// See `ureq::AgentBuilder::timeout_read` and
-// `ureq::AgentBuilder::timeout_write`.
-pub const HTTP_IO_TIMEOUT: Duration = Duration::from_millis(4 * 1000);
+const HTTP_IO_TIMEOUT: Duration = Duration::from_millis(4 * 1000);
+
+pub fn default_ureq_agent_builder(proxy_url: Option<&str>) -> Result<ureq::AgentBuilder, Error> {
+    let builder = ureq::AgentBuilder::new()
+        .timeout_connect(HTTP_CONNECT_TIMEOUT)
+        .timeout_read(HTTP_IO_TIMEOUT)
+        .timeout_write(HTTP_IO_TIMEOUT);
+    if let Some(url) = proxy_url {
+        let proxy = ureq::Proxy::new(url)?;
+        Ok(builder.proxy(proxy))
+    } else {
+        Ok(builder)
+    }
+}
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord, Default)]
 pub struct Sequence<T>(T);

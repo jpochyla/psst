@@ -13,9 +13,15 @@ use quick_protobuf::MessageRead;
 use serde::de::DeserializeOwned;
 use std::{
     io,
-    net::TcpStream,
+    net::{Shutdown, TcpStream},
     sync::{Arc, Mutex, RwLock},
 };
+
+#[derive(Clone)]
+pub struct SessionConfig {
+    pub login_creds: Credentials,
+    pub proxy_url: Option<String>,
+}
 
 #[derive(Clone)]
 pub struct SessionHandle {
@@ -37,52 +43,71 @@ impl SessionHandle {
             .ok_or(Error::SessionDisconnected)
     }
 
-    pub fn connect(&self, login_creds: Credentials) -> Result<Arc<Session>, Error> {
+    pub fn connect(&self, config: SessionConfig) -> Result<Arc<Session>, Error> {
         // First we need to drop the old session, so it counts as disconnected until we
         // successfully connect again.
-        self.session.write().unwrap().take();
+        self.session
+            .write()
+            .unwrap()
+            .take()
+            .map(|old_session| old_session.shutdown());
         // Try to connect and block until it either succeeds or fails.
-        let session = Arc::new(Session::connect(login_creds)?);
+        let session = Arc::new(Session::connect(config)?);
         // Save the connected session.
         self.session.write().unwrap().replace(session.clone());
         Ok(session)
     }
 }
 
+struct ShutdownSwitch {
+    shutdown: bool,
+    stream: TcpStream,
+}
+
+impl ShutdownSwitch {
+    fn shutdown(&mut self) {
+        self.shutdown = true;
+        let _ = self.stream.shutdown(Shutdown::Both);
+    }
+}
+
 pub struct Session {
+    shutdown: Mutex<ShutdownSwitch>,
     encoder: Mutex<ShannonEncoder<TcpStream>>,
     decoder: Mutex<ShannonDecoder<TcpStream>>,
     mercury: Mutex<MercuryDispatcher>,
     audio_key: Mutex<AudioKeyDispatcher>,
     country_code: Mutex<Option<String>>,
-    reusable_creds: Credentials,
+    credentials: Credentials,
 }
 
 impl Session {
-    pub fn connect(login_creds: Credentials) -> Result<Self, Error> {
+    pub fn connect(config: SessionConfig) -> Result<Self, Error> {
         // Connect to the server and exchange keys.
-        let mut transport = Transport::connect(&Transport::resolve_ap_with_fallback())?;
+        let proxy_url = config.proxy_url.as_deref();
+        let mut transport =
+            Transport::connect(&Transport::resolve_ap_with_fallback(proxy_url), proxy_url)?;
         // Authenticate with provided credentials (either username/password, or saved,
         // reusable credential blob from an earlier run).
-        let reusable_creds = transport.authenticate(login_creds)?;
-        // Split transport into encoding/decoding parts, so we can read/write in
+        let credentials = transport.authenticate(config.login_creds)?;
+        // Split transport into encoding/decoding parts, so we can read/write/shutdown in
         // parallel.
-        let Transport { encoder, decoder } = transport;
-        let encoder = Mutex::new(encoder);
-        let decoder = Mutex::new(decoder);
-        // Create the subsystem dispatchers.
-        let audio_key = Mutex::new(AudioKeyDispatcher::new());
-        let mercury = Mutex::new(MercuryDispatcher::new());
-        // Start with an empty country code, it will get filled later from a server
-        // message.
-        let country_code = Mutex::new(None);
-        Ok(Self {
+        let Transport {
+            stream,
             encoder,
             decoder,
-            reusable_creds,
-            country_code,
-            audio_key,
-            mercury,
+        } = transport;
+        Ok(Self {
+            shutdown: Mutex::new(ShutdownSwitch {
+                shutdown: false,
+                stream,
+            }),
+            encoder: Mutex::new(encoder),
+            decoder: Mutex::new(decoder),
+            credentials,
+            country_code: Mutex::new(None),
+            audio_key: Mutex::new(AudioKeyDispatcher::new()),
+            mercury: Mutex::new(MercuryDispatcher::new()),
         })
     }
 
@@ -91,6 +116,18 @@ impl Session {
             let msg = self.receive()?;
             self.dispatch(msg)?;
         }
+    }
+
+    pub fn shutdown(&self) {
+        self.shutdown.lock().unwrap().shutdown();
+    }
+
+    pub fn has_been_shut_down(&self) -> bool {
+        self.shutdown.lock().unwrap().shutdown
+    }
+
+    pub fn credentials(&self) -> &Credentials {
+        &self.credentials
     }
 
     pub fn get_mercury_protobuf<T>(&self, uri: String) -> Result<T, Error>

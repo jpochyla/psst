@@ -81,6 +81,10 @@ where
 
         self.inner.write_all(&buf)
     }
+
+    pub fn as_inner(&self) -> &T {
+        &self.inner
+    }
 }
 
 pub struct ShannonDecoder<T> {
@@ -127,5 +131,9 @@ where
         self.cipher.check_mac(&mac)?;
 
         Ok(ShannonMessage::new(cmd, payload))
+    }
+
+    pub fn as_inner(&self) -> &T {
+        &self.inner
     }
 }

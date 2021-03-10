@@ -7,34 +7,43 @@ use psst_core::{
     connection::Credentials,
     error::Error,
     item_id::{ItemId, ItemIdType},
-    session::SessionHandle,
+    session::{SessionConfig, SessionHandle},
 };
 use std::{env, io, io::BufRead, path::PathBuf, thread};
 
 fn main() {
     env_logger::init();
 
+    let args: Vec<String> = env::args().collect();
+    let track_id = args
+        .get(1)
+        .expect("Expected <track_id> in the first parameter");
     let login_creds = Credentials::from_username_and_password(
         env::var("SPOTIFY_USERNAME").unwrap(),
         env::var("SPOTIFY_PASSWORD").unwrap(),
     );
     let session = SessionHandle::new();
 
-    let connection = session.connect(login_creds).unwrap();
+    let connection = session
+        .connect(SessionConfig {
+            login_creds,
+            proxy_url: None,
+        })
+        .unwrap();
     let processing = thread::spawn({
         move || {
             connection.service().unwrap();
         }
     });
 
-    start(session).unwrap();
+    start(&track_id, session).unwrap();
     processing.join().unwrap();
 }
 
-fn start(session: SessionHandle) -> Result<(), Error> {
-    let cdn = Cdn::connect(session.clone());
+fn start(track_id: &str, session: SessionHandle) -> Result<(), Error> {
+    let cdn = Cdn::connect(session.clone(), None)?;
     let cache = Cache::new(PathBuf::from("cache"))?;
-    let item_id = ItemId::from_base62("6UCFZ9ZOFRxK8oak7MdPZu", ItemIdType::Track).unwrap();
+    let item_id = ItemId::from_base62(&track_id, ItemIdType::Track).unwrap();
     play_item(
         session,
         cdn,

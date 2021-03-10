@@ -5,6 +5,7 @@ pub enum Error {
     SessionDisconnected,
     UnexpectedResponse,
     AudioFileNotFound,
+    ProxyUrlInvalid,
     AuthFailed { code: i32 },
     JsonError(Box<dyn error::Error + Send>),
     AudioFetchingError(Box<dyn error::Error + Send>),
@@ -21,6 +22,7 @@ impl fmt::Display for Error {
             Self::SessionDisconnected => write!(f, "Session disconnected"),
             Self::UnexpectedResponse => write!(f, "Unknown server response"),
             Self::AudioFileNotFound => write!(f, "Audio file not found"),
+            Self::ProxyUrlInvalid => write!(f, "Invalid proxy URL"),
             Self::AuthFailed { code } => match code {
                 0 => write!(f, "Authentication failed: protocol error"),
                 2 => write!(f, "Authentication failed: try another AP"),

@@ -1,9 +1,6 @@
 use crate::{
-    access_token::TokenProvider,
-    error::Error,
-    item_id::FileId,
-    session::SessionHandle,
-    util::{HTTP_CONNECT_TIMEOUT, HTTP_IO_TIMEOUT},
+    access_token::TokenProvider, error::Error, item_id::FileId, session::SessionHandle,
+    util::default_ureq_agent_builder,
 };
 use serde::Deserialize;
 use std::{
@@ -21,17 +18,13 @@ pub struct Cdn {
 }
 
 impl Cdn {
-    pub fn connect(session: SessionHandle) -> CdnHandle {
-        let agent = ureq::AgentBuilder::new()
-            .timeout_connect(HTTP_CONNECT_TIMEOUT)
-            .timeout_read(HTTP_IO_TIMEOUT)
-            .timeout_write(HTTP_IO_TIMEOUT)
-            .build();
-        Arc::new(Self {
+    pub fn connect(session: SessionHandle, proxy_url: Option<&str>) -> Result<CdnHandle, Error> {
+        let agent = default_ureq_agent_builder(proxy_url)?.build();
+        Ok(Arc::new(Self {
             session,
             agent,
             token_provider: TokenProvider::new(),
-        })
+        }))
     }
 
     pub fn resolve_audio_file_url(&self, id: FileId) -> Result<CdnUrl, Error> {
