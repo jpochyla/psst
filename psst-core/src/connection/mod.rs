@@ -92,7 +92,7 @@ impl Transport {
 
     fn connect_with_proxy(ap: &str, url: &str) -> Result<TcpStream, Error> {
         match Url::parse(url) {
-            Ok(url) if url.scheme() == "socks5" => {
+            Ok(url) if url.scheme() == "socks" || url.scheme() == "socks5" => {
                 // Currently we only support SOCKS5 proxies.
                 Self::connect_with_socks5_proxy(ap, url)
             }
