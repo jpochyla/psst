@@ -27,7 +27,7 @@ impl Preferences {
 
 const APP_NAME: &str = "Psst";
 const CONFIG_FILENAME: &str = "config.json";
-const PROXY_ENV_VAR: &str = "HTTPS_PROXY";
+const PROXY_ENV_VAR: &str = "SOCKS_PROXY";
 
 #[derive(Clone, Debug, Default, Data, Lens, Serialize, Deserialize)]
 #[serde(default)]
@@ -97,7 +97,7 @@ impl Config {
         }
     }
 
-    pub fn proxy(&self) -> Option<String> {
+    pub fn proxy() -> Option<String> {
         env::var(PROXY_ENV_VAR).map_or_else(
             |err| match err {
                 VarError::NotPresent => None,

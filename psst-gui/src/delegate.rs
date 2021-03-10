@@ -23,11 +23,7 @@ use psst_core::{
     connection::Credentials,
     session::{SessionConfig, SessionHandle},
 };
-use std::{collections::HashSet, env, sync::Arc, thread, thread::JoinHandle, time::Duration};
-
-fn proxy_from_env_var() -> Option<String> {
-    env::var("SOCKS_PROXY").ok()
-}
+use std::{collections::HashSet, sync::Arc, thread, thread::JoinHandle, time::Duration};
 
 struct SessionDelegate {
     handle: SessionHandle,
@@ -51,7 +47,7 @@ impl SessionDelegate {
         let connect_and_service_single_session = || {
             let config = SessionConfig {
                 login_creds: credentials.clone(),
-                proxy_url: proxy_from_env_var(),
+                proxy_url: Config::proxy(),
             };
             let session = handle.connect(config)?;
             log::info!("session connected");
@@ -83,7 +79,7 @@ struct PlayerDelegate {
 
 impl PlayerDelegate {
     fn new(config: PlaybackConfig, session: SessionHandle, event_sink: ExtEventSink) -> Self {
-        let cdn = Cdn::connect(session.clone(), proxy_from_env_var().as_deref())
+        let cdn = Cdn::connect(session.clone(), Config::proxy().as_deref())
             .expect("Failed to initialize CDN connection");
 
         let cache = {
@@ -380,7 +376,7 @@ impl Delegate {
         };
         let webapi = {
             let session = session.handle.clone();
-            Arc::new(WebApi::new(session, proxy_from_env_var().as_deref()))
+            Arc::new(WebApi::new(session, Config::proxy().as_deref()))
         };
 
         const IMAGE_CACHE_SIZE: usize = 256;
