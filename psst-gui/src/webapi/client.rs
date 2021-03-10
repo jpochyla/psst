@@ -277,7 +277,7 @@ impl WebApi {
     pub fn get_playlist_tracks(&self, id: &str) -> Result<Vector<Arc<Track>>, Error> {
         #[derive(Clone, Deserialize)]
         struct PlaylistItem {
-            track: Arc<Track>,
+            track: Option<Arc<Track>>,
         }
 
         let request = self
@@ -286,7 +286,7 @@ impl WebApi {
             .query("additional_types", "track");
         let result: Vector<PlaylistItem> = self.load_all_pages(request)?;
 
-        Ok(result.into_iter().map(|item| item.track).collect())
+        Ok(result.into_iter().filter_map(|item| item.track).collect())
     }
 }
 
