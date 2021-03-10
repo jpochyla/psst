@@ -1,4 +1,4 @@
-use crate::data::{Album, Artist, Promise, Track};
+use crate::data::{Album, Artist, Playlist, Promise, Track};
 use druid::{im::Vector, Data, Lens};
 use std::sync::Arc;
 
@@ -14,4 +14,5 @@ pub struct SearchResults {
     pub artists: Vector<Artist>,
     pub albums: Vector<Album>,
     pub tracks: Vector<Arc<Track>>,
+    pub playlists: Vector<Playlist>,
 }

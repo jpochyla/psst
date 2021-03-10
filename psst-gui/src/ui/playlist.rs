@@ -1,6 +1,6 @@
 use crate::{
     cmd,
-    data::{Ctx, Library, Nav, Playlist, PlaylistDetail, State},
+    data::{CommonCtx, Ctx, Library, Nav, Playlist, PlaylistDetail, State},
     ui::{
         theme,
         track::{make_tracklist, TrackDisplay},
@@ -10,7 +10,7 @@ use crate::{
 };
 use druid::{
     widget::{Label, LineBreaking, List},
-    Insets, LensExt, Widget, WidgetExt,
+    Insets, LensExt, MouseButton, Widget, WidgetExt,
 };
 
 pub fn make_list() -> impl Widget<State> {
@@ -34,6 +34,25 @@ pub fn make_list() -> impl Widget<State> {
         || make_error(),
     )
     .lens(State::library.then(Library::playlists.in_arc()))
+}
+
+pub fn make_playlist() -> impl Widget<Ctx<CommonCtx, Playlist>> {
+    let playlist_name = Label::raw()
+        .with_font(theme::UI_FONT_MEDIUM)
+        .with_line_break_mode(LineBreaking::Clip)
+        .lens(Playlist::name);
+
+    let playlist = playlist_name.padding(theme::grid(1.0)).lens(Ctx::data());
+
+    playlist.hover().on_ex_click(
+        move |ctx, event, playlist: &mut Ctx<CommonCtx, Playlist>, _| match event.button {
+            MouseButton::Left => {
+                let nav = Nav::PlaylistDetail(playlist.data.link());
+                ctx.submit_command(cmd::NAVIGATE_TO.with(nav));
+            }
+            _ => {}
+        },
+    )
 }
 
 pub fn make_detail() -> impl Widget<State> {

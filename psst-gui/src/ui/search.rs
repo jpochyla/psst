@@ -11,9 +11,11 @@ use crate::{
     widget::{Async, InputController},
 };
 use druid::{
-    widget::{Flex, Label, List, TextBox},
+    widget::{CrossAxisAlignment, Flex, Label, List, TextBox},
     LensExt, Widget, WidgetExt,
 };
+
+use super::playlist::make_playlist;
 
 pub fn make_input() -> impl Widget<State> {
     TextBox::new()
@@ -36,14 +38,18 @@ pub fn make_results() -> impl Widget<State> {
                     .with_font(theme::UI_FONT_MEDIUM)
                     .with_text_color(theme::PLACEHOLDER_COLOR)
                     .with_text_size(theme::TEXT_SIZE_SMALL)
+                    .padding((0.0, theme::grid(2.0), 0.0, theme::grid(1.0)))
             };
             Flex::column()
+                .cross_axis_alignment(CrossAxisAlignment::Fill)
                 .with_child(label("Artists"))
                 .with_child(make_artist_results())
                 .with_child(label("Albums"))
                 .with_child(make_album_results())
                 .with_child(label("Tracks"))
                 .with_child(make_track_results())
+                .with_child(label("Playlists"))
+                .with_child(make_playlist_results())
         },
         || make_error().lens(Ctx::data()),
     )
@@ -65,4 +71,8 @@ fn make_track_results() -> impl Widget<Ctx<CommonCtx, SearchResults>> {
         artist: true,
         album: true,
     })
+}
+
+fn make_playlist_results() -> impl Widget<Ctx<CommonCtx, SearchResults>> {
+    List::new(make_playlist).lens(Ctx::map(SearchResults::playlists))
 }

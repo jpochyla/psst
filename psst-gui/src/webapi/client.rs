@@ -292,30 +292,33 @@ impl WebApi {
 
 /// Search endpoints.
 impl WebApi {
-    // https://developer.spotify.com/documentation/web-api/reference/search/search/
+    // https://developer.spotify.com/documentation/web-api/reference/search/
     pub fn search(&self, query: &str) -> Result<SearchResults, Error> {
         #[derive(Deserialize)]
         struct ApiSearchResults {
             artists: Option<Page<Artist>>,
             albums: Option<Page<Album>>,
             tracks: Option<Page<Arc<Track>>>,
+            playlists: Option<Page<Playlist>>,
         }
 
         let request = self
             .get("v1/search")?
             .query("q", query)
-            .query("type", "artist,album,track")
+            .query("type", "artist,album,track,playlist")
             .query("marker", "from_token");
         let result: ApiSearchResults = self.load(request)?;
 
         let artists = result.artists.map_or_else(Vector::new, |page| page.items);
         let albums = result.albums.map_or_else(Vector::new, |page| page.items);
         let tracks = result.tracks.map_or_else(Vector::new, |page| page.items);
+        let playlists = result.playlists.map_or_else(Vector::new, |page| page.items);
         Ok(SearchResults {
             query: query.to_string(),
             artists,
             albums,
             tracks,
+            playlists,
         })
     }
 }
