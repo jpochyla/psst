@@ -67,9 +67,9 @@ fn make_detail_loaded() -> impl Widget<Ctx<CommonCtx, Album>> {
         .with_child(album_cover)
         .with_spacer(theme::grid(2.0))
         .with_child(album_name)
-        .with_spacer(theme::grid(0.5))
+        .with_default_spacer()
         .with_child(album_artists)
-        .with_spacer(theme::grid(0.5))
+        .with_default_spacer()
         .with_child(album_date)
         .with_default_spacer()
         .with_default_spacer()
@@ -77,6 +77,7 @@ fn make_detail_loaded() -> impl Widget<Ctx<CommonCtx, Album>> {
         .with_spacer(theme::grid(0.5))
         .with_child(album_copyrights)
         .fix_width(theme::grid(30.0))
+        .padding(theme::grid(0.8))
         .lens(Ctx::data());
 
     let album_tracks = make_tracklist(TrackDisplay {

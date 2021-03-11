@@ -1,5 +1,5 @@
 use crate::{
-    cmd::{self, SESSION_CONNECTED},
+    cmd,
     data::{ArtistTracks, Config, Nav, PlaylistTracks, SavedTracks, State},
     ui,
     webapi::WebApi,
