@@ -1,5 +1,6 @@
 use crate::{
     cmd,
+    controller::{PlaybackController, SessionController},
     data::{Nav, State},
     ui::utils::Border,
     widget::{icons, Empty, HoverExt, ThemeScope, ViewDispatcher},
@@ -87,7 +88,11 @@ fn make_root() -> impl Widget<State> {
 
     let themed = ThemeScope::new(split);
 
-    themed
+    let controlled = themed
+        .controller(PlaybackController::new())
+        .controller(SessionController::new());
+
+    controlled
     // .debug_invalidation()
     // .debug_widget_id()
     // .debug_paint_layout()
@@ -234,7 +239,10 @@ fn make_route_title() -> impl Widget<State> {
 }
 
 fn make_is_online() -> impl Widget<State> {
-    Either::new(|&is_online, _| is_online, Empty, Label::new("Offline"))
-        .padding(theme::grid(1.0))
-        .lens(State::is_online)
+    Either::new(
+        |state: &State, _| state.session.is_connected(),
+        Empty,
+        Label::new("Offline"),
+    )
+    .padding(theme::grid(1.0))
 }

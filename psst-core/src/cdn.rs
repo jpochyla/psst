@@ -18,7 +18,7 @@ pub struct Cdn {
 }
 
 impl Cdn {
-    pub fn connect(session: SessionHandle, proxy_url: Option<&str>) -> Result<CdnHandle, Error> {
+    pub fn new(session: SessionHandle, proxy_url: Option<&str>) -> Result<CdnHandle, Error> {
         let agent = default_ureq_agent_builder(proxy_url)?.build();
         Ok(Arc::new(Self {
             session,

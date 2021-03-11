@@ -1,6 +1,6 @@
 use crate::{
     cmd,
-    data::{Album, AlbumDetail, AlbumLink, ArtistLink, CommonCtx, Copyright, Ctx, Nav, State},
+    data::{Album, AlbumDetail, ArtistLink, CommonCtx, Copyright, Ctx, Nav, State},
     ui::{
         theme,
         track::{make_tracklist, TrackDisplay},

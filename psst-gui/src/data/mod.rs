@@ -18,6 +18,7 @@ pub use crate::data::{
     nav::Nav,
     playback::{
         CurrentPlayback, Playback, PlaybackOrigin, PlaybackPayload, PlaybackState, QueueBehavior,
+        QueuedTrack,
     },
     playlist::{Playlist, PlaylistDetail, PlaylistLink, PlaylistTracks},
     promise::{Promise, PromiseState},
@@ -29,11 +30,14 @@ use druid::{
     im::{HashSet, Vector},
     Data, Lens,
 };
+use psst_core::session::SessionHandle;
 use std::{sync::Arc, time::Duration};
 
-#[derive(Clone, Debug, Data, Lens)]
+#[derive(Clone, Data, Lens)]
 pub struct State {
-    pub is_online: bool,
+    #[data(ignore)]
+    pub session: SessionHandle,
+
     pub route: Nav,
     pub history: Vector<Nav>,
     pub config: Config,
@@ -50,7 +54,7 @@ pub struct State {
 impl Default for State {
     fn default() -> Self {
         Self {
-            is_online: false,
+            session: SessionHandle::new(),
             route: Nav::Home,
             history: Vector::new(),
             config: Config::default(),
@@ -62,6 +66,7 @@ impl Default for State {
                 state: PlaybackState::Stopped,
                 current: None,
                 queue_behavior: QueueBehavior::Sequential,
+                queue: Vector::new(),
             },
             search: Search {
                 input: "".into(),
@@ -95,6 +100,14 @@ impl Default for State {
 }
 
 impl State {
+    pub fn queued_track(&self, track_id: &TrackId) -> Option<QueuedTrack> {
+        self.playback
+            .queue
+            .iter()
+            .find(|queued| queued.track.id.same(track_id))
+            .cloned()
+    }
+
     pub fn loading_playback(&mut self, item: Arc<Track>, origin: PlaybackOrigin) {
         self.common_ctx.playback_item.take();
         self.playback.state = PlaybackState::Loading;
@@ -178,19 +191,19 @@ impl State {
     }
 }
 
-#[derive(Clone, Debug, Data, Lens)]
+#[derive(Clone, Data, Lens)]
 pub struct Library {
     pub playlists: Promise<Vector<Playlist>>,
     pub saved_albums: Promise<Vector<Album>>,
     pub saved_tracks: Promise<SavedTracks>,
 }
 
-#[derive(Clone, Debug, Data, Lens)]
+#[derive(Clone, Data, Lens)]
 pub struct SavedTracks {
     pub tracks: Vector<Arc<Track>>,
 }
 
-#[derive(Clone, Debug, Data)]
+#[derive(Clone, Data)]
 pub struct CommonCtx {
     pub playback_item: Option<Arc<Track>>,
     pub saved_tracks: HashSet<TrackId>,

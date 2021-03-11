@@ -179,6 +179,7 @@ pub struct Player {
     config: PlaybackConfig,
     queue: Queue,
     event_sender: Sender<PlayerEvent>,
+    event_receiver: Receiver<PlayerEvent>,
     audio_source: Arc<Mutex<PlayerAudioSource>>,
     audio_output_remote: AudioOutputRemote,
 }
@@ -190,27 +191,25 @@ impl Player {
         cache: CacheHandle,
         config: PlaybackConfig,
         audio_output_remote: AudioOutputRemote,
-    ) -> (Self, Receiver<PlayerEvent>) {
+    ) -> Self {
         let (event_sender, event_receiver) = unbounded();
         let audio_source = {
             let event_sender = event_sender.clone();
             Arc::new(Mutex::new(PlayerAudioSource::new(event_sender)))
         };
-        (
-            Self {
-                session,
-                cdn,
-                cache,
-                config,
-                event_sender,
-                audio_source,
-                audio_output_remote,
-                state: PlayerState::Stopped,
-                preload: PreloadState::None,
-                queue: Queue::new(),
-            },
+        Self {
+            session,
+            cdn,
+            cache,
+            config,
+            event_sender,
             event_receiver,
-        )
+            audio_source,
+            audio_output_remote,
+            state: PlayerState::Stopped,
+            preload: PreloadState::None,
+            queue: Queue::new(),
+        }
     }
 
     pub fn audio_source(&self) -> Arc<Mutex<impl AudioSource>> {
@@ -219,6 +218,10 @@ impl Player {
 
     pub fn event_sender(&self) -> Sender<PlayerEvent> {
         self.event_sender.clone()
+    }
+
+    pub fn event_receiver(&self) -> Receiver<PlayerEvent> {
+        self.event_receiver.clone()
     }
 
     pub fn handle(&mut self, event: PlayerEvent) {

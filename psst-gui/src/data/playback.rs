@@ -9,6 +9,13 @@ pub struct Playback {
     pub state: PlaybackState,
     pub current: Option<CurrentPlayback>,
     pub queue_behavior: QueueBehavior,
+    pub queue: Vector<QueuedTrack>,
+}
+
+#[derive(Clone, Debug, Data, Lens)]
+pub struct QueuedTrack {
+    pub track: Arc<Track>,
+    pub origin: PlaybackOrigin,
 }
 
 #[derive(Copy, Clone, Debug, Data, Eq, PartialEq)]

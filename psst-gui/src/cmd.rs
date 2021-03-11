@@ -6,6 +6,7 @@ use crate::{
     error::Error,
 };
 use druid::{im::Vector, Selector, WidgetId};
+use psst_core::audio_player::PlayerEvent;
 use std::{sync::Arc, time::Duration};
 
 // Widget IDs
@@ -21,8 +22,9 @@ pub const COPY: Selector<String> = Selector::new("app.copy-to-clipboard");
 
 // Session
 
+pub const SESSION_CONNECT: Selector = Selector::new("app.session-connect");
 pub const SESSION_CONNECTED: Selector = Selector::new("app.session-connected");
-pub const SESSION_LOST: Selector = Selector::new("app.session-lost");
+pub const SESSION_DISCONNECTED: Selector = Selector::new("app.session-disconnected");
 
 // Navigation
 
@@ -76,6 +78,7 @@ pub const UPDATE_PLAYLIST_TRACKS: Selector<(PlaylistLink, Result<Vector<Arc<Trac
 
 // Playback state
 
+pub const PLAYBACK_EVENT: Selector<PlayerEvent> = Selector::new("app.playback-event");
 pub const PLAYBACK_LOADING: Selector<TrackId> = Selector::new("app.playback-loading");
 pub const PLAYBACK_PLAYING: Selector<(TrackId, Duration)> = Selector::new("app.playback-playing");
 pub const PLAYBACK_PROGRESS: Selector<Duration> = Selector::new("app.playback-progress");
@@ -96,4 +99,4 @@ pub const PLAY_RESUME: Selector = Selector::new("app.play-resume");
 pub const PLAY_NEXT: Selector = Selector::new("app.play-next");
 pub const PLAY_STOP: Selector = Selector::new("app.play-stop");
 pub const PLAY_QUEUE_BEHAVIOR: Selector<QueueBehavior> = Selector::new("app.play-queue-behavior");
-pub const SEEK_TO_FRACTION: Selector<f64> = Selector::new("app.seek-to-fraction");
+pub const PLAY_SEEK: Selector<f64> = Selector::new("app.play-seek");

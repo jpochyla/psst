@@ -2,7 +2,10 @@ use druid::{Data, Lens};
 use env::VarError;
 use platform_dirs::AppDirs;
 use psst_core::{
-    audio_player::PlaybackConfig, cache::mkdir_if_not_exists, connection::Credentials,
+    audio_player::PlaybackConfig,
+    cache::mkdir_if_not_exists,
+    connection::Credentials,
+    session::{Session, SessionConfig},
 };
 use serde::{Deserialize, Serialize};
 use std::{env, fs::File, path::PathBuf};
@@ -97,6 +100,13 @@ impl Config {
         }
     }
 
+    pub fn session(&self) -> Option<SessionConfig> {
+        self.credentials().map(|credentials| SessionConfig {
+            login_creds: credentials,
+            proxy_url: Self::proxy(),
+        })
+    }
+
     pub fn proxy() -> Option<String> {
         env::var(PROXY_ENV_VAR).map_or_else(
             |err| match err {
@@ -108,6 +118,12 @@ impl Config {
             },
             |url| Some(url),
         )
+    }
+
+    pub fn try_to_authenticate(&self) -> Option<Credentials> {
+        let config = self.session()?;
+        let session = Session::connect(config).ok()?;
+        Some(session.credentials().clone())
     }
 }
 

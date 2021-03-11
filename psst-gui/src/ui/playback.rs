@@ -13,7 +13,7 @@ use druid::{
     BoxConstraints, Data, Env, Event, EventCtx, LayoutCtx, LensExt, LifeCycle, LifeCycleCtx,
     MouseButton, PaintCtx, Point, Rect, RenderContext, Size, UpdateCtx, Widget, WidgetExt,
 };
-use icons::{SvgIcon, PLAY_LOOP_ALL, PLAY_LOOP_TRACK};
+use icons::SvgIcon;
 use itertools::Itertools;
 use std::{sync::Arc, time::Duration};
 
@@ -244,7 +244,7 @@ impl Widget<CurrentPlayback> for SeekBar {
                 if ctx.is_active() && mouse.button == MouseButton::Left {
                     if ctx.is_hot() {
                         let fraction = mouse.pos.x / ctx.size().width;
-                        ctx.submit_command(cmd::SEEK_TO_FRACTION.with(fraction));
+                        ctx.submit_command(cmd::PLAY_SEEK.with(fraction));
                     }
                     ctx.set_active(false);
                 }

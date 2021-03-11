@@ -41,7 +41,7 @@ fn main() {
 }
 
 fn start(track_id: &str, session: SessionHandle) -> Result<(), Error> {
-    let cdn = Cdn::connect(session.clone(), None)?;
+    let cdn = Cdn::new(session.clone(), None)?;
     let cache = Cache::new(PathBuf::from("cache"))?;
     let item_id = ItemId::from_base62(&track_id, ItemIdType::Track).unwrap();
     play_item(
@@ -65,7 +65,7 @@ fn play_item(
     let output_remote = output.remote();
     let config = PlaybackConfig::default();
 
-    let (mut player, player_receiver) = Player::new(session, cdn, cache, config, output.remote());
+    let mut player = Player::new(session, cdn, cache, config, output.remote());
 
     let output_thread = thread::spawn({
         let player_source = player.audio_source();
@@ -120,7 +120,7 @@ fn play_item(
         }
     });
 
-    for event in player_receiver {
+    for event in player.event_receiver() {
         player.handle(event);
     }
     output_remote.close();

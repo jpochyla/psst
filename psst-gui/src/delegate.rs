@@ -1,314 +1,119 @@
 use crate::{
-    cmd,
-    data::{
-        ArtistTracks, Config, Nav, PlaybackOrigin, PlaylistTracks, QueueBehavior, SavedTracks,
-        State, Track, TrackId,
-    },
+    cmd::{self, SESSION_CONNECTED},
+    data::{ArtistTracks, Config, Nav, PlaylistTracks, SavedTracks, State},
     ui,
     webapi::WebApi,
     widget::remote_image,
 };
-use crossbeam_channel::{Receiver, Sender};
 use druid::{
-    commands, im::Vector, image, AppDelegate, Application, Command, Data, DelegateCtx, Env, Event,
-    ExtEventSink, Handled, ImageBuf, Target, WindowId,
+    commands, im::Vector, image, AppDelegate, Application, Command, DelegateCtx, Env, ExtEventSink,
+    Handled, ImageBuf, Target, WindowId,
 };
 use lru_cache::LruCache;
-use psst_core::{
-    audio_normalize::NormalizationLevel,
-    audio_output::AudioOutput,
-    audio_player::{PlaybackConfig, PlaybackItem, Player, PlayerCommand, PlayerEvent},
-    cache::Cache,
-    cdn::{Cdn, CdnHandle},
-    connection::Credentials,
-    session::{SessionConfig, SessionHandle},
-};
-use std::{collections::HashSet, sync::Arc, thread, thread::JoinHandle, time::Duration};
+use psst_core::session::SessionHandle;
+use std::{collections::HashSet, sync::Arc, thread};
 
-struct SessionDelegate {
-    handle: SessionHandle,
-    thread: JoinHandle<()>,
-}
-
-// Amount of time to wait before trying to connect again, in case session dies.
-const RECONNECT_AFTER_DELAY: Duration = Duration::from_secs(3);
-
-impl SessionDelegate {
-    fn new(credentials: Credentials, event_sink: ExtEventSink) -> Self {
-        let handle = SessionHandle::new();
-        let thread = thread::spawn({
-            let handle = handle.clone();
-            move || Self::service(credentials, event_sink, handle)
-        });
-        Self { handle, thread }
-    }
-
-    fn service(credentials: Credentials, event_sink: ExtEventSink, handle: SessionHandle) {
-        let connect_and_service_single_session = || {
-            let config = SessionConfig {
-                login_creds: credentials.clone(),
-                proxy_url: Config::proxy(),
-            };
-            let session = handle.connect(config)?;
-            log::info!("session connected");
-            event_sink
-                .submit_command(cmd::SESSION_CONNECTED, (), Target::Auto)
-                .unwrap();
-            session.service()
-        };
-        loop {
-            if let Err(err) = connect_and_service_single_session() {
-                log::error!("connection error: {:?}", err);
-                event_sink
-                    .submit_command(cmd::SESSION_LOST, (), Target::Auto)
-                    .unwrap();
-                thread::sleep(RECONNECT_AFTER_DELAY);
-            }
-        }
-    }
-}
-
-struct PlayerDelegate {
-    cdn: CdnHandle,
-    session: SessionHandle,
-    player_queue: Vector<(PlaybackOrigin, Arc<Track>)>,
-    player_sender: Sender<PlayerEvent>,
-    player_thread: JoinHandle<()>,
-    audio_output_thread: JoinHandle<()>,
-}
-
-impl PlayerDelegate {
-    fn new(config: PlaybackConfig, session: SessionHandle, event_sink: ExtEventSink) -> Self {
-        let cdn = Cdn::connect(session.clone(), Config::proxy().as_deref())
-            .expect("Failed to initialize CDN connection");
-
-        let cache = {
-            let dir = Config::cache_dir().expect("Failed to find cache location");
-            Cache::new(dir).expect("Failed to open cache")
-        };
-
-        let audio_output = AudioOutput::open().expect("Failed to open audio output");
-
-        let (player, player_receiver) = {
-            let session = session.clone();
-            let cdn = cdn.clone();
-            let remote = audio_output.remote();
-            Player::new(session, cdn, cache, config, remote)
-        };
-        let player_sender = player.event_sender();
-
-        let audio_output_thread = thread::spawn({
-            let player_source = player.audio_source();
-            move || {
-                audio_output
-                    .start_playback(player_source)
-                    .expect("Playback failed");
-            }
-        });
-
-        let player_thread = thread::spawn(move || {
-            Self::service(player, player_receiver, event_sink);
-        });
-
-        Self {
-            cdn,
-            session,
-            audio_output_thread,
-            player_thread,
-            player_sender,
-            player_queue: Vector::new(),
-        }
-    }
-
-    fn service(mut player: Player, player_events: Receiver<PlayerEvent>, sink: ExtEventSink) {
-        for event in player_events {
-            match &event {
-                PlayerEvent::Loading { item } => {
-                    let item: TrackId = item.item_id.into();
-                    sink.submit_command(cmd::PLAYBACK_LOADING, item, Target::Auto)
-                        .unwrap();
-                }
-                PlayerEvent::Playing { path, duration } => {
-                    let item: TrackId = path.item_id.into();
-                    let progress = duration.to_owned();
-                    sink.submit_command(cmd::PLAYBACK_PLAYING, (item, progress), Target::Auto)
-                        .unwrap();
-                }
-                PlayerEvent::Pausing { .. } => {
-                    sink.submit_command(cmd::PLAYBACK_PAUSING, (), Target::Auto)
-                        .unwrap();
-                }
-                PlayerEvent::Resuming { .. } => {
-                    sink.submit_command(cmd::PLAYBACK_RESUMING, (), Target::Auto)
-                        .unwrap();
-                }
-                PlayerEvent::Progress { duration, .. } => {
-                    let progress = duration.to_owned();
-                    sink.submit_command(cmd::PLAYBACK_PROGRESS, progress, Target::Auto)
-                        .unwrap();
-                }
-                PlayerEvent::Blocked => {
-                    sink.submit_command(cmd::PLAYBACK_BLOCKED, (), Target::Auto)
-                        .unwrap();
-                }
-                PlayerEvent::Stopped => {
-                    sink.submit_command(cmd::PLAYBACK_STOPPED, (), Target::Auto)
-                        .unwrap();
-                }
-                _ => {}
-            }
-            player.handle(event);
-        }
-    }
-
-    fn get_track(&self, id: &TrackId) -> Option<(PlaybackOrigin, Arc<Track>)> {
-        self.player_queue
-            .iter()
-            .find(|(_origin, track)| track.id.same(id))
-            .cloned()
-    }
-
-    fn set_tracks(&mut self, origin: PlaybackOrigin, tracks: Vector<Arc<Track>>) {
-        self.player_queue = tracks
-            .into_iter()
-            .map(|track| (origin.clone(), track))
-            .collect();
-    }
-
-    fn play(&mut self, position: usize) {
-        let items = self
-            .player_queue
-            .iter()
-            .map(|(origin, track)| PlaybackItem {
-                item_id: *track.id,
-                norm_level: match origin {
-                    PlaybackOrigin::Album(_) => NormalizationLevel::Album,
-                    _ => NormalizationLevel::Track,
-                },
-            })
-            .collect();
-        self.player_sender
-            .send(PlayerEvent::Command(PlayerCommand::LoadQueue {
-                items,
-                position,
-            }))
-            .unwrap();
-    }
-
-    fn pause(&mut self) {
-        self.player_sender
-            .send(PlayerEvent::Command(PlayerCommand::Pause))
-            .unwrap();
-    }
-
-    fn resume(&mut self) {
-        self.player_sender
-            .send(PlayerEvent::Command(PlayerCommand::Resume))
-            .unwrap();
-    }
-
-    fn previous(&mut self) {
-        self.player_sender
-            .send(PlayerEvent::Command(PlayerCommand::Previous))
-            .unwrap();
-    }
-
-    fn next(&mut self) {
-        self.player_sender
-            .send(PlayerEvent::Command(PlayerCommand::Next))
-            .unwrap();
-    }
-
-    fn stop(&mut self) {
-        self.player_sender
-            .send(PlayerEvent::Command(PlayerCommand::Stop))
-            .unwrap();
-    }
-
-    fn seek(&mut self, position: Duration) {
-        self.player_sender
-            .send(PlayerEvent::Command(PlayerCommand::Seek { position }))
-            .unwrap();
-    }
-
-    fn set_queue_behavior(&mut self, behavior: QueueBehavior) {
-        self.player_sender
-            .send(PlayerEvent::Command(PlayerCommand::SetQueueBehavior {
-                behavior: match behavior {
-                    QueueBehavior::Sequential => psst_core::audio_player::QueueBehavior::Sequential,
-                    QueueBehavior::Random => psst_core::audio_player::QueueBehavior::Random,
-                    QueueBehavior::LoopTrack => psst_core::audio_player::QueueBehavior::LoopTrack,
-                    QueueBehavior::LoopAll => psst_core::audio_player::QueueBehavior::LoopAll,
-                },
-            }))
-            .unwrap();
-    }
-}
-
-pub struct DelegateHolder {
-    event_sink: ExtEventSink,
-    delegate: Option<Delegate>,
+pub struct Delegate {
+    webapi: Arc<WebApi>,
+    image_cache: LruCache<Arc<str>, ImageBuf>,
     pub main_window: Option<WindowId>,
     pub preferences_window: Option<WindowId>,
     opened_windows: HashSet<WindowId>,
 }
 
-impl DelegateHolder {
-    pub fn new(event_sink: ExtEventSink) -> Self {
+impl Delegate {
+    pub fn new(handle: SessionHandle) -> Self {
+        let webapi = Arc::new(WebApi::new(handle, Config::proxy().as_deref()));
+
+        const IMAGE_CACHE_SIZE: usize = 256;
+        let image_cache = LruCache::new(IMAGE_CACHE_SIZE);
+
         Self {
-            event_sink,
-            delegate: None,
+            webapi,
+            image_cache,
             main_window: None,
             preferences_window: None,
             opened_windows: HashSet::new(),
         }
     }
 
-    pub fn configure(&mut self, config: &Config) {
-        if self.delegate.is_none() {
-            self.delegate
-                .replace(Delegate::new(config, self.event_sink.clone()));
-        } else {
-            log::warn!("already configured");
+    fn navigate_to(data: &mut State, nav: Nav, event_sink: ExtEventSink) {
+        if data.route != nav {
+            data.history.push_back(nav.clone());
+            Self::navigate(data, nav, event_sink);
         }
+    }
+
+    fn navigate_back(data: &mut State, event_sink: ExtEventSink) {
+        data.history.pop_back();
+        Self::navigate(
+            data,
+            data.history.last().cloned().unwrap_or(Nav::Home),
+            event_sink,
+        );
+    }
+
+    fn navigate(data: &mut State, nav: Nav, event_sink: ExtEventSink) {
+        match nav {
+            Nav::Home => {
+                data.route = Nav::Home;
+            }
+            Nav::SearchResults(query) => {
+                event_sink
+                    .submit_command(cmd::GOTO_SEARCH_RESULTS, query, Target::Auto)
+                    .unwrap();
+            }
+            Nav::AlbumDetail(link) => {
+                event_sink
+                    .submit_command(cmd::GOTO_ALBUM_DETAIL, link, Target::Auto)
+                    .unwrap();
+            }
+            Nav::ArtistDetail(link) => {
+                event_sink
+                    .submit_command(cmd::GOTO_ARTIST_DETAIL, link, Target::Auto)
+                    .unwrap();
+            }
+            Nav::PlaylistDetail(link) => {
+                event_sink
+                    .submit_command(cmd::GOTO_PLAYLIST_DETAIL, link, Target::Auto)
+                    .unwrap();
+            }
+            Nav::Library => {
+                event_sink
+                    .submit_command(cmd::GOTO_LIBRARY, (), Target::Auto)
+                    .unwrap();
+            }
+        }
+    }
+
+    fn spawn<F, T>(&self, f: F)
+    where
+        F: FnOnce() -> T,
+        F: Send + 'static,
+        T: Send + 'static,
+    {
+        // TODO: Use a thread pool.
+        thread::spawn(f);
     }
 }
 
-impl AppDelegate<State> for DelegateHolder {
-    fn event(
-        &mut self,
-        ctx: &mut DelegateCtx,
-        window_id: WindowId,
-        event: Event,
-        data: &mut State,
-        env: &Env,
-    ) -> Option<Event> {
-        if let Some(delegate) = self.delegate.as_mut() {
-            delegate.event(ctx, window_id, event, data, env)
-        } else {
-            Some(event)
-        }
-    }
-
+impl AppDelegate<State> for Delegate {
     fn command(
         &mut self,
         ctx: &mut DelegateCtx,
         target: Target,
         cmd: &Command,
         data: &mut State,
-        env: &Env,
+        _env: &Env,
     ) -> Handled {
-        if cmd.is(cmd::CONFIGURE) {
-            self.configure(&data.config);
-            Handled::Yes
-        } else if cmd.is(cmd::SHOW_MAIN) {
+        if cmd.is(cmd::SHOW_MAIN) {
             if self
                 .main_window
                 .as_ref()
                 .map(|id| self.opened_windows.contains(id))
                 .unwrap_or(false)
             {
-                let win_id = self.preferences_window.unwrap();
+                let win_id = self.main_window.unwrap();
                 ctx.submit_command(commands::SHOW_WINDOW.to(win_id));
             } else {
                 let win = ui::make_main_window();
@@ -331,164 +136,61 @@ impl AppDelegate<State> for DelegateHolder {
                 ctx.new_window(win);
             }
             Handled::Yes
-        } else {
-            self.delegate
-                .as_mut()
-                .map(|delegate| delegate.command(ctx, target, cmd, data, env))
-                .unwrap_or(Handled::No)
-        }
-    }
-
-    fn window_added(&mut self, id: WindowId, data: &mut State, env: &Env, ctx: &mut DelegateCtx) {
-        self.opened_windows.insert(id);
-        self.delegate
-            .as_mut()
-            .map(|delegate| delegate.window_added(id, data, env, ctx));
-    }
-
-    fn window_removed(&mut self, id: WindowId, data: &mut State, env: &Env, ctx: &mut DelegateCtx) {
-        self.opened_windows.remove(&id);
-        self.delegate
-            .as_mut()
-            .map(|delegate| delegate.window_removed(id, data, env, ctx));
-    }
-}
-
-pub struct Delegate {
-    event_sink: ExtEventSink,
-    session: SessionDelegate,
-    player: PlayerDelegate,
-    webapi: Arc<WebApi>,
-    image_cache: LruCache<Arc<str>, ImageBuf>,
-}
-
-impl Delegate {
-    pub fn new(config: &Config, event_sink: ExtEventSink) -> Self {
-        let session = {
-            let sink = event_sink.clone();
-            let creds = config.credentials().expect("Missing session credentials");
-            SessionDelegate::new(creds, sink)
-        };
-        let player = {
-            let session = session.handle.clone();
-            let sink = event_sink.clone();
-            PlayerDelegate::new(config.playback(), session, sink)
-        };
-        let webapi = {
-            let session = session.handle.clone();
-            Arc::new(WebApi::new(session, Config::proxy().as_deref()))
-        };
-
-        const IMAGE_CACHE_SIZE: usize = 256;
-        let image_cache = LruCache::new(IMAGE_CACHE_SIZE);
-
-        Self {
-            event_sink,
-            session,
-            player,
-            webapi,
-            image_cache,
-        }
-    }
-
-    fn navigate_to(&mut self, data: &mut State, nav: Nav) {
-        if data.route != nav {
-            data.history.push_back(nav.clone());
-            self.navigate(data, nav);
-        }
-    }
-
-    fn navigate_back(&mut self, data: &mut State) {
-        data.history.pop_back();
-        self.navigate(data, data.history.last().cloned().unwrap_or(Nav::Home));
-    }
-
-    fn navigate(&mut self, data: &mut State, nav: Nav) {
-        match nav {
-            Nav::Home => {
-                data.route = Nav::Home;
-            }
-            Nav::SearchResults(query) => {
-                self.event_sink
-                    .submit_command(cmd::GOTO_SEARCH_RESULTS, query, Target::Auto)
-                    .unwrap();
-            }
-            Nav::AlbumDetail(link) => {
-                self.event_sink
-                    .submit_command(cmd::GOTO_ALBUM_DETAIL, link, Target::Auto)
-                    .unwrap();
-            }
-            Nav::ArtistDetail(link) => {
-                self.event_sink
-                    .submit_command(cmd::GOTO_ARTIST_DETAIL, link, Target::Auto)
-                    .unwrap();
-            }
-            Nav::PlaylistDetail(link) => {
-                self.event_sink
-                    .submit_command(cmd::GOTO_PLAYLIST_DETAIL, link, Target::Auto)
-                    .unwrap();
-            }
-            Nav::Library => {
-                self.event_sink
-                    .submit_command(cmd::GOTO_LIBRARY, (), Target::Auto)
-                    .unwrap();
-            }
-        }
-    }
-
-    fn spawn<F, T>(&self, f: F)
-    where
-        F: FnOnce() -> T,
-        F: Send + 'static,
-        T: Send + 'static,
-    {
-        // TODO: Use a thread pool.
-        thread::spawn(f);
-    }
-}
-
-impl AppDelegate<State> for Delegate {
-    fn command(
-        &mut self,
-        _ctx: &mut DelegateCtx,
-        target: Target,
-        cmd: &Command,
-        data: &mut State,
-        _env: &Env,
-    ) -> Handled {
-        if let Some(text) = cmd.get(cmd::COPY) {
+        } else if let Some(text) = cmd.get(cmd::COPY) {
             Application::global().clipboard().put_string(&text);
             Handled::Yes
-        } else if let Handled::Yes = self.command_image(target, cmd, data) {
+        } else if let Handled::Yes = self.command_image(ctx, target, cmd, data) {
             Handled::Yes
-        } else if let Handled::Yes = self.command_playback(target, cmd, data) {
+        } else if let Handled::Yes = self.command_playback(ctx, target, cmd, data) {
             Handled::Yes
-        } else if let Handled::Yes = self.command_playback_ctrl(target, cmd, data) {
+        } else if let Handled::Yes = self.command_nav(ctx, target, cmd, data) {
             Handled::Yes
-        } else if let Handled::Yes = self.command_session(target, cmd, data) {
+        } else if let Handled::Yes = self.command_playlist(ctx, target, cmd, data) {
             Handled::Yes
-        } else if let Handled::Yes = self.command_nav(target, cmd, data) {
+        } else if let Handled::Yes = self.command_library(ctx, target, cmd, data) {
             Handled::Yes
-        } else if let Handled::Yes = self.command_playlist(target, cmd, data) {
+        } else if let Handled::Yes = self.command_album(ctx, target, cmd, data) {
             Handled::Yes
-        } else if let Handled::Yes = self.command_library(target, cmd, data) {
+        } else if let Handled::Yes = self.command_artist(ctx, target, cmd, data) {
             Handled::Yes
-        } else if let Handled::Yes = self.command_album(target, cmd, data) {
-            Handled::Yes
-        } else if let Handled::Yes = self.command_artist(target, cmd, data) {
-            Handled::Yes
-        } else if let Handled::Yes = self.command_search(target, cmd, data) {
+        } else if let Handled::Yes = self.command_search(ctx, target, cmd, data) {
             Handled::Yes
         } else {
             Handled::No
         }
     }
+
+    fn window_added(
+        &mut self,
+        id: WindowId,
+        _data: &mut State,
+        _env: &Env,
+        _ctx: &mut DelegateCtx,
+    ) {
+        self.opened_windows.insert(id);
+    }
+
+    fn window_removed(
+        &mut self,
+        id: WindowId,
+        _data: &mut State,
+        _env: &Env,
+        _ctx: &mut DelegateCtx,
+    ) {
+        self.opened_windows.remove(&id);
+    }
 }
 
 impl Delegate {
-    fn command_image(&mut self, target: Target, cmd: &Command, _data: &mut State) -> Handled {
+    fn command_image(
+        &mut self,
+        ctx: &mut DelegateCtx,
+        target: Target,
+        cmd: &Command,
+        _data: &mut State,
+    ) -> Handled {
         if let Some(location) = cmd.get(remote_image::REQUEST_DATA).cloned() {
-            let sink = self.event_sink.clone();
+            let sink = ctx.get_external_handle();
             if let Some(image_buf) = self.image_cache.get_mut(&location).cloned() {
                 let payload = remote_image::ImagePayload {
                     location,
@@ -518,37 +220,34 @@ impl Delegate {
         }
     }
 
-    fn command_session(&mut self, _target: Target, cmd: &Command, data: &mut State) -> Handled {
-        if cmd.is(cmd::SESSION_CONNECTED) {
-            data.is_online = true;
-            self.event_sink
-                .submit_command(cmd::LOAD_PLAYLISTS, (), Target::Auto)
-                .unwrap();
-            Handled::Yes
-        } else if cmd.is(cmd::SESSION_LOST) {
-            data.is_online = false;
-            Handled::Yes
-        } else {
-            Handled::No
-        }
-    }
-
-    fn command_nav(&mut self, _target: Target, cmd: &Command, data: &mut State) -> Handled {
+    fn command_nav(
+        &mut self,
+        ctx: &mut DelegateCtx,
+        _target: Target,
+        cmd: &Command,
+        data: &mut State,
+    ) -> Handled {
         if let Some(nav) = cmd.get(cmd::NAVIGATE_TO).cloned() {
-            self.navigate_to(data, nav);
+            Self::navigate_to(data, nav, ctx.get_external_handle());
             Handled::Yes
         } else if cmd.is(cmd::NAVIGATE_BACK) {
-            self.navigate_back(data);
+            Self::navigate_back(data, ctx.get_external_handle());
             Handled::Yes
         } else {
             Handled::No
         }
     }
 
-    fn command_playlist(&mut self, _target: Target, cmd: &Command, data: &mut State) -> Handled {
-        if cmd.is(cmd::LOAD_PLAYLISTS) {
+    fn command_playlist(
+        &mut self,
+        ctx: &mut DelegateCtx,
+        _target: Target,
+        cmd: &Command,
+        data: &mut State,
+    ) -> Handled {
+        if cmd.is(cmd::SESSION_CONNECTED) || cmd.is(cmd::LOAD_PLAYLISTS) {
             let web = self.webapi.clone();
-            let sink = self.event_sink.clone();
+            let sink = ctx.get_external_handle();
             data.library_mut().playlists.defer_default();
             self.spawn(move || {
                 sink.submit_command(cmd::UPDATE_PLAYLISTS, web.get_playlists(), Target::Auto)
@@ -560,7 +259,7 @@ impl Delegate {
             Handled::Yes
         } else if let Some(link) = cmd.get(cmd::GOTO_PLAYLIST_DETAIL).cloned() {
             let web = self.webapi.clone();
-            let sink = self.event_sink.clone();
+            let sink = ctx.get_external_handle();
             data.route = Nav::PlaylistDetail(link.clone());
             data.playlist.playlist.defer(link.clone());
             data.playlist.tracks.defer(link.clone());
@@ -586,13 +285,19 @@ impl Delegate {
         }
     }
 
-    fn command_library(&mut self, _target: Target, cmd: &Command, data: &mut State) -> Handled {
+    fn command_library(
+        &mut self,
+        ctx: &mut DelegateCtx,
+        _target: Target,
+        cmd: &Command,
+        data: &mut State,
+    ) -> Handled {
         if cmd.is(cmd::GOTO_LIBRARY) {
             data.route = Nav::Library;
             if data.library.saved_albums.is_empty() || data.library.saved_albums.is_rejected() {
                 data.library_mut().saved_albums.defer_default();
                 let web = self.webapi.clone();
-                let sink = self.event_sink.clone();
+                let sink = ctx.get_external_handle();
                 self.spawn(move || {
                     let result = web.get_saved_albums();
                     sink.submit_command(cmd::UPDATE_SAVED_ALBUMS, result, Target::Auto)
@@ -602,7 +307,7 @@ impl Delegate {
             if data.library.saved_tracks.is_empty() || data.library.saved_tracks.is_rejected() {
                 data.library_mut().saved_tracks.defer_default();
                 let web = self.webapi.clone();
-                let sink = self.event_sink.clone();
+                let sink = ctx.get_external_handle();
                 self.spawn(move || {
                     let result = web.get_saved_tracks();
                     sink.submit_command(cmd::UPDATE_SAVED_TRACKS, result, Target::Auto)
@@ -683,12 +388,18 @@ impl Delegate {
         }
     }
 
-    fn command_album(&mut self, _target: Target, cmd: &Command, data: &mut State) -> Handled {
+    fn command_album(
+        &mut self,
+        ctx: &mut DelegateCtx,
+        _target: Target,
+        cmd: &Command,
+        data: &mut State,
+    ) -> Handled {
         if let Some(link) = cmd.get(cmd::GOTO_ALBUM_DETAIL).cloned() {
             data.route = Nav::AlbumDetail(link.clone());
             data.album.album.defer(link.clone());
             let web = self.webapi.clone();
-            let sink = self.event_sink.clone();
+            let sink = ctx.get_external_handle();
             self.spawn(move || {
                 let result = web.get_album(&link.id);
                 sink.submit_command(cmd::UPDATE_ALBUM_DETAIL, (link, result), Target::Auto)
@@ -705,14 +416,20 @@ impl Delegate {
         }
     }
 
-    fn command_artist(&mut self, _target: Target, cmd: &Command, data: &mut State) -> Handled {
+    fn command_artist(
+        &mut self,
+        ctx: &mut DelegateCtx,
+        _target: Target,
+        cmd: &Command,
+        data: &mut State,
+    ) -> Handled {
         if let Some(album_link) = cmd.get(cmd::GOTO_ARTIST_DETAIL) {
             data.route = Nav::ArtistDetail(album_link.clone());
             // Load artist detail
             data.artist.artist.defer(album_link.clone());
             let link = album_link.clone();
             let web = self.webapi.clone();
-            let sink = self.event_sink.clone();
+            let sink = ctx.get_external_handle();
             self.spawn(move || {
                 let result = web.get_artist(&link.id);
                 sink.submit_command(cmd::UPDATE_ARTIST_DETAIL, (link, result), Target::Auto)
@@ -722,7 +439,7 @@ impl Delegate {
             data.artist.top_tracks.defer(album_link.clone());
             let link = album_link.clone();
             let web = self.webapi.clone();
-            let sink = self.event_sink.clone();
+            let sink = ctx.get_external_handle();
             self.spawn(move || {
                 let result = web.get_artist_top_tracks(&link.id);
                 sink.submit_command(cmd::UPDATE_ARTIST_TOP_TRACKS, (link, result), Target::Auto)
@@ -732,7 +449,7 @@ impl Delegate {
             data.artist.related_artists.defer(album_link.clone());
             let link = album_link.clone();
             let web = self.webapi.clone();
-            let sink = self.event_sink.clone();
+            let sink = ctx.get_external_handle();
             self.spawn(move || {
                 let result = web.get_related_artists(&link.id);
                 sink.submit_command(cmd::UPDATE_ARTIST_RELATED, (link, result), Target::Auto)
@@ -742,7 +459,7 @@ impl Delegate {
             data.artist.albums.defer(album_link.clone());
             let link = album_link.clone();
             let web = self.webapi.clone();
-            let sink = self.event_sink.clone();
+            let sink = ctx.get_external_handle();
             self.spawn(move || {
                 let result = web.get_artist_albums(&link.id);
                 sink.submit_command(cmd::UPDATE_ARTIST_ALBUMS, (link, result), Target::Auto)
@@ -780,10 +497,16 @@ impl Delegate {
         }
     }
 
-    fn command_search(&mut self, _target: Target, cmd: &Command, data: &mut State) -> Handled {
+    fn command_search(
+        &mut self,
+        ctx: &mut DelegateCtx,
+        _target: Target,
+        cmd: &Command,
+        data: &mut State,
+    ) -> Handled {
         if let Some(query) = cmd.get(cmd::GOTO_SEARCH_RESULTS).cloned() {
             let web = self.webapi.clone();
-            let sink = self.event_sink.clone();
+            let sink = ctx.get_external_handle();
             data.route = Nav::SearchResults(query.clone());
             data.search.results.defer(query.clone());
             self.spawn(move || {
@@ -800,95 +523,29 @@ impl Delegate {
         }
     }
 
-    fn command_playback(&mut self, _target: Target, cmd: &Command, data: &mut State) -> Handled {
-        if let Some(item) = cmd.get(cmd::PLAYBACK_LOADING) {
-            if let Some((origin, track)) = self.player.get_track(item) {
-                data.loading_playback(track, origin);
-            } else {
-                log::warn!("loaded item not found in playback queue");
-            }
-            Handled::Yes
-        } else if let Some((item, progress)) = cmd.get(cmd::PLAYBACK_PLAYING) {
-            if let Some((origin, track)) = self.player.get_track(item) {
-                data.start_playback(track, origin, progress.to_owned());
-                data.playback.current.as_mut().map(|current| {
-                    current.analysis.defer(item.clone());
-                });
-                let item = item.clone();
-                let web = self.webapi.clone();
-                let sink = self.event_sink.clone();
-                self.spawn(move || {
-                    let result = web.get_audio_analysis(&item.to_base62());
-                    sink.submit_command(cmd::UPDATE_AUDIO_ANALYSIS, (item, result), Target::Auto)
-                        .unwrap();
-                });
-            } else {
-                log::warn!("played item not found in playback queue");
-            }
-            Handled::Yes
-        } else if let Some(progress) = cmd.get(cmd::PLAYBACK_PROGRESS).cloned() {
-            data.progress_playback(progress);
-            Handled::Yes
-        } else if cmd.is(cmd::PLAYBACK_PAUSING) {
-            data.pause_playback();
-            Handled::Yes
-        } else if cmd.is(cmd::PLAYBACK_RESUMING) {
-            data.resume_playback();
-            Handled::Yes
-        } else if cmd.is(cmd::PLAYBACK_BLOCKED) {
-            data.block_playback();
-            Handled::Yes
-        } else if cmd.is(cmd::PLAYBACK_STOPPED) {
-            data.stop_playback();
-            Handled::Yes
-        } else if let Some((track_id, result)) = cmd.get(cmd::UPDATE_AUDIO_ANALYSIS).cloned() {
-            data.playback.current.as_mut().map(|current| {
-                if current.analysis.is_deferred(&track_id) {
-                    current.analysis.resolve_or_reject(result);
-                }
-            });
-            Handled::Yes
-        } else {
-            Handled::No
-        }
-    }
-
-    fn command_playback_ctrl(
+    fn command_playback(
         &mut self,
+        ctx: &mut DelegateCtx,
         _target: Target,
         cmd: &Command,
         data: &mut State,
     ) -> Handled {
-        if let Some(payload) = cmd.get(cmd::PLAY_TRACKS).cloned() {
-            self.player.set_tracks(payload.origin, payload.tracks);
-            self.player.play(payload.position);
-            Handled::Yes
-        } else if cmd.is(cmd::PLAY_PAUSE) {
-            self.player.pause();
-            Handled::Yes
-        } else if cmd.is(cmd::PLAY_RESUME) {
-            self.player.resume();
-            Handled::Yes
-        } else if cmd.is(cmd::PLAY_PREVIOUS) {
-            self.player.previous();
-            Handled::Yes
-        } else if cmd.is(cmd::PLAY_NEXT) {
-            self.player.next();
-            Handled::Yes
-        } else if cmd.is(cmd::PLAY_STOP) {
-            self.player.stop();
-            Handled::Yes
-        } else if let Some(behavior) = cmd.get(cmd::PLAY_QUEUE_BEHAVIOR) {
-            data.playback.queue_behavior = behavior.clone();
-            self.player.set_queue_behavior(behavior.clone());
-            Handled::Yes
-        } else if let Some(fraction) = cmd.get(cmd::SEEK_TO_FRACTION) {
-            data.playback.current.as_ref().map(|current| {
-                let position =
-                    Duration::from_secs_f64(current.item.duration.as_secs_f64() * fraction);
-                self.player.seek(position);
+        if cmd.is(cmd::PLAYBACK_PLAYING) {
+            let (item, progress) = cmd.get_unchecked(cmd::PLAYBACK_PLAYING);
+
+            data.playback.current.as_mut().map(|current| {
+                current.analysis.defer(item.clone());
             });
-            Handled::Yes
+            let item = item.clone();
+            let web = self.webapi.clone();
+            let sink = ctx.get_external_handle();
+            self.spawn(move || {
+                let result = web.get_audio_analysis(&item.to_base62());
+                sink.submit_command(cmd::UPDATE_AUDIO_ANALYSIS, (item, result), Target::Auto)
+                    .unwrap();
+            });
+
+            Handled::No
         } else {
             Handled::No
         }

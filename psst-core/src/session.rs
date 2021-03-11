@@ -35,6 +35,10 @@ impl SessionHandle {
         }
     }
 
+    pub fn is_connected(&self) -> bool {
+        self.session.read().unwrap().is_some()
+    }
+
     pub fn connected(&self) -> Result<Arc<Session>, Error> {
         self.session
             .read()
@@ -60,13 +64,13 @@ impl SessionHandle {
 }
 
 struct ShutdownSwitch {
-    shutdown: bool,
     stream: TcpStream,
+    has_been_shut_down: bool,
 }
 
 impl ShutdownSwitch {
     fn shutdown(&mut self) {
-        self.shutdown = true;
+        self.has_been_shut_down = true;
         let _ = self.stream.shutdown(Shutdown::Both);
     }
 }
@@ -99,8 +103,8 @@ impl Session {
         } = transport;
         Ok(Self {
             shutdown: Mutex::new(ShutdownSwitch {
-                shutdown: false,
                 stream,
+                has_been_shut_down: false,
             }),
             encoder: Mutex::new(encoder),
             decoder: Mutex::new(decoder),
@@ -123,7 +127,7 @@ impl Session {
     }
 
     pub fn has_been_shut_down(&self) -> bool {
-        self.shutdown.lock().unwrap().shutdown
+        self.shutdown.lock().unwrap().has_been_shut_down
     }
 
     pub fn credentials(&self) -> &Credentials {

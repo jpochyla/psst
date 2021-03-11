@@ -104,7 +104,11 @@ fn make_general() -> impl Widget<State> {
                 .with_placeholder("Password")
                 .env_scope(|env, _state| env.set(theme::WIDE_WIDGET_WIDTH, theme::grid(16.0)))
                 .lens(Config::password),
-        );
+        )
+        .with_spacer(theme::grid(1.0))
+        .with_child(Button::new("Log In").on_click(|ctx, _, _| {
+            ctx.submit_command(cmd::SESSION_CONNECT);
+        }));
 
     col = col.with_spacer(theme::grid(3.0));
 
@@ -128,7 +132,7 @@ fn make_general() -> impl Widget<State> {
         Button::new("Save")
             .on_click(move |ctx, config: &mut Config, _env| {
                 config.save();
-                ctx.submit_command(cmd::CONFIGURE);
+                ctx.submit_command(cmd::SESSION_CONNECT);
                 ctx.submit_command(cmd::SHOW_MAIN);
                 ctx.submit_command(commands::CLOSE_WINDOW);
             })

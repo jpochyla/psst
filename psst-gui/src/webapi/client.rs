@@ -351,9 +351,6 @@ impl WebApi {
     }
 }
 
-const LOCAL_ARTIST_ID: &str = "local_artist";
-const LOCAL_ALBUM_ID: &str = "local_album";
-
 impl From<io::Error> for Error {
     fn from(err: io::Error) -> Self {
         Error::WebApiError(err.to_string())

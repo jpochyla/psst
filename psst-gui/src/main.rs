@@ -1,6 +1,7 @@
 #![recursion_limit = "256"]
 
 mod cmd;
+mod controller;
 mod data;
 mod delegate;
 mod error;
@@ -10,7 +11,7 @@ mod widget;
 
 use crate::{
     data::{Config, State},
-    delegate::DelegateHolder,
+    delegate::Delegate,
 };
 use druid::AppLauncher;
 use env_logger::{Builder, Env};
@@ -28,30 +29,26 @@ fn main() {
     )
     .init();
 
-    let config = Config::load().unwrap_or_default();
-
-    let (launcher, delegate) = if config.has_credentials() {
-        let win = ui::make_main_window();
-        let win_id = win.id;
-        let launcher = AppLauncher::with_window(win).configure_env(ui::theme::setup);
-        let mut delegate = DelegateHolder::new(launcher.get_external_handle());
-        delegate.configure(&config);
-        delegate.main_window.replace(win_id);
-        (launcher, delegate)
-    } else {
-        let win = ui::make_preferences_window();
-        let win_id = win.id;
-        let launcher =
-            AppLauncher::with_window(ui::make_preferences_window()).configure_env(ui::theme::setup);
-        let mut delegate = DelegateHolder::new(launcher.get_external_handle());
-        delegate.preferences_window.replace(win_id);
-        (launcher, delegate)
-    };
-
     let state = State {
-        config,
+        config: Config::load().unwrap_or_default(),
         ..State::default()
     };
+    let mut delegate = Delegate::new(state.session.clone());
+
+    let launcher = if state.config.has_credentials() {
+        // Credentials are configured, open the main window.
+        let window = ui::make_main_window();
+        delegate.main_window.replace(window.id);
+        let launcher = AppLauncher::with_window(window).configure_env(ui::theme::setup);
+        launcher
+    } else {
+        // No configured credentials, open the preferences.
+        let window = ui::make_preferences_window();
+        delegate.preferences_window.replace(window.id);
+        let launcher = AppLauncher::with_window(window).configure_env(ui::theme::setup);
+        launcher
+    };
+
     launcher
         .delegate(delegate)
         .launch(state)
