@@ -94,8 +94,8 @@ impl Session {
         // Authenticate with provided credentials (either username/password, or saved,
         // reusable credential blob from an earlier run).
         let credentials = transport.authenticate(config.login_creds)?;
-        // Split transport into encoding/decoding parts, so we can read/write/shutdown in
-        // parallel.
+        // Split transport into encoding/decoding parts, so we can read/write/shutdown
+        // in parallel.
         let Transport {
             stream,
             encoder,

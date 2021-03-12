@@ -171,10 +171,10 @@ impl PlaybackController {
     fn set_queue_behavior(&mut self, behavior: QueueBehavior) {
         self.send(PlayerEvent::Command(PlayerCommand::SetQueueBehavior {
             behavior: match behavior {
-                QueueBehavior::Sequential => psst_core::audio_player::QueueBehavior::Sequential,
-                QueueBehavior::Random => psst_core::audio_player::QueueBehavior::Random,
-                QueueBehavior::LoopTrack => psst_core::audio_player::QueueBehavior::LoopTrack,
-                QueueBehavior::LoopAll => psst_core::audio_player::QueueBehavior::LoopAll,
+                QueueBehavior::Sequential => psst_core::audio_queue::QueueBehavior::Sequential,
+                QueueBehavior::Random => psst_core::audio_queue::QueueBehavior::Random,
+                QueueBehavior::LoopTrack => psst_core::audio_queue::QueueBehavior::LoopTrack,
+                QueueBehavior::LoopAll => psst_core::audio_queue::QueueBehavior::LoopAll,
             },
         }));
     }

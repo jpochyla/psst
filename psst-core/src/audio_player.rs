@@ -3,6 +3,7 @@ use crate::{
     audio_key::AudioKey,
     audio_normalize::NormalizationLevel,
     audio_output::{AudioOutputRemote, AudioSample, AudioSource},
+    audio_queue::{Queue, QueueBehavior},
     cache::CacheHandle,
     cdn::CdnHandle,
     error::Error,
@@ -12,7 +13,6 @@ use crate::{
     session::SessionHandle,
 };
 use crossbeam_channel::{unbounded, Receiver, Sender};
-use rand::Rng;
 use std::{
     mem,
     sync::{Arc, Mutex},
@@ -241,12 +241,12 @@ impl Player {
             PlayerEvent::Finished { .. } => {
                 self.handle_finished();
             }
-            PlayerEvent::Loading { .. } => {}
-            PlayerEvent::Playing { .. } => {}
-            PlayerEvent::Pausing { .. } => {}
-            PlayerEvent::Resuming { .. } => {}
-            PlayerEvent::Stopped { .. } => {}
-            PlayerEvent::Blocked => {}
+            PlayerEvent::Loading { .. }
+            | PlayerEvent::Playing { .. }
+            | PlayerEvent::Pausing { .. }
+            | PlayerEvent::Resuming { .. }
+            | PlayerEvent::Stopped { .. }
+            | PlayerEvent::Blocked => {}
         };
     }
 
@@ -262,7 +262,7 @@ impl Player {
             PlayerCommand::Stop => self.stop(),
             PlayerCommand::Seek { position } => self.seek(position),
             PlayerCommand::Configure { config } => self.configure(config),
-            PlayerCommand::SetQueueBehavior { behavior } => self.queue.behavior = behavior,
+            PlayerCommand::SetQueueBehavior { behavior } => self.queue.set_behaviour(behavior),
         }
     }
 
@@ -317,7 +317,7 @@ impl Player {
             }
         }
         const PRELOAD_BEFORE_END_OF_TRACK: Duration = Duration::from_secs(30);
-        if let Some(&item_to_preload) = self.queue.get_next() {
+        if let Some(&item_to_preload) = self.queue.get_following() {
             let time_until_end_of_track = path.duration.checked_sub(progress).unwrap_or_default();
             if time_until_end_of_track <= PRELOAD_BEFORE_END_OF_TRACK {
                 self.preload(item_to_preload);
@@ -326,12 +326,16 @@ impl Player {
     }
 
     fn handle_finished(&mut self) {
-        self.next();
+        self.queue.skip_to_following();
+        if let Some(&item) = self.queue.get_current() {
+            self.load_and_play(item);
+        } else {
+            self.stop();
+        }
     }
 
     fn load_queue(&mut self, items: Vec<PlaybackItem>, position: usize) {
-        self.queue.items = items;
-        self.queue.position = position;
+        self.queue.fill(items, position);
         if let Some(&item) = self.queue.get_current() {
             self.load_and_play(item);
         } else {
@@ -735,104 +739,5 @@ impl Iterator for PlayerAudioSource {
             }
         }
         sample
-    }
-}
-
-#[derive(Debug)]
-pub enum QueueBehavior {
-    Sequential,
-    Random,
-    LoopTrack,
-    LoopAll,
-}
-
-impl Default for QueueBehavior {
-    fn default() -> Self {
-        Self::Sequential
-    }
-}
-
-struct Queue {
-    items: Vec<PlaybackItem>,
-    position: usize,
-    behavior: QueueBehavior,
-    prev_random_positions: Vec<usize>,
-    next_random_position: Option<usize>,
-}
-
-impl Queue {
-    fn new() -> Self {
-        Self {
-            items: Vec::new(),
-            position: 0,
-            behavior: QueueBehavior::default(),
-            prev_random_positions: Vec::new(),
-            next_random_position: None,
-        }
-    }
-
-    fn clear(&mut self) {
-        self.position = 0;
-        self.items.clear();
-        self.prev_random_positions.clear();
-        self.next_random_position = None;
-    }
-
-    fn random_position(&self) -> usize {
-        rand::thread_rng().gen_range(0..self.items.len())
-    }
-
-    fn skip_to_previous(&mut self) {
-        self.position = match self.behavior {
-            QueueBehavior::Sequential | QueueBehavior::LoopAll => self.position.saturating_sub(1),
-            QueueBehavior::Random => self
-                .prev_random_positions
-                .pop()
-                .unwrap_or_else(|| self.position.saturating_sub(1)),
-            QueueBehavior::LoopTrack => self.position,
-        }
-    }
-
-    fn skip_to_next(&mut self) {
-        self.position = match self.behavior {
-            QueueBehavior::Sequential => self.position + 1,
-            QueueBehavior::Random => {
-                if let Some(next_position) = self.next_random_position.take() {
-                    // If we have already committed to the next position is `self.get_next()`, use
-                    // the saved index.
-                    next_position
-                } else {
-                    self.prev_random_positions.push(self.position);
-                    self.random_position()
-                }
-            }
-            QueueBehavior::LoopTrack => self.position,
-            QueueBehavior::LoopAll => (self.position + 1) % self.items.len(),
-        }
-    }
-
-    fn get_current(&self) -> Option<&PlaybackItem> {
-        self.items.get(self.position)
-    }
-
-    fn get_next(&mut self) -> Option<&PlaybackItem> {
-        let position = match self.behavior {
-            QueueBehavior::Sequential => self.position + 1,
-            QueueBehavior::Random => {
-                if let Some(next_position) = self.next_random_position {
-                    // We have previously commited to the random position here, use it.
-                    next_position
-                } else {
-                    // This is the first time we are getting called, generate a random position and
-                    // store it.
-                    let next_position = self.random_position();
-                    self.next_random_position.replace(next_position);
-                    next_position
-                }
-            }
-            QueueBehavior::LoopTrack => self.position,
-            QueueBehavior::LoopAll => (self.position + 1) % self.items.len(),
-        };
-        self.items.get(position)
     }
 }
