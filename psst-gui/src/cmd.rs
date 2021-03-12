@@ -6,7 +6,6 @@ use crate::{
     error::Error,
 };
 use druid::{im::Vector, Selector, WidgetId};
-use psst_core::audio_player::PlayerEvent;
 use std::{sync::Arc, time::Duration};
 
 // Widget IDs
@@ -15,7 +14,6 @@ pub const WIDGET_SEARCH_INPUT: WidgetId = WidgetId::reserved(1);
 
 // Common
 
-pub const CONFIGURE: Selector = Selector::new("app.configure");
 pub const SHOW_MAIN: Selector = Selector::new("app.show-main");
 pub const SET_FOCUS: Selector = Selector::new("app.set-focus");
 pub const COPY: Selector<String> = Selector::new("app.copy-to-clipboard");
@@ -78,7 +76,6 @@ pub const UPDATE_PLAYLIST_TRACKS: Selector<(PlaylistLink, Result<Vector<Arc<Trac
 
 // Playback state
 
-pub const PLAYBACK_EVENT: Selector<PlayerEvent> = Selector::new("app.playback-event");
 pub const PLAYBACK_LOADING: Selector<TrackId> = Selector::new("app.playback-loading");
 pub const PLAYBACK_PLAYING: Selector<(TrackId, Duration)> = Selector::new("app.playback-playing");
 pub const PLAYBACK_PROGRESS: Selector<Duration> = Selector::new("app.playback-progress");

@@ -1,5 +1,4 @@
-use crate::data::AlbumLink;
-use crate::data::ArtistLink;
+use crate::data::{AlbumLink, ArtistLink};
 use druid::{im::Vector, Data, Lens};
 use psst_core::item_id::{ItemId, ItemIdType};
 use serde::Deserialize;

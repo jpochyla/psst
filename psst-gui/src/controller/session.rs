@@ -1,7 +1,9 @@
 use std::thread::{self, JoinHandle};
 
-use druid::widget::{prelude::*, Controller};
-use druid::{ExtEventSink, Target};
+use druid::{
+    widget::{prelude::*, Controller},
+    ExtEventSink, Target,
+};
 use psst_core::session::{SessionConfig, SessionHandle};
 
 use crate::{cmd, data::State};
