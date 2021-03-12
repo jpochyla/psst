@@ -19,20 +19,20 @@ use std::{sync::Arc, time::Duration};
 
 use super::utils;
 
-pub fn make_panel() -> impl Widget<State> {
+pub fn panel_widget() -> impl Widget<State> {
     Flex::row()
         .must_fill_main_axis(true)
-        .with_flex_child(make_playback_info(), 1.0)
-        .with_flex_child(make_player(), 1.0)
+        .with_flex_child(playback_info_widget(), 1.0)
+        .with_flex_child(player_widget(), 1.0)
         .background(Border::Top.widget(theme::BACKGROUND_DARK))
         .lens(State::playback)
 }
 
-fn make_playback_info() -> impl Widget<Playback> {
-    Maybe::or_empty(make_current_playback_info).lens(Playback::current)
+fn playback_info_widget() -> impl Widget<Playback> {
+    Maybe::or_empty(current_playback_info_widget).lens(Playback::current)
 }
 
-fn make_current_playback_info() -> impl Widget<CurrentPlayback> {
+fn current_playback_info_widget() -> impl Widget<CurrentPlayback> {
     let track_name = Label::raw()
         .with_line_break_mode(LineBreaking::Clip)
         .with_font(theme::UI_FONT_MEDIUM)
@@ -83,15 +83,15 @@ fn make_current_playback_info() -> impl Widget<CurrentPlayback> {
         })
 }
 
-fn make_player() -> impl Widget<Playback> {
+fn player_widget() -> impl Widget<Playback> {
     Flex::column()
-        .with_child(make_player_controls())
+        .with_child(player_controls_widget())
         .with_default_spacer()
-        .with_child(Maybe::or_empty(make_player_progress).lens(Playback::current))
+        .with_child(Maybe::or_empty(player_progress_widget).lens(Playback::current))
         .padding(theme::grid(1.0))
 }
 
-fn make_player_controls() -> impl Widget<Playback> {
+fn player_controls_widget() -> impl Widget<Playback> {
     let play_previous = icons::SKIP_BACK
         .scale((theme::grid(2.0), theme::grid(2.0)))
         .with_color(theme::PLACEHOLDER_COLOR)
@@ -193,7 +193,7 @@ fn make_player_controls() -> impl Widget<Playback> {
         .with_child(queue_behavior)
 }
 
-fn make_player_progress() -> impl Widget<CurrentPlayback> {
+fn player_progress_widget() -> impl Widget<CurrentPlayback> {
     let current_time =
         Label::dynamic(|progress: &Duration, _| utils::as_minutes_and_seconds(progress))
             .with_text_size(theme::TEXT_SIZE_SMALL)

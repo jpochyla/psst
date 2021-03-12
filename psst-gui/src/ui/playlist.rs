@@ -3,8 +3,8 @@ use crate::{
     data::{CommonCtx, Ctx, Library, Nav, Playlist, PlaylistDetail, State},
     ui::{
         theme,
-        track::{make_tracklist, TrackDisplay},
-        utils::{make_error, make_loader},
+        track::{tracklist_widget, TrackDisplay},
+        utils::{error_widget, spinner_widget},
     },
     widget::{Async, HoverExt},
 };
@@ -13,9 +13,9 @@ use druid::{
     Insets, LensExt, MouseButton, Widget, WidgetExt,
 };
 
-pub fn make_list() -> impl Widget<State> {
+pub fn list_widget() -> impl Widget<State> {
     Async::new(
-        || make_loader(),
+        || spinner_widget(),
         || {
             List::new(|| {
                 Label::raw()
@@ -31,12 +31,12 @@ pub fn make_list() -> impl Widget<State> {
                     })
             })
         },
-        || make_error(),
+        || error_widget(),
     )
     .lens(State::library.then(Library::playlists.in_arc()))
 }
 
-pub fn make_playlist() -> impl Widget<Ctx<CommonCtx, Playlist>> {
+pub fn playlist_widget() -> impl Widget<Ctx<CommonCtx, Playlist>> {
     let playlist_name = Label::raw()
         .with_font(theme::UI_FONT_MEDIUM)
         .with_line_break_mode(LineBreaking::Clip)
@@ -55,18 +55,18 @@ pub fn make_playlist() -> impl Widget<Ctx<CommonCtx, Playlist>> {
     )
 }
 
-pub fn make_detail() -> impl Widget<State> {
+pub fn detail_widget() -> impl Widget<State> {
     Async::new(
-        || make_loader(),
+        || spinner_widget(),
         || {
-            make_tracklist(TrackDisplay {
+            tracklist_widget(TrackDisplay {
                 title: true,
                 artist: true,
                 album: true,
                 ..TrackDisplay::empty()
             })
         },
-        || make_error().lens(Ctx::data()),
+        || error_widget().lens(Ctx::data()),
     )
     .lens(
         Ctx::make(

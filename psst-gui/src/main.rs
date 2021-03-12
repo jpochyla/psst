@@ -37,13 +37,13 @@ fn main() {
 
     let launcher = if state.config.has_credentials() {
         // Credentials are configured, open the main window.
-        let window = ui::make_main_window();
+        let window = ui::main_window();
         delegate.main_window.replace(window.id);
         let launcher = AppLauncher::with_window(window).configure_env(ui::theme::setup);
         launcher
     } else {
         // No configured credentials, open the preferences.
-        let window = ui::make_preferences_window();
+        let window = ui::preferences_window();
         delegate.preferences_window.replace(window.id);
         let launcher = AppLauncher::with_window(window).configure_env(ui::theme::setup);
         launcher

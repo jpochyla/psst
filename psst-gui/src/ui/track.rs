@@ -43,11 +43,11 @@ impl TrackDisplay {
     }
 }
 
-pub fn make_tracklist<T>(mode: TrackDisplay) -> impl Widget<Ctx<CommonCtx, T>>
+pub fn tracklist_widget<T>(mode: TrackDisplay) -> impl Widget<Ctx<CommonCtx, T>>
 where
     T: TrackIter + Data,
 {
-    ControllerHost::new(List::new(move || make_track(mode)), PlayController)
+    ControllerHost::new(List::new(move || track_widget(mode)), PlayController)
 }
 
 pub trait TrackIter {
@@ -195,7 +195,7 @@ where
     }
 }
 
-fn make_track(display: TrackDisplay) -> impl Widget<TrackRow> {
+fn track_widget(display: TrackDisplay) -> impl Widget<TrackRow> {
     let mut major = Flex::row();
     let mut minor = Flex::row();
 
@@ -283,7 +283,7 @@ fn make_track(display: TrackDisplay) -> impl Widget<TrackRow> {
                 ctx.submit_notification(cmd::PLAY_TRACK_AT.with(tr.position));
             }
             MouseButton::Right => {
-                let menu = make_track_menu(tr);
+                let menu = track_menu(tr);
                 ctx.show_context_menu(ContextMenu::new(menu, event.window_pos));
                 ctx.set_active(true);
             }
@@ -308,7 +308,7 @@ fn popularity_stars(popularity: u32) -> String {
     stars
 }
 
-fn make_track_menu(tr: &TrackRow) -> MenuDesc<State> {
+fn track_menu(tr: &TrackRow) -> MenuDesc<State> {
     let mut menu = MenuDesc::empty();
 
     for artist_link in &tr.track.artists {

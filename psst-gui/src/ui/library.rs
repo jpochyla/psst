@@ -1,9 +1,9 @@
 use crate::{
     data::{Ctx, Library, State},
     ui::{
-        album::make_album,
-        track::{make_tracklist, TrackDisplay},
-        utils::{make_error, make_loader},
+        album::album_widget,
+        track::{tracklist_widget, TrackDisplay},
+        utils::{error_widget, spinner_widget},
     },
     widget::Async,
 };
@@ -12,19 +12,19 @@ use druid::{
     LensExt, Widget, WidgetExt,
 };
 
-pub fn make_detail() -> impl Widget<State> {
+pub fn detail_widget() -> impl Widget<State> {
     Flex::row()
         .must_fill_main_axis(true)
         .cross_axis_alignment(CrossAxisAlignment::Start)
-        .with_flex_child(make_saved_albums(), 1.0)
-        .with_flex_child(make_saved_tracks(), 1.0)
+        .with_flex_child(saved_albums_widget(), 1.0)
+        .with_flex_child(saved_tracks_widget(), 1.0)
 }
 
-fn make_saved_albums() -> impl Widget<State> {
+fn saved_albums_widget() -> impl Widget<State> {
     Async::new(
-        || make_loader(),
-        || List::new(make_album),
-        || make_error().lens(Ctx::data()),
+        || spinner_widget(),
+        || List::new(album_widget),
+        || error_widget().lens(Ctx::data()),
     )
     .lens(
         Ctx::make(
@@ -35,18 +35,18 @@ fn make_saved_albums() -> impl Widget<State> {
     )
 }
 
-fn make_saved_tracks() -> impl Widget<State> {
+fn saved_tracks_widget() -> impl Widget<State> {
     Async::new(
-        || make_loader(),
+        || spinner_widget(),
         || {
-            make_tracklist(TrackDisplay {
+            tracklist_widget(TrackDisplay {
                 title: true,
                 artist: true,
                 album: true,
                 ..TrackDisplay::empty()
             })
         },
-        || make_error().lens(Ctx::data()),
+        || error_widget().lens(Ctx::data()),
     )
     .lens(
         Ctx::make(

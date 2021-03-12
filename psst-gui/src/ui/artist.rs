@@ -2,10 +2,10 @@ use crate::{
     cmd,
     data::{Artist, ArtistAlbums, ArtistDetail, ArtistTracks, CommonCtx, Ctx, Nav, State},
     ui::{
-        album::make_album,
+        album::album_widget,
         theme,
-        track::{make_tracklist, TrackDisplay},
-        utils::{make_error, make_loader, make_placeholder},
+        track::{tracklist_widget, TrackDisplay},
+        utils::{error_widget, placeholder_widget, spinner_widget},
     },
     widget::{Async, Clip, HoverExt, RemoteImage},
 };
@@ -16,11 +16,11 @@ use druid::{
     Data, Insets, LensExt, Widget, WidgetExt,
 };
 
-pub fn make_detail() -> impl Widget<State> {
+pub fn detail_widget() -> impl Widget<State> {
     let top_tracks = Async::new(
-        || make_loader(),
-        || make_top_tracks(),
-        || make_error().lens(Ctx::data()),
+        || spinner_widget(),
+        || top_tracks_widget(),
+        || error_widget().lens(Ctx::data()),
     )
     .lens(
         Ctx::make(
@@ -31,9 +31,9 @@ pub fn make_detail() -> impl Widget<State> {
     );
 
     let albums = Async::new(
-        || make_loader(),
-        || make_albums(),
-        || make_error().lens(Ctx::data()),
+        || spinner_widget(),
+        || albums_widget(),
+        || error_widget().lens(Ctx::data()),
     )
     .lens(
         Ctx::make(State::common_ctx, State::artist.then(ArtistDetail::albums))
@@ -41,7 +41,7 @@ pub fn make_detail() -> impl Widget<State> {
     )
     .padding((theme::grid(0.8), 0.0));
 
-    let related_artists = Async::new(|| make_loader(), || make_related(), || make_error())
+    let related_artists = Async::new(|| spinner_widget(), || related_widget(), || error_widget())
         .lens(State::artist.then(ArtistDetail::related_artists))
         .padding((theme::grid(0.8), 0.0));
 
@@ -51,23 +51,8 @@ pub fn make_detail() -> impl Widget<State> {
         .with_child(related_artists)
 }
 
-pub fn make_artist() -> impl Widget<Artist> {
-    make_artist_with_cover(theme::grid(7.0))
-}
-
-pub fn make_cover(size: f64) -> impl Widget<Artist> {
-    let radius = size / 2.0;
-    Clip::new(
-        Circle::new((radius, radius), radius),
-        RemoteImage::new(make_placeholder(), move |artist: &Artist, _| {
-            artist.image(size, size).map(|image| image.url.clone())
-        })
-        .fix_size(size, size),
-    )
-}
-
-fn make_artist_with_cover(width: f64) -> impl Widget<Artist> {
-    let artist_image = make_cover(width);
+pub fn artist_widget() -> impl Widget<Artist> {
+    let artist_image = cover_widget(theme::grid(7.0));
     let artist_label = Label::raw()
         .with_font(theme::UI_FONT_MEDIUM)
         .lens(Artist::name);
@@ -81,8 +66,19 @@ fn make_artist_with_cover(width: f64) -> impl Widget<Artist> {
     })
 }
 
-fn make_top_tracks() -> impl Widget<Ctx<CommonCtx, ArtistTracks>> {
-    make_tracklist(TrackDisplay {
+pub fn cover_widget(size: f64) -> impl Widget<Artist> {
+    let radius = size / 2.0;
+    Clip::new(
+        Circle::new((radius, radius), radius),
+        RemoteImage::new(placeholder_widget(), move |artist: &Artist, _| {
+            artist.image(size, size).map(|image| image.url.clone())
+        })
+        .fix_size(size, size),
+    )
+}
+
+fn top_tracks_widget() -> impl Widget<Ctx<CommonCtx, ArtistTracks>> {
+    tracklist_widget(TrackDisplay {
         title: true,
         album: true,
         popularity: true,
@@ -90,25 +86,25 @@ fn make_top_tracks() -> impl Widget<Ctx<CommonCtx, ArtistTracks>> {
     })
 }
 
-fn make_albums() -> impl Widget<Ctx<CommonCtx, ArtistAlbums>> {
+fn albums_widget() -> impl Widget<Ctx<CommonCtx, ArtistAlbums>> {
     Flex::column()
         .cross_axis_alignment(CrossAxisAlignment::Start)
-        .with_child(make_label("Albums"))
-        .with_child(List::new(make_album).lens(Ctx::map(ArtistAlbums::albums)))
-        .with_child(make_label("Singles"))
-        .with_child(List::new(make_album).lens(Ctx::map(ArtistAlbums::singles)))
-        .with_child(make_label("Compilations"))
-        .with_child(List::new(make_album).lens(Ctx::map(ArtistAlbums::compilations)))
+        .with_child(label_widget("Albums"))
+        .with_child(List::new(album_widget).lens(Ctx::map(ArtistAlbums::albums)))
+        .with_child(label_widget("Singles"))
+        .with_child(List::new(album_widget).lens(Ctx::map(ArtistAlbums::singles)))
+        .with_child(label_widget("Compilations"))
+        .with_child(List::new(album_widget).lens(Ctx::map(ArtistAlbums::compilations)))
 }
 
-fn make_related() -> impl Widget<Vector<Artist>> {
+fn related_widget() -> impl Widget<Vector<Artist>> {
     Flex::column()
         .cross_axis_alignment(CrossAxisAlignment::Start)
-        .with_child(make_label("Related Artists"))
-        .with_child(List::new(make_artist))
+        .with_child(label_widget("Related Artists"))
+        .with_child(List::new(artist_widget))
 }
 
-fn make_label<T: Data>(text: impl Into<LabelText<T>>) -> impl Widget<T> {
+fn label_widget<T: Data>(text: impl Into<LabelText<T>>) -> impl Widget<T> {
     Label::new(text)
         .with_font(theme::UI_FONT_MEDIUM)
         .with_text_color(theme::PLACEHOLDER_COLOR)

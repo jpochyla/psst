@@ -15,16 +15,16 @@ use druid::{
     Env, Event, EventCtx, LifeCycle, LifeCycleCtx, Selector, Widget, WidgetExt,
 };
 
-pub fn make_preferences() -> impl Widget<State> {
-    let tabs = make_tabs()
+pub fn preferences_widget() -> impl Widget<State> {
+    let tabs = tabs_widget()
         .padding(theme::grid(2.0))
         .background(theme::BACKGROUND_LIGHT);
 
     let active = ViewSwitcher::new(
         |state: &State, _env| state.preferences.active,
         |active: &PreferencesTab, _state, _env| match active {
-            PreferencesTab::General => make_general().boxed(),
-            PreferencesTab::Cache => make_cache().boxed(),
+            PreferencesTab::General => general_widget().boxed(),
+            PreferencesTab::Cache => cache_widget().boxed(),
         },
     )
     .padding(theme::grid(4.0))
@@ -37,7 +37,7 @@ pub fn make_preferences() -> impl Widget<State> {
         .with_child(active)
 }
 
-fn make_tabs() -> impl Widget<State> {
+fn tabs_widget() -> impl Widget<State> {
     let label = |text, icon: &SvgIcon, tab: PreferencesTab| {
         Flex::column()
             .with_child(icon.scale(theme::ICON_SIZE_LARGE))
@@ -74,7 +74,7 @@ fn make_tabs() -> impl Widget<State> {
         .with_child(label("Cache", &icons::STORAGE, PreferencesTab::Cache))
 }
 
-fn make_general() -> impl Widget<State> {
+fn general_widget() -> impl Widget<State> {
     let mut col = Flex::column().cross_axis_alignment(CrossAxisAlignment::Start);
 
     // Theme
@@ -139,7 +139,7 @@ fn make_general() -> impl Widget<State> {
     col.lens(State::config)
 }
 
-fn make_cache() -> impl Widget<State> {
+fn cache_widget() -> impl Widget<State> {
     let mut col = Flex::column().cross_axis_alignment(CrossAxisAlignment::Start);
 
     col = col

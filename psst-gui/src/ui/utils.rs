@@ -87,11 +87,11 @@ impl<T: Data, W: Widget<T>> Widget<T> for WashingMachine<W> {
     }
 }
 
-pub fn make_placeholder<T: Data>() -> impl Widget<T> {
+pub fn placeholder_widget<T: Data>() -> impl Widget<T> {
     SizedBox::empty().background(theme::BACKGROUND_DARK)
 }
 
-pub fn make_loader<T: Data>() -> impl Widget<T> {
+pub fn spinner_widget<T: Data>() -> impl Widget<T> {
     let bytes = include_bytes!("../../assets/loader.png");
     let img = image::load_from_memory_with_format(&bytes[..], image::ImageFormat::Png).unwrap();
     let buf = ImageBuf::from_dynamic_image_with_alpha(img);
@@ -103,7 +103,7 @@ pub fn make_loader<T: Data>() -> impl Widget<T> {
         .center()
 }
 
-pub fn make_error() -> impl Widget<Error> {
+pub fn error_widget() -> impl Widget<Error> {
     let icon = icons::SAD_FACE
         .scale((theme::grid(3.0), theme::grid(3.0)))
         .with_color(theme::PLACEHOLDER_COLOR);

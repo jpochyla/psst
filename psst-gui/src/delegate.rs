@@ -116,7 +116,7 @@ impl AppDelegate<State> for Delegate {
                 let win_id = self.main_window.unwrap();
                 ctx.submit_command(commands::SHOW_WINDOW.to(win_id));
             } else {
-                let win = ui::make_main_window();
+                let win = ui::main_window();
                 self.main_window.replace(win.id);
                 ctx.new_window(win);
             }
@@ -131,7 +131,7 @@ impl AppDelegate<State> for Delegate {
                 let win_id = self.preferences_window.unwrap();
                 ctx.submit_command(commands::SHOW_WINDOW.to(win_id));
             } else {
-                let win = ui::make_preferences_window();
+                let win = ui::preferences_window();
                 self.preferences_window.replace(win.id);
                 ctx.new_window(win);
             }

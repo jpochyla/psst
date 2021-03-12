@@ -4,17 +4,17 @@ use crate::{
 };
 use druid::{commands, platform_menus, LocalizedString, MenuDesc, MenuItem, SysMods};
 
-#[allow(unused_mut)]
-pub fn make_menu() -> MenuDesc<State> {
+pub fn main_menu() -> MenuDesc<State> {
+    #[allow(unused_mut)]
     let mut menu = MenuDesc::empty();
     #[cfg(target_os = "macos")]
     {
-        menu = menu.append(make_mac_app_menu());
+        menu = menu.append(mac_app_menu());
     }
-    menu.append(make_edit_menu()).append(make_view_menu())
+    menu.append(edit_menu()).append(view_menu())
 }
 
-fn make_mac_app_menu() -> MenuDesc<State> {
+fn mac_app_menu() -> MenuDesc<State> {
     MenuDesc::new(LocalizedString::new("macos-menu-application-menu"))
         .append(platform_menus::mac::application::preferences())
         .append_separator()
@@ -30,14 +30,14 @@ fn make_mac_app_menu() -> MenuDesc<State> {
         )
 }
 
-fn make_edit_menu() -> MenuDesc<State> {
+fn edit_menu() -> MenuDesc<State> {
     MenuDesc::new(LocalizedString::new("common-menu-edit-menu").with_placeholder("Edit"))
         .append(platform_menus::common::cut())
         .append(platform_menus::common::copy())
         .append(platform_menus::common::paste())
 }
 
-fn make_view_menu() -> MenuDesc<State> {
+fn view_menu() -> MenuDesc<State> {
     MenuDesc::new(LocalizedString::new("menu-view-menu").with_placeholder("View"))
         .append(
             MenuItem::new(

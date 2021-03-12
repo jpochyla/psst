@@ -2,11 +2,11 @@ use crate::{
     cmd,
     data::{CommonCtx, Ctx, Nav, Search, SearchResults, State},
     ui::{
-        album::make_album,
-        artist::make_artist,
+        album::album_widget,
+        artist::artist_widget,
         theme,
-        track::{make_tracklist, TrackDisplay},
-        utils::{make_error, make_loader},
+        track::{tracklist_widget, TrackDisplay},
+        utils::{error_widget, spinner_widget},
     },
     widget::{Async, InputController},
 };
@@ -15,9 +15,9 @@ use druid::{
     LensExt, Widget, WidgetExt,
 };
 
-use super::playlist::make_playlist;
+use super::playlist::playlist_widget;
 
-pub fn make_input() -> impl Widget<State> {
+pub fn input_widget() -> impl Widget<State> {
     TextBox::new()
         .with_placeholder("Search")
         .controller(InputController::new().on_submit(|ctx, query, _env| {
@@ -29,9 +29,9 @@ pub fn make_input() -> impl Widget<State> {
         .lens(State::search.then(Search::input))
 }
 
-pub fn make_results() -> impl Widget<State> {
+pub fn results_widget() -> impl Widget<State> {
     Async::new(
-        || make_loader(),
+        || spinner_widget(),
         || {
             let label = |text| {
                 Label::new(text)
@@ -43,29 +43,29 @@ pub fn make_results() -> impl Widget<State> {
             Flex::column()
                 .cross_axis_alignment(CrossAxisAlignment::Fill)
                 .with_child(label("Artists"))
-                .with_child(make_artist_results())
+                .with_child(artist_results_widget())
                 .with_child(label("Albums"))
-                .with_child(make_album_results())
+                .with_child(album_results_widget())
                 .with_child(label("Tracks"))
-                .with_child(make_track_results())
+                .with_child(track_results_widget())
                 .with_child(label("Playlists"))
-                .with_child(make_playlist_results())
+                .with_child(playlist_results_widget())
         },
-        || make_error().lens(Ctx::data()),
+        || error_widget().lens(Ctx::data()),
     )
     .lens(Ctx::make(State::common_ctx, State::search.then(Search::results)).then(Ctx::in_promise()))
 }
 
-fn make_artist_results() -> impl Widget<Ctx<CommonCtx, SearchResults>> {
-    List::new(make_artist).lens(Ctx::data().then(SearchResults::artists))
+fn artist_results_widget() -> impl Widget<Ctx<CommonCtx, SearchResults>> {
+    List::new(artist_widget).lens(Ctx::data().then(SearchResults::artists))
 }
 
-fn make_album_results() -> impl Widget<Ctx<CommonCtx, SearchResults>> {
-    List::new(make_album).lens(Ctx::map(SearchResults::albums))
+fn album_results_widget() -> impl Widget<Ctx<CommonCtx, SearchResults>> {
+    List::new(album_widget).lens(Ctx::map(SearchResults::albums))
 }
 
-fn make_track_results() -> impl Widget<Ctx<CommonCtx, SearchResults>> {
-    make_tracklist(TrackDisplay {
+fn track_results_widget() -> impl Widget<Ctx<CommonCtx, SearchResults>> {
+    tracklist_widget(TrackDisplay {
         title: true,
         artist: true,
         album: true,
@@ -73,6 +73,6 @@ fn make_track_results() -> impl Widget<Ctx<CommonCtx, SearchResults>> {
     })
 }
 
-fn make_playlist_results() -> impl Widget<Ctx<CommonCtx, SearchResults>> {
-    List::new(make_playlist).lens(Ctx::map(SearchResults::playlists))
+fn playlist_results_widget() -> impl Widget<Ctx<CommonCtx, SearchResults>> {
+    List::new(playlist_widget).lens(Ctx::map(SearchResults::playlists))
 }
