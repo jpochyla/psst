@@ -63,7 +63,9 @@ where
         env: &Env,
     ) {
         match event {
-            Event::Command(cmd) if cmd.is(cmd::SESSION_CONNECT) => {
+            Event::Command(cmd)
+                if cmd.is(cmd::SESSION_CONNECT) && data.config.has_credentials() =>
+            {
                 self.start_connection_thread(
                     data.session.clone(),
                     data.config.session(),

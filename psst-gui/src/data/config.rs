@@ -123,7 +123,7 @@ impl Config {
 
     pub fn session(&self) -> SessionConfig {
         SessionConfig {
-            login_creds: self.credentials.clone().unwrap(),
+            login_creds: self.credentials.clone().expect("Missing credentials"),
             proxy_url: Config::proxy(),
         }
     }
