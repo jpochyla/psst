@@ -2,9 +2,11 @@ use std::thread::{self, JoinHandle};
 
 use crate::{
     cmd,
-    data::{AudioQuality, Config, Preferences, PreferencesTab, State, Theme},
+    data::{
+        AudioQuality, Authentication, Config, Preferences, PreferencesTab, Promise, State, Theme,
+    },
     ui::{icons::SvgIcon, theme, utils::Border},
-    widget::{icons, HoverExt},
+    widget::{icons, Empty, HoverExt},
 };
 use druid::{
     commands,
@@ -14,6 +16,7 @@ use druid::{
     },
     Env, Event, EventCtx, LifeCycle, LifeCycleCtx, Selector, Widget, WidgetExt,
 };
+use psst_core::connection::Credentials;
 
 pub fn preferences_widget() -> impl Widget<State> {
     let tabs = tabs_widget()
@@ -23,8 +26,8 @@ pub fn preferences_widget() -> impl Widget<State> {
     let active = ViewSwitcher::new(
         |state: &State, _env| state.preferences.active,
         |active: &PreferencesTab, _state, _env| match active {
-            PreferencesTab::General => general_widget().boxed(),
-            PreferencesTab::Cache => cache_widget().boxed(),
+            PreferencesTab::General => general_tab_widget().boxed(),
+            PreferencesTab::Cache => cache_tab_widget().boxed(),
         },
     )
     .padding(theme::grid(4.0))
@@ -74,7 +77,7 @@ fn tabs_widget() -> impl Widget<State> {
         .with_child(label("Cache", &icons::STORAGE, PreferencesTab::Cache))
 }
 
-fn general_widget() -> impl Widget<State> {
+fn general_tab_widget() -> impl Widget<State> {
     let mut col = Flex::column().cross_axis_alignment(CrossAxisAlignment::Start);
 
     // Theme
@@ -83,12 +86,13 @@ fn general_widget() -> impl Widget<State> {
         .with_spacer(theme::grid(2.0))
         .with_child(
             RadioGroup::new(vec![("Light", Theme::Light), ("Dark", Theme::Dark)])
-                .lens(Config::theme),
+                .lens(Config::theme)
+                .lens(State::config),
         );
 
     col = col.with_spacer(theme::grid(3.0));
 
-    // Credentials
+    // Authentication
     col = col
         .with_child(Label::new("Credentials").with_font(theme::UI_FONT_MEDIUM))
         .with_spacer(theme::grid(2.0))
@@ -96,14 +100,46 @@ fn general_widget() -> impl Widget<State> {
             TextBox::new()
                 .with_placeholder("Username")
                 .env_scope(|env, _state| env.set(theme::WIDE_WIDGET_WIDTH, theme::grid(16.0)))
-                .lens(Config::username),
+                .lens(Authentication::username)
+                .lens(Preferences::auth)
+                .lens(State::preferences),
         )
         .with_spacer(theme::grid(1.0))
         .with_child(
             TextBox::new()
                 .with_placeholder("Password")
                 .env_scope(|env, _state| env.set(theme::WIDE_WIDGET_WIDTH, theme::grid(16.0)))
-                .lens(Config::password),
+                .lens(Authentication::password)
+                .lens(Preferences::auth)
+                .lens(State::preferences),
+        )
+        .with_spacer(theme::grid(1.0))
+        .with_child(
+            Flex::row()
+                .with_child(Button::new("Log In").on_click(|ctx, _, _| {
+                    ctx.submit_command(Authenticate::REQUEST);
+                }))
+                .with_spacer(theme::grid(1.0))
+                .with_child(
+                    ViewSwitcher::new(
+                        |auth: &Authentication, _| auth.result.to_owned(),
+                        |result, _, _| match result {
+                            Promise::Empty => Empty.boxed(),
+                            Promise::Deferred(_) => Label::new("Logging In...")
+                                .with_text_size(theme::TEXT_SIZE_SMALL)
+                                .boxed(),
+                            Promise::Resolved(_) => Label::new("Success.")
+                                .with_text_size(theme::TEXT_SIZE_SMALL)
+                                .boxed(),
+                            Promise::Rejected(message) => Label::new(message.to_owned())
+                                .with_text_size(theme::TEXT_SIZE_SMALL)
+                                .with_text_color(theme::RED)
+                                .boxed(),
+                        },
+                    )
+                    .lens(Preferences::auth)
+                    .lens(State::preferences),
+                ),
         );
 
     col = col.with_spacer(theme::grid(3.0));
@@ -118,7 +154,8 @@ fn general_widget() -> impl Widget<State> {
                 ("Normal (160kbit)", AudioQuality::Normal),
                 ("High (320kbit)", AudioQuality::High),
             ])
-            .lens(Config::audio_quality),
+            .lens(Config::audio_quality)
+            .lens(State::config),
         );
 
     col = col.with_spacer(theme::grid(3.0));
@@ -133,13 +170,67 @@ fn general_widget() -> impl Widget<State> {
                 ctx.submit_command(commands::CLOSE_WINDOW);
             })
             .fix_width(theme::grid(10.0))
-            .align_right(),
+            .align_right()
+            .lens(State::config),
     );
 
-    col.lens(State::config)
+    col.controller(Authenticate::new())
 }
 
-fn cache_widget() -> impl Widget<State> {
+struct Authenticate {
+    thread: Option<JoinHandle<()>>,
+}
+
+impl Authenticate {
+    fn new() -> Self {
+        Self { thread: None }
+    }
+}
+
+impl Authenticate {
+    const REQUEST: Selector = Selector::new("app.preferences.authenticate-request");
+    const RESPONSE: Selector<Result<Credentials, String>> =
+        Selector::new("app.preferences.authenticate-response");
+}
+
+impl<W: Widget<State>> Controller<State, W> for Authenticate {
+    fn event(
+        &mut self,
+        child: &mut W,
+        ctx: &mut EventCtx,
+        event: &Event,
+        data: &mut State,
+        env: &Env,
+    ) {
+        match event {
+            Event::Command(cmd) if cmd.is(Self::REQUEST) => {
+                let config = data.preferences.auth.session_config();
+                let widget_id = ctx.widget_id();
+                let event_sink = ctx.get_external_handle();
+                let thread = thread::spawn(move || {
+                    let response = Authentication::authenticate_and_get_credentials(config);
+                    event_sink
+                        .submit_command(Self::RESPONSE, response, widget_id)
+                        .unwrap();
+                });
+                self.thread.replace(thread);
+            }
+            Event::Command(cmd) if cmd.is(Self::RESPONSE) => {
+                let result = cmd.get_unchecked(Self::RESPONSE);
+                let result = result.to_owned().map(|credentials| {
+                    data.config.store_credentials(credentials.to_owned());
+                });
+                data.preferences.auth.result.resolve_or_reject(result);
+                self.thread.take();
+            }
+            _ => {
+                child.event(ctx, event, data, env);
+            }
+        }
+    }
+}
+
+fn cache_tab_widget() -> impl Widget<State> {
     let mut col = Flex::column().cross_axis_alignment(CrossAxisAlignment::Start);
 
     col = col
@@ -161,13 +252,16 @@ fn cache_widget() -> impl Widget<State> {
         .with_spacer(theme::grid(2.0))
         .with_child(Label::dynamic(
             |preferences: &Preferences, _| match preferences.cache_size {
-                None => {
+                Promise::Empty | Promise::Rejected(_) => {
                     format!("Unknown")
                 }
-                Some(0) => {
+                Promise::Deferred(_) => {
+                    format!("Computing")
+                }
+                Promise::Resolved(0) => {
                     format!("Empty")
                 }
-                Some(b) => {
+                Promise::Resolved(b) => {
                     format!("{:.2} MB", b as f64 / 1e6 as f64)
                 }
             },
@@ -188,7 +282,7 @@ impl MeasureCacheSize {
 }
 
 impl MeasureCacheSize {
-    const UPDATE_CACHE_SIZE: Selector<Option<u64>> = Selector::new("app.measure-cache-size");
+    const RESULT: Selector<Option<u64>> = Selector::new("app.preferences.measure-cache-size");
 }
 
 impl<W: Widget<Preferences>> Controller<Preferences, W> for MeasureCacheSize {
@@ -201,8 +295,9 @@ impl<W: Widget<Preferences>> Controller<Preferences, W> for MeasureCacheSize {
         env: &Env,
     ) {
         match &event {
-            Event::Command(cmd) if cmd.is(Self::UPDATE_CACHE_SIZE) => {
-                data.cache_size = cmd.get_unchecked(Self::UPDATE_CACHE_SIZE).to_owned();
+            Event::Command(cmd) if cmd.is(Self::RESULT) => {
+                let result = cmd.get_unchecked(Self::RESULT).to_owned();
+                data.cache_size.resolve_or_reject(result.ok_or(()));
                 self.thread.take();
             }
             _ => {
@@ -226,7 +321,7 @@ impl<W: Widget<Preferences>> Controller<Preferences, W> for MeasureCacheSize {
                 move || {
                     let size = Preferences::measure_cache_usage();
                     event_sink
-                        .submit_command(Self::UPDATE_CACHE_SIZE, size, widget_id)
+                        .submit_command(Self::RESULT, size, widget_id)
                         .unwrap();
                 }
             });

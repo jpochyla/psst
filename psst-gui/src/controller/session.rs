@@ -64,15 +64,11 @@ where
     ) {
         match event {
             Event::Command(cmd) if cmd.is(cmd::SESSION_CONNECT) => {
-                if let Some(config) = data.config.session() {
-                    self.start_connection_thread(
-                        data.session.clone(),
-                        config,
-                        ctx.get_external_handle(),
-                    );
-                } else {
-                    log::error!("cannot connect without configured credentials");
-                }
+                self.start_connection_thread(
+                    data.session.clone(),
+                    data.config.session(),
+                    ctx.get_external_handle(),
+                );
             }
             _ => {
                 child.event(ctx, event, data, env);
@@ -90,10 +86,10 @@ where
     ) {
         match event {
             LifeCycle::WidgetAdded => {
-                if let Some(config) = data.config.session() {
+                if data.config.has_credentials() {
                     self.start_connection_thread(
                         data.session.clone(),
-                        config,
+                        data.config.session(),
                         ctx.get_external_handle(),
                     );
                 }

@@ -42,6 +42,10 @@ impl<T: Data, D: Data, E: Data> Promise<T, D, E> {
         matches!(self, Self::Deferred(d) if d == def)
     }
 
+    pub fn clear(&mut self) {
+        *self = Self::Empty;
+    }
+
     pub fn defer(&mut self, def: D) {
         *self = Self::Deferred(def);
     }

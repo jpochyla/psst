@@ -12,7 +12,7 @@ use crate::{
 };
 use byteorder::{ReadBytesExt, BE};
 use hmac::{Hmac, Mac, NewMac};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use sha1::Sha1;
 use socks::Socks5Stream;
 use std::{
@@ -31,7 +31,9 @@ const AP_RESOLVE_ENDPOINT: &str = "http://apresolve.spotify.com";
 // Access-point used in case the resolving fails.
 const AP_FALLBACK: &str = "ap.spotify.com:443";
 
-#[derive(Clone)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(from = "SerializedCredentials")]
+#[serde(into = "SerializedCredentials")]
 pub struct Credentials {
     username: String,
     auth_data: Vec<u8>,
@@ -44,6 +46,34 @@ impl Credentials {
             username,
             auth_type: AuthenticationType::AUTHENTICATION_USER_PASS,
             auth_data: password.into_bytes(),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+struct SerializedCredentials {
+    username: String,
+    auth_data: String,
+    auth_type: i32,
+}
+
+impl From<SerializedCredentials> for Credentials {
+    fn from(value: SerializedCredentials) -> Self {
+        Self {
+            username: value.username,
+            auth_data: value.auth_data.into_bytes(),
+            auth_type: value.auth_type.into(),
+        }
+    }
+}
+
+impl From<Credentials> for SerializedCredentials {
+    fn from(value: Credentials) -> Self {
+        Self {
+            username: value.username,
+            auth_data: String::from_utf8(value.auth_data)
+                .expect("Invalid UTF-8 in serialized credentials"),
+            auth_type: value.auth_type as _,
         }
     }
 }

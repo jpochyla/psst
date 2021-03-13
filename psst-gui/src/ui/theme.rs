@@ -19,6 +19,8 @@ pub const GREY_700: Key<Color> = Key::new("app.grey_700");
 pub const BLUE_100: Key<Color> = Key::new("app.blue_100");
 pub const BLUE_200: Key<Color> = Key::new("app.blue_200");
 
+pub const RED: Key<Color> = Key::new("app.red");
+
 pub const MENU_BUTTON_BG_ACTIVE: Key<Color> = Key::new("app.menu-bg-active");
 pub const MENU_BUTTON_BG_INACTIVE: Key<Color> = Key::new("app.menu-bg-inactive");
 pub const MENU_BUTTON_FG_ACTIVE: Key<Color> = Key::new("app.menu-fg-active");
@@ -133,6 +135,8 @@ fn setup_light_theme(env: &mut Env) {
     env.set(BLUE_100, Color::rgb8(0x5c, 0xc4, 0xff));
     env.set(BLUE_200, Color::rgb8(0x00, 0x8d, 0xdd));
 
+    env.set(RED, Color::rgba8(0xEB, 0x57, 0x57, 0xFF));
+
     env.set(HOVER_HOT_COLOR, Color::rgba(0.0, 0.0, 0.0, 0.05));
     env.set(HOVER_COLD_COLOR, Color::rgba(0.0, 0.0, 0.0, 0.0));
 }
@@ -148,6 +152,8 @@ fn setup_dark_theme(env: &mut Env) {
     env.set(GREY_700, Color::grey8(0x28));
     env.set(BLUE_100, Color::rgb8(0x00, 0x8d, 0xdd));
     env.set(BLUE_200, Color::rgb8(0x5c, 0xc4, 0xff));
+
+    env.set(RED, Color::rgba8(0xEB, 0x57, 0x57, 0xFF));
 
     env.set(HOVER_HOT_COLOR, Color::rgba(1.0, 1.0, 1.0, 0.05));
     env.set(HOVER_COLD_COLOR, Color::rgba(1.0, 1.0, 1.0, 0.0));

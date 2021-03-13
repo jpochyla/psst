@@ -10,6 +10,26 @@ use psst_core::{
 use serde::{Deserialize, Serialize};
 use std::{env, fs::File, path::PathBuf};
 
+use super::Promise;
+
+#[derive(Clone, Debug, Data, Lens)]
+pub struct Preferences {
+    pub active: PreferencesTab,
+    pub cache_size: Promise<u64, (), ()>,
+    pub auth: Authentication,
+}
+
+impl Preferences {
+    pub fn reset(&mut self) {
+        self.cache_size.clear();
+        self.auth.result.clear();
+    }
+
+    pub fn measure_cache_usage() -> Option<u64> {
+        Config::cache_dir().and_then(|path| fs_extra::dir::get_size(&path).ok())
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Data)]
 pub enum PreferencesTab {
     General,
@@ -17,14 +37,29 @@ pub enum PreferencesTab {
 }
 
 #[derive(Clone, Debug, Data, Lens)]
-pub struct Preferences {
-    pub active: PreferencesTab,
-    pub cache_size: Option<u64>,
+pub struct Authentication {
+    pub username: String,
+    pub password: String,
+    pub result: Promise<(), (), String>,
 }
 
-impl Preferences {
-    pub fn measure_cache_usage() -> Option<u64> {
-        Config::cache_dir().and_then(|path| fs_extra::dir::get_size(&path).ok())
+impl Authentication {
+    pub fn session_config(&self) -> SessionConfig {
+        SessionConfig {
+            login_creds: Credentials::from_username_and_password(
+                self.username.to_owned(),
+                self.password.to_owned(),
+            ),
+            proxy_url: Config::proxy(),
+        }
+    }
+
+    pub fn authenticate_and_get_credentials(config: SessionConfig) -> Result<Credentials, String> {
+        let credentials = Session::connect(config)
+            .map_err(|err| err.to_string())?
+            .credentials()
+            .to_owned();
+        Ok(credentials)
     }
 }
 
@@ -35,8 +70,8 @@ const PROXY_ENV_VAR: &str = "SOCKS_PROXY";
 #[derive(Clone, Debug, Default, Data, Lens, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Config {
-    pub username: String,
-    pub password: String,
+    #[data(ignore)]
+    credentials: Option<Credentials>,
     pub audio_quality: AudioQuality,
     pub theme: Theme,
 }
@@ -79,17 +114,17 @@ impl Config {
     }
 
     pub fn has_credentials(&self) -> bool {
-        !self.username.is_empty() && !self.password.is_empty()
+        self.credentials.is_some()
     }
 
-    pub fn credentials(&self) -> Option<Credentials> {
-        if self.has_credentials() {
-            Some(Credentials::from_username_and_password(
-                self.username.to_owned(),
-                self.password.to_owned(),
-            ))
-        } else {
-            None
+    pub fn store_credentials(&mut self, credentials: Credentials) {
+        self.credentials.replace(credentials);
+    }
+
+    pub fn session(&self) -> SessionConfig {
+        SessionConfig {
+            login_creds: self.credentials.clone().unwrap(),
+            proxy_url: Config::proxy(),
         }
     }
 
@@ -98,13 +133,6 @@ impl Config {
             bitrate: self.audio_quality.as_bitrate(),
             ..PlaybackConfig::default()
         }
-    }
-
-    pub fn session(&self) -> Option<SessionConfig> {
-        self.credentials().map(|credentials| SessionConfig {
-            login_creds: credentials,
-            proxy_url: Self::proxy(),
-        })
     }
 
     pub fn proxy() -> Option<String> {
@@ -118,12 +146,6 @@ impl Config {
             },
             |url| Some(url),
         )
-    }
-
-    pub fn try_to_authenticate(&self) -> Option<Credentials> {
-        let config = self.session()?;
-        let session = Session::connect(config).ok()?;
-        Some(session.credentials().clone())
     }
 }
 

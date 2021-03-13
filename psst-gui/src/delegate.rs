@@ -173,11 +173,15 @@ impl AppDelegate<State> for Delegate {
     fn window_removed(
         &mut self,
         id: WindowId,
-        _data: &mut State,
+        data: &mut State,
         _env: &Env,
         _ctx: &mut DelegateCtx,
     ) {
         self.opened_windows.remove(&id);
+
+        if Some(id) == self.preferences_window {
+            data.preferences.reset();
+        }
     }
 }
 

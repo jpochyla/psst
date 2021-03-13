@@ -38,7 +38,7 @@ pub fn preferences_window() -> WindowDesc<State> {
     let mut win = WindowDesc::new(preferences_widget()).title("Preferences");
     win = win
         .set_level(WindowLevel::Modal)
-        .window_size((theme::grid(50.0), theme::grid(64.0)))
+        .window_size((theme::grid(50.0), theme::grid(69.0)))
         .resizable(false);
     if cfg!(target_os = "macos") {
         win = win.menu(menu::main_menu());
@@ -242,6 +242,7 @@ fn route_title_widget() -> impl Widget<State> {
 
 fn is_online_widget() -> impl Widget<State> {
     Either::new(
+        // TODO: Avoid the locking here.
         |state: &State, _| state.session.is_connected(),
         Empty,
         Label::new("Offline"),

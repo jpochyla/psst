@@ -13,6 +13,7 @@ crossbeam-channel = "0.5"
 hmac = "0.10"
 iset = "0.0.3"
 log = "0.4"
+miniaudio = { git = "https://github.com/jpochyla/miniaudio-rs", default-features = false, features = ["ma-log-level-error", "ma-no-flac", "ma-no-mp3", "ma-no-wav"] }
 minivorbis = { path = "../minivorbis"}
 num-bigint = { version = "0.4", features = ["rand"] }
 num-traits = "0.2"
@@ -23,7 +24,6 @@ serde_json = "1.0"
 sha-1 = "0.9"
 shannon = "0.2"
 socks = "0.3.3"
-miniaudio = { git = "https://github.com/jpochyla/miniaudio-rs", default-features = false, features = ["ma-log-level-error", "ma-no-flac", "ma-no-mp3", "ma-no-wav"] }
 tempfile = "3.2"
 ureq = { version = "2.0", features = ["json"] }
 url = "2.2"

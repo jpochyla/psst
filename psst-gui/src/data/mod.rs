@@ -13,7 +13,7 @@ mod utils;
 pub use crate::data::{
     album::{Album, AlbumDetail, AlbumLink, AlbumType, Copyright, CopyrightType},
     artist::{Artist, ArtistAlbums, ArtistDetail, ArtistLink, ArtistTracks},
-    config::{AudioQuality, Config, Preferences, PreferencesTab, Theme},
+    config::{AudioQuality, Authentication, Config, Preferences, PreferencesTab, Theme},
     ctx::Ctx,
     nav::Nav,
     playback::{
@@ -60,7 +60,12 @@ impl Default for State {
             config: Config::default(),
             preferences: Preferences {
                 active: PreferencesTab::General,
-                cache_size: None,
+                auth: Authentication {
+                    username: String::new(),
+                    password: String::new(),
+                    result: Promise::Empty,
+                },
+                cache_size: Promise::Empty,
             },
             playback: Playback {
                 state: PlaybackState::Stopped,
