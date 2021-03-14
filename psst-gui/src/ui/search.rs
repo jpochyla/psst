@@ -1,5 +1,6 @@
 use crate::{
     cmd,
+    controller::InputController,
     data::{CommonCtx, Ctx, Nav, Search, SearchResults, State},
     ui::{
         album::album_widget,
@@ -8,7 +9,7 @@ use crate::{
         track::{tracklist_widget, TrackDisplay},
         utils::{error_widget, spinner_widget},
     },
-    widget::{Async, InputController},
+    widget::Async,
 };
 use druid::{
     widget::{CrossAxisAlignment, Flex, Label, List, TextBox},

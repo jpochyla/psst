@@ -6,8 +6,8 @@ use crate::{
     widget::remote_image,
 };
 use druid::{
-    commands, im::Vector, image, AppDelegate, Application, Command, DelegateCtx, Env, ExtEventSink,
-    Handled, ImageBuf, Target, WindowId,
+    commands, im::Vector, image, AppDelegate, Application, Command, DelegateCtx, Env, Handled,
+    ImageBuf, Target, WindowId,
 };
 use lru_cache::LruCache;
 use psst_core::session::SessionHandle;
@@ -34,55 +34,6 @@ impl Delegate {
             main_window: None,
             preferences_window: None,
             opened_windows: HashSet::new(),
-        }
-    }
-
-    fn navigate_to(data: &mut State, nav: Nav, event_sink: ExtEventSink) {
-        if data.route != nav {
-            data.history.push_back(nav.clone());
-            Self::navigate(data, nav, event_sink);
-        }
-    }
-
-    fn navigate_back(data: &mut State, event_sink: ExtEventSink) {
-        data.history.pop_back();
-        Self::navigate(
-            data,
-            data.history.last().cloned().unwrap_or(Nav::Home),
-            event_sink,
-        );
-    }
-
-    fn navigate(data: &mut State, nav: Nav, event_sink: ExtEventSink) {
-        match nav {
-            Nav::Home => {
-                data.route = Nav::Home;
-            }
-            Nav::SearchResults(query) => {
-                event_sink
-                    .submit_command(cmd::GOTO_SEARCH_RESULTS, query, Target::Auto)
-                    .unwrap();
-            }
-            Nav::AlbumDetail(link) => {
-                event_sink
-                    .submit_command(cmd::GOTO_ALBUM_DETAIL, link, Target::Auto)
-                    .unwrap();
-            }
-            Nav::ArtistDetail(link) => {
-                event_sink
-                    .submit_command(cmd::GOTO_ARTIST_DETAIL, link, Target::Auto)
-                    .unwrap();
-            }
-            Nav::PlaylistDetail(link) => {
-                event_sink
-                    .submit_command(cmd::GOTO_PLAYLIST_DETAIL, link, Target::Auto)
-                    .unwrap();
-            }
-            Nav::Library => {
-                event_sink
-                    .submit_command(cmd::GOTO_LIBRARY, (), Target::Auto)
-                    .unwrap();
-            }
         }
     }
 
@@ -142,8 +93,6 @@ impl AppDelegate<State> for Delegate {
         } else if let Handled::Yes = self.command_image(ctx, target, cmd, data) {
             Handled::Yes
         } else if let Handled::Yes = self.command_playback(ctx, target, cmd, data) {
-            Handled::Yes
-        } else if let Handled::Yes = self.command_nav(ctx, target, cmd, data) {
             Handled::Yes
         } else if let Handled::Yes = self.command_playlist(ctx, target, cmd, data) {
             Handled::Yes
@@ -224,24 +173,6 @@ impl Delegate {
         }
     }
 
-    fn command_nav(
-        &mut self,
-        ctx: &mut DelegateCtx,
-        _target: Target,
-        cmd: &Command,
-        data: &mut State,
-    ) -> Handled {
-        if let Some(nav) = cmd.get(cmd::NAVIGATE_TO).cloned() {
-            Self::navigate_to(data, nav, ctx.get_external_handle());
-            Handled::Yes
-        } else if cmd.is(cmd::NAVIGATE_BACK) {
-            Self::navigate_back(data, ctx.get_external_handle());
-            Handled::Yes
-        } else {
-            Handled::No
-        }
-    }
-
     fn command_playlist(
         &mut self,
         ctx: &mut DelegateCtx,
@@ -261,10 +192,9 @@ impl Delegate {
         } else if let Some(result) = cmd.get(cmd::UPDATE_PLAYLISTS).cloned() {
             data.library_mut().playlists.resolve_or_reject(result);
             Handled::Yes
-        } else if let Some(link) = cmd.get(cmd::GOTO_PLAYLIST_DETAIL).cloned() {
+        } else if let Some(link) = cmd.get(cmd::LOAD_PLAYLIST_DETAIL).cloned() {
             let web = self.webapi.clone();
             let sink = ctx.get_external_handle();
-            data.route = Nav::PlaylistDetail(link.clone());
             data.playlist.playlist.defer(link.clone());
             data.playlist.tracks.defer(link.clone());
             self.spawn(move || {
@@ -296,8 +226,7 @@ impl Delegate {
         cmd: &Command,
         data: &mut State,
     ) -> Handled {
-        if cmd.is(cmd::GOTO_LIBRARY) {
-            data.route = Nav::Library;
+        if cmd.is(cmd::LOAD_LIBRARY) {
             if data.library.saved_albums.is_empty() || data.library.saved_albums.is_rejected() {
                 data.library_mut().saved_albums.defer_default();
                 let web = self.webapi.clone();
@@ -399,8 +328,7 @@ impl Delegate {
         cmd: &Command,
         data: &mut State,
     ) -> Handled {
-        if let Some(link) = cmd.get(cmd::GOTO_ALBUM_DETAIL).cloned() {
-            data.route = Nav::AlbumDetail(link.clone());
+        if let Some(link) = cmd.get(cmd::LOAD_ALBUM_DETAIL).cloned() {
             data.album.album.defer(link.clone());
             let web = self.webapi.clone();
             let sink = ctx.get_external_handle();
@@ -427,8 +355,7 @@ impl Delegate {
         cmd: &Command,
         data: &mut State,
     ) -> Handled {
-        if let Some(album_link) = cmd.get(cmd::GOTO_ARTIST_DETAIL) {
-            data.route = Nav::ArtistDetail(album_link.clone());
+        if let Some(album_link) = cmd.get(cmd::LOAD_ARTIST_DETAIL) {
             // Load artist detail
             data.artist.artist.defer(album_link.clone());
             let link = album_link.clone();
@@ -508,10 +435,9 @@ impl Delegate {
         cmd: &Command,
         data: &mut State,
     ) -> Handled {
-        if let Some(query) = cmd.get(cmd::GOTO_SEARCH_RESULTS).cloned() {
+        if let Some(query) = cmd.get(cmd::LOAD_SEARCH_RESULTS).cloned() {
             let web = self.webapi.clone();
             let sink = ctx.get_external_handle();
-            data.route = Nav::SearchResults(query.clone());
             data.search.results.defer(query.clone());
             self.spawn(move || {
                 let result = web.search(&query);

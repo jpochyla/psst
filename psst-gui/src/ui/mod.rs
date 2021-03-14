@@ -1,11 +1,12 @@
 use crate::{
     cmd,
-    controller::{PlaybackController, SessionController},
+    controller::{NavController, PlaybackController, SessionController},
     data::{Nav, State},
     ui::utils::Border,
     widget::{icons, Empty, HoverExt, ThemeScope, ViewDispatcher},
 };
 use druid::{
+    commands,
     widget::{CrossAxisAlignment, Either, Flex, Label, Scroll, Split, ViewSwitcher},
     Widget, WidgetExt, WindowDesc, WindowLevel,
 };
@@ -69,7 +70,14 @@ fn root_widget() -> impl Widget<State> {
         .with_child(back_button_widget())
         .with_default_spacer()
         .with_child(title_widget())
-        .with_flex_child(is_online_widget().align_right(), 1.0)
+        .with_flex_child(
+            Flex::row()
+                .with_child(is_online_widget())
+                .with_default_spacer()
+                .with_child(preferences_button_widget())
+                .align_right(),
+            1.0,
+        )
         .background(Border::Bottom.widget(theme::BACKGROUND_DARK));
 
     let main = Flex::column()
@@ -90,7 +98,8 @@ fn root_widget() -> impl Widget<State> {
 
     let controlled = themed
         .controller(PlaybackController::new())
-        .controller(SessionController::new());
+        .controller(SessionController::new())
+        .controller(NavController);
 
     controlled
     // .debug_invalidation()
@@ -238,6 +247,19 @@ fn route_title_widget() -> impl Widget<State> {
         Nav::PlaylistDetail(link) => link.name.to_string(),
     })
     .with_font(theme::UI_FONT_MEDIUM)
+}
+
+fn preferences_button_widget() -> impl Widget<State> {
+    icons::PREFERENCES
+        .scale((theme::grid(2.0), theme::grid(2.0)))
+        .with_color(theme::GREY_400)
+        .padding(theme::grid(1.0))
+        .hover()
+        .rounded(theme::BUTTON_BORDER_RADIUS)
+        .on_click(|ctx, _state, _env| {
+            ctx.submit_command(commands::SHOW_PREFERENCES);
+        })
+        .padding(theme::grid(1.0))
 }
 
 fn is_online_widget() -> impl Widget<State> {

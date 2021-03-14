@@ -201,6 +201,7 @@ where
                 } else {
                     log::warn!("loaded item not found in playback queue");
                 }
+                ctx.set_handled();
             }
             Event::Command(cmd) if cmd.is(cmd::PLAYBACK_PLAYING) => {
                 let (item, progress) = cmd.get_unchecked(cmd::PLAYBACK_PLAYING);
@@ -211,22 +212,28 @@ where
                 } else {
                     log::warn!("played item not found in playback queue");
                 }
+                ctx.set_handled();
             }
             Event::Command(cmd) if cmd.is(cmd::PLAYBACK_PROGRESS) => {
                 let progress = cmd.get_unchecked(cmd::PLAYBACK_PROGRESS);
                 data.progress_playback(progress.to_owned());
+                ctx.set_handled();
             }
             Event::Command(cmd) if cmd.is(cmd::PLAYBACK_PAUSING) => {
                 data.pause_playback();
+                ctx.set_handled();
             }
             Event::Command(cmd) if cmd.is(cmd::PLAYBACK_RESUMING) => {
                 data.resume_playback();
+                ctx.set_handled();
             }
             Event::Command(cmd) if cmd.is(cmd::PLAYBACK_BLOCKED) => {
                 data.block_playback();
+                ctx.set_handled();
             }
             Event::Command(cmd) if cmd.is(cmd::PLAYBACK_STOPPED) => {
                 data.stop_playback();
+                ctx.set_handled();
             }
             Event::Command(cmd) if cmd.is(cmd::UPDATE_AUDIO_ANALYSIS) => {
                 let (track_id, result) = cmd.get_unchecked(cmd::UPDATE_AUDIO_ANALYSIS);
@@ -235,6 +242,7 @@ where
                         current.analysis.resolve_or_reject(result.to_owned());
                     }
                 });
+                ctx.set_handled();
             }
             //
             Event::Command(cmd) if cmd.is(cmd::PLAY_TRACKS) => {
@@ -248,26 +256,33 @@ where
                     })
                     .collect();
                 self.play(&data.playback.queue, payload.position);
+                ctx.set_handled();
             }
             Event::Command(cmd) if cmd.is(cmd::PLAY_PAUSE) => {
                 self.pause();
+                ctx.set_handled();
             }
             Event::Command(cmd) if cmd.is(cmd::PLAY_RESUME) => {
                 self.resume();
+                ctx.set_handled();
             }
             Event::Command(cmd) if cmd.is(cmd::PLAY_PREVIOUS) => {
                 self.previous();
+                ctx.set_handled();
             }
             Event::Command(cmd) if cmd.is(cmd::PLAY_NEXT) => {
                 self.next();
+                ctx.set_handled();
             }
             Event::Command(cmd) if cmd.is(cmd::PLAY_STOP) => {
                 self.stop();
+                ctx.set_handled();
             }
             Event::Command(cmd) if cmd.is(cmd::PLAY_QUEUE_BEHAVIOR) => {
                 let behavior = cmd.get_unchecked(cmd::PLAY_QUEUE_BEHAVIOR);
                 data.playback.queue_behavior = behavior.to_owned();
                 self.set_queue_behavior(behavior.to_owned());
+                ctx.set_handled();
             }
             Event::Command(cmd) if cmd.is(cmd::PLAY_SEEK) => {
                 let fraction = cmd.get_unchecked(cmd::PLAY_SEEK);
@@ -276,6 +291,7 @@ where
                         Duration::from_secs_f64(current.item.duration.as_secs_f64() * fraction);
                     self.seek(position);
                 });
+                ctx.set_handled();
             }
             //
             _ => child.event(ctx, event, data, env),

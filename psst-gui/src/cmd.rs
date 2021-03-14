@@ -31,13 +31,13 @@ pub const NAVIGATE_BACK: Selector = Selector::new("app.navigate-back");
 
 // Search
 
-pub const GOTO_SEARCH_RESULTS: Selector<String> = Selector::new("app.goto-search-results");
+pub const LOAD_SEARCH_RESULTS: Selector<String> = Selector::new("app.load-search-results");
 pub const UPDATE_SEARCH_RESULTS: Selector<Result<SearchResults, Error>> =
     Selector::new("app.update-search-results");
 
 // Library
 
-pub const GOTO_LIBRARY: Selector = Selector::new("app.goto-library");
+pub const LOAD_LIBRARY: Selector = Selector::new("app.load-library");
 pub const LOAD_PLAYLISTS: Selector = Selector::new("app.load-playlists");
 pub const UPDATE_PLAYLISTS: Selector<Result<Vector<Playlist>, Error>> =
     Selector::new("app.update-playlists");
@@ -52,13 +52,13 @@ pub const UNSAVE_ALBUM: Selector<AlbumLink> = Selector::new("app.unsave-album");
 
 // Album detail
 
-pub const GOTO_ALBUM_DETAIL: Selector<AlbumLink> = Selector::new("app.goto-album-detail");
+pub const LOAD_ALBUM_DETAIL: Selector<AlbumLink> = Selector::new("app.load-album-detail");
 pub const UPDATE_ALBUM_DETAIL: Selector<(AlbumLink, Result<Album, Error>)> =
     Selector::new("app.update-album-detail");
 
 // Artist detail
 
-pub const GOTO_ARTIST_DETAIL: Selector<ArtistLink> = Selector::new("app.goto-artist-detail");
+pub const LOAD_ARTIST_DETAIL: Selector<ArtistLink> = Selector::new("app.load-artist-detail");
 pub const UPDATE_ARTIST_DETAIL: Selector<(ArtistLink, Result<Artist, Error>)> =
     Selector::new("app.update-artist-detail");
 pub const UPDATE_ARTIST_ALBUMS: Selector<(ArtistLink, Result<ArtistAlbums, Error>)> =
@@ -70,7 +70,7 @@ pub const UPDATE_ARTIST_RELATED: Selector<(ArtistLink, Result<Vector<Artist>, Er
 
 // Playlist detail
 
-pub const GOTO_PLAYLIST_DETAIL: Selector<PlaylistLink> = Selector::new("app.goto-playlist-detail");
+pub const LOAD_PLAYLIST_DETAIL: Selector<PlaylistLink> = Selector::new("app.load-playlist-detail");
 pub const UPDATE_PLAYLIST_TRACKS: Selector<(PlaylistLink, Result<Vector<Arc<Track>>, Error>)> =
     Selector::new("app.update-playlist-tracks");
 

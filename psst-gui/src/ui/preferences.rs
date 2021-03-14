@@ -2,6 +2,7 @@ use std::thread::{self, JoinHandle};
 
 use crate::{
     cmd,
+    controller::InputController,
     data::{
         AudioQuality, Authentication, Config, Preferences, PreferencesTab, Promise, State, Theme,
     },
@@ -99,6 +100,7 @@ fn general_tab_widget() -> impl Widget<State> {
         .with_child(
             TextBox::new()
                 .with_placeholder("Username")
+                .controller(InputController::new())
                 .env_scope(|env, _state| env.set(theme::WIDE_WIDGET_WIDTH, theme::grid(16.0)))
                 .lens(Authentication::username)
                 .lens(Preferences::auth)
@@ -108,6 +110,7 @@ fn general_tab_widget() -> impl Widget<State> {
         .with_child(
             TextBox::new()
                 .with_placeholder("Password")
+                .controller(InputController::new())
                 .env_scope(|env, _state| env.set(theme::WIDE_WIDGET_WIDTH, theme::grid(16.0)))
                 .lens(Authentication::password)
                 .lens(Preferences::auth)
@@ -214,6 +217,7 @@ impl<W: Widget<State>> Controller<State, W> for Authenticate {
                         .unwrap();
                 });
                 self.thread.replace(thread);
+                ctx.set_handled();
             }
             Event::Command(cmd) if cmd.is(Self::RESPONSE) => {
                 let result = cmd.get_unchecked(Self::RESPONSE);
@@ -222,6 +226,7 @@ impl<W: Widget<State>> Controller<State, W> for Authenticate {
                 });
                 data.preferences.auth.result.resolve_or_reject(result);
                 self.thread.take();
+                ctx.set_handled();
             }
             _ => {
                 child.event(ctx, event, data, env);
@@ -299,6 +304,7 @@ impl<W: Widget<Preferences>> Controller<Preferences, W> for MeasureCacheSize {
                 let result = cmd.get_unchecked(Self::RESULT).to_owned();
                 data.cache_size.resolve_or_reject(result.ok_or(()));
                 self.thread.take();
+                ctx.set_handled();
             }
             _ => {
                 child.event(ctx, event, data, env);

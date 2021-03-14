@@ -71,6 +71,7 @@ where
                     data.config.session(),
                     ctx.get_external_handle(),
                 );
+                ctx.set_handled();
             }
             _ => {
                 child.event(ctx, event, data, env);
