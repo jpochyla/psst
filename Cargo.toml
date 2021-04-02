@@ -1,5 +1,4 @@
 [workspace]
-
 members = [
     "psst-protocol",
     "psst-core",
@@ -8,3 +7,6 @@ members = [
     "minivorbis-sys",
     "minivorbis",
 ]
+
+[profile.dev]
+split-debuginfo = "unpacked"

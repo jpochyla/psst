@@ -141,7 +141,7 @@ impl StreamWriter {
 
 impl Write for StreamWriter {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        let position = self.writer.seek(SeekFrom::Current(0))?;
+        let position = self.writer.stream_position()?;
         let written = self.writer.write(buf)?;
         self.data_map.mark_as_downloaded(position, written as u64);
         Ok(written)
@@ -163,7 +163,7 @@ const PREFETCH_READ_LENGTH: u64 = 1024 * 256;
 
 impl Read for StreamReader {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        let position = self.reader.seek(SeekFrom::Current(0))?;
+        let position = self.reader.stream_position()?;
         let remaining_len = self.data_map.remaining(position);
         if remaining_len == 0 {
             return Ok(0); // We're at the end of the file.
