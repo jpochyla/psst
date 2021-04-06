@@ -563,7 +563,8 @@ pub enum PlayerEvent {
         item: PlaybackItem,
         result: Result<LoadedPlaybackItem, Error>,
     },
-    /// Next item in queue has been either successfully preloaded or failed to preload.
+    /// Next item in queue has been either successfully preloaded or failed to
+    /// preload.
     Preloaded {
         item: PlaybackItem,
         result: Result<LoadedPlaybackItem, Error>,

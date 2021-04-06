@@ -39,7 +39,7 @@ where
     }
 
     fn spawn_action(&mut self, self_id: WidgetId, event_sink: ExtEventSink, deferred: D) {
-        self.handle.replace(thread::spawn({
+        let old_handle = self.handle.replace(thread::spawn({
             let func = self.func.clone();
             move || {
                 let result = AsyncResult {
@@ -55,14 +55,17 @@ where
                     .unwrap();
             }
         }));
+        if old_handle.is_some() {
+            log::warn!("async action pending");
+        }
     }
 }
 
 impl<T, D, E, W> Controller<Promise<T, D, E>, W> for AsyncAction<T, D, E>
 where
-    T: Data,
-    D: Data + PartialEq,
-    E: Data,
+    T: Send + Data,
+    D: Send + Data + PartialEq,
+    E: Send + Data,
     W: Widget<Promise<T, D, E>>,
 {
     fn event(
@@ -81,6 +84,7 @@ where
                 if data.is_deferred(&deferred) {
                     data.resolve_or_reject(*result);
                 }
+                self.handle.take();
             }
             _ => {
                 child.event(ctx, event, data, env);
@@ -96,6 +100,15 @@ where
         data: &Promise<T, D, E>,
         env: &Env,
     ) {
+        if let LifeCycle::WidgetAdded = event {
+            if let Promise::Deferred(deferred) = data {
+                self.spawn_action(
+                    ctx.widget_id(),
+                    ctx.get_external_handle(),
+                    deferred.to_owned(),
+                );
+            }
+        }
         child.lifecycle(ctx, event, data, env)
     }
 
@@ -107,6 +120,15 @@ where
         data: &Promise<T, D, E>,
         env: &Env,
     ) {
+        if !old_data.same(data) {
+            if let Promise::Deferred(deferred) = data {
+                self.spawn_action(
+                    ctx.widget_id(),
+                    ctx.get_external_handle(),
+                    deferred.to_owned(),
+                );
+            }
+        }
         child.update(ctx, old_data, data, env)
     }
 }

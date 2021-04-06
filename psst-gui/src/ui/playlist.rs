@@ -6,7 +6,8 @@ use crate::{
         track::{tracklist_widget, TrackDisplay},
         utils::{error_widget, spinner_widget},
     },
-    widget::{Async, HoverExt},
+    webapi::WebApi,
+    widget::{Async, AsyncAction, HoverExt},
 };
 use druid::{
     widget::{Label, LineBreaking, List},
@@ -27,12 +28,13 @@ pub fn list_widget() -> impl Widget<State> {
                     .hover()
                     .on_click(|ctx, playlist, _| {
                         let nav = Nav::PlaylistDetail(playlist.link());
-                        ctx.submit_command(cmd::NAVIGATE_TO.with(nav));
+                        ctx.submit_command(cmd::NAVIGATE.with(nav));
                     })
             })
         },
         || error_widget(),
     )
+    .controller(AsyncAction::new(|_| WebApi::global().get_playlists()))
     .lens(State::library.then(Library::playlists.in_arc()))
 }
 
@@ -48,7 +50,7 @@ pub fn playlist_widget() -> impl Widget<Ctx<CommonCtx, Playlist>> {
         move |ctx, event, playlist: &mut Ctx<CommonCtx, Playlist>, _| match event.button {
             MouseButton::Left => {
                 let nav = Nav::PlaylistDetail(playlist.data.link());
-                ctx.submit_command(cmd::NAVIGATE_TO.with(nav));
+                ctx.submit_command(cmd::NAVIGATE.with(nav));
             }
             _ => {}
         },

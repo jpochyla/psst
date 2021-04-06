@@ -8,7 +8,7 @@ use crate::{
 pub struct NavController;
 
 impl NavController {
-    fn load_route(&self, ctx: &mut EventCtx, data: &mut State) {
+    fn load_route_data(&self, ctx: &mut EventCtx, data: &mut State) {
         match &data.route {
             Nav::Home => {}
             Nav::SearchResults(query) => {
@@ -43,15 +43,15 @@ where
         env: &Env,
     ) {
         match event {
-            Event::Command(cmd) if cmd.is(cmd::NAVIGATE_TO) => {
-                let nav = cmd.get_unchecked(cmd::NAVIGATE_TO);
-                data.navigate_to(nav);
-                self.load_route(ctx, data);
+            Event::Command(cmd) if cmd.is(cmd::NAVIGATE) => {
+                let nav = cmd.get_unchecked(cmd::NAVIGATE);
+                data.navigate(nav);
+                self.load_route_data(ctx, data);
                 ctx.set_handled();
             }
             Event::Command(cmd) if cmd.is(cmd::NAVIGATE_BACK) => {
                 data.navigate_back();
-                self.load_route(ctx, data);
+                self.load_route_data(ctx, data);
                 ctx.set_handled();
             }
             _ => {

@@ -2,62 +2,54 @@ use crate::{
     cmd,
     data::{Nav, State},
 };
-use druid::{commands, platform_menus, LocalizedString, MenuDesc, MenuItem, SysMods};
+use druid::{commands, platform_menus, Env, LocalizedString, Menu, MenuItem, SysMods, WindowId};
 
-pub fn main_menu() -> MenuDesc<State> {
+pub fn main_menu(_window: Option<WindowId>, _data: &State, _env: &Env) -> Menu<State> {
     #[allow(unused_mut)]
-    let mut menu = MenuDesc::empty();
+    let mut menu = Menu::empty();
     #[cfg(target_os = "macos")]
     {
-        menu = menu.append(mac_app_menu());
+        menu = menu.entry(mac_app_menu());
     }
-    menu.append(edit_menu()).append(view_menu())
+    menu.entry(edit_menu()).entry(view_menu())
 }
 
-fn mac_app_menu() -> MenuDesc<State> {
-    MenuDesc::new(LocalizedString::new("macos-menu-application-menu"))
-        .append(platform_menus::mac::application::preferences())
-        .append_separator()
-        .append(
+fn mac_app_menu() -> Menu<State> {
+    Menu::new(LocalizedString::new("macos-menu-application-menu"))
+        .entry(platform_menus::mac::application::preferences())
+        .separator()
+        .entry(
             // TODO:
             //  This is just overriding `platform_menus::mac::application::quit()`
             //  because l10n is a bit stupid now.
-            MenuItem::new(
-                LocalizedString::new("macos-menu-quit").with_placeholder("Quit Psst"),
-                commands::QUIT_APP,
-            )
-            .hotkey(SysMods::Cmd, "q"),
+            MenuItem::new(LocalizedString::new("macos-menu-quit").with_placeholder("Quit Psst"))
+                .command(commands::QUIT_APP)
+                .hotkey(SysMods::Cmd, "q"),
         )
 }
 
-fn edit_menu() -> MenuDesc<State> {
-    MenuDesc::new(LocalizedString::new("common-menu-edit-menu").with_placeholder("Edit"))
-        .append(platform_menus::common::cut())
-        .append(platform_menus::common::copy())
-        .append(platform_menus::common::paste())
+fn edit_menu() -> Menu<State> {
+    Menu::new(LocalizedString::new("common-menu-edit-menu").with_placeholder("Edit"))
+        .entry(platform_menus::common::cut())
+        .entry(platform_menus::common::copy())
+        .entry(platform_menus::common::paste())
 }
 
-fn view_menu() -> MenuDesc<State> {
-    MenuDesc::new(LocalizedString::new("menu-view-menu").with_placeholder("View"))
-        .append(
-            MenuItem::new(
-                LocalizedString::new("menu-item-home").with_placeholder("Home"),
-                cmd::NAVIGATE_TO.with(Nav::Home),
-            )
-            .hotkey(SysMods::Cmd, "1"),
+fn view_menu() -> Menu<State> {
+    Menu::new(LocalizedString::new("menu-view-menu").with_placeholder("View"))
+        .entry(
+            MenuItem::new(LocalizedString::new("menu-item-home").with_placeholder("Home"))
+                .command(cmd::NAVIGATE.with(Nav::Home))
+                .hotkey(SysMods::Cmd, "1"),
         )
-        .append(
-            MenuItem::new(
-                LocalizedString::new("menu-item-library").with_placeholder("Library"),
-                cmd::NAVIGATE_TO.with(Nav::Library),
-            )
-            .hotkey(SysMods::Cmd, "2"),
+        .entry(
+            MenuItem::new(LocalizedString::new("menu-item-library").with_placeholder("Library"))
+                .command(cmd::NAVIGATE.with(Nav::Library))
+                .hotkey(SysMods::Cmd, "2"),
         )
-        .append(
-            MenuItem::new(
-                LocalizedString::new("menu-item-search").with_placeholder("Search..."),
-                cmd::SET_FOCUS.to(cmd::WIDGET_SEARCH_INPUT),
-            )
-            .hotkey(SysMods::Cmd, "l"),
+        .entry(
+            MenuItem::new(LocalizedString::new("menu-item-search").with_placeholder("Search..."))
+                .command(cmd::SET_FOCUS.to(cmd::WIDGET_SEARCH_INPUT))
+                .hotkey(SysMods::Cmd, "l"),
         )
 }

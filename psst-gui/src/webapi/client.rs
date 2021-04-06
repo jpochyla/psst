@@ -5,6 +5,7 @@ use crate::{
     error::Error,
 };
 use druid::{im::Vector, image};
+use once_cell::sync::OnceCell;
 use psst_core::{
     access_token::TokenProvider, session::SessionHandle, util::default_ureq_agent_builder,
 };
@@ -12,24 +13,33 @@ use serde::{de::DeserializeOwned, Deserialize};
 use std::{
     fmt::Display,
     io::{self, Read},
+    path::PathBuf,
     sync::Arc,
     thread,
     time::Duration,
 };
 use ureq::{Agent, Request, Response};
 
+use super::cache::WebApiCache;
+
 pub struct WebApi {
     session: SessionHandle,
     agent: Agent,
+    cache: WebApiCache,
     token_provider: TokenProvider,
 }
 
 impl WebApi {
-    pub fn new(session: SessionHandle, proxy_url: Option<&str>) -> Self {
+    pub fn new(
+        session: SessionHandle,
+        proxy_url: Option<&str>,
+        cache_base: Option<PathBuf>,
+    ) -> Self {
         let agent = default_ureq_agent_builder(proxy_url).unwrap().build();
         Self {
             session,
             agent,
+            cache: WebApiCache::new(cache_base),
             token_provider: TokenProvider::new(),
         }
     }
@@ -68,7 +78,6 @@ impl WebApi {
             let response = f()?;
             match response.status() {
                 429 => {
-                    //
                     let retry_after_secs = response
                         .header("Retry-After")
                         .and_then(|secs| secs.parse().ok())
@@ -76,30 +85,53 @@ impl WebApi {
                     thread::sleep(Duration::from_secs(retry_after_secs));
                 }
                 _ => {
-                    //
                     break Ok(response);
                 }
             }
         }
     }
 
-    fn load<T: DeserializeOwned>(&self, request: Request) -> Result<T, Error> {
-        let response = Self::with_retry(|| {
-            let response = request.clone().call()?;
-            Ok(response)
-        })?;
-        let result = response.into_json()?;
-        Ok(result)
-    }
-
+    /// Send a request with a empty JSON object, throw away the response body.
+    /// Use for POST/PUT/DELETE requests.
     fn send_empty_json(&self, request: Request) -> Result<(), Error> {
-        Self::with_retry(|| {
-            let response = request.clone().send_string("{}")?;
-            Ok(response)
-        })?;
+        Self::with_retry(|| Ok(request.clone().send_string("{}")?))?;
         Ok(())
     }
 
+    /// Send a request and return the deserialized JSON body.  Use for GET
+    /// requests.
+    fn load<T: DeserializeOwned>(&self, request: Request) -> Result<T, Error> {
+        let result = Self::with_retry(|| Ok(request.clone().call()?))?.into_json()?;
+        Ok(result)
+    }
+
+    /// Send a request using `self.load()`, but only if it isn't already present
+    /// in cache.
+    fn load_cached<T: DeserializeOwned>(
+        &self,
+        request: Request,
+        bucket: &str,
+        key: &str,
+    ) -> Result<T, Error> {
+        if let Some(file) = self.cache.get(bucket, key) {
+            let result = serde_json::from_reader(file)?;
+            Ok(result)
+        } else {
+            let response = Self::with_retry(|| Ok(request.clone().call()?))?;
+            let body = {
+                let mut reader = response.into_reader();
+                let mut body = Vec::new();
+                reader.read_to_end(&mut body)?;
+                body
+            };
+            let result = serde_json::from_slice(&body)?;
+            self.cache.set(bucket, key, &body);
+            Ok(result)
+        }
+    }
+
+    /// Load a paginated result set by sending `request` with added pagination
+    /// parameters and return the aggregated results.  Use with GET requests.
     fn load_all_pages<T: DeserializeOwned + Clone>(
         &self,
         request: Request,
@@ -131,12 +163,28 @@ impl WebApi {
     }
 }
 
+static GLOBAL_WEBAPI: OnceCell<Arc<WebApi>> = OnceCell::new();
+
+/// Global instance.
+impl WebApi {
+    pub fn install_as_global(self) {
+        GLOBAL_WEBAPI
+            .set(Arc::new(self))
+            .map_err(|_| "Cannot install more than once")
+            .unwrap()
+    }
+
+    pub fn global() -> Arc<Self> {
+        GLOBAL_WEBAPI.get().unwrap().clone()
+    }
+}
+
 /// Artist endpoints.
 impl WebApi {
     // https://developer.spotify.com/documentation/web-api/reference/artists/get-artist/
     pub fn get_artist(&self, id: &str) -> Result<Artist, Error> {
         let request = self.get(format!("v1/artists/{}", id))?;
-        let result = self.load(request)?;
+        let result = self.load_cached(request, "artist", id)?;
         Ok(result)
     }
 
@@ -167,7 +215,7 @@ impl WebApi {
         #[derive(Deserialize)]
         struct Tracks {
             tracks: Vector<Arc<Track>>,
-        };
+        }
 
         let request = self
             .get(format!("v1/artists/{}/top-tracks", id))?
@@ -181,10 +229,10 @@ impl WebApi {
         #[derive(Deserialize)]
         struct Artists {
             artists: Vector<Artist>,
-        };
+        }
 
         let request = self.get(format!("v1/artists/{}/related-artists", id))?;
-        let result: Artists = self.load(request)?;
+        let result: Artists = self.load_cached(request, "related-artists", id)?;
         Ok(result.artists)
     }
 }
@@ -196,7 +244,7 @@ impl WebApi {
         let request = self
             .get(format!("v1/albums/{}", id))?
             .query("market", "from_token");
-        let result = self.load(request)?;
+        let result = self.load_cached(request, "album", id)?;
         Ok(result)
     }
 }
@@ -208,7 +256,7 @@ impl WebApi {
         #[derive(Clone, Deserialize)]
         struct SavedAlbum {
             album: Album,
-        };
+        }
 
         let request = self.get("v1/me/albums")?.query("market", "from_token");
 
@@ -238,7 +286,7 @@ impl WebApi {
         #[derive(Clone, Deserialize)]
         struct SavedTrack {
             track: Arc<Track>,
-        };
+        }
 
         let request = self.get("v1/me/tracks")?.query("market", "from_token");
 
@@ -328,7 +376,7 @@ impl WebApi {
     // https://developer.spotify.com/documentation/web-api/reference/tracks/get-audio-analysis/
     pub fn get_audio_analysis(&self, track_id: &str) -> Result<AudioAnalysis, Error> {
         let request = self.get(format!("v1/audio-analysis/{}", track_id))?;
-        let result = self.load(request)?;
+        let result = self.load_cached(request, "audio-analysis", track_id)?;
         Ok(result)
     }
 }

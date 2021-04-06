@@ -1,6 +1,6 @@
 use crate::{
     cmd,
-    data::{ArtistTracks, Config, Nav, PlaylistTracks, SavedTracks, State},
+    data::{ArtistTracks, PlaylistTracks, SavedTracks, State},
     ui,
     webapi::WebApi,
     widget::remote_image,
@@ -10,31 +10,36 @@ use druid::{
     ImageBuf, Target, WindowId,
 };
 use lru_cache::LruCache;
-use psst_core::session::SessionHandle;
-use std::{collections::HashSet, sync::Arc, thread};
+use std::{sync::Arc, thread};
 
 pub struct Delegate {
-    webapi: Arc<WebApi>,
     image_cache: LruCache<Arc<str>, ImageBuf>,
-    pub main_window: Option<WindowId>,
-    pub preferences_window: Option<WindowId>,
-    opened_windows: HashSet<WindowId>,
+    main_window: Option<WindowId>,
+    preferences_window: Option<WindowId>,
 }
 
 impl Delegate {
-    pub fn new(handle: SessionHandle) -> Self {
-        let webapi = Arc::new(WebApi::new(handle, Config::proxy().as_deref()));
-
+    pub fn new() -> Self {
         const IMAGE_CACHE_SIZE: usize = 256;
         let image_cache = LruCache::new(IMAGE_CACHE_SIZE);
 
         Self {
-            webapi,
             image_cache,
             main_window: None,
             preferences_window: None,
-            opened_windows: HashSet::new(),
         }
+    }
+
+    pub fn with_main(main_window: WindowId) -> Self {
+        let mut this = Self::new();
+        this.main_window.replace(main_window);
+        this
+    }
+
+    pub fn with_preferences(preferences_window: WindowId) -> Self {
+        let mut this = Self::new();
+        this.preferences_window.replace(preferences_window);
+        this
     }
 
     fn spawn<F, T>(&self, f: F)
@@ -58,33 +63,27 @@ impl AppDelegate<State> for Delegate {
         _env: &Env,
     ) -> Handled {
         if cmd.is(cmd::SHOW_MAIN) {
-            if self
-                .main_window
-                .as_ref()
-                .map(|id| self.opened_windows.contains(id))
-                .unwrap_or(false)
-            {
-                let win_id = self.main_window.unwrap();
-                ctx.submit_command(commands::SHOW_WINDOW.to(win_id));
-            } else {
-                let win = ui::main_window();
-                self.main_window.replace(win.id);
-                ctx.new_window(win);
+            match self.main_window {
+                Some(id) => {
+                    ctx.submit_command(commands::SHOW_WINDOW.to(id));
+                }
+                None => {
+                    let window = ui::main_window();
+                    self.main_window.replace(window.id);
+                    ctx.new_window(window);
+                }
             }
             Handled::Yes
         } else if cmd.is(commands::SHOW_PREFERENCES) {
-            if self
-                .preferences_window
-                .as_ref()
-                .map(|id| self.opened_windows.contains(id))
-                .unwrap_or(false)
-            {
-                let win_id = self.preferences_window.unwrap();
-                ctx.submit_command(commands::SHOW_WINDOW.to(win_id));
-            } else {
-                let win = ui::preferences_window();
-                self.preferences_window.replace(win.id);
-                ctx.new_window(win);
+            match self.preferences_window {
+                Some(id) => {
+                    ctx.submit_command(commands::SHOW_WINDOW.to(id));
+                }
+                None => {
+                    let window = ui::preferences_window();
+                    self.preferences_window.replace(window.id);
+                    ctx.new_window(window);
+                }
             }
             Handled::Yes
         } else if let Some(text) = cmd.get(cmd::COPY) {
@@ -109,16 +108,6 @@ impl AppDelegate<State> for Delegate {
         }
     }
 
-    fn window_added(
-        &mut self,
-        id: WindowId,
-        _data: &mut State,
-        _env: &Env,
-        _ctx: &mut DelegateCtx,
-    ) {
-        self.opened_windows.insert(id);
-    }
-
     fn window_removed(
         &mut self,
         id: WindowId,
@@ -126,10 +115,12 @@ impl AppDelegate<State> for Delegate {
         _env: &Env,
         _ctx: &mut DelegateCtx,
     ) {
-        self.opened_windows.remove(&id);
-
-        if Some(id) == self.preferences_window {
+        if self.preferences_window == Some(id) {
+            self.preferences_window.take();
             data.preferences.reset();
+        }
+        if self.main_window == Some(id) {
+            self.main_window.take();
         }
     }
 }
@@ -152,9 +143,10 @@ impl Delegate {
                 sink.submit_command(remote_image::PROVIDE_DATA, payload, target)
                     .unwrap();
             } else {
-                let web = self.webapi.clone();
                 self.spawn(move || {
-                    let dyn_image = web.get_image(&location, image::ImageFormat::Jpeg).unwrap();
+                    let dyn_image = WebApi::global()
+                        .get_image(&location, image::ImageFormat::Jpeg)
+                        .unwrap();
                     let image_buf = ImageBuf::from_dynamic_image(dyn_image);
                     let payload = remote_image::ImagePayload {
                         location,
@@ -181,24 +173,14 @@ impl Delegate {
         data: &mut State,
     ) -> Handled {
         if cmd.is(cmd::SESSION_CONNECTED) || cmd.is(cmd::LOAD_PLAYLISTS) {
-            let web = self.webapi.clone();
-            let sink = ctx.get_external_handle();
             data.library_mut().playlists.defer_default();
-            self.spawn(move || {
-                sink.submit_command(cmd::UPDATE_PLAYLISTS, web.get_playlists(), Target::Auto)
-                    .unwrap();
-            });
-            Handled::Yes
-        } else if let Some(result) = cmd.get(cmd::UPDATE_PLAYLISTS).cloned() {
-            data.library_mut().playlists.resolve_or_reject(result);
             Handled::Yes
         } else if let Some(link) = cmd.get(cmd::LOAD_PLAYLIST_DETAIL).cloned() {
-            let web = self.webapi.clone();
             let sink = ctx.get_external_handle();
             data.playlist.playlist.defer(link.clone());
             data.playlist.tracks.defer(link.clone());
             self.spawn(move || {
-                let result = web.get_playlist_tracks(&link.id);
+                let result = WebApi::global().get_playlist_tracks(&link.id);
                 sink.submit_command(cmd::UPDATE_PLAYLIST_TRACKS, (link, result), Target::Auto)
                     .unwrap();
             });
@@ -229,20 +211,18 @@ impl Delegate {
         if cmd.is(cmd::LOAD_LIBRARY) {
             if data.library.saved_albums.is_empty() || data.library.saved_albums.is_rejected() {
                 data.library_mut().saved_albums.defer_default();
-                let web = self.webapi.clone();
                 let sink = ctx.get_external_handle();
                 self.spawn(move || {
-                    let result = web.get_saved_albums();
+                    let result = WebApi::global().get_saved_albums();
                     sink.submit_command(cmd::UPDATE_SAVED_ALBUMS, result, Target::Auto)
                         .unwrap();
                 });
             }
             if data.library.saved_tracks.is_empty() || data.library.saved_tracks.is_rejected() {
                 data.library_mut().saved_tracks.defer_default();
-                let web = self.webapi.clone();
                 let sink = ctx.get_external_handle();
                 self.spawn(move || {
-                    let result = web.get_saved_tracks();
+                    let result = WebApi::global().get_saved_tracks();
                     sink.submit_command(cmd::UPDATE_SAVED_TRACKS, result, Target::Auto)
                         .unwrap();
                 });
@@ -275,42 +255,38 @@ impl Delegate {
             };
             Handled::Yes
         } else if let Some(track) = cmd.get(cmd::SAVE_TRACK).cloned() {
-            let web = self.webapi.clone();
             let track_id = track.id.to_base62();
             data.save_track(track);
             self.spawn(move || {
-                let result = web.save_track(&track_id);
+                let result = WebApi::global().save_track(&track_id);
                 if result.is_err() {
                     // TODO: Refresh saved tracks.
                 }
             });
             Handled::Yes
         } else if let Some(track_id) = cmd.get(cmd::UNSAVE_TRACK).cloned() {
-            let web = self.webapi.clone();
             data.unsave_track(&track_id);
             self.spawn(move || {
-                let result = web.unsave_track(&track_id.to_base62());
+                let result = WebApi::global().unsave_track(&track_id.to_base62());
                 if result.is_err() {
                     // TODO: Refresh saved tracks.
                 }
             });
             Handled::Yes
         } else if let Some(album) = cmd.get(cmd::SAVE_ALBUM).cloned() {
-            let web = self.webapi.clone();
             let album_id = album.id.clone();
             data.save_album(album);
             self.spawn(move || {
-                let result = web.save_album(&album_id);
+                let result = WebApi::global().save_album(&album_id);
                 if result.is_err() {
                     // TODO: Refresh saved albums.
                 }
             });
             Handled::Yes
         } else if let Some(link) = cmd.get(cmd::UNSAVE_ALBUM).cloned() {
-            let web = self.webapi.clone();
             data.unsave_album(&link.id);
             self.spawn(move || {
-                let result = web.unsave_album(&link.id);
+                let result = WebApi::global().unsave_album(&link.id);
                 if result.is_err() {
                     // TODO: Refresh saved albums.
                 }
@@ -330,10 +306,9 @@ impl Delegate {
     ) -> Handled {
         if let Some(link) = cmd.get(cmd::LOAD_ALBUM_DETAIL).cloned() {
             data.album.album.defer(link.clone());
-            let web = self.webapi.clone();
             let sink = ctx.get_external_handle();
             self.spawn(move || {
-                let result = web.get_album(&link.id);
+                let result = WebApi::global().get_album(&link.id);
                 sink.submit_command(cmd::UPDATE_ALBUM_DETAIL, (link, result), Target::Auto)
                     .unwrap();
             });
@@ -359,40 +334,36 @@ impl Delegate {
             // Load artist detail
             data.artist.artist.defer(album_link.clone());
             let link = album_link.clone();
-            let web = self.webapi.clone();
             let sink = ctx.get_external_handle();
             self.spawn(move || {
-                let result = web.get_artist(&link.id);
+                let result = WebApi::global().get_artist(&link.id);
                 sink.submit_command(cmd::UPDATE_ARTIST_DETAIL, (link, result), Target::Auto)
                     .unwrap();
             });
             // Load artist top tracks
             data.artist.top_tracks.defer(album_link.clone());
             let link = album_link.clone();
-            let web = self.webapi.clone();
             let sink = ctx.get_external_handle();
             self.spawn(move || {
-                let result = web.get_artist_top_tracks(&link.id);
+                let result = WebApi::global().get_artist_top_tracks(&link.id);
                 sink.submit_command(cmd::UPDATE_ARTIST_TOP_TRACKS, (link, result), Target::Auto)
                     .unwrap();
             });
             // Load artist's related artists
             data.artist.related_artists.defer(album_link.clone());
             let link = album_link.clone();
-            let web = self.webapi.clone();
             let sink = ctx.get_external_handle();
             self.spawn(move || {
-                let result = web.get_related_artists(&link.id);
+                let result = WebApi::global().get_related_artists(&link.id);
                 sink.submit_command(cmd::UPDATE_ARTIST_RELATED, (link, result), Target::Auto)
                     .unwrap();
             });
             // Load artist albums
             data.artist.albums.defer(album_link.clone());
             let link = album_link.clone();
-            let web = self.webapi.clone();
             let sink = ctx.get_external_handle();
             self.spawn(move || {
-                let result = web.get_artist_albums(&link.id);
+                let result = WebApi::global().get_artist_albums(&link.id);
                 sink.submit_command(cmd::UPDATE_ARTIST_ALBUMS, (link, result), Target::Auto)
                     .unwrap();
             });
@@ -436,11 +407,10 @@ impl Delegate {
         data: &mut State,
     ) -> Handled {
         if let Some(query) = cmd.get(cmd::LOAD_SEARCH_RESULTS).cloned() {
-            let web = self.webapi.clone();
             let sink = ctx.get_external_handle();
             data.search.results.defer(query.clone());
             self.spawn(move || {
-                let result = web.search(&query);
+                let result = WebApi::global().search(&query);
                 sink.submit_command(cmd::UPDATE_SEARCH_RESULTS, result, Target::Auto)
                     .unwrap();
             });
@@ -461,16 +431,15 @@ impl Delegate {
         data: &mut State,
     ) -> Handled {
         if cmd.is(cmd::PLAYBACK_PLAYING) {
-            let (item, progress) = cmd.get_unchecked(cmd::PLAYBACK_PLAYING);
+            let (item, _progress) = cmd.get_unchecked(cmd::PLAYBACK_PLAYING);
 
             data.playback.current.as_mut().map(|current| {
                 current.analysis.defer(item.clone());
             });
             let item = item.clone();
-            let web = self.webapi.clone();
             let sink = ctx.get_external_handle();
             self.spawn(move || {
-                let result = web.get_audio_analysis(&item.to_base62());
+                let result = WebApi::global().get_audio_analysis(&item.to_base62());
                 sink.submit_command(cmd::UPDATE_AUDIO_ANALYSIS, (item, result), Target::Auto)
                     .unwrap();
             });

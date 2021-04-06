@@ -1,5 +1,3 @@
-#![recursion_limit = "256"]
-
 mod cmd;
 mod controller;
 mod data;
@@ -15,6 +13,7 @@ use crate::{
 };
 use druid::AppLauncher;
 use env_logger::{Builder, Env};
+use webapi::WebApi;
 
 const ENV_LOG: &str = "PSST_LOG";
 const ENV_LOG_STYLE: &str = "PSST_LOG_STYLE";
@@ -33,20 +32,26 @@ fn main() {
         config: Config::load().unwrap_or_default(),
         ..State::default()
     };
-    let mut delegate = Delegate::new(state.session.clone());
 
-    let launcher = if state.config.has_credentials() {
+    WebApi::new(
+        state.session.clone(),
+        Config::proxy().as_deref(),
+        Config::cache_dir(),
+    )
+    .install_as_global();
+
+    let delegate;
+    let launcher;
+    if state.config.has_credentials() {
         // Credentials are configured, open the main window.
         let window = ui::main_window();
-        delegate.main_window.replace(window.id);
-        let launcher = AppLauncher::with_window(window).configure_env(ui::theme::setup);
-        launcher
+        delegate = Delegate::with_main(window.id);
+        launcher = AppLauncher::with_window(window).configure_env(ui::theme::setup);
     } else {
         // No configured credentials, open the preferences.
         let window = ui::preferences_window();
-        delegate.preferences_window.replace(window.id);
-        let launcher = AppLauncher::with_window(window).configure_env(ui::theme::setup);
-        launcher
+        delegate = Delegate::with_preferences(window.id);
+        launcher = AppLauncher::with_window(window).configure_env(ui::theme::setup);
     };
 
     launcher

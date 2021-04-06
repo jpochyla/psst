@@ -15,7 +15,7 @@ pub use ex_click::ExClick;
 pub use hover::{Hover, HoverExt};
 pub use icons::Icon;
 pub use maybe::Maybe;
-pub use promise::Async;
+pub use promise::{Async, AsyncAction};
 pub use remote_image::RemoteImage;
 pub use theme::ThemeScope;
 pub use utils::{Clip, Logger};

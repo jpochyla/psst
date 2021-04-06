@@ -105,19 +105,19 @@ impl Default for State {
 }
 
 impl State {
-    pub fn navigate_to(&mut self, nav: &Nav) {
+    pub fn navigate(&mut self, nav: &Nav) {
         if self.route != *nav {
             self.history.push_back(nav.to_owned());
-            self.change_route(nav.to_owned());
+            self.set_route(nav.to_owned());
         }
     }
 
     pub fn navigate_back(&mut self) {
         self.history.pop_back();
-        self.change_route(self.history.last().cloned().unwrap_or(Nav::Home));
+        self.set_route(self.history.last().cloned().unwrap_or(Nav::Home));
     }
 
-    fn change_route(&mut self, nav: Nav) {
+    fn set_route(&mut self, nav: Nav) {
         self.route = nav;
     }
 }

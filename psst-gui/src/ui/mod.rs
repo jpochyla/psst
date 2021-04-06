@@ -30,7 +30,7 @@ pub fn main_window() -> WindowDesc<State> {
         .with_min_size((theme::grid(25.0), theme::grid(25.0)))
         .window_size((theme::grid(100.0), theme::grid(100.0)));
     if cfg!(target_os = "macos") {
-        win = win.menu(menu::main_menu());
+        win = win.menu(menu::main_menu);
     }
     win
 }
@@ -42,7 +42,7 @@ pub fn preferences_window() -> WindowDesc<State> {
         .window_size((theme::grid(50.0), theme::grid(69.0)))
         .resizable(false);
     if cfg!(target_os = "macos") {
-        win = win.menu(menu::main_menu());
+        win = win.menu(menu::main_menu);
     }
     win
 }
@@ -150,7 +150,7 @@ fn menu_item_widget(title: &str, nav: Nav) -> impl Widget<State> {
             }
         })
         .on_click(move |ctx, _, _| {
-            ctx.submit_command(cmd::NAVIGATE_TO.with(nav.clone()));
+            ctx.submit_command(cmd::NAVIGATE.with(nav.clone()));
         })
 }
 

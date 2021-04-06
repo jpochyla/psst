@@ -69,7 +69,7 @@ pub fn setup(env: &mut Env, state: &State) {
     env.set(BORDER_LIGHT, env.get(GREY_400));
     env.set(BORDER_DARK, env.get(GREY_500));
 
-    env.set(SELECTION_COLOR, env.get(BLUE_200));
+    env.set(SELECTED_TEXT_BACKGROUND_COLOR, env.get(BLUE_200));
     env.set(SELECTION_TEXT_COLOR, env.get(GREY_700));
 
     env.set(CURSOR_COLOR, env.get(GREY_000));

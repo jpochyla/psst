@@ -1,7 +1,7 @@
 use crate::{
     data::{
         Album, AlbumLink, Artist, ArtistAlbums, ArtistLink, AudioAnalysis, Nav, PlaybackPayload,
-        Playlist, PlaylistLink, QueueBehavior, SearchResults, Track, TrackId,
+        PlaylistLink, QueueBehavior, SearchResults, Track, TrackId,
     },
     error::Error,
 };
@@ -26,7 +26,7 @@ pub const SESSION_DISCONNECTED: Selector = Selector::new("app.session-disconnect
 
 // Navigation
 
-pub const NAVIGATE_TO: Selector<Nav> = Selector::new("app.navigate-to");
+pub const NAVIGATE: Selector<Nav> = Selector::new("app.navigates");
 pub const NAVIGATE_BACK: Selector = Selector::new("app.navigate-back");
 
 // Search
@@ -39,8 +39,6 @@ pub const UPDATE_SEARCH_RESULTS: Selector<Result<SearchResults, Error>> =
 
 pub const LOAD_LIBRARY: Selector = Selector::new("app.load-library");
 pub const LOAD_PLAYLISTS: Selector = Selector::new("app.load-playlists");
-pub const UPDATE_PLAYLISTS: Selector<Result<Vector<Playlist>, Error>> =
-    Selector::new("app.update-playlists");
 pub const UPDATE_SAVED_ALBUMS: Selector<Result<Vector<Album>, Error>> =
     Selector::new("app.update-saved-albums");
 pub const UPDATE_SAVED_TRACKS: Selector<Result<Vector<Arc<Track>>, Error>> =

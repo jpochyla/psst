@@ -62,7 +62,7 @@ pub fn artist_widget() -> impl Widget<Artist> {
         .with_flex_child(artist_label, 1.);
     artist.hover().on_click(|ctx, artist, _| {
         let nav = Nav::ArtistDetail(artist.link());
-        ctx.submit_command(cmd::NAVIGATE_TO.with(nav));
+        ctx.submit_command(cmd::NAVIGATE.with(nav));
     })
 }
 

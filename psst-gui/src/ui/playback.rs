@@ -79,7 +79,7 @@ fn current_playback_info_widget() -> impl Widget<CurrentPlayback> {
         .hover()
         .on_ex_click(|ctx, _event, current: &mut CurrentPlayback, _| {
             let nav = current.origin.as_nav();
-            ctx.submit_command(cmd::NAVIGATE_TO.with(nav));
+            ctx.submit_command(cmd::NAVIGATE.with(nav));
         })
 }
 

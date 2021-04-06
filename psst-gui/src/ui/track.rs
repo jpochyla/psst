@@ -15,8 +15,8 @@ use druid::{
     widget::{
         Controller, ControllerHost, CrossAxisAlignment, Flex, Label, List, ListIter, Painter,
     },
-    ContextMenu, Data, Env, Event, EventCtx, Lens, LensExt, LocalizedString, MenuDesc, MenuItem,
-    MouseButton, RenderContext, Widget, WidgetExt,
+    Data, Env, Event, EventCtx, Lens, LensExt, LocalizedString, Menu, MenuItem, MouseButton,
+    RenderContext, Widget, WidgetExt,
 };
 use std::sync::Arc;
 
@@ -231,20 +231,16 @@ fn track_widget(display: TrackDisplay) -> impl Widget<TrackRow> {
         minor.add_child(track_album);
     }
 
-    let line_style = StrokeStyle {
-        line_join: None,
-        line_cap: None,
-        dash: Some((vec![1.0, 2.0], 0.0)),
-        miter_limit: None,
-    };
     let line_painter = Painter::new(move |ctx, is_playing: &bool, env| {
+        const STYLE: StrokeStyle = StrokeStyle::new().dash_pattern(&[1.0, 2.0]);
+
         let line = Line::new((0.0, 0.0), (ctx.size().width, 0.0));
         let color = if *is_playing {
             env.get(theme::GREY_200)
         } else {
             env.get(theme::GREY_500)
         };
-        ctx.stroke_styled(line, &color, 1.0, &line_style);
+        ctx.stroke_styled(line, &color, 1.0, &STYLE);
     })
     .lens(TrackRow::is_playing())
     .fix_height(1.0);
@@ -283,8 +279,7 @@ fn track_widget(display: TrackDisplay) -> impl Widget<TrackRow> {
                 ctx.submit_notification(cmd::PLAY_TRACK_AT.with(tr.position));
             }
             MouseButton::Right => {
-                let menu = track_menu(tr);
-                ctx.show_context_menu(ContextMenu::new(menu, event.window_pos));
+                ctx.show_context_menu(track_menu(tr), event.window_pos);
                 ctx.set_active(true);
             }
             _ => {}
@@ -308,8 +303,8 @@ fn popularity_stars(popularity: u32) -> String {
     stars
 }
 
-fn track_menu(tr: &TrackRow) -> MenuDesc<State> {
-    let mut menu = MenuDesc::empty();
+fn track_menu(tr: &TrackRow) -> Menu<State> {
+    let mut menu = Menu::empty();
 
     for artist_link in &tr.track.artists {
         let more_than_one_artist = tr.track.artists.len() > 1;
@@ -319,37 +314,44 @@ fn track_menu(tr: &TrackRow) -> MenuDesc<State> {
         } else {
             LocalizedString::new("menu-item-show-artist").with_placeholder("Go To Artist")
         };
-        menu = menu.append(MenuItem::new(
-            title,
-            cmd::NAVIGATE_TO.with(Nav::ArtistDetail(artist_link.to_owned())),
-        ));
+        menu = menu.entry(
+            MenuItem::new(title)
+                .command(cmd::NAVIGATE.with(Nav::ArtistDetail(artist_link.to_owned()))),
+        );
     }
 
     if let Some(album_link) = tr.track.album.as_ref() {
-        menu = menu.append(MenuItem::new(
-            LocalizedString::new("menu-item-show-album").with_placeholder("Go To Album"),
-            cmd::NAVIGATE_TO.with(Nav::AlbumDetail(album_link.to_owned())),
-        ))
+        menu = menu.entry(
+            MenuItem::new(
+                LocalizedString::new("menu-item-show-album").with_placeholder("Go To Album"),
+            )
+            .command(cmd::NAVIGATE.with(Nav::AlbumDetail(album_link.to_owned()))),
+        )
     }
 
-    menu = menu.append(MenuItem::new(
-        LocalizedString::new("menu-item-copy-link").with_placeholder("Copy Link"),
-        cmd::COPY.with(tr.track.url()),
-    ));
+    menu = menu.entry(
+        MenuItem::new(LocalizedString::new("menu-item-copy-link").with_placeholder("Copy Link"))
+            .command(cmd::COPY.with(tr.track.url())),
+    );
 
-    menu = menu.append_separator();
+    menu = menu.separator();
 
     if tr.ctx.is_track_saved(&tr.track) {
-        menu = menu.append(MenuItem::new(
-            LocalizedString::new("menu-item-remove-from-library")
-                .with_placeholder("Remove from Library"),
-            cmd::UNSAVE_TRACK.with(tr.track.id.clone()),
-        ));
+        menu = menu.entry(
+            MenuItem::new(
+                LocalizedString::new("menu-item-remove-from-library")
+                    .with_placeholder("Remove from Library"),
+            )
+            .command(cmd::UNSAVE_TRACK.with(tr.track.id.clone())),
+        );
     } else {
-        menu = menu.append(MenuItem::new(
-            LocalizedString::new("menu-item-save-to-library").with_placeholder("Save to Library"),
-            cmd::SAVE_TRACK.with(tr.track.clone()),
-        ));
+        menu = menu.entry(
+            MenuItem::new(
+                LocalizedString::new("menu-item-save-to-library")
+                    .with_placeholder("Save to Library"),
+            )
+            .command(cmd::SAVE_TRACK.with(tr.track.clone())),
+        );
     }
 
     menu

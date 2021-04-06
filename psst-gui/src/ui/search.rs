@@ -23,7 +23,7 @@ pub fn input_widget() -> impl Widget<State> {
         .with_placeholder("Search")
         .controller(InputController::new().on_submit(|ctx, query, _env| {
             let nav = Nav::SearchResults(query.clone());
-            ctx.submit_command(cmd::NAVIGATE_TO.with(nav));
+            ctx.submit_command(cmd::NAVIGATE.with(nav));
         }))
         .with_id(cmd::WIDGET_SEARCH_INPUT)
         .expand_width()

@@ -10,8 +10,7 @@ use crate::{
 };
 use druid::{
     widget::{CrossAxisAlignment, Flex, Label, LineBreaking, List},
-    ContextMenu, LensExt, LocalizedString, MenuDesc, MenuItem, MouseButton, Size, Widget,
-    WidgetExt,
+    LensExt, LocalizedString, Menu, MenuItem, MouseButton, Size, Widget, WidgetExt,
 };
 
 pub fn detail_widget() -> impl Widget<State> {
@@ -40,7 +39,7 @@ fn loaded_detail_widget() -> impl Widget<Ctx<CommonCtx, Album>> {
             .lens(ArtistLink::name)
             .on_click(|ctx, artist_link: &mut ArtistLink, _| {
                 let nav = Nav::ArtistDetail(artist_link.to_owned());
-                ctx.submit_command(cmd::NAVIGATE_TO.with(nav));
+                ctx.submit_command(cmd::NAVIGATE.with(nav));
             })
     })
     .lens(Album::artists);
@@ -144,19 +143,18 @@ pub fn album_widget() -> impl Widget<Ctx<CommonCtx, Album>> {
             move |ctx, event, album: &mut Ctx<CommonCtx, Album>, _| match event.button {
                 MouseButton::Left => {
                     let nav = Nav::AlbumDetail(album.data.link());
-                    ctx.submit_command(cmd::NAVIGATE_TO.with(nav));
+                    ctx.submit_command(cmd::NAVIGATE.with(nav));
                 }
                 MouseButton::Right => {
-                    let menu = album_menu(&album);
-                    ctx.show_context_menu(ContextMenu::new(menu, event.window_pos));
+                    ctx.show_context_menu(album_menu(&album), event.window_pos);
                 }
                 _ => {}
             },
         )
 }
 
-fn album_menu(album: &Ctx<CommonCtx, Album>) -> MenuDesc<State> {
-    let mut menu = MenuDesc::empty();
+fn album_menu(album: &Ctx<CommonCtx, Album>) -> Menu<State> {
+    let mut menu = Menu::empty();
 
     for artist_link in &album.data.artists {
         let more_than_one_artist = album.data.artists.len() > 1;
@@ -166,30 +164,35 @@ fn album_menu(album: &Ctx<CommonCtx, Album>) -> MenuDesc<State> {
         } else {
             LocalizedString::new("menu-item-show-artist").with_placeholder("Go To Artist")
         };
-        menu = menu.append(MenuItem::new(
-            title,
-            cmd::NAVIGATE_TO.with(Nav::ArtistDetail(artist_link.to_owned())),
-        ));
+        menu = menu.entry(
+            MenuItem::new(title)
+                .command(cmd::NAVIGATE.with(Nav::ArtistDetail(artist_link.to_owned()))),
+        );
     }
 
-    menu = menu.append(MenuItem::new(
-        LocalizedString::new("menu-item-copy-link").with_placeholder("Copy Link"),
-        cmd::COPY.with(album.data.url()),
-    ));
+    menu = menu.entry(
+        MenuItem::new(LocalizedString::new("menu-item-copy-link").with_placeholder("Copy Link"))
+            .command(cmd::COPY.with(album.data.url())),
+    );
 
-    menu = menu.append_separator();
+    menu = menu.separator();
 
     if album.ctx.is_album_saved(&album.data) {
-        menu = menu.append(MenuItem::new(
-            LocalizedString::new("menu-item-remove-from-library")
-                .with_placeholder("Remove from Library"),
-            cmd::UNSAVE_ALBUM.with(album.data.link()),
-        ));
+        menu = menu.entry(
+            MenuItem::new(
+                LocalizedString::new("menu-item-remove-from-library")
+                    .with_placeholder("Remove from Library"),
+            )
+            .command(cmd::UNSAVE_ALBUM.with(album.data.link())),
+        );
     } else {
-        menu = menu.append(MenuItem::new(
-            LocalizedString::new("menu-item-save-to-library").with_placeholder("Save to Library"),
-            cmd::SAVE_ALBUM.with(album.data.clone()),
-        ));
+        menu = menu.entry(
+            MenuItem::new(
+                LocalizedString::new("menu-item-save-to-library")
+                    .with_placeholder("Save to Library"),
+            )
+            .command(cmd::SAVE_ALBUM.with(album.data.clone())),
+        );
     }
 
     menu
