@@ -7,35 +7,9 @@ use crate::{
     },
     widget::Async,
 };
-use druid::{
-    widget::{CrossAxisAlignment, Flex, List},
-    LensExt, Widget, WidgetExt,
-};
+use druid::{widget::List, LensExt, Widget, WidgetExt};
 
-pub fn detail_widget() -> impl Widget<State> {
-    Flex::row()
-        .must_fill_main_axis(true)
-        .cross_axis_alignment(CrossAxisAlignment::Start)
-        .with_flex_child(saved_albums_widget(), 1.0)
-        .with_flex_child(saved_tracks_widget(), 1.0)
-}
-
-fn saved_albums_widget() -> impl Widget<State> {
-    Async::new(
-        || spinner_widget(),
-        || List::new(album_widget),
-        || error_widget().lens(Ctx::data()),
-    )
-    .lens(
-        Ctx::make(
-            State::common_ctx,
-            State::library.then(Library::saved_albums.in_arc()),
-        )
-        .then(Ctx::in_promise()),
-    )
-}
-
-fn saved_tracks_widget() -> impl Widget<State> {
+pub fn saved_tracks_widget() -> impl Widget<State> {
     Async::new(
         || spinner_widget(),
         || {
@@ -52,6 +26,21 @@ fn saved_tracks_widget() -> impl Widget<State> {
         Ctx::make(
             State::common_ctx,
             State::library.then(Library::saved_tracks.in_arc()),
+        )
+        .then(Ctx::in_promise()),
+    )
+}
+
+pub fn saved_albums_widget() -> impl Widget<State> {
+    Async::new(
+        || spinner_widget(),
+        || List::new(album_widget),
+        || error_widget().lens(Ctx::data()),
+    )
+    .lens(
+        Ctx::make(
+            State::common_ctx,
+            State::library.then(Library::saved_albums.in_arc()),
         )
         .then(Ctx::in_promise()),
     )

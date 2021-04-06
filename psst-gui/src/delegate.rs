@@ -208,16 +208,7 @@ impl Delegate {
         cmd: &Command,
         data: &mut State,
     ) -> Handled {
-        if cmd.is(cmd::LOAD_LIBRARY) {
-            if data.library.saved_albums.is_empty() || data.library.saved_albums.is_rejected() {
-                data.library_mut().saved_albums.defer_default();
-                let sink = ctx.get_external_handle();
-                self.spawn(move || {
-                    let result = WebApi::global().get_saved_albums();
-                    sink.submit_command(cmd::UPDATE_SAVED_ALBUMS, result, Target::Auto)
-                        .unwrap();
-                });
-            }
+        if cmd.is(cmd::LOAD_SAVED_TRACKS) {
             if data.library.saved_tracks.is_empty() || data.library.saved_tracks.is_rejected() {
                 data.library_mut().saved_tracks.defer_default();
                 let sink = ctx.get_external_handle();
@@ -228,17 +219,16 @@ impl Delegate {
                 });
             }
             Handled::Yes
-        } else if let Some(result) = cmd.get(cmd::UPDATE_SAVED_ALBUMS).cloned() {
-            match result {
-                Ok(albums) => {
-                    data.common_ctx.set_saved_albums(&albums);
-                    data.library_mut().saved_albums.resolve(albums);
-                }
-                Err(err) => {
-                    data.common_ctx.set_saved_albums(&Vector::new());
-                    data.library_mut().saved_albums.reject(err);
-                }
-            };
+        } else if cmd.is(cmd::LOAD_SAVED_ALBUMS) {
+            if data.library.saved_albums.is_empty() || data.library.saved_albums.is_rejected() {
+                data.library_mut().saved_albums.defer_default();
+                let sink = ctx.get_external_handle();
+                self.spawn(move || {
+                    let result = WebApi::global().get_saved_albums();
+                    sink.submit_command(cmd::UPDATE_SAVED_ALBUMS, result, Target::Auto)
+                        .unwrap();
+                });
+            }
             Handled::Yes
         } else if let Some(result) = cmd.get(cmd::UPDATE_SAVED_TRACKS).cloned() {
             match result {
@@ -251,6 +241,18 @@ impl Delegate {
                 Err(err) => {
                     data.common_ctx.set_saved_tracks(&Vector::new());
                     data.library_mut().saved_tracks.reject(err);
+                }
+            };
+            Handled::Yes
+        } else if let Some(result) = cmd.get(cmd::UPDATE_SAVED_ALBUMS).cloned() {
+            match result {
+                Ok(albums) => {
+                    data.common_ctx.set_saved_albums(&albums);
+                    data.library_mut().saved_albums.resolve(albums);
+                }
+                Err(err) => {
+                    data.common_ctx.set_saved_albums(&Vector::new());
+                    data.library_mut().saved_albums.reject(err);
                 }
             };
             Handled::Yes
@@ -433,7 +435,7 @@ impl Delegate {
         if cmd.is(cmd::PLAYBACK_PLAYING) {
             let (item, _progress) = cmd.get_unchecked(cmd::PLAYBACK_PLAYING);
 
-            data.playback.current.as_mut().map(|current| {
+            data.playback.now_playing.as_mut().map(|current| {
                 current.analysis.defer(item.clone());
             });
             let item = item.clone();

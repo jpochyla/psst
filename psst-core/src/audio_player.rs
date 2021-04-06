@@ -257,6 +257,7 @@ impl Player {
             PlayerCommand::Preload { item } => self.preload(item),
             PlayerCommand::Pause => self.pause(),
             PlayerCommand::Resume => self.resume(),
+            PlayerCommand::PauseOrResume => self.pause_or_resume(),
             PlayerCommand::Previous => self.previous(),
             PlayerCommand::Next => self.next(),
             PlayerCommand::Stop => self.stop(),
@@ -464,6 +465,16 @@ impl Player {
         }
     }
 
+    fn pause_or_resume(&mut self) {
+        match &self.state {
+            PlayerState::Playing { .. } => self.pause(),
+            PlayerState::Paused { .. } => self.resume(),
+            _ => {
+                // Do nothing.
+            }
+        }
+    }
+
     fn previous(&mut self) {
         if self.is_near_playback_start() {
             self.queue.skip_to_previous();
@@ -537,6 +548,7 @@ pub enum PlayerCommand {
     },
     Pause,
     Resume,
+    PauseOrResume,
     Previous,
     Next,
     Stop,

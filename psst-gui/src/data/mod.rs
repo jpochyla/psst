@@ -17,7 +17,7 @@ pub use crate::data::{
     ctx::Ctx,
     nav::Nav,
     playback::{
-        CurrentPlayback, Playback, PlaybackOrigin, PlaybackPayload, PlaybackState, QueueBehavior,
+        NowPlaying, Playback, PlaybackOrigin, PlaybackPayload, PlaybackState, QueueBehavior,
         QueuedTrack,
     },
     playlist::{Playlist, PlaylistDetail, PlaylistLink, PlaylistTracks},
@@ -69,7 +69,7 @@ impl Default for State {
             },
             playback: Playback {
                 state: PlaybackState::Stopped,
-                current: None,
+                now_playing: None,
                 queue_behavior: QueueBehavior::Sequential,
                 queue: Vector::new(),
             },
@@ -134,7 +134,7 @@ impl State {
     pub fn loading_playback(&mut self, item: Arc<Track>, origin: PlaybackOrigin) {
         self.common_ctx.playback_item.take();
         self.playback.state = PlaybackState::Loading;
-        self.playback.current.replace(CurrentPlayback {
+        self.playback.now_playing.replace(NowPlaying {
             item,
             origin,
             progress: Duration::default(),
@@ -145,7 +145,7 @@ impl State {
     pub fn start_playback(&mut self, item: Arc<Track>, origin: PlaybackOrigin, progress: Duration) {
         self.common_ctx.playback_item.replace(item.clone());
         self.playback.state = PlaybackState::Playing;
-        self.playback.current.replace(CurrentPlayback {
+        self.playback.now_playing.replace(NowPlaying {
             item,
             origin,
             progress,
@@ -154,7 +154,7 @@ impl State {
     }
 
     pub fn progress_playback(&mut self, progress: Duration) {
-        self.playback.current.as_mut().map(|current| {
+        self.playback.now_playing.as_mut().map(|current| {
             current.progress = progress;
         });
     }
@@ -173,7 +173,7 @@ impl State {
 
     pub fn stop_playback(&mut self) {
         self.playback.state = PlaybackState::Stopped;
-        self.playback.current.take();
+        self.playback.now_playing.take();
         self.common_ctx.playback_item.take();
     }
 }

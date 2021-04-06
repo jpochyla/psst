@@ -7,7 +7,7 @@ use std::{sync::Arc, time::Duration};
 #[derive(Clone, Debug, Data, Lens)]
 pub struct Playback {
     pub state: PlaybackState,
-    pub current: Option<CurrentPlayback>,
+    pub now_playing: Option<NowPlaying>,
     pub queue_behavior: QueueBehavior,
     pub queue: Vector<QueuedTrack>,
 }
@@ -35,7 +35,7 @@ pub enum PlaybackState {
 }
 
 #[derive(Clone, Debug, Data, Lens)]
-pub struct CurrentPlayback {
+pub struct NowPlaying {
     pub item: Arc<Track>,
     pub origin: PlaybackOrigin,
     pub progress: Duration,
@@ -52,9 +52,9 @@ pub enum PlaybackOrigin {
 }
 
 impl PlaybackOrigin {
-    pub fn as_nav(&self) -> Nav {
+    pub fn to_nav(&self) -> Nav {
         match &self {
-            PlaybackOrigin::Library => Nav::Library,
+            PlaybackOrigin::Library => Nav::SavedTracks,
             PlaybackOrigin::Album(link) => Nav::AlbumDetail(link.clone()),
             PlaybackOrigin::Artist(link) => Nav::ArtistDetail(link.clone()),
             PlaybackOrigin::Playlist(link) => Nav::PlaylistDetail(link.clone()),
@@ -62,7 +62,7 @@ impl PlaybackOrigin {
         }
     }
 
-    pub fn as_string(&self) -> String {
+    pub fn to_string(&self) -> String {
         match &self {
             PlaybackOrigin::Library => "Saved Tracks".to_string(),
             PlaybackOrigin::Album(link) => link.name.to_string(),

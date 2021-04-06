@@ -84,14 +84,22 @@ impl<T: Data> Widget<T> for Hover<T> {
         };
         let border_color = self.border_color.resolve(env);
         let border_width = self.border_width.resolve(env);
-        let corner_radius = self.corner_radius.resolve(env);
-        let rounded_rect = ctx
-            .size()
-            .to_rect()
-            .inset(-border_width / 2.0)
-            .to_rounded_rect(corner_radius);
-        ctx.stroke(rounded_rect, &border_color, border_width);
-        ctx.fill(rounded_rect, &background);
+        let visible_background = background.as_rgba_u32() & 0x00000FF > 0;
+        let visible_border = border_color.as_rgba_u32() & 0x000000FF > 0 && border_width > 0.0;
+        if visible_background || visible_border {
+            let corner_radius = self.corner_radius.resolve(env);
+            let rounded_rect = ctx
+                .size()
+                .to_rect()
+                .inset(-border_width / 2.0)
+                .to_rounded_rect(corner_radius);
+            if visible_border {
+                ctx.stroke(rounded_rect, &border_color, border_width);
+            }
+            if visible_background {
+                ctx.fill(rounded_rect, &background);
+            }
+        }
         self.inner.paint(ctx, data, env);
     }
 }

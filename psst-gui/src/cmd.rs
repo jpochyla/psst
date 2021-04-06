@@ -37,7 +37,8 @@ pub const UPDATE_SEARCH_RESULTS: Selector<Result<SearchResults, Error>> =
 
 // Library
 
-pub const LOAD_LIBRARY: Selector = Selector::new("app.load-library");
+pub const LOAD_SAVED_TRACKS: Selector = Selector::new("app.load-saved-tracks");
+pub const LOAD_SAVED_ALBUMS: Selector = Selector::new("app.load-saved-albums");
 pub const LOAD_PLAYLISTS: Selector = Selector::new("app.load-playlists");
 pub const UPDATE_SAVED_ALBUMS: Selector<Result<Vector<Album>, Error>> =
     Selector::new("app.update-saved-albums");

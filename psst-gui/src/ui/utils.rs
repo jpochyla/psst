@@ -16,7 +16,7 @@ pub enum Border {
 }
 
 impl Border {
-    pub fn widget<T: Data>(
+    pub fn with_color<T: Data>(
         self,
         color: impl Into<KeyOrValue<Color>>,
     ) -> impl Into<BackgroundBrush<T>> {

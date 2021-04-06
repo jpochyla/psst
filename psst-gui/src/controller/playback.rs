@@ -18,15 +18,22 @@ use psst_core::{
     session::SessionHandle,
 };
 
+#[cfg(target_os = "macos")]
+use souvlaki::platform::macos::MediaControlsExtMacOs;
+use souvlaki::{MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback};
+
 use crate::{
     cmd,
-    data::{Config, PlaybackOrigin, QueueBehavior, QueuedTrack, State, TrackId},
+    data::{
+        Config, Playback, PlaybackOrigin, PlaybackState, QueueBehavior, QueuedTrack, State, TrackId,
+    },
 };
 
 pub struct PlaybackController {
     sender: Option<Sender<PlayerEvent>>,
     thread: Option<JoinHandle<()>>,
     output_thread: Option<JoinHandle<()>>,
+    media_controls: Option<MediaControls>,
 }
 
 impl PlaybackController {
@@ -35,6 +42,7 @@ impl PlaybackController {
             sender: None,
             thread: None,
             output_thread: None,
+            media_controls: None,
         }
     }
 
@@ -67,9 +75,18 @@ impl PlaybackController {
             output.start_playback(source).expect("Playback failed");
         });
 
+        let mut media_controls = MediaControls::create().unwrap();
+        media_controls.attach({
+            let sender = sender.clone();
+            move |event| {
+                Self::handle_media_control_event(event, &sender);
+            }
+        });
+
         self.sender.replace(sender);
         self.thread.replace(thread);
         self.output_thread.replace(output_thread);
+        self.media_controls.replace(media_controls);
     }
 
     fn service_events(mut player: Player, event_sink: ExtEventSink, widget_id: WidgetId) {
@@ -120,6 +137,35 @@ impl PlaybackController {
 
             // Let the player react to its internal events.
             player.handle(event);
+        }
+    }
+
+    fn handle_media_control_event(event: MediaControlEvent, sender: &Sender<PlayerEvent>) {
+        let cmd = match event {
+            MediaControlEvent::Play => PlayerEvent::Command(PlayerCommand::Resume),
+            MediaControlEvent::Pause => PlayerEvent::Command(PlayerCommand::Pause),
+            MediaControlEvent::Toggle => PlayerEvent::Command(PlayerCommand::PauseOrResume),
+            MediaControlEvent::Next => PlayerEvent::Command(PlayerCommand::Next),
+            MediaControlEvent::Previous => PlayerEvent::Command(PlayerCommand::Previous),
+        };
+        sender.send(cmd).unwrap();
+    }
+
+    fn update_media_controls(&mut self, playback: &Playback) {
+        if let Some(media_controls) = self.media_controls.as_mut() {
+            media_controls.set_playback(match playback.state {
+                PlaybackState::Loading | PlaybackState::Stopped => MediaPlayback::Stopped,
+                PlaybackState::Playing => MediaPlayback::Playing,
+                PlaybackState::Paused => MediaPlayback::Paused,
+            });
+            let title = playback.now_playing.as_ref().map(|c| c.item.name.clone());
+            let album = playback.now_playing.as_ref().map(|c| c.item.album_name());
+            let artist = playback.now_playing.as_ref().map(|c| c.item.artist_name());
+            media_controls.set_metadata(MediaMetadata {
+                title: title.as_deref(),
+                album: album.as_deref(),
+                artist: artist.as_deref(),
+            });
         }
     }
 
@@ -198,6 +244,7 @@ where
 
                 if let Some(queued) = data.queued_track(item) {
                     data.loading_playback(queued.track, queued.origin);
+                    self.update_media_controls(&data.playback);
                 } else {
                     log::warn!("loaded item not found in playback queue");
                 }
@@ -209,6 +256,7 @@ where
 
                 if let Some(queued) = data.queued_track(item) {
                     data.start_playback(queued.track, queued.origin, progress.to_owned());
+                    self.update_media_controls(&data.playback);
                 } else {
                     log::warn!("played item not found in playback queue");
                 }
@@ -221,10 +269,12 @@ where
             }
             Event::Command(cmd) if cmd.is(cmd::PLAYBACK_PAUSING) => {
                 data.pause_playback();
+                self.update_media_controls(&data.playback);
                 ctx.set_handled();
             }
             Event::Command(cmd) if cmd.is(cmd::PLAYBACK_RESUMING) => {
                 data.resume_playback();
+                self.update_media_controls(&data.playback);
                 ctx.set_handled();
             }
             Event::Command(cmd) if cmd.is(cmd::PLAYBACK_BLOCKED) => {
@@ -233,11 +283,12 @@ where
             }
             Event::Command(cmd) if cmd.is(cmd::PLAYBACK_STOPPED) => {
                 data.stop_playback();
+                self.update_media_controls(&data.playback);
                 ctx.set_handled();
             }
             Event::Command(cmd) if cmd.is(cmd::UPDATE_AUDIO_ANALYSIS) => {
                 let (track_id, result) = cmd.get_unchecked(cmd::UPDATE_AUDIO_ANALYSIS);
-                data.playback.current.as_mut().map(|current| {
+                data.playback.now_playing.as_mut().map(|current| {
                     if current.analysis.is_deferred(track_id) {
                         current.analysis.resolve_or_reject(result.to_owned());
                     }
@@ -286,7 +337,7 @@ where
             }
             Event::Command(cmd) if cmd.is(cmd::PLAY_SEEK) => {
                 let fraction = cmd.get_unchecked(cmd::PLAY_SEEK);
-                data.playback.current.as_ref().map(|current| {
+                data.playback.now_playing.as_ref().map(|current| {
                     let position =
                         Duration::from_secs_f64(current.item.duration.as_secs_f64() * fraction);
                     self.seek(position);

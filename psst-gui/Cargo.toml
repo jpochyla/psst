@@ -21,4 +21,5 @@ platform-dirs = "0.3"
 rand = "0.8"
 serde = { version = "1.0", features = ["derive", "rc"] }
 serde_json = "1.0"
+souvlaki = { git = "https://github.com/jpochyla/souvlaki", branch = "macos" }
 ureq = { version = "2.1", features = ["json"] }

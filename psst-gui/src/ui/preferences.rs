@@ -32,7 +32,7 @@ pub fn preferences_widget() -> impl Widget<State> {
         },
     )
     .padding(theme::grid(4.0))
-    .background(Border::Top.widget(theme::GREY_500));
+    .background(Border::Top.with_color(theme::GREY_500));
 
     Flex::column()
         .must_fill_main_axis(true)

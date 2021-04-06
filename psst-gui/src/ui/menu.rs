@@ -43,9 +43,18 @@ fn view_menu() -> Menu<State> {
                 .hotkey(SysMods::Cmd, "1"),
         )
         .entry(
-            MenuItem::new(LocalizedString::new("menu-item-library").with_placeholder("Library"))
-                .command(cmd::NAVIGATE.with(Nav::Library))
-                .hotkey(SysMods::Cmd, "2"),
+            MenuItem::new(
+                LocalizedString::new("menu-item-saved-tracks").with_placeholder("Saved Tracks"),
+            )
+            .command(cmd::NAVIGATE.with(Nav::SavedTracks))
+            .hotkey(SysMods::Cmd, "2"),
+        )
+        .entry(
+            MenuItem::new(
+                LocalizedString::new("menu-item-saved-albums").with_placeholder("Saved Albums"),
+            )
+            .command(cmd::NAVIGATE.with(Nav::SavedAlbums))
+            .hotkey(SysMods::Cmd, "3"),
         )
         .entry(
             MenuItem::new(LocalizedString::new("menu-item-search").with_placeholder("Search..."))

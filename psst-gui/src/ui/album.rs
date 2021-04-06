@@ -1,6 +1,6 @@
 use crate::{
     cmd,
-    data::{Album, AlbumDetail, ArtistLink, CommonCtx, Copyright, Ctx, Nav, State},
+    data::{Album, AlbumDetail, ArtistLink, CommonCtx, Ctx, Nav, State},
     ui::{
         theme,
         track::{tracklist_widget, TrackDisplay},
@@ -25,7 +25,7 @@ pub fn detail_widget() -> impl Widget<State> {
 }
 
 fn loaded_detail_widget() -> impl Widget<Ctx<CommonCtx, Album>> {
-    let album_cover = rounded_cover_widget(theme::grid(30.0));
+    let album_cover = rounded_cover_widget(theme::grid(24.0));
 
     let album_name = Label::raw()
         .with_line_break_mode(LineBreaking::WordWrap)
@@ -35,6 +35,7 @@ fn loaded_detail_widget() -> impl Widget<Ctx<CommonCtx, Album>> {
     let album_artists = List::new(|| {
         Label::raw()
             .with_line_break_mode(LineBreaking::WordWrap)
+            .with_font(theme::UI_FONT_MEDIUM)
             .hover()
             .lens(ArtistLink::name)
             .on_click(|ctx, artist_link: &mut ArtistLink, _| {
@@ -52,15 +53,6 @@ fn loaded_detail_widget() -> impl Widget<Ctx<CommonCtx, Album>> {
         .with_text_color(theme::PLACEHOLDER_COLOR)
         .lens(Album::label);
 
-    let album_copyrights = List::new(|| {
-        Label::raw()
-            .with_line_break_mode(LineBreaking::WordWrap)
-            .with_text_size(theme::TEXT_SIZE_SMALL)
-            .with_text_color(theme::PLACEHOLDER_COLOR)
-            .lens(Copyright::text)
-    })
-    .lens(Album::copyrights);
-
     let album_info = Flex::column()
         .cross_axis_alignment(CrossAxisAlignment::Start)
         .with_child(album_cover)
@@ -71,11 +63,8 @@ fn loaded_detail_widget() -> impl Widget<Ctx<CommonCtx, Album>> {
         .with_default_spacer()
         .with_child(album_date)
         .with_default_spacer()
-        .with_default_spacer()
         .with_child(album_label)
-        .with_spacer(theme::grid(0.5))
-        .with_child(album_copyrights)
-        .fix_width(theme::grid(30.0))
+        .fix_width(theme::grid(24.0))
         .padding(theme::grid(0.8))
         .lens(Ctx::data());
 

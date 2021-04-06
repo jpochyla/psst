@@ -270,6 +270,7 @@ fn track_widget(display: TrackDisplay) -> impl Widget<TrackRow> {
     Flex::column()
         .cross_axis_alignment(CrossAxisAlignment::Start)
         .with_child(major)
+        .with_spacer(2.0)
         .with_child(minor)
         .padding(theme::grid(0.8))
         .hover()

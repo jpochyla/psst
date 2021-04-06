@@ -39,7 +39,8 @@ impl<T: Data> Widget<T> for RemoteImage<T> {
         if let Event::Command(cmd) = event {
             if let Some(payload) = cmd.get(PROVIDE_DATA) {
                 if Some(&payload.location) == self.location.as_ref() {
-                    self.image = Some(WidgetPod::new(Image::new(payload.image_buf.clone())));
+                    self.image
+                        .replace(WidgetPod::new(Image::new(payload.image_buf.clone())));
                     ctx.children_changed();
                 }
                 return;

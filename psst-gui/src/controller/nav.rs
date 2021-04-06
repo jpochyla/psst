@@ -11,6 +11,12 @@ impl NavController {
     fn load_route_data(&self, ctx: &mut EventCtx, data: &mut State) {
         match &data.route {
             Nav::Home => {}
+            Nav::SavedTracks => {
+                ctx.submit_command(cmd::LOAD_SAVED_TRACKS);
+            }
+            Nav::SavedAlbums => {
+                ctx.submit_command(cmd::LOAD_SAVED_ALBUMS);
+            }
             Nav::SearchResults(query) => {
                 ctx.submit_command(cmd::LOAD_SEARCH_RESULTS.with(query.to_owned()));
             }
@@ -22,9 +28,6 @@ impl NavController {
             }
             Nav::PlaylistDetail(link) => {
                 ctx.submit_command(cmd::LOAD_PLAYLIST_DETAIL.with(link.to_owned()));
-            }
-            Nav::Library => {
-                ctx.submit_command(cmd::LOAD_LIBRARY);
             }
         }
     }

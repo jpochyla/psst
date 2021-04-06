@@ -1,10 +1,10 @@
 use crate::{
     cmd,
     data::{
-        AudioAnalysis, CurrentPlayback, Playback, PlaybackOrigin, PlaybackState, Promise,
-        QueueBehavior, State, Track,
+        AudioAnalysis, NowPlaying, Playback, PlaybackOrigin, PlaybackState, Promise, QueueBehavior,
+        State, Track,
     },
-    ui::{theme, utils::Border},
+    ui::theme,
     widget::{icons, Empty, HoverExt, Maybe},
 };
 use druid::{
@@ -20,36 +20,38 @@ use std::{sync::Arc, time::Duration};
 use super::utils;
 
 pub fn panel_widget() -> impl Widget<State> {
-    Flex::row()
-        .must_fill_main_axis(true)
-        .with_flex_child(playback_info_widget(), 1.0)
-        .with_flex_child(player_widget(), 1.0)
-        .background(Border::Top.widget(theme::BACKGROUND_DARK))
+    Flex::column()
+        .with_child(Maybe::or_empty(SeekBar::new).lens(Playback::now_playing))
+        .with_child(
+            Flex::row()
+                .must_fill_main_axis(true)
+                .with_flex_child(
+                    Maybe::or_empty(playback_item_widget).lens(Playback::now_playing),
+                    1.0,
+                )
+                .with_flex_child(player_widget(), 1.0),
+        )
         .lens(State::playback)
 }
 
-fn playback_info_widget() -> impl Widget<Playback> {
-    Maybe::or_empty(current_playback_info_widget).lens(Playback::current)
-}
-
-fn current_playback_info_widget() -> impl Widget<CurrentPlayback> {
+fn playback_item_widget() -> impl Widget<NowPlaying> {
     let track_name = Label::raw()
         .with_line_break_mode(LineBreaking::Clip)
         .with_font(theme::UI_FONT_MEDIUM)
-        .lens(CurrentPlayback::item.then(Track::name.in_arc()));
+        .lens(NowPlaying::item.then(Track::name.in_arc()));
 
     let track_artist = Label::dynamic(|track: &Arc<Track>, _| track.artist_name())
         .with_line_break_mode(LineBreaking::Clip)
         .with_text_size(theme::TEXT_SIZE_SMALL)
-        .lens(CurrentPlayback::item);
+        .lens(NowPlaying::item);
 
     let track_origin = ViewSwitcher::new(
-        |current: &CurrentPlayback, _| current.origin.clone(),
+        |origin: &PlaybackOrigin, _| origin.clone(),
         |origin, _, _| {
             Flex::row()
                 .cross_axis_alignment(CrossAxisAlignment::Center)
                 .with_flex_child(
-                    Label::dynamic(|current: &CurrentPlayback, _| current.origin.as_string())
+                    Label::dynamic(|origin: &PlaybackOrigin, _| origin.to_string())
                         .with_line_break_mode(LineBreaking::Clip)
                         .with_text_size(theme::TEXT_SIZE_SMALL),
                     1.0,
@@ -67,31 +69,26 @@ fn current_playback_info_widget() -> impl Widget<CurrentPlayback> {
                 )
                 .boxed()
         },
-    );
+    )
+    .lens(NowPlaying::origin);
 
     Flex::column()
         .cross_axis_alignment(CrossAxisAlignment::Start)
         .with_child(track_name)
+        .with_spacer(2.0)
         .with_child(track_artist)
+        .with_spacer(2.0)
         .with_child(track_origin)
-        .padding(theme::grid(1.8))
+        .padding(theme::grid(1.0 + 0.8))
         .expand_width()
         .hover()
-        .on_ex_click(|ctx, _event, current: &mut CurrentPlayback, _| {
-            let nav = current.origin.as_nav();
+        .on_ex_click(|ctx, _event, now_playing: &mut NowPlaying, _| {
+            let nav = now_playing.origin.to_nav();
             ctx.submit_command(cmd::NAVIGATE.with(nav));
         })
 }
 
 fn player_widget() -> impl Widget<Playback> {
-    Flex::column()
-        .with_child(player_controls_widget())
-        .with_default_spacer()
-        .with_child(Maybe::or_empty(player_progress_widget).lens(Playback::current))
-        .padding(theme::grid(1.0))
-}
-
-fn player_controls_widget() -> impl Widget<Playback> {
     let play_previous = icons::SKIP_BACK
         .scale((theme::grid(2.0), theme::grid(2.0)))
         .with_color(theme::PLACEHOLDER_COLOR)
@@ -100,7 +97,7 @@ fn player_controls_widget() -> impl Widget<Playback> {
         .rounded(theme::BUTTON_BORDER_RADIUS)
         .on_click(|ctx, _, _| ctx.submit_command(cmd::PLAY_PREVIOUS));
     let play_previous = Either::new(
-        |playback: &Playback, _| playback.current.is_some(),
+        |playback: &Playback, _| playback.now_playing.is_some(),
         play_previous,
         Empty,
     );
@@ -144,7 +141,7 @@ fn player_controls_widget() -> impl Widget<Playback> {
         .rounded(theme::BUTTON_BORDER_RADIUS)
         .on_click(|ctx, _, _| ctx.submit_command(cmd::PLAY_NEXT));
     let play_next = Either::new(
-        |playback: &Playback, _| playback.current.is_some(),
+        |playback: &Playback, _| playback.now_playing.is_some(),
         play_next,
         Empty,
     );
@@ -178,10 +175,12 @@ fn player_controls_widget() -> impl Widget<Playback> {
         },
     );
     let queue_behavior = Either::new(
-        |playback: &Playback, _| playback.current.is_some(),
+        |playback: &Playback, _| playback.now_playing.is_some(),
         queue_behavior,
         Empty,
     );
+
+    let times = Maybe::or_empty(player_times_widget).lens(Playback::now_playing);
 
     Flex::row()
         .with_child(play_previous)
@@ -191,27 +190,20 @@ fn player_controls_widget() -> impl Widget<Playback> {
         .with_child(play_next)
         .with_default_spacer()
         .with_child(queue_behavior)
+        .with_default_spacer()
+        .with_child(times)
 }
 
-fn player_progress_widget() -> impl Widget<CurrentPlayback> {
-    let current_time =
-        Label::dynamic(|progress: &Duration, _| utils::as_minutes_and_seconds(progress))
-            .with_text_size(theme::TEXT_SIZE_SMALL)
-            .align_right()
-            .fix_width(theme::grid(4.0))
-            .lens(CurrentPlayback::progress);
-    let total_time =
-        Label::dynamic(|track: &Arc<Track>, _| utils::as_minutes_and_seconds(&track.duration))
-            .with_text_size(theme::TEXT_SIZE_SMALL)
-            .align_left()
-            .fix_width(theme::grid(4.0))
-            .lens(CurrentPlayback::item);
-    Flex::row()
-        .with_child(current_time)
-        .with_default_spacer()
-        .with_flex_child(SeekBar::new(), 1.0)
-        .with_default_spacer()
-        .with_child(total_time)
+fn player_times_widget() -> impl Widget<NowPlaying> {
+    Label::dynamic(|now_playing: &NowPlaying, _| {
+        format!(
+            "{} / {}",
+            utils::as_minutes_and_seconds(&now_playing.progress),
+            utils::as_minutes_and_seconds(&now_playing.item.duration)
+        )
+    })
+    .with_text_size(theme::TEXT_SIZE_SMALL)
+    .with_text_color(theme::PLACEHOLDER_COLOR)
 }
 
 struct SeekBar {
@@ -226,14 +218,8 @@ impl SeekBar {
     }
 }
 
-impl Widget<CurrentPlayback> for SeekBar {
-    fn event(
-        &mut self,
-        ctx: &mut EventCtx,
-        event: &Event,
-        _data: &mut CurrentPlayback,
-        _env: &Env,
-    ) {
+impl Widget<NowPlaying> for SeekBar {
+    fn event(&mut self, ctx: &mut EventCtx, event: &Event, _data: &mut NowPlaying, _env: &Env) {
         match event {
             Event::MouseDown(mouse) => {
                 if mouse.button == MouseButton::Left {
@@ -257,12 +243,12 @@ impl Widget<CurrentPlayback> for SeekBar {
         &mut self,
         ctx: &mut LifeCycleCtx,
         event: &LifeCycle,
-        data: &CurrentPlayback,
+        data: &NowPlaying,
         _env: &Env,
     ) {
         match &event {
             LifeCycle::Size(bounds) => {
-                self.loudness_path = compute_loudness_path(bounds, &data);
+                // self.loudness_path = compute_loudness_path(bounds, &data);
             }
             LifeCycle::HotChanged(_) => {
                 ctx.request_paint();
@@ -274,12 +260,12 @@ impl Widget<CurrentPlayback> for SeekBar {
     fn update(
         &mut self,
         ctx: &mut UpdateCtx,
-        old_data: &CurrentPlayback,
-        data: &CurrentPlayback,
+        old_data: &NowPlaying,
+        data: &NowPlaying,
         _env: &Env,
     ) {
         if !old_data.analysis.same(&data.analysis) || !old_data.item.same(&data.item) {
-            self.loudness_path = compute_loudness_path(&ctx.size(), &data);
+            // self.loudness_path = compute_loudness_path(&ctx.size(), &data);
         }
         if !old_data.same(data) {
             ctx.request_paint();
@@ -290,13 +276,13 @@ impl Widget<CurrentPlayback> for SeekBar {
         &mut self,
         _ctx: &mut LayoutCtx,
         bc: &BoxConstraints,
-        _data: &CurrentPlayback,
+        _data: &NowPlaying,
         _env: &Env,
     ) -> Size {
-        Size::new(bc.max().width, theme::grid(1.0))
+        Size::new(bc.max().width, theme::grid(0.5))
     }
 
-    fn paint(&mut self, ctx: &mut PaintCtx, data: &CurrentPlayback, env: &Env) {
+    fn paint(&mut self, ctx: &mut PaintCtx, data: &NowPlaying, env: &Env) {
         if self.loudness_path.is_empty() {
             paint_progress_bar(ctx, data, env)
         } else {
@@ -305,7 +291,7 @@ impl Widget<CurrentPlayback> for SeekBar {
     }
 }
 
-fn compute_loudness_path(bounds: &Size, data: &CurrentPlayback) -> BezPath {
+fn compute_loudness_path(bounds: &Size, data: &NowPlaying) -> BezPath {
     if let Promise::Resolved(analysis) = &data.analysis {
         compute_loudness_path_from_analysis(&bounds, &data.item.duration, &analysis)
     } else {
@@ -374,7 +360,7 @@ fn compute_loudness_path_from_analysis(
     path
 }
 
-fn paint_audio_analysis(ctx: &mut PaintCtx, data: &CurrentPlayback, path: &BezPath, env: &Env) {
+fn paint_audio_analysis(ctx: &mut PaintCtx, data: &NowPlaying, path: &BezPath, env: &Env) {
     let bounds = ctx.size();
 
     let elapsed_time = data.progress.as_secs_f64();
@@ -396,7 +382,7 @@ fn paint_audio_analysis(ctx: &mut PaintCtx, data: &CurrentPlayback, path: &BezPa
     });
 }
 
-fn paint_progress_bar(ctx: &mut PaintCtx, data: &CurrentPlayback, env: &Env) {
+fn paint_progress_bar(ctx: &mut PaintCtx, data: &NowPlaying, env: &Env) {
     let elapsed_time = data.progress.as_secs_f64();
     let total_time = data.item.duration.as_secs_f64();
 

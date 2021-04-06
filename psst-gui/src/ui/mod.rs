@@ -7,8 +7,9 @@ use crate::{
 };
 use druid::{
     commands,
+    lens::Unit,
     widget::{CrossAxisAlignment, Either, Flex, Label, Scroll, Split, ViewSwitcher},
-    Widget, WidgetExt, WindowDesc, WindowLevel,
+    Insets, Widget, WidgetExt, WindowDesc, WindowLevel,
 };
 use icons::SvgIcon;
 
@@ -24,27 +25,37 @@ pub mod theme;
 pub mod track;
 pub mod utils;
 
-pub fn main_window() -> WindowDesc<State> {
-    let mut win = WindowDesc::new(root_widget()).title("Psst");
-    win = win
-        .with_min_size((theme::grid(25.0), theme::grid(25.0)))
-        .window_size((theme::grid(100.0), theme::grid(100.0)));
+fn content_insets() -> Insets {
     if cfg!(target_os = "macos") {
-        win = win.menu(menu::main_menu);
+        Insets::new(0.0, 24.0, 0.0, 0.0)
+    } else {
+        Insets::ZERO
     }
-    win
+}
+
+pub fn main_window() -> WindowDesc<State> {
+    let win = WindowDesc::new(root_widget())
+        .title("Psst")
+        .with_min_size((theme::grid(25.0), theme::grid(25.0)))
+        .window_size((theme::grid(80.0), theme::grid(100.0)));
+    if cfg!(target_os = "macos") {
+        win.menu(menu::main_menu)
+    } else {
+        win
+    }
 }
 
 pub fn preferences_window() -> WindowDesc<State> {
-    let mut win = WindowDesc::new(preferences_widget()).title("Preferences");
-    win = win
+    let win = WindowDesc::new(preferences_widget())
+        .title("Preferences")
         .set_level(WindowLevel::Modal)
         .window_size((theme::grid(50.0), theme::grid(69.0)))
         .resizable(false);
     if cfg!(target_os = "macos") {
-        win = win.menu(menu::main_menu);
+        win.menu(menu::main_menu)
+    } else {
+        win
     }
-    win
 }
 
 fn preferences_widget() -> impl Widget<State> {
@@ -63,6 +74,7 @@ fn root_widget() -> impl Widget<State> {
         .with_child(menu_widget())
         .with_default_spacer()
         .with_flex_child(playlists, 1.0)
+        .padding(content_insets())
         .background(theme::BACKGROUND_DARK);
 
     let topbar = Flex::row()
@@ -78,7 +90,7 @@ fn root_widget() -> impl Widget<State> {
                 .align_right(),
             1.0,
         )
-        .background(Border::Bottom.widget(theme::BACKGROUND_DARK));
+        .background(Border::Bottom.with_color(theme::BACKGROUND_DARK));
 
     let main = Flex::column()
         .cross_axis_alignment(CrossAxisAlignment::Start)
@@ -113,13 +125,15 @@ fn logo_widget() -> impl Widget<State> {
         .with_color(theme::GREY_500)
         .padding((0.0, theme::grid(2.0), 0.0, theme::grid(1.0)))
         .center()
+        .lens(Unit)
 }
 
 fn menu_widget() -> impl Widget<State> {
     Flex::column()
         .with_default_spacer()
         .with_child(menu_item_widget("Home", Nav::Home))
-        .with_child(menu_item_widget("Library", Nav::Library))
+        .with_child(menu_item_widget("Tracks", Nav::SavedTracks))
+        .with_child(menu_item_widget("Albums", Nav::SavedAlbums))
         .with_child(menu_search_widget())
 }
 
@@ -130,10 +144,10 @@ fn menu_item_widget(title: &str, nav: Nav) -> impl Widget<State> {
         .hover()
         .env_scope({
             let nav = nav.clone();
-            move |env, state: &State| {
+            move |env, route: &Nav| {
                 env.set(
                     theme::HOVER_COLD_COLOR,
-                    if nav == state.route {
+                    if &nav == route {
                         env.get(theme::MENU_BUTTON_BG_ACTIVE)
                     } else {
                         env.get(theme::MENU_BUTTON_BG_INACTIVE)
@@ -141,7 +155,7 @@ fn menu_item_widget(title: &str, nav: Nav) -> impl Widget<State> {
                 );
                 env.set(
                     theme::LABEL_COLOR,
-                    if nav == state.route {
+                    if &nav == route {
                         env.get(theme::MENU_BUTTON_FG_ACTIVE)
                     } else {
                         env.get(theme::MENU_BUTTON_FG_INACTIVE)
@@ -152,6 +166,7 @@ fn menu_item_widget(title: &str, nav: Nav) -> impl Widget<State> {
         .on_click(move |ctx, _, _| {
             ctx.submit_command(cmd::NAVIGATE.with(nav.clone()));
         })
+        .lens(State::route)
 }
 
 fn menu_search_widget() -> impl Widget<State> {
@@ -163,6 +178,16 @@ fn route_widget() -> impl Widget<State> {
         |state: &State, _| state.route.clone(),
         |route: &Nav, _, _| match route {
             Nav::Home => home_widget().padding(theme::grid(1.0)).boxed(),
+            Nav::SavedTracks => {
+                Scroll::new(library::saved_tracks_widget().padding(theme::grid(1.0)))
+                    .vertical()
+                    .boxed()
+            }
+            Nav::SavedAlbums => {
+                Scroll::new(library::saved_albums_widget().padding(theme::grid(1.0)))
+                    .vertical()
+                    .boxed()
+            }
             Nav::SearchResults(_) => {
                 Scroll::new(search::results_widget().padding(theme::grid(1.0)))
                     .vertical()
@@ -179,9 +204,6 @@ fn route_widget() -> impl Widget<State> {
                     .vertical()
                     .boxed()
             }
-            Nav::Library => Scroll::new(library::detail_widget().padding(theme::grid(1.0)))
-                .vertical()
-                .boxed(),
         },
     )
     .expand()
@@ -218,16 +240,18 @@ fn title_widget() -> impl Widget<State> {
         .with_child(route_title_widget())
         .with_spacer(theme::grid(0.5))
         .with_child(route_icon_widget())
+        .lens(State::route)
 }
 
-fn route_icon_widget() -> impl Widget<State> {
+fn route_icon_widget() -> impl Widget<Nav> {
     ViewSwitcher::new(
-        |state: &State, _| state.route.clone(),
+        |route: &Nav, _| route.clone(),
         |route: &Nav, _, _| {
             let icon = |icon: &SvgIcon| icon.scale(theme::ICON_SIZE);
             match &route {
                 Nav::Home => Empty.boxed(),
-                Nav::Library => Empty.boxed(),
+                Nav::SavedTracks => Empty.boxed(),
+                Nav::SavedAlbums => Empty.boxed(),
                 Nav::SearchResults(_) => icon(&icons::SEARCH).boxed(),
                 Nav::AlbumDetail(_) => icon(&icons::ALBUM).boxed(),
                 Nav::ArtistDetail(_) => icon(&icons::ARTIST).boxed(),
@@ -237,16 +261,18 @@ fn route_icon_widget() -> impl Widget<State> {
     )
 }
 
-fn route_title_widget() -> impl Widget<State> {
-    Label::dynamic(|state: &State, _| match &state.route {
+fn route_title_widget() -> impl Widget<Nav> {
+    Label::dynamic(|route: &Nav, _| match route {
         Nav::Home => "Home".to_string(),
-        Nav::Library => "Library".to_string(),
+        Nav::SavedTracks => "Saved Tracks".to_string(),
+        Nav::SavedAlbums => "Saved Albums".to_string(),
         Nav::SearchResults(query) => query.clone(),
         Nav::AlbumDetail(link) => link.name.to_string(),
         Nav::ArtistDetail(link) => link.name.to_string(),
         Nav::PlaylistDetail(link) => link.name.to_string(),
     })
     .with_font(theme::UI_FONT_MEDIUM)
+    .with_text_size(theme::TEXT_SIZE_LARGE)
 }
 
 fn preferences_button_widget() -> impl Widget<State> {
@@ -260,6 +286,7 @@ fn preferences_button_widget() -> impl Widget<State> {
             ctx.submit_command(commands::SHOW_PREFERENCES);
         })
         .padding(theme::grid(1.0))
+        .lens(Unit)
 }
 
 fn is_online_widget() -> impl Widget<State> {
