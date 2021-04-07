@@ -472,7 +472,7 @@ checksum = "212d0f5754cb6769937f4501cc0e67f4f4483c8d2c3e1e922ee9edbe4ab4c7c0"
 [[package]]
 name = "druid"
 version = "0.7.0"
-source = "git+https://github.com/linebender/druid#39238adf7a8e52f8fcaafd0436cbab516e8961d9"
+source = "git+https://github.com/jpochyla/druid?branch=mac-transparent-titlebar#18690594699e29fd2623a24ac24350631a3d6890"
 dependencies = [
  "console_error_panic_hook",
  "druid-derive",
@@ -494,7 +494,7 @@ dependencies = [
 [[package]]
 name = "druid-derive"
 version = "0.4.0"
-source = "git+https://github.com/linebender/druid#39238adf7a8e52f8fcaafd0436cbab516e8961d9"
+source = "git+https://github.com/jpochyla/druid?branch=mac-transparent-titlebar#18690594699e29fd2623a24ac24350631a3d6890"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -504,7 +504,7 @@ dependencies = [
 [[package]]
 name = "druid-shell"
 version = "0.7.0"
-source = "git+https://github.com/linebender/druid#39238adf7a8e52f8fcaafd0436cbab516e8961d9"
+source = "git+https://github.com/jpochyla/druid?branch=mac-transparent-titlebar#18690594699e29fd2623a24ac24350631a3d6890"
 dependencies = [
  "anyhow",
  "bitflags",
@@ -1979,7 +1979,7 @@ dependencies = [
 [[package]]
 name = "souvlaki"
 version = "0.1.0"
-source = "git+https://github.com/jpochyla/souvlaki?branch=macos#6ba6e1ce469af6d0cc2396556e34ff46aaad85d4"
+source = "git+https://github.com/jpochyla/souvlaki?branch=macos#aeca2bd3ed29779b4315b3c7b6cfe70677b49bfd"
 dependencies = [
  "block",
  "cocoa",

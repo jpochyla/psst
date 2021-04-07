@@ -37,7 +37,9 @@ pub fn main_window() -> WindowDesc<State> {
     let win = WindowDesc::new(root_widget())
         .title("Psst")
         .with_min_size((theme::grid(25.0), theme::grid(25.0)))
-        .window_size((theme::grid(80.0), theme::grid(100.0)));
+        .window_size((theme::grid(80.0), theme::grid(100.0)))
+        .show_title(false)
+        .transparent_titlebar(true);
     if cfg!(target_os = "macos") {
         win.menu(menu::main_menu)
     } else {
@@ -48,9 +50,11 @@ pub fn main_window() -> WindowDesc<State> {
 pub fn preferences_window() -> WindowDesc<State> {
     let win = WindowDesc::new(preferences_widget())
         .title("Preferences")
-        .set_level(WindowLevel::Modal)
         .window_size((theme::grid(50.0), theme::grid(69.0)))
-        .resizable(false);
+        .resizable(false)
+        .show_title(false)
+        .transparent_titlebar(true)
+        .set_level(WindowLevel::Modal);
     if cfg!(target_os = "macos") {
         win.menu(menu::main_menu)
     } else {
