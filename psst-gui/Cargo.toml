@@ -9,6 +9,7 @@ psst-core = { path = "../psst-core" }
 
 chrono = { version = "0.4", features = ["serde"] }
 crossbeam-channel = "0.5"
+druid-shell = { git = "https://github.com/linebender/druid", features = ["raw-win-handle"] }
 druid = { git = "https://github.com/linebender/druid", features = ["im", "image", "jpeg", "png", "serde"] }
 env_logger = "0.8"
 fs_extra = "1.2"

@@ -7,7 +7,7 @@ use crossbeam_channel::Sender;
 use druid::{
     im::Vector,
     widget::{prelude::*, Controller},
-    ExtEventSink,
+    ExtEventSink, WindowHandle,
 };
 use psst_core::{
     audio_normalize::NormalizationLevel,
@@ -17,9 +17,6 @@ use psst_core::{
     cdn::Cdn,
     session::SessionHandle,
 };
-
-#[cfg(target_os = "macos")]
-use souvlaki::platform::macos::MediaControlsExtMacOs;
 use souvlaki::{MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback};
 
 use crate::{
@@ -52,6 +49,7 @@ impl PlaybackController {
         config: PlaybackConfig,
         event_sink: ExtEventSink,
         widget_id: WidgetId,
+        #[allow(unused_variables)] window: &WindowHandle,
     ) {
         let output = AudioOutput::open().unwrap();
         let remote = output.remote();
@@ -75,13 +73,19 @@ impl PlaybackController {
             output.start_playback(source).expect("Playback failed");
         });
 
-        let mut media_controls = MediaControls::create().unwrap();
-        media_controls.attach({
-            let sender = sender.clone();
-            move |event| {
-                Self::handle_media_control_event(event, &sender);
-            }
-        });
+        #[cfg(target_os = "windows")]
+        let mut media_controls = MediaControls::for_window(window.raw_window_handle()).unwrap();
+        #[cfg(not(target_os = "windows"))]
+        let mut media_controls = MediaControls::new();
+
+        media_controls
+            .attach({
+                let sender = sender.clone();
+                move |event| {
+                    Self::handle_media_control_event(event, &sender);
+                }
+            })
+            .unwrap();
 
         self.sender.replace(sender);
         self.thread.replace(thread);
@@ -153,19 +157,23 @@ impl PlaybackController {
 
     fn update_media_controls(&mut self, playback: &Playback) {
         if let Some(media_controls) = self.media_controls.as_mut() {
-            media_controls.set_playback(match playback.state {
-                PlaybackState::Loading | PlaybackState::Stopped => MediaPlayback::Stopped,
-                PlaybackState::Playing => MediaPlayback::Playing,
-                PlaybackState::Paused => MediaPlayback::Paused,
-            });
+            media_controls
+                .set_playback(match playback.state {
+                    PlaybackState::Loading | PlaybackState::Stopped => MediaPlayback::Stopped,
+                    PlaybackState::Playing => MediaPlayback::Playing,
+                    PlaybackState::Paused => MediaPlayback::Paused,
+                })
+                .unwrap();
             let title = playback.now_playing.as_ref().map(|c| c.item.name.clone());
             let album = playback.now_playing.as_ref().map(|c| c.item.album_name());
             let artist = playback.now_playing.as_ref().map(|c| c.item.artist_name());
-            media_controls.set_metadata(MediaMetadata {
-                title: title.as_deref(),
-                album: album.as_deref(),
-                artist: artist.as_deref(),
-            });
+            media_controls
+                .set_metadata(MediaMetadata {
+                    title: title.as_deref(),
+                    album: album.as_deref(),
+                    artist: artist.as_deref(),
+                })
+                .unwrap();
         }
     }
 
@@ -364,6 +372,7 @@ where
                     data.config.playback(),
                     ctx.get_external_handle(),
                     ctx.widget_id(),
+                    ctx.window(),
                 );
             }
             _ => {}
