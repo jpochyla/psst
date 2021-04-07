@@ -27,7 +27,7 @@ pub const SESSION_DISCONNECTED: Selector = Selector::new("app.session-disconnect
 // Navigation
 
 pub const NAVIGATE: Selector<Nav> = Selector::new("app.navigates");
-pub const NAVIGATE_BACK: Selector = Selector::new("app.navigate-back");
+pub const NAVIGATE_BACK: Selector<usize> = Selector::new("app.navigate-back");
 
 // Search
 

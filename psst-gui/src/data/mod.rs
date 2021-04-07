@@ -106,19 +106,16 @@ impl Default for State {
 
 impl State {
     pub fn navigate(&mut self, nav: &Nav) {
-        if self.route != *nav {
-            self.history.push_back(nav.to_owned());
-            self.set_route(nav.to_owned());
+        if &self.route != nav {
+            self.history.push_back(self.route.clone());
+            self.route = nav.to_owned();
         }
     }
 
     pub fn navigate_back(&mut self) {
-        self.history.pop_back();
-        self.set_route(self.history.last().cloned().unwrap_or(Nav::Home));
-    }
-
-    fn set_route(&mut self, nav: Nav) {
-        self.route = nav;
+        if let Some(nav) = self.history.pop_back() {
+            self.route = nav;
+        }
     }
 }
 

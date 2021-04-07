@@ -53,7 +53,10 @@ where
                 ctx.set_handled();
             }
             Event::Command(cmd) if cmd.is(cmd::NAVIGATE_BACK) => {
-                data.navigate_back();
+                let count = cmd.get_unchecked(cmd::NAVIGATE_BACK);
+                for _ in 0..*count {
+                    data.navigate_back();
+                }
                 self.load_route_data(ctx, data);
                 ctx.set_handled();
             }

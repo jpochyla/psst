@@ -9,7 +9,7 @@ use druid::{
     commands,
     lens::Unit,
     widget::{CrossAxisAlignment, Either, Flex, Label, Scroll, Split, ViewSwitcher},
-    Insets, Widget, WidgetExt, WindowDesc, WindowLevel,
+    Insets, Menu, MenuItem, MouseButton, Widget, WidgetExt, WindowDesc, WindowLevel,
 };
 use icons::SvgIcon;
 
@@ -223,8 +223,14 @@ fn back_button_widget() -> impl Widget<State> {
         .padding(theme::grid(1.0))
         .hover()
         .rounded(theme::BUTTON_BORDER_RADIUS)
-        .on_click(|ctx, _state, _env| {
-            ctx.submit_command(cmd::NAVIGATE_BACK);
+        .on_ex_click(|ctx, event, state, _env| match event.button {
+            MouseButton::Left => {
+                ctx.submit_command(cmd::NAVIGATE_BACK.with(1));
+            }
+            MouseButton::Right => {
+                ctx.show_context_menu(history_menu(state), event.window_pos);
+            }
+            _ => {}
         });
     Either::new(
         |state: &State, _| state.history.is_empty(),
@@ -232,6 +238,18 @@ fn back_button_widget() -> impl Widget<State> {
         enabled,
     )
     .padding(theme::grid(1.0))
+}
+
+fn history_menu(state: &State) -> Menu<State> {
+    let mut menu = Menu::empty();
+    for (index, history) in state.history.iter().rev().take(10).enumerate() {
+        let skip_back_in_history_n_times = index + 1;
+        menu = menu.entry(
+            MenuItem::new(history.to_full_title())
+                .command(cmd::NAVIGATE_BACK.with(skip_back_in_history_n_times)),
+        );
+    }
+    menu
 }
 
 fn title_widget() -> impl Widget<State> {
@@ -262,17 +280,9 @@ fn route_icon_widget() -> impl Widget<Nav> {
 }
 
 fn route_title_widget() -> impl Widget<Nav> {
-    Label::dynamic(|route: &Nav, _| match route {
-        Nav::Home => "Home".to_string(),
-        Nav::SavedTracks => "Saved Tracks".to_string(),
-        Nav::SavedAlbums => "Saved Albums".to_string(),
-        Nav::SearchResults(query) => query.clone(),
-        Nav::AlbumDetail(link) => link.name.to_string(),
-        Nav::ArtistDetail(link) => link.name.to_string(),
-        Nav::PlaylistDetail(link) => link.name.to_string(),
-    })
-    .with_font(theme::UI_FONT_MEDIUM)
-    .with_text_size(theme::TEXT_SIZE_LARGE)
+    Label::dynamic(|route: &Nav, _| route.to_title())
+        .with_font(theme::UI_FONT_MEDIUM)
+        .with_text_size(theme::TEXT_SIZE_LARGE)
 }
 
 fn preferences_button_widget() -> impl Widget<State> {
