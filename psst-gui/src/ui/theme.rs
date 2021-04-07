@@ -44,9 +44,9 @@ pub fn setup(env: &mut Env, state: &State) {
     };
 
     env.set(WINDOW_BACKGROUND_COLOR, env.get(GREY_700));
-    env.set(LABEL_COLOR, env.get(GREY_200));
+    env.set(LABEL_COLOR, env.get(GREY_100));
     env.set(ICON_COLOR, env.get(GREY_300));
-    env.set(PLACEHOLDER_COLOR, env.get(GREY_400));
+    env.set(PLACEHOLDER_COLOR, env.get(GREY_300));
     env.set(PRIMARY_LIGHT, env.get(BLUE_100));
     env.set(PRIMARY_DARK, env.get(BLUE_200));
 
@@ -129,9 +129,9 @@ fn setup_light_theme(env: &mut Env) {
     env.set(GREY_200, Color::grey8(0x4f));
     env.set(GREY_300, Color::grey8(0x82));
     env.set(GREY_400, Color::grey8(0xbd));
-    env.set(GREY_500, Color::grey8(0xe0));
-    env.set(GREY_600, Color::grey8(0xf2));
-    env.set(GREY_700, Color::grey8(0xff));
+    env.set(GREY_500, Color::from_rgba32_u32(0xe5e6e7ff));
+    env.set(GREY_600, Color::from_rgba32_u32(0xf5f6f7ff));
+    env.set(GREY_700, Color::from_rgba32_u32(0xffffffff));
     env.set(BLUE_100, Color::rgb8(0x5c, 0xc4, 0xff));
     env.set(BLUE_200, Color::rgb8(0x00, 0x8d, 0xdd));
 
