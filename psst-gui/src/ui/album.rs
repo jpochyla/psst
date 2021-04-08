@@ -65,7 +65,7 @@ fn loaded_detail_widget() -> impl Widget<Ctx<CommonCtx, Album>> {
         .with_default_spacer()
         .with_child(album_label)
         .fix_width(theme::grid(24.0))
-        .padding(theme::grid(0.8))
+        .padding(theme::grid(1.0))
         .lens(Ctx::data());
 
     let album_tracks = tracklist_widget(TrackDisplay {
@@ -149,7 +149,7 @@ fn album_menu(album: &Ctx<CommonCtx, Album>) -> Menu<State> {
         let more_than_one_artist = album.data.artists.len() > 1;
         let title = if more_than_one_artist {
             LocalizedString::new("menu-item-show-artist-name")
-                .with_placeholder(format!("Go To {}", artist_link.name))
+                .with_placeholder(format!("Go To Artist “{}”", artist_link.name))
         } else {
             LocalizedString::new("menu-item-show-artist").with_placeholder("Go To Artist")
         };

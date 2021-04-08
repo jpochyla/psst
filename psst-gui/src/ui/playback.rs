@@ -79,7 +79,7 @@ fn playback_item_widget() -> impl Widget<NowPlaying> {
         .with_child(track_artist)
         .with_spacer(2.0)
         .with_child(track_origin)
-        .padding(theme::grid(1.0 + 0.8))
+        .padding(theme::grid(2.0))
         .expand_width()
         .hover()
         .on_ex_click(|ctx, _event, now_playing: &mut NowPlaying, _| {

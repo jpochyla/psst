@@ -272,7 +272,7 @@ fn track_widget(display: TrackDisplay) -> impl Widget<TrackRow> {
         .with_child(major)
         .with_spacer(2.0)
         .with_child(minor)
-        .padding(theme::grid(0.8))
+        .padding(theme::grid(1.0))
         .hover()
         .rounded(theme::BUTTON_BORDER_RADIUS)
         .on_ex_click(move |ctx, event, tr: &mut TrackRow, _| match event.button {

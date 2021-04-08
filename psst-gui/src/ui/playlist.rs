@@ -10,7 +10,7 @@ use crate::{
     widget::{Async, AsyncAction, HoverExt},
 };
 use druid::{
-    widget::{Label, LineBreaking, List},
+    widget::{CrossAxisAlignment, Flex, Label, LineBreaking, List},
     Insets, LensExt, MouseButton, Widget, WidgetExt,
 };
 
@@ -44,17 +44,32 @@ pub fn playlist_widget() -> impl Widget<Ctx<CommonCtx, Playlist>> {
         .with_line_break_mode(LineBreaking::Clip)
         .lens(Playlist::name);
 
-    let playlist = playlist_name.padding(theme::grid(1.0)).lens(Ctx::data());
+    let track_count = Label::dynamic(|&track_count, _| match track_count {
+        0 => format!("Empty"),
+        1 => format!("1 track"),
+        n => format!("{} tracks", n),
+    })
+    .with_text_color(theme::PLACEHOLDER_COLOR)
+    .with_text_size(theme::TEXT_SIZE_SMALL)
+    .lens(Playlist::track_count);
 
-    playlist.hover().on_ex_click(
-        move |ctx, event, playlist: &mut Ctx<CommonCtx, Playlist>, _| match event.button {
-            MouseButton::Left => {
-                let nav = Nav::PlaylistDetail(playlist.data.link());
-                ctx.submit_command(cmd::NAVIGATE.with(nav));
-            }
-            _ => {}
-        },
-    )
+    Flex::column()
+        .cross_axis_alignment(CrossAxisAlignment::Start)
+        .with_child(playlist_name)
+        .with_spacer(2.0)
+        .with_child(track_count)
+        .padding(theme::grid(1.0))
+        .hover()
+        .on_ex_click(
+            move |ctx, event, playlist: &mut Playlist, _| match event.button {
+                MouseButton::Left => {
+                    let nav = Nav::PlaylistDetail(playlist.link());
+                    ctx.submit_command(cmd::NAVIGATE.with(nav));
+                }
+                _ => {}
+            },
+        )
+        .lens(Ctx::data())
 }
 
 pub fn detail_widget() -> impl Widget<State> {

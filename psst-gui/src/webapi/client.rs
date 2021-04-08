@@ -1,6 +1,7 @@
 use crate::{
     data::{
-        Album, AlbumType, Artist, ArtistAlbums, AudioAnalysis, Page, Playlist, SearchResults, Track,
+        Album, AlbumType, Artist, ArtistAlbums, AudioAnalysis, Image, Page, Playlist,
+        SearchResults, Track,
     },
     error::Error,
 };

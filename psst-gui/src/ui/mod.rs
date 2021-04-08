@@ -25,14 +25,6 @@ pub mod theme;
 pub mod track;
 pub mod utils;
 
-fn content_insets() -> Insets {
-    if cfg!(target_os = "macos") {
-        Insets::new(0.0, 24.0, 0.0, 0.0)
-    } else {
-        Insets::ZERO
-    }
-}
-
 pub fn main_window() -> WindowDesc<State> {
     let win = WindowDesc::new(root_widget())
         .title("Psst")
@@ -78,7 +70,11 @@ fn root_widget() -> impl Widget<State> {
         .with_child(menu_widget())
         .with_default_spacer()
         .with_flex_child(playlists, 1.0)
-        .padding(content_insets())
+        .padding(if cfg!(target_os = "macos") {
+            Insets::new(0.0, 24.0, 0.0, 0.0)
+        } else {
+            Insets::ZERO
+        })
         .background(theme::BACKGROUND_DARK);
 
     let topbar = Flex::row()

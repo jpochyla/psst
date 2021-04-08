@@ -30,10 +30,10 @@ impl Nav {
             Nav::Home => "Home".to_string(),
             Nav::SavedTracks => "Saved Tracks".to_string(),
             Nav::SavedAlbums => "Saved Albums".to_string(),
-            Nav::SearchResults(query) => format!("Search: {}", query),
-            Nav::AlbumDetail(link) => format!("Album: {}", link.name),
-            Nav::ArtistDetail(link) => format!("Artist: {}", link.name),
-            Nav::PlaylistDetail(link) => format!("Playlist: {}", link.name),
+            Nav::SearchResults(query) => format!("Search “{}”", query),
+            Nav::AlbumDetail(link) => format!("Album “{}”", link.name),
+            Nav::ArtistDetail(link) => format!("Artist “{}”", link.name),
+            Nav::PlaylistDetail(link) => format!("Playlist “{}”", link.name),
         }
     }
 }

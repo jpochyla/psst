@@ -39,11 +39,11 @@ pub fn detail_widget() -> impl Widget<State> {
         Ctx::make(State::common_ctx, State::artist.then(ArtistDetail::albums))
             .then(Ctx::in_promise()),
     )
-    .padding((theme::grid(0.8), 0.0));
+    .padding((theme::grid(1.0), 0.0));
 
     let related_artists = Async::new(|| spinner_widget(), || related_widget(), || error_widget())
         .lens(State::artist.then(ArtistDetail::related_artists))
-        .padding((theme::grid(0.8), 0.0));
+        .padding((theme::grid(1.0), 0.0));
 
     Flex::column()
         .with_child(top_tracks)
@@ -60,7 +60,7 @@ pub fn artist_widget() -> impl Widget<Artist> {
         .with_child(artist_image)
         .with_default_spacer()
         .with_flex_child(artist_label, 1.);
-    artist.hover().on_click(|ctx, artist, _| {
+    artist.padding(theme::grid(0.5)).hover().on_click(|ctx, artist, _| {
         let nav = Nav::ArtistDetail(artist.link());
         ctx.submit_command(cmd::NAVIGATE.with(nav));
     })

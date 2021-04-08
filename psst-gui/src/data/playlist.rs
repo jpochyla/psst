@@ -1,6 +1,6 @@
 use crate::data::{Image, Promise, Track};
 use druid::{im::Vector, Data, Lens};
-use serde::Deserialize;
+use serde::{Deserialize, Deserializer};
 use std::sync::Arc;
 
 #[derive(Clone, Debug, Data, Lens)]
@@ -14,6 +14,10 @@ pub struct Playlist {
     pub id: Arc<str>,
     pub name: Arc<str>,
     pub images: Vector<Image>,
+    pub description: Arc<str>,
+    #[serde(rename = "tracks")]
+    #[serde(deserialize_with = "deserialize_track_count")]
+    pub track_count: usize,
 }
 
 impl Playlist {
@@ -45,4 +49,16 @@ impl PlaylistTracks {
 pub struct PlaylistLink {
     pub id: Arc<str>,
     pub name: Arc<str>,
+}
+
+fn deserialize_track_count<'de, D>(deserializer: D) -> Result<usize, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    struct PlaylistTracksRef {
+        total: usize,
+    }
+
+    Ok(PlaylistTracksRef::deserialize(deserializer)?.total)
 }
