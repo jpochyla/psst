@@ -89,6 +89,7 @@ pub enum AlbumType {
     Album,
     Single,
     Compilation,
+    AppearsOn,
 }
 
 impl Default for AlbumType {

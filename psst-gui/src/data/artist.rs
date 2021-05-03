@@ -40,6 +40,7 @@ pub struct ArtistAlbums {
     pub albums: Vector<Album>,
     pub singles: Vector<Album>,
     pub compilations: Vector<Album>,
+    pub appears_on: Vector<Album>,
 }
 
 #[derive(Clone, Debug, Data, Lens)]

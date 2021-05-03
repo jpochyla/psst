@@ -1,7 +1,6 @@
 use crate::{
     data::{
-        Album, AlbumType, Artist, ArtistAlbums, AudioAnalysis, Image, Page, Playlist,
-        SearchResults, Track,
+        Album, AlbumType, Artist, ArtistAlbums, AudioAnalysis, Page, Playlist, SearchResults, Track,
     },
     error::Error,
 };
@@ -200,12 +199,14 @@ impl WebApi {
             albums: Vector::new(),
             singles: Vector::new(),
             compilations: Vector::new(),
+            appears_on: Vector::new(),
         };
         for album in result {
             match album.album_type {
                 AlbumType::Album => artist_albums.albums.push_back(album),
                 AlbumType::Single => artist_albums.singles.push_back(album),
                 AlbumType::Compilation => artist_albums.compilations.push_back(album),
+                AlbumType::AppearsOn => artist_albums.appears_on.push_back(album),
             }
         }
         Ok(artist_albums)
