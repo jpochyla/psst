@@ -60,10 +60,13 @@ pub fn artist_widget() -> impl Widget<Artist> {
         .with_child(artist_image)
         .with_default_spacer()
         .with_flex_child(artist_label, 1.);
-    artist.padding(theme::grid(0.5)).hover().on_click(|ctx, artist, _| {
-        let nav = Nav::ArtistDetail(artist.link());
-        ctx.submit_command(cmd::NAVIGATE.with(nav));
-    })
+    artist
+        .padding(theme::grid(0.5))
+        .hover()
+        .on_click(|ctx, artist, _| {
+            let nav = Nav::ArtistDetail(artist.link());
+            ctx.submit_command(cmd::NAVIGATE.with(nav));
+        })
 }
 
 pub fn cover_widget(size: f64) -> impl Widget<Artist> {

@@ -16,7 +16,7 @@ use druid::{
         Controller, ControllerHost, CrossAxisAlignment, Flex, Label, List, ListIter, Painter,
     },
     Data, Env, Event, EventCtx, Lens, LensExt, LocalizedString, Menu, MenuItem, MouseButton,
-    RenderContext, Widget, WidgetExt,
+    RenderContext, TextAlignment, Widget, WidgetExt,
 };
 use std::sync::Arc;
 
@@ -201,9 +201,11 @@ fn track_widget(display: TrackDisplay) -> impl Widget<TrackRow> {
 
     if display.number {
         let track_number = Label::dynamic(|tr: &TrackRow, _| tr.track.track_number.to_string())
-            .with_font(theme::UI_FONT_MONO)
             .with_text_size(theme::TEXT_SIZE_SMALL)
-            .with_text_color(theme::PLACEHOLDER_COLOR);
+            .with_text_color(theme::PLACEHOLDER_COLOR)
+            .with_text_alignment(TextAlignment::Center)
+            .center()
+            .fix_width(theme::grid(2.0));
         major.add_child(track_number);
         major.add_default_spacer();
     }
