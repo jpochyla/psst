@@ -27,11 +27,6 @@ pub fn detail_widget() -> impl Widget<State> {
 fn loaded_detail_widget() -> impl Widget<Ctx<CommonCtx, Album>> {
     let album_cover = rounded_cover_widget(theme::grid(24.0));
 
-    let album_name = Label::raw()
-        .with_line_break_mode(LineBreaking::WordWrap)
-        .with_font(theme::UI_FONT_MEDIUM)
-        .lens(Album::name);
-
     let album_artists = List::new(|| {
         Label::raw()
             .with_line_break_mode(LineBreaking::WordWrap)
@@ -57,8 +52,6 @@ fn loaded_detail_widget() -> impl Widget<Ctx<CommonCtx, Album>> {
         .cross_axis_alignment(CrossAxisAlignment::Start)
         .with_child(album_cover)
         .with_spacer(theme::grid(2.0))
-        .with_child(album_name)
-        .with_default_spacer()
         .with_child(album_artists)
         .with_default_spacer()
         .with_child(album_date)
