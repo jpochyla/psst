@@ -25,7 +25,7 @@ pub fn detail_widget() -> impl Widget<State> {
 }
 
 fn loaded_detail_widget() -> impl Widget<Ctx<CommonCtx, Album>> {
-    let album_cover = rounded_cover_widget(theme::grid(24.0));
+    let album_cover = rounded_cover_widget(theme::grid(10.0));
 
     let album_artists = List::new(|| {
         Label::raw()
@@ -50,16 +50,12 @@ fn loaded_detail_widget() -> impl Widget<Ctx<CommonCtx, Album>> {
 
     let album_info = Flex::column()
         .cross_axis_alignment(CrossAxisAlignment::Start)
-        .with_child(album_cover)
-        .with_spacer(theme::grid(2.0))
         .with_child(album_artists)
         .with_default_spacer()
         .with_child(album_date)
         .with_default_spacer()
         .with_child(album_label)
-        .fix_width(theme::grid(24.0))
-        .padding(theme::grid(1.0))
-        .lens(Ctx::data());
+        .padding(theme::grid(1.0));
 
     let album_tracks = tracklist_widget(TrackDisplay {
         number: true,
@@ -67,11 +63,16 @@ fn loaded_detail_widget() -> impl Widget<Ctx<CommonCtx, Album>> {
         ..TrackDisplay::empty()
     });
 
-    Flex::row()
+    Flex::column()
         .cross_axis_alignment(CrossAxisAlignment::Start)
-        .with_child(album_info)
-        .with_default_spacer()
-        .with_flex_child(album_tracks, 1.0)
+        .with_child(
+            Flex::row()
+                .with_child(album_cover)
+                .with_child(album_info)
+                .lens(Ctx::data()),
+        )
+        .with_spacer(theme::grid(1.0))
+        .with_child(album_tracks)
 }
 
 fn cover_widget(size: f64) -> impl Widget<Album> {
