@@ -1,5 +1,6 @@
 use crate::error::Error;
 use std::io;
+use std::slice;
 
 pub struct VorbisDecoder<R>
 where
@@ -7,7 +8,7 @@ where
 {
     vorbis: minivorbis::Decoder<R>,
     // Buffer with enough capacity for `minivorbis` packets.
-    packet: Vec<i16>,
+    packet: Vec<f32>,
     // Offset into `packet`, currently pending sample.
     pos: usize,
 }
@@ -34,10 +35,17 @@ where
 
     fn read_next_packet(&mut self) -> Result<usize, minivorbis::Error> {
         loop {
-            match self.vorbis.read_packet(&mut self.packet) {
+            let packet = unsafe {
+                slice::from_raw_parts_mut(self.packet.as_mut_ptr(), self.packet.capacity())
+            };
+            match self.vorbis.read_packet(packet) {
                 Err(minivorbis::Error::Hole) => {
                     // Skip holes in decoding.
                     continue;
+                }
+                Ok(len) => {
+                    unsafe { self.packet.set_len(len) };
+                    return Ok(len);
                 }
                 other_result => {
                     return other_result;
@@ -59,9 +67,9 @@ impl<R> Iterator for VorbisDecoder<R>
 where
     R: io::Read + io::Seek,
 {
-    type Item = i16;
+    type Item = f32;
 
-    fn next(&mut self) -> Option<i16> {
+    fn next(&mut self) -> Option<f32> {
         if self.pos >= self.packet.len() {
             // We have reached the end of the packet, try to read the next one.
             match self.read_next_packet() {

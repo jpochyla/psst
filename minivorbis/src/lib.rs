@@ -7,7 +7,7 @@ use std::{
     io::{self, Read, Seek},
     mem,
     os::raw,
-    slice,
+    ptr, slice,
 };
 
 pub struct Decoder<R: Read + Seek> {
@@ -79,18 +79,14 @@ impl<R: Read + Seek> Decoder<R> {
         }
     }
 
-    pub fn read_packet(&mut self, samples: &mut Vec<i16>) -> Result<usize, Error> {
-        let buf = samples.as_mut_ptr();
-        let buf_nbytes = samples.capacity() * 2; // 2 bytes in i16
+    pub fn read_packet(&mut self, samples: &mut [f32]) -> Result<usize, Error> {
+        let mut pcm_channels = ptr::null_mut();
         let previous_bitstream = self.data.bitstream;
         match unsafe {
-            minivorbis_sys::ov_read(
+            minivorbis_sys::ov_read_float(
                 &mut self.data.vorbis,
-                buf as *mut raw::c_char,
-                buf_nbytes as raw::c_int,
-                0, // little endian
-                2, // 2 bytes in i16
-                1, // signed data
+                &mut pcm_channels,
+                samples.len() as i32,
                 &mut self.data.bitstream,
             )
         } {
@@ -106,7 +102,7 @@ impl<R: Read + Seek> Decoder<R> {
                 let err = Error::from_code(code as raw::c_int).unwrap_err();
                 Err(err)
             }
-            read_bytes => {
+            decoded_samples => {
                 if previous_bitstream != self.data.bitstream {
                     // The section has changed, assert that the number of channels and the sample
                     // rate is the same.
@@ -129,11 +125,20 @@ impl<R: Read + Seek> Decoder<R> {
                         "the sample rate have changed between sections",
                     );
                 }
-                // We have read `read_bytes` of bytes. Convert to the number of read samples,
-                // adjust the `samples` length, and return.
-                let read_samples = read_bytes as usize / 2; // 2 bytes in i16
-                unsafe { samples.set_len(read_samples) };
-                Ok(read_samples)
+                let mut written_samples = 0;
+                for isample in 0..decoded_samples {
+                    for ichan in 0..self.channels {
+                        samples[written_samples] = unsafe {
+                            pcm_channels
+                                .add(ichan as usize)
+                                .read()
+                                .add(isample as usize)
+                                .read()
+                        };
+                        written_samples += 1;
+                    }
+                }
+                Ok(written_samples)
             }
         }
     }

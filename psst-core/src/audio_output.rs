@@ -3,7 +3,7 @@ use crossbeam_channel::{unbounded, Receiver, Sender};
 use miniaudio::{Context, Device, DeviceConfig, DeviceType, Format};
 use std::sync::{Arc, Mutex};
 
-pub type AudioSample = i16;
+pub type AudioSample = f32;
 
 pub trait AudioSource: Iterator<Item = AudioSample> {
     fn channels(&self) -> u8;
@@ -72,7 +72,7 @@ impl AudioOutput {
             // Setup the device config for playback with the channel count and sample rate
             // from the audio source.
             let source = source.lock().expect("Failed to acquire audio source lock");
-            config.playback_mut().set_format(Format::S16);
+            config.playback_mut().set_format(Format::F32);
             config.playback_mut().set_channels(source.channels().into());
             config.set_sample_rate(source.sample_rate());
         };
@@ -92,8 +92,8 @@ impl AudioOutput {
             }
             // Fill the buffer with audio samples from the source.
             for sample in output.as_samples_mut() {
-                *sample = source.next().unwrap_or(0); // Use silence in case the
-                                                      // source has finished.
+                *sample = source.next().unwrap_or(0.0); // Use silence in case the
+                                                        // source has finished.
             }
         });
 
