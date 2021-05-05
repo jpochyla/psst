@@ -119,8 +119,8 @@ pub fn setup(env: &mut Env, state: &State) {
 
     env.set(MENU_BUTTON_BG_ACTIVE, env.get(GREY_500));
     env.set(MENU_BUTTON_BG_INACTIVE, env.get(GREY_600));
-    env.set(MENU_BUTTON_FG_ACTIVE, env.get(GREY_100));
-    env.set(MENU_BUTTON_FG_INACTIVE, env.get(GREY_200));
+    env.set(MENU_BUTTON_FG_ACTIVE, env.get(GREY_000));
+    env.set(MENU_BUTTON_FG_INACTIVE, env.get(GREY_100));
 }
 
 fn setup_light_theme(env: &mut Env) {
