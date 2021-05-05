@@ -1,16 +1,16 @@
-use crate::data::{ArtistLink, Image, Promise, Track};
+use crate::data::{ArtistLink, Cached, Image, Promise, Track};
 use chrono::NaiveDate;
 use druid::{im::Vector, Data, Lens};
 use itertools::Itertools;
 use serde::Deserialize;
 use std::sync::Arc;
 
-#[derive(Clone, Debug, Data, Lens)]
+#[derive(Clone, Data, Lens)]
 pub struct AlbumDetail {
-    pub album: Promise<Album, AlbumLink>,
+    pub album: Promise<Cached<Album>, AlbumLink>,
 }
 
-#[derive(Clone, Debug, Data, Lens, Deserialize)]
+#[derive(Clone, Data, Lens, Deserialize)]
 pub struct Album {
     pub id: Arc<str>,
     pub name: Arc<str>,

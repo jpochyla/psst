@@ -1,10 +1,11 @@
 use crate::{
     data::{
-        Album, AlbumType, Artist, ArtistAlbums, AudioAnalysis, Page, Playlist, SearchResults, Track,
+        Album, AlbumType, Artist, ArtistAlbums, AudioAnalysis, Cached, Page, Playlist,
+        SearchResults, Track,
     },
     error::Error,
 };
-use druid::{im::Vector, image};
+use druid::{im::Vector, image, Data};
 use once_cell::sync::OnceCell;
 use psst_core::{
     access_token::TokenProvider, session::SessionHandle, util::default_ureq_agent_builder,
@@ -107,15 +108,16 @@ impl WebApi {
 
     /// Send a request using `self.load()`, but only if it isn't already present
     /// in cache.
-    fn load_cached<T: DeserializeOwned>(
+    fn load_cached<T: Data + DeserializeOwned>(
         &self,
         request: Request,
         bucket: &str,
         key: &str,
-    ) -> Result<T, Error> {
+    ) -> Result<Cached<T>, Error> {
         if let Some(file) = self.cache.get(bucket, key) {
-            let result = serde_json::from_reader(file)?;
-            Ok(result)
+            let cached_at = file.metadata()?.modified()?;
+            let value = serde_json::from_reader(file)?;
+            Ok(Cached::cached(value, cached_at))
         } else {
             let response = Self::with_retry(|| Ok(request.clone().call()?))?;
             let body = {
@@ -124,9 +126,9 @@ impl WebApi {
                 reader.read_to_end(&mut body)?;
                 body
             };
-            let result = serde_json::from_slice(&body)?;
+            let value = serde_json::from_slice(&body)?;
             self.cache.set(bucket, key, &body);
-            Ok(result)
+            Ok(Cached::fresh(value))
         }
     }
 
@@ -185,7 +187,7 @@ impl WebApi {
     pub fn get_artist(&self, id: &str) -> Result<Artist, Error> {
         let request = self.get(format!("v1/artists/{}", id))?;
         let result = self.load_cached(request, "artist", id)?;
-        Ok(result)
+        Ok(result.data)
     }
 
     // https://developer.spotify.com/documentation/web-api/reference/artists/get-artists-albums/
@@ -227,22 +229,22 @@ impl WebApi {
     }
 
     // https://developer.spotify.com/documentation/web-api/reference/artists/get-related-artists/
-    pub fn get_related_artists(&self, id: &str) -> Result<Vector<Artist>, Error> {
-        #[derive(Deserialize)]
+    pub fn get_related_artists(&self, id: &str) -> Result<Cached<Vector<Artist>>, Error> {
+        #[derive(Clone, Data, Deserialize)]
         struct Artists {
             artists: Vector<Artist>,
         }
 
         let request = self.get(format!("v1/artists/{}/related-artists", id))?;
-        let result: Artists = self.load_cached(request, "related-artists", id)?;
-        Ok(result.artists)
+        let result: Cached<Artists> = self.load_cached(request, "related-artists", id)?;
+        Ok(result.map(|result| result.artists))
     }
 }
 
 /// Album endpoints.
 impl WebApi {
     // https://developer.spotify.com/documentation/web-api/reference/albums/get-album/
-    pub fn get_album(&self, id: &str) -> Result<Album, Error> {
+    pub fn get_album(&self, id: &str) -> Result<Cached<Album>, Error> {
         let request = self
             .get(format!("v1/albums/{}", id))?
             .query("market", "from_token");
@@ -379,7 +381,7 @@ impl WebApi {
     pub fn get_audio_analysis(&self, track_id: &str) -> Result<AudioAnalysis, Error> {
         let request = self.get(format!("v1/audio-analysis/{}", track_id))?;
         let result = self.load_cached(request, "audio-analysis", track_id)?;
-        Ok(result)
+        Ok(result.data)
     }
 }
 

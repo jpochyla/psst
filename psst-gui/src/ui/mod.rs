@@ -153,7 +153,7 @@ fn menu_link_widget(title: &str, nav: Nav) -> impl Widget<State> {
                     },
                 );
                 env.set(
-                    theme::LABEL_COLOR,
+                    theme::TEXT_COLOR,
                     if &nav == route {
                         env.get(theme::MENU_BUTTON_FG_ACTIVE)
                     } else {

@@ -55,10 +55,9 @@ fn tabs_widget() -> impl Widget<State> {
                 move |env, state: &State| {
                     if tab == state.preferences.active {
                         env.set(theme::LINK_COLD_COLOR, env.get(theme::BACKGROUND_DARK));
-                        env.set(theme::LABEL_COLOR, env.get(theme::FOREGROUND_LIGHT));
+                        env.set(theme::TEXT_COLOR, env.get(theme::FOREGROUND_LIGHT));
                     } else {
                         env.set(theme::LINK_COLD_COLOR, env.get(theme::BACKGROUND_LIGHT));
-                        env.set(theme::LABEL_COLOR, env.get(theme::LABEL_COLOR));
                     }
                 }
             })

@@ -1,7 +1,45 @@
-use chrono::NaiveDate;
-use druid::{im::Vector, Data};
+use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
+use druid::{im::Vector, Data, Lens};
 use serde::{Deserialize, Deserializer};
-use std::{sync::Arc, time::Duration};
+use std::{
+    sync::Arc,
+    time::{Duration, SystemTime},
+};
+
+#[derive(Clone, Data, Lens)]
+pub struct Cached<T: Data> {
+    pub data: T,
+    #[data(ignore)]
+    pub cached_at: Option<NaiveDateTime>,
+}
+
+impl<T: Data> Cached<T> {
+    pub fn fresh(data: T) -> Self {
+        Self {
+            data,
+            cached_at: None,
+        }
+    }
+
+    pub fn cached(data: T, at: SystemTime) -> Self {
+        let datetime: DateTime<Utc> = at.into();
+        Self {
+            data,
+            cached_at: Some(datetime.naive_utc()),
+        }
+    }
+
+    pub fn is_cached(&self) -> bool {
+        self.cached_at.is_some()
+    }
+
+    pub fn map<U: Data>(self, f: impl Fn(T) -> U) -> Cached<U> {
+        Cached {
+            data: f(self.data),
+            cached_at: self.cached_at,
+        }
+    }
+}
 
 #[derive(Deserialize)]
 pub struct Page<T: Clone> {

@@ -24,7 +24,7 @@ pub use crate::data::{
     promise::{Promise, PromiseState},
     search::{Search, SearchResults},
     track::{AudioAnalysis, AudioSegment, TimeInterval, Track, TrackId},
-    utils::{Image, Page},
+    utils::{Cached, Image, Page},
 };
 use druid::{
     im::{HashSet, Vector},

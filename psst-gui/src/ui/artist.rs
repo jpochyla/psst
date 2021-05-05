@@ -1,6 +1,6 @@
 use crate::{
     cmd,
-    data::{Artist, ArtistAlbums, ArtistDetail, ArtistTracks, CommonCtx, Ctx, Nav, State},
+    data::{Artist, ArtistAlbums, ArtistDetail, ArtistTracks, Cached, CommonCtx, Ctx, Nav, State},
     ui::{
         album::album_widget,
         theme,
@@ -100,11 +100,12 @@ fn albums_widget() -> impl Widget<Ctx<CommonCtx, ArtistAlbums>> {
         .with_child(List::new(album_widget).lens(Ctx::map(ArtistAlbums::compilations)))
 }
 
-fn related_widget() -> impl Widget<Vector<Artist>> {
+fn related_widget() -> impl Widget<Cached<Vector<Artist>>> {
     Flex::column()
         .cross_axis_alignment(CrossAxisAlignment::Start)
         .with_child(label_widget("Related Artists"))
         .with_child(List::new(artist_widget))
+        .lens(Cached::data)
 }
 
 fn label_widget<T: Data>(text: impl Into<LabelText<T>>) -> impl Widget<T> {

@@ -1,7 +1,7 @@
 use crate::{
     data::{
-        Album, AlbumLink, Artist, ArtistAlbums, ArtistLink, AudioAnalysis, Nav, PlaybackPayload,
-        PlaylistLink, QueueBehavior, SearchResults, Track, TrackId,
+        Album, AlbumLink, Artist, ArtistAlbums, ArtistLink, AudioAnalysis, Cached, Nav,
+        PlaybackPayload, PlaylistLink, QueueBehavior, SearchResults, Track, TrackId,
     },
     error::Error,
 };
@@ -52,7 +52,7 @@ pub const UNSAVE_ALBUM: Selector<AlbumLink> = Selector::new("app.unsave-album");
 // Album detail
 
 pub const LOAD_ALBUM_DETAIL: Selector<AlbumLink> = Selector::new("app.load-album-detail");
-pub const UPDATE_ALBUM_DETAIL: Selector<(AlbumLink, Result<Album, Error>)> =
+pub const UPDATE_ALBUM_DETAIL: Selector<(AlbumLink, Result<Cached<Album>, Error>)> =
     Selector::new("app.update-album-detail");
 
 // Artist detail
@@ -64,7 +64,7 @@ pub const UPDATE_ARTIST_ALBUMS: Selector<(ArtistLink, Result<ArtistAlbums, Error
     Selector::new("app.update-artist-album");
 pub const UPDATE_ARTIST_TOP_TRACKS: Selector<(ArtistLink, Result<Vector<Arc<Track>>, Error>)> =
     Selector::new("app.update-artist-top_tracks");
-pub const UPDATE_ARTIST_RELATED: Selector<(ArtistLink, Result<Vector<Artist>, Error>)> =
+pub const UPDATE_ARTIST_RELATED: Selector<(ArtistLink, Result<Cached<Vector<Artist>>, Error>)> =
     Selector::new("app.update-artist-related");
 
 // Playlist detail

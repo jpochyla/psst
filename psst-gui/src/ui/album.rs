@@ -1,6 +1,6 @@
 use crate::{
     cmd,
-    data::{Album, AlbumDetail, ArtistLink, CommonCtx, Ctx, Nav, State},
+    data::{Album, AlbumDetail, ArtistLink, Cached, CommonCtx, Ctx, Nav, State},
     ui::{
         theme,
         track::{tracklist_widget, TrackDisplay},
@@ -24,7 +24,7 @@ pub fn detail_widget() -> impl Widget<State> {
     )
 }
 
-fn loaded_detail_widget() -> impl Widget<Ctx<CommonCtx, Album>> {
+fn loaded_detail_widget() -> impl Widget<Ctx<CommonCtx, Cached<Album>>> {
     let album_cover = rounded_cover_widget(theme::grid(10.0));
 
     let album_artists = List::new(|| {
@@ -77,6 +77,7 @@ fn loaded_detail_widget() -> impl Widget<Ctx<CommonCtx, Album>> {
         )
         .with_spacer(theme::grid(1.0))
         .with_child(album_tracks)
+        .lens(Ctx::map(Cached::data))
 }
 
 fn cover_widget(size: f64) -> impl Widget<Album> {
