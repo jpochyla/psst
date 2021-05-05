@@ -40,7 +40,9 @@ fn loaded_detail_widget() -> impl Widget<Ctx<CommonCtx, Album>> {
     })
     .lens(Album::artists);
 
-    let album_date = Label::dynamic(|album: &Album, _| album.release());
+    let album_date = Label::dynamic(|album: &Album, _| album.release())
+        .with_text_size(theme::TEXT_SIZE_SMALL)
+        .with_text_color(theme::PLACEHOLDER_COLOR);
 
     let album_label = Label::raw()
         .with_line_break_mode(LineBreaking::WordWrap)
@@ -67,7 +69,9 @@ fn loaded_detail_widget() -> impl Widget<Ctx<CommonCtx, Album>> {
         .cross_axis_alignment(CrossAxisAlignment::Start)
         .with_child(
             Flex::row()
+                .with_spacer(theme::grid(4.0))
                 .with_child(album_cover)
+                .with_default_spacer()
                 .with_child(album_info)
                 .lens(Ctx::data()),
         )

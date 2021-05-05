@@ -91,7 +91,6 @@ fn playback_item_widget() -> impl Widget<NowPlaying> {
 fn player_widget() -> impl Widget<Playback> {
     let play_previous = icons::SKIP_BACK
         .scale((theme::grid(2.0), theme::grid(2.0)))
-        .with_color(theme::PLACEHOLDER_COLOR)
         .padding(theme::grid(1.0))
         .hover()
         .rounded(theme::BUTTON_BORDER_RADIUS)
@@ -107,6 +106,7 @@ fn player_widget() -> impl Widget<Playback> {
         |&state, _, _| match state {
             PlaybackState::Loading => Spinner::new()
                 .with_color(theme::GREY_400)
+                .fix_size(theme::grid(3.0), theme::grid(3.0))
                 .padding(theme::grid(1.0))
                 .hover()
                 .circle()
@@ -135,7 +135,6 @@ fn player_widget() -> impl Widget<Playback> {
 
     let play_next = icons::SKIP_FORWARD
         .scale((theme::grid(2.0), theme::grid(2.0)))
-        .with_color(theme::PLACEHOLDER_COLOR)
         .padding(theme::grid(1.0))
         .hover()
         .rounded(theme::BUTTON_BORDER_RADIUS)

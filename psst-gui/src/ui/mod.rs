@@ -80,7 +80,6 @@ fn root_widget() -> impl Widget<State> {
     let topbar = Flex::row()
         .must_fill_main_axis(true)
         .with_child(back_button_widget())
-        .with_default_spacer()
         .with_child(title_widget())
         .with_flex_child(
             Flex::row()
