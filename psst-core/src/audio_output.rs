@@ -79,21 +79,15 @@ impl AudioOutput {
 
         // Move the source into the config's data callback.  Callback will get cloned
         // for each device we create.
-        config.set_data_callback(move |device, output, _frames| {
+        config.set_data_callback(move |_device, output, _frames| {
             let mut source = source.lock().expect("Failed to acquire audio source lock");
-            // Apply correct normalization factor before each audio packet.
-            if let Some(norm_factor) = source.normalization_factor() {
-                // TODO: Avoid the clamping.
-                let norm_factor = norm_factor.min(1.0);
-                // TODO: Add a global master volume to the calculation.
-                if let Err(err) = device.set_master_volume(norm_factor) {
-                    log::error!("failed to set master volume: {}", err);
-                }
-            }
+            // Get the audio normalization factor.
+            let norm_factor = source.normalization_factor().unwrap_or(1.0);
             // Fill the buffer with audio samples from the source.
             for sample in output.as_samples_mut() {
-                *sample = source.next().unwrap_or(0.0); // Use silence in case the
-                                                        // source has finished.
+                let s = source.next().unwrap_or(0.0); // Use silence in case the
+                                                      // source has finished.
+                *sample = s * norm_factor;
             }
         });
 
