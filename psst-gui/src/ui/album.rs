@@ -6,7 +6,7 @@ use crate::{
         track::{tracklist_widget, TrackDisplay},
         utils::{error_widget, placeholder_widget, spinner_widget},
     },
-    widget::{Async, Clip, HoverExt, RemoteImage},
+    widget::{Async, Clip, LinkExt, RemoteImage},
 };
 use druid::{
     widget::{CrossAxisAlignment, Flex, Label, LineBreaking, List},
@@ -31,7 +31,7 @@ fn loaded_detail_widget() -> impl Widget<Ctx<CommonCtx, Album>> {
         Label::raw()
             .with_line_break_mode(LineBreaking::WordWrap)
             .with_font(theme::UI_FONT_MEDIUM)
-            .hover()
+            .link()
             .lens(ArtistLink::name)
             .on_click(|ctx, artist_link: &mut ArtistLink, _| {
                 let nav = Nav::ArtistDetail(artist_link.to_owned());
@@ -125,7 +125,7 @@ pub fn album_widget() -> impl Widget<Ctx<CommonCtx, Album>> {
         .lens(Ctx::data());
 
     album
-        .hover()
+        .link()
         .on_ex_click(
             move |ctx, event, album: &mut Ctx<CommonCtx, Album>, _| match event.button {
                 MouseButton::Left => {

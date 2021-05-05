@@ -7,7 +7,7 @@ use crate::{
         AudioQuality, Authentication, Config, Preferences, PreferencesTab, Promise, State, Theme,
     },
     ui::{icons::SvgIcon, theme, utils::Border},
-    widget::{icons, Empty, HoverExt},
+    widget::{icons, Empty, LinkExt},
 };
 use druid::{
     commands,
@@ -48,16 +48,16 @@ fn tabs_widget() -> impl Widget<State> {
             .with_default_spacer()
             .with_child(Label::new(text).with_font(theme::UI_FONT_MEDIUM))
             .padding(theme::grid(1.0))
-            .hover()
+            .link()
             .rounded(theme::BUTTON_BORDER_RADIUS)
             .env_scope({
                 let tab = tab.clone();
                 move |env, state: &State| {
                     if tab == state.preferences.active {
-                        env.set(theme::HOVER_COLD_COLOR, env.get(theme::BACKGROUND_DARK));
+                        env.set(theme::LINK_COLD_COLOR, env.get(theme::BACKGROUND_DARK));
                         env.set(theme::LABEL_COLOR, env.get(theme::FOREGROUND_LIGHT));
                     } else {
-                        env.set(theme::HOVER_COLD_COLOR, env.get(theme::BACKGROUND_LIGHT));
+                        env.set(theme::LINK_COLD_COLOR, env.get(theme::BACKGROUND_LIGHT));
                         env.set(theme::LABEL_COLOR, env.get(theme::LABEL_COLOR));
                     }
                 }

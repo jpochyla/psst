@@ -3,7 +3,7 @@ use crate::{
     controller::{NavController, PlaybackController, SessionController},
     data::{Nav, State},
     ui::utils::Border,
-    widget::{icons, Empty, HoverExt, ThemeScope, ViewDispatcher},
+    widget::{icons, Empty, LinkExt, ThemeScope, ViewDispatcher},
 };
 use druid::{
     commands,
@@ -130,22 +130,22 @@ fn logo_widget() -> impl Widget<State> {
 fn menu_widget() -> impl Widget<State> {
     Flex::column()
         .with_default_spacer()
-        .with_child(menu_item_widget("Home", Nav::Home))
-        .with_child(menu_item_widget("Tracks", Nav::SavedTracks))
-        .with_child(menu_item_widget("Albums", Nav::SavedAlbums))
+        .with_child(menu_link_widget("Home", Nav::Home))
+        .with_child(menu_link_widget("Tracks", Nav::SavedTracks))
+        .with_child(menu_link_widget("Albums", Nav::SavedAlbums))
         .with_child(menu_search_widget())
 }
 
-fn menu_item_widget(title: &str, nav: Nav) -> impl Widget<State> {
+fn menu_link_widget(title: &str, nav: Nav) -> impl Widget<State> {
     Label::new(title)
         .padding((theme::grid(2.0), theme::grid(1.0)))
         .expand_width()
-        .hover()
+        .link()
         .env_scope({
             let nav = nav.clone();
             move |env, route: &Nav| {
                 env.set(
-                    theme::HOVER_COLD_COLOR,
+                    theme::LINK_COLD_COLOR,
                     if &nav == route {
                         env.get(theme::MENU_BUTTON_BG_ACTIVE)
                     } else {
@@ -220,7 +220,7 @@ fn back_button_widget() -> impl Widget<State> {
         .padding(theme::grid(1.0));
     let enabled = icon
         .padding(theme::grid(1.0))
-        .hover()
+        .link()
         .rounded(theme::BUTTON_BORDER_RADIUS)
         .on_ex_click(|ctx, event, state, _env| match event.button {
             MouseButton::Left => {
@@ -289,7 +289,7 @@ fn preferences_button_widget() -> impl Widget<State> {
         .scale((theme::grid(2.0), theme::grid(2.0)))
         .with_color(theme::GREY_400)
         .padding(theme::grid(1.0))
-        .hover()
+        .link()
         .rounded(theme::BUTTON_BORDER_RADIUS)
         .on_click(|ctx, _state, _env| {
             ctx.submit_command(commands::SHOW_PREFERENCES);

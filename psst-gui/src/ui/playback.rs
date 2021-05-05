@@ -5,7 +5,7 @@ use crate::{
         State, Track,
     },
     ui::theme,
-    widget::{icons, Empty, HoverExt, Maybe},
+    widget::{icons, Empty, LinkExt, Maybe},
 };
 use druid::{
     kurbo::{Affine, BezPath},
@@ -81,7 +81,7 @@ fn playback_item_widget() -> impl Widget<NowPlaying> {
         .with_child(track_origin)
         .padding(theme::grid(2.0))
         .expand_width()
-        .hover()
+        .link()
         .on_ex_click(|ctx, _event, now_playing: &mut NowPlaying, _| {
             let nav = now_playing.origin.to_nav();
             ctx.submit_command(cmd::NAVIGATE.with(nav));
@@ -92,7 +92,7 @@ fn player_widget() -> impl Widget<Playback> {
     let play_previous = icons::SKIP_BACK
         .scale((theme::grid(2.0), theme::grid(2.0)))
         .padding(theme::grid(1.0))
-        .hover()
+        .link()
         .rounded(theme::BUTTON_BORDER_RADIUS)
         .on_click(|ctx, _, _| ctx.submit_command(cmd::PLAY_PREVIOUS));
     let play_previous = Either::new(
@@ -108,7 +108,7 @@ fn player_widget() -> impl Widget<Playback> {
                 .with_color(theme::GREY_400)
                 .fix_size(theme::grid(3.0), theme::grid(3.0))
                 .padding(theme::grid(1.0))
-                .hover()
+                .link()
                 .circle()
                 .border(theme::GREY_600, 1.0)
                 .on_click(|ctx, _, _| ctx.submit_command(cmd::PLAY_STOP))
@@ -116,7 +116,7 @@ fn player_widget() -> impl Widget<Playback> {
             PlaybackState::Playing => icons::PAUSE
                 .scale((theme::grid(3.0), theme::grid(3.0)))
                 .padding(theme::grid(1.0))
-                .hover()
+                .link()
                 .circle()
                 .border(theme::GREY_500, 1.0)
                 .on_click(|ctx, _, _| ctx.submit_command(cmd::PLAY_PAUSE))
@@ -124,7 +124,7 @@ fn player_widget() -> impl Widget<Playback> {
             PlaybackState::Paused => icons::PLAY
                 .scale((theme::grid(3.0), theme::grid(3.0)))
                 .padding(theme::grid(1.0))
-                .hover()
+                .link()
                 .circle()
                 .border(theme::GREY_500, 1.0)
                 .on_click(|ctx, _, _| ctx.submit_command(cmd::PLAY_RESUME))
@@ -136,7 +136,7 @@ fn player_widget() -> impl Widget<Playback> {
     let play_next = icons::SKIP_FORWARD
         .scale((theme::grid(2.0), theme::grid(2.0)))
         .padding(theme::grid(1.0))
-        .hover()
+        .link()
         .rounded(theme::BUTTON_BORDER_RADIUS)
         .on_click(|ctx, _, _| ctx.submit_command(cmd::PLAY_NEXT));
     let play_next = Either::new(
@@ -152,7 +152,7 @@ fn player_widget() -> impl Widget<Playback> {
                 svg.scale((theme::grid(2.0), theme::grid(2.0)))
                     .with_color(theme::PLACEHOLDER_COLOR)
                     .padding(theme::grid(1.0))
-                    .hover()
+                    .link()
                     .rounded(theme::BUTTON_BORDER_RADIUS)
                     .on_click(|ctx: &mut EventCtx, playback: &mut Playback, _| {
                         let new_behavior = match playback.queue_behavior {

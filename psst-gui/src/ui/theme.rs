@@ -34,8 +34,8 @@ pub const ICON_COLOR: Key<Color> = Key::new("app.icon-color");
 pub const ICON_SIZE: Size = Size::new(12.0, 12.0);
 pub const ICON_SIZE_LARGE: Size = Size::new(GRID * 2.0, GRID * 2.0);
 
-pub const HOVER_HOT_COLOR: Key<Color> = Key::new("app.hover-hot-color");
-pub const HOVER_COLD_COLOR: Key<Color> = Key::new("app.hover-cold-color");
+pub const LINK_HOT_COLOR: Key<Color> = Key::new("app.link-hot-color");
+pub const LINK_COLD_COLOR: Key<Color> = Key::new("app.link-cold-color");
 
 pub fn setup(env: &mut Env, state: &State) {
     match state.config.theme {
@@ -137,8 +137,8 @@ fn setup_light_theme(env: &mut Env) {
 
     env.set(RED, Color::rgba8(0xEB, 0x57, 0x57, 0xFF));
 
-    env.set(HOVER_HOT_COLOR, Color::rgba(0.0, 0.0, 0.0, 0.05));
-    env.set(HOVER_COLD_COLOR, Color::rgba(0.0, 0.0, 0.0, 0.0));
+    env.set(LINK_HOT_COLOR, Color::rgba(0.0, 0.0, 0.0, 0.05));
+    env.set(LINK_COLD_COLOR, Color::rgba(0.0, 0.0, 0.0, 0.0));
 }
 
 fn setup_dark_theme(env: &mut Env) {
@@ -155,6 +155,6 @@ fn setup_dark_theme(env: &mut Env) {
 
     env.set(RED, Color::rgba8(0xEB, 0x57, 0x57, 0xFF));
 
-    env.set(HOVER_HOT_COLOR, Color::rgba(1.0, 1.0, 1.0, 0.05));
-    env.set(HOVER_COLD_COLOR, Color::rgba(1.0, 1.0, 1.0, 0.0));
+    env.set(LINK_HOT_COLOR, Color::rgba(1.0, 1.0, 1.0, 0.05));
+    env.set(LINK_COLD_COLOR, Color::rgba(1.0, 1.0, 1.0, 0.0));
 }

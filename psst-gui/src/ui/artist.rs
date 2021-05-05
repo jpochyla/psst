@@ -7,7 +7,7 @@ use crate::{
         track::{tracklist_widget, TrackDisplay},
         utils::{error_widget, placeholder_widget, spinner_widget},
     },
-    widget::{Async, Clip, HoverExt, RemoteImage},
+    widget::{Async, Clip, LinkExt, RemoteImage},
 };
 use druid::{
     im::Vector,
@@ -62,7 +62,7 @@ pub fn artist_widget() -> impl Widget<Artist> {
         .with_flex_child(artist_label, 1.);
     artist
         .padding(theme::grid(0.5))
-        .hover()
+        .link()
         .on_click(|ctx, artist, _| {
             let nav = Nav::ArtistDetail(artist.link());
             ctx.submit_command(cmd::NAVIGATE.with(nav));

@@ -5,7 +5,7 @@ use crate::{
         SavedTracks, SearchResults, State, Track,
     },
     ui::theme,
-    widget::HoverExt,
+    widget::LinkExt,
 };
 use druid::{
     im::Vector,
@@ -275,7 +275,7 @@ fn track_widget(display: TrackDisplay) -> impl Widget<TrackRow> {
         .with_spacer(2.0)
         .with_child(minor)
         .padding(theme::grid(1.0))
-        .hover()
+        .link()
         .rounded(theme::BUTTON_BORDER_RADIUS)
         .on_ex_click(move |ctx, event, tr: &mut TrackRow, _| match event.button {
             MouseButton::Left => {

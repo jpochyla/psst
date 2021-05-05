@@ -4,18 +4,18 @@ use druid::{
     Color, Data, KeyOrValue, MouseEvent, Point, WidgetPod,
 };
 
-pub struct Hover<T> {
+pub struct Link<T> {
     inner: WidgetPod<T, Box<dyn Widget<T>>>,
     border_color: KeyOrValue<Color>,
     border_width: KeyOrValue<f64>,
     corner_radius: KeyOrValue<f64>,
 }
 
-impl<T: Data> Hover<T> {
+impl<T: Data> Link<T> {
     pub fn new(inner: impl Widget<T> + 'static) -> Self {
         Self {
             inner: WidgetPod::new(inner).boxed(),
-            border_color: theme::HOVER_HOT_COLOR.into(),
+            border_color: theme::LINK_HOT_COLOR.into(),
             border_width: 0.0.into(),
             corner_radius: 0.0.into(),
         }
@@ -54,7 +54,7 @@ impl<T: Data> Hover<T> {
     }
 }
 
-impl<T: Data> Widget<T> for Hover<T> {
+impl<T: Data> Widget<T> for Link<T> {
     fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut T, env: &Env) {
         self.inner.event(ctx, event, data, env);
     }
@@ -78,9 +78,9 @@ impl<T: Data> Widget<T> for Hover<T> {
 
     fn paint(&mut self, ctx: &mut PaintCtx, data: &T, env: &Env) {
         let background = if ctx.is_hot() {
-            env.get(theme::HOVER_HOT_COLOR)
+            env.get(theme::LINK_HOT_COLOR)
         } else {
-            env.get(theme::HOVER_COLD_COLOR)
+            env.get(theme::LINK_COLD_COLOR)
         };
         let border_color = self.border_color.resolve(env);
         let border_width = self.border_width.resolve(env);
@@ -104,9 +104,9 @@ impl<T: Data> Widget<T> for Hover<T> {
     }
 }
 
-pub trait HoverExt<T: Data>: Widget<T> + Sized + 'static {
-    fn hover(self) -> Hover<T> {
-        Hover::new(self)
+pub trait LinkExt<T: Data>: Widget<T> + Sized + 'static {
+    fn link(self) -> Link<T> {
+        Link::new(self)
     }
 
     fn on_ex_click(
@@ -117,4 +117,4 @@ pub trait HoverExt<T: Data>: Widget<T> + Sized + 'static {
     }
 }
 
-impl<T: Data, W: Widget<T> + 'static> HoverExt<T> for W {}
+impl<T: Data, W: Widget<T> + 'static> LinkExt<T> for W {}
