@@ -299,14 +299,14 @@ fn compute_keys(
     let mut data = Vec::with_capacity(0x64);
     for i in 1..6 {
         let mut mac: Hmac<Sha1> =
-            Hmac::new_varkey(&shared_secret).expect("HMAC can take key of any size");
+            Hmac::new_from_slice(&shared_secret).expect("HMAC can take key of any size");
         mac.update(hello_packet);
         mac.update(apresp_packet);
         mac.update(&[i]);
         data.extend_from_slice(&mac.finalize().into_bytes());
     }
     let mut mac: Hmac<Sha1> =
-        Hmac::new_varkey(&data[..0x14]).expect("HMAC can take key of any size");
+        Hmac::new_from_slice(&data[..0x14]).expect("HMAC can take key of any size");
     mac.update(hello_packet);
     mac.update(apresp_packet);
     let digest = mac.finalize().into_bytes();
