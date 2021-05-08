@@ -351,15 +351,12 @@ dependencies = [
 
 [[package]]
 name = "cpufeatures"
-version = "0.1.0"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5cd5a7748210e7ec1a9696610b1015e6e31fbf58f77a160801f124bd1c36592a"
-
-[[package]]
-name = "cpuid-bool"
-version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8aebca1129a03dc6dc2b127edd729435bbc4a37e1d5f4d7513165089ceb02634"
+checksum = "dec1028182c380cc45a2e2c5ec841134f2dfd0f8f5f0a5bcd68004f81b5efdf4"
+dependencies = [
+ "libc",
+]
 
 [[package]]
 name = "crc32fast"
@@ -459,7 +456,7 @@ checksum = "212d0f5754cb6769937f4501cc0e67f4f4483c8d2c3e1e922ee9edbe4ab4c7c0"
 [[package]]
 name = "druid"
 version = "0.7.0"
-source = "git+https://github.com/jpochyla/druid?branch=mac-transparent-titlebar#18690594699e29fd2623a24ac24350631a3d6890"
+source = "git+https://github.com/jpochyla/druid?branch=mac-transparent-titlebar#f18ada3e7204fb89599ee682029e52a6e0ac858e"
 dependencies = [
  "console_error_panic_hook",
  "druid-derive",
@@ -481,7 +478,7 @@ dependencies = [
 [[package]]
 name = "druid-derive"
 version = "0.4.0"
-source = "git+https://github.com/jpochyla/druid?branch=mac-transparent-titlebar#18690594699e29fd2623a24ac24350631a3d6890"
+source = "git+https://github.com/jpochyla/druid?branch=mac-transparent-titlebar#f18ada3e7204fb89599ee682029e52a6e0ac858e"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -491,7 +488,7 @@ dependencies = [
 [[package]]
 name = "druid-shell"
 version = "0.7.0"
-source = "git+https://github.com/jpochyla/druid?branch=mac-transparent-titlebar#18690594699e29fd2623a24ac24350631a3d6890"
+source = "git+https://github.com/jpochyla/druid?branch=mac-transparent-titlebar#f18ada3e7204fb89599ee682029e52a6e0ac858e"
 dependencies = [
  "anyhow",
  "bitflags",
@@ -1726,9 +1723,9 @@ dependencies = [
 
 [[package]]
 name = "regex"
-version = "1.5.3"
+version = "1.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ce5f1ceb7f74abbce32601642fcf8e8508a8a8991e0621c7d750295b9095702b"
+checksum = "d07a8629359eb56f1e2fb1652bb04212c072a87ba68546a04065d525673ac461"
 dependencies = [
  "aho-corasick",
  "memchr",
@@ -1894,13 +1891,13 @@ dependencies = [
 
 [[package]]
 name = "sha-1"
-version = "0.9.4"
+version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dfebf75d25bd900fd1e7d11501efab59bc846dbc76196839663e6637bba9f25f"
+checksum = "b659df5fc3ce22274daac600ffb845300bd2125bcfaec047823075afdab81c00"
 dependencies = [
  "block-buffer",
  "cfg-if 1.0.0",
- "cpuid-bool",
+ "cpufeatures",
  "digest",
  "opaque-debug",
 ]
@@ -1965,8 +1962,8 @@ dependencies = [
 
 [[package]]
 name = "souvlaki"
-version = "0.1.0"
-source = "git+https://github.com/Sinono3/souvlaki#45d99bcf1f1313f75137b6df2e70c2fa94c29a2d"
+version = "0.2.0"
+source = "git+https://github.com/Sinono3/souvlaki#a1f9c1d4bbc35d3878c617ddb2120943fdfcc063"
 dependencies = [
  "block",
  "cocoa",
@@ -2451,9 +2448,9 @@ dependencies = [
 
 [[package]]
 name = "url"
-version = "2.2.1"
+version = "2.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9ccd964113622c8e9322cfac19eb1004a07e636c545f325da085d5cdde6f1f8b"
+checksum = "a507c383b2d33b5fc35d1861e77e6b383d158b2da5e14fe51b83dfedf6fd578c"
 dependencies = [
  "form_urlencoded",
  "idna",
