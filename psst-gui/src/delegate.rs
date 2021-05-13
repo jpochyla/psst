@@ -172,8 +172,9 @@ impl Delegate {
         cmd: &Command,
         data: &mut State,
     ) -> Handled {
-        if cmd.is(cmd::SESSION_CONNECTED) || cmd.is(cmd::LOAD_PLAYLISTS) {
+        if cmd.is(cmd::SESSION_CONNECTED) {
             data.library_mut().playlists.defer_default();
+            data.user_profile.defer_default();
             Handled::Yes
         } else if let Some(link) = cmd.get(cmd::LOAD_PLAYLIST_DETAIL).cloned() {
             let sink = ctx.get_external_handle();

@@ -8,6 +8,7 @@ mod playlist;
 mod promise;
 mod search;
 mod track;
+mod user;
 mod utils;
 
 pub use crate::data::{
@@ -24,6 +25,7 @@ pub use crate::data::{
     promise::{Promise, PromiseState},
     search::{Search, SearchResults},
     track::{AudioAnalysis, AudioSegment, TimeInterval, Track, TrackId},
+    user::UserProfile,
     utils::{Cached, Image, Page},
 };
 use druid::{
@@ -49,6 +51,7 @@ pub struct State {
     pub playlist: PlaylistDetail,
     pub library: Arc<Library>,
     pub common_ctx: CommonCtx,
+    pub user_profile: Promise<UserProfile>,
 }
 
 impl Default for State {
@@ -100,6 +103,7 @@ impl Default for State {
                 saved_tracks: HashSet::new(),
                 saved_albums: HashSet::new(),
             },
+            user_profile: Promise::Empty,
         }
     }
 }

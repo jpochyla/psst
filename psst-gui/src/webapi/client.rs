@@ -1,7 +1,7 @@
 use crate::{
     data::{
         Album, AlbumType, Artist, ArtistAlbums, AudioAnalysis, Cached, Page, Playlist,
-        SearchResults, Track,
+        SearchResults, Track, UserProfile,
     },
     error::Error,
 };
@@ -178,6 +178,15 @@ impl WebApi {
 
     pub fn global() -> Arc<Self> {
         GLOBAL_WEBAPI.get().unwrap().clone()
+    }
+}
+
+/// Other endpoints.
+impl WebApi {
+    pub fn get_user_profile(&self) -> Result<UserProfile, Error> {
+        let request = self.get("v1/me")?;
+        let result = self.load(request)?;
+        Ok(result)
     }
 }
 

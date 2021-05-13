@@ -6,7 +6,6 @@ use crate::{
     widget::{icons, Empty, LinkExt, ThemeScope, ViewDispatcher},
 };
 use druid::{
-    commands,
     lens::Unit,
     widget::{CrossAxisAlignment, Either, Flex, Label, Scroll, Split, ViewSwitcher},
     Insets, Menu, MenuItem, MouseButton, Widget, WidgetExt, WindowDesc, WindowLevel,
@@ -23,6 +22,7 @@ pub mod preferences;
 pub mod search;
 pub mod theme;
 pub mod track;
+pub mod user;
 pub mod utils;
 
 pub fn main_window() -> WindowDesc<State> {
@@ -69,7 +69,8 @@ fn root_widget() -> impl Widget<State> {
         .with_child(logo_widget())
         .with_child(menu_widget())
         .with_default_spacer()
-        .with_flex_child(playlists, 1.0)
+        .with_flex_child(playlists.expand_height(), 1.0)
+        .with_child(user::user_widget())
         .padding(if cfg!(target_os = "macos") {
             Insets::new(0.0, 24.0, 0.0, 0.0)
         } else {
@@ -81,14 +82,6 @@ fn root_widget() -> impl Widget<State> {
         .must_fill_main_axis(true)
         .with_child(back_button_widget())
         .with_child(title_widget())
-        .with_flex_child(
-            Flex::row()
-                .with_child(is_online_widget())
-                .with_default_spacer()
-                .with_child(preferences_button_widget())
-                .align_right(),
-            1.0,
-        )
         .background(Border::Bottom.with_color(theme::BACKGROUND_DARK));
 
     let main = Flex::column()
@@ -282,28 +275,4 @@ fn route_title_widget() -> impl Widget<Nav> {
     Label::dynamic(|route: &Nav, _| route.to_title())
         .with_font(theme::UI_FONT_MEDIUM)
         .with_text_size(theme::TEXT_SIZE_LARGE)
-}
-
-fn preferences_button_widget() -> impl Widget<State> {
-    icons::PREFERENCES
-        .scale((theme::grid(2.0), theme::grid(2.0)))
-        .with_color(theme::GREY_400)
-        .padding(theme::grid(1.0))
-        .link()
-        .rounded(theme::BUTTON_BORDER_RADIUS)
-        .on_click(|ctx, _state, _env| {
-            ctx.submit_command(commands::SHOW_PREFERENCES);
-        })
-        .padding(theme::grid(1.0))
-        .lens(Unit)
-}
-
-fn is_online_widget() -> impl Widget<State> {
-    Either::new(
-        // TODO: Avoid the locking here.
-        |state: &State, _| state.session.is_connected(),
-        Empty,
-        Label::new("Offline"),
-    )
-    .padding(theme::grid(1.0))
 }
