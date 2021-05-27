@@ -27,6 +27,10 @@ impl Playlist {
             name: self.name.clone(),
         }
     }
+
+    pub fn image(&self, width: f64, height: f64) -> Option<&Image> {
+        Image::fitting(&self.images, width, height)
+    }
 }
 
 #[derive(Clone, Debug, Data, Lens)]

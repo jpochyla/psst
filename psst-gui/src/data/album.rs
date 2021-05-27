@@ -58,11 +58,7 @@ impl Album {
     }
 
     pub fn image(&self, width: f64, height: f64) -> Option<&Image> {
-        self.images
-            .iter()
-            .rev()
-            .find(|img| !img.fits(width, height))
-            .or_else(|| self.images.back())
+        Image::fitting(&self.images, width, height)
     }
 
     pub fn url(&self) -> String {

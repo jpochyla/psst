@@ -64,6 +64,14 @@ impl Image {
             true // Unknown dimensions, treat as fitting.
         }
     }
+
+    pub fn fitting(images: &Vector<Self>, width: f64, height: f64) -> Option<&Self> {
+        images
+            .iter()
+            .rev()
+            .find(|img| !img.fits(width, height))
+            .or_else(|| images.back())
+    }
 }
 
 pub fn default_str() -> Arc<str> {
