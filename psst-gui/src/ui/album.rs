@@ -111,7 +111,7 @@ pub fn album_widget() -> impl Widget<Ctx<CommonCtx, Album>> {
         .with_text_size(theme::TEXT_SIZE_SMALL)
         .with_text_color(theme::PLACEHOLDER_COLOR);
 
-    let album_label = Flex::column()
+    let album_info = Flex::column()
         .cross_axis_alignment(CrossAxisAlignment::Start)
         .with_child(album_name)
         .with_spacer(1.0)
@@ -122,7 +122,7 @@ pub fn album_widget() -> impl Widget<Ctx<CommonCtx, Album>> {
     let album = Flex::row()
         .with_child(album_cover)
         .with_default_spacer()
-        .with_flex_child(album_label, 1.0)
+        .with_flex_child(album_info, 1.0)
         .lens(Ctx::data());
 
     album
