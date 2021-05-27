@@ -3,5 +3,6 @@ target
 cache
 .cargo
 .idea
+.DS_Store
 .env
 *.iml
