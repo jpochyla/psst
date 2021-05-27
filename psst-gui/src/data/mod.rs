@@ -41,6 +41,7 @@ pub struct State {
     pub session: SessionHandle,
 
     pub route: Nav,
+    pub volume: f64,
     pub history: Vector<Nav>,
     pub config: Config,
     pub preferences: Preferences,
@@ -60,6 +61,7 @@ impl Default for State {
         Self {
             session: SessionHandle::new(),
             route: Nav::Home,
+            volume: 50.0,
             history: Vector::new(),
             config: Config::default(),
             preferences: Preferences {

@@ -28,6 +28,10 @@ impl AudioOutputRemote {
         self.send(InternalEvent::Resume);
     }
 
+    pub fn set_volume(&self, volume: f32) {
+        self.send(InternalEvent::SetVolume(volume));
+    }
+
     fn send(&self, event: InternalEvent) {
         self.event_sender.send(event).expect("Audio output died");
     }
@@ -111,6 +115,12 @@ impl AudioOutput {
                         device.stop()?;
                     }
                 }
+                InternalEvent::SetVolume(volume) => {
+                    log::debug!("volume has changed");
+                    if device.is_started() {
+                        device.set_master_volume(volume);
+                    }
+                }
                 InternalEvent::Resume => {
                     log::debug!("resuming audio output");
                     if !device.is_started() {
@@ -128,6 +138,7 @@ enum InternalEvent {
     Close,
     Pause,
     Resume,
+    SetVolume(f32),
 }
 
 impl From<miniaudio::Error> for Error {

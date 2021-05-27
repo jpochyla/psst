@@ -31,6 +31,7 @@ pub struct PlaybackController {
     thread: Option<JoinHandle<()>>,
     output_thread: Option<JoinHandle<()>>,
     media_controls: Option<MediaControls>,
+    volume: f64,
 }
 
 impl PlaybackController {
@@ -40,6 +41,7 @@ impl PlaybackController {
             thread: None,
             output_thread: None,
             media_controls: None,
+            volume: 50.0,
         }
     }
 
@@ -85,8 +87,8 @@ impl PlaybackController {
                     Self::handle_media_control_event(event, &sender);
                 }
             })
-            .unwrap();
 
+            .unwrap();
         self.sender.replace(sender);
         self.thread.replace(thread);
         self.output_thread.replace(output_thread);
@@ -222,6 +224,11 @@ impl PlaybackController {
         self.send(PlayerEvent::Command(PlayerCommand::Seek { position }));
     }
 
+    fn update_volume(&mut self, volume: f64)  {
+        self.send(PlayerEvent::Command(PlayerCommand::SetVolume { volume: ((volume / 100.0) as f32) }));
+        self.volume = volume;
+    }
+
     fn set_queue_behavior(&mut self, behavior: QueueBehavior) {
         self.send(PlayerEvent::Command(PlayerCommand::SetQueueBehavior {
             behavior: match behavior {
@@ -246,6 +253,9 @@ where
         data: &mut State,
         env: &Env,
     ) {
+        if self.volume != data.volume {
+            self.update_volume(data.volume);
+        }
         match event {
             Event::Command(cmd) if cmd.is(cmd::PLAYBACK_LOADING) => {
                 let item = cmd.get_unchecked(cmd::PLAYBACK_LOADING);
