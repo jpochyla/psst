@@ -95,14 +95,15 @@ impl WebApi {
     /// Send a request with a empty JSON object, throw away the response body.
     /// Use for POST/PUT/DELETE requests.
     fn send_empty_json(&self, request: Request) -> Result<(), Error> {
-        Self::with_retry(|| Ok(request.clone().send_string("{}")?))?;
+        let _response = Self::with_retry(|| Ok(request.clone().send_string("{}")?))?;
         Ok(())
     }
 
     /// Send a request and return the deserialized JSON body.  Use for GET
     /// requests.
     fn load<T: DeserializeOwned>(&self, request: Request) -> Result<T, Error> {
-        let result = Self::with_retry(|| Ok(request.clone().call()?))?.into_json()?;
+        let response = Self::with_retry(|| Ok(request.clone().call()?))?;
+        let result = response.into_json()?;
         Ok(result)
     }
 
@@ -322,6 +323,24 @@ impl WebApi {
         let request = self.delete("v1/me/tracks")?.query("ids", id);
         self.send_empty_json(request)?;
         Ok(())
+    }
+}
+
+/// View endpoints.
+impl WebApi {
+    pub fn get_made_for_you(&self) -> Result<Vector<Playlist>, Error> {
+        #[derive(Deserialize)]
+        struct View {
+            content: Page<Playlist>,
+        }
+
+        let request = self
+            .get("v1/views/made-for-x")?
+            .query("types", "playlist")
+            .query("limit", "20")
+            .query("offset", "0");
+        let result: View = self.load(request)?;
+        Ok(result.content.items)
     }
 }
 
