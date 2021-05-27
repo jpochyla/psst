@@ -1,18 +1,20 @@
 use crate::{
     cmd,
-    data::{CommonCtx, Ctx, Library, Nav, Playlist, PlaylistDetail, State},
+    data::{Ctx, Library, Nav, Playlist, PlaylistDetail, State},
     ui::{
         theme,
         track::{tracklist_widget, TrackDisplay},
         utils::{error_widget, spinner_widget},
     },
     webapi::WebApi,
-    widget::{Async, AsyncAction, LinkExt},
+    widget::{Async, AsyncAction, Clip, LinkExt, RemoteImage},
 };
 use druid::{
     widget::{CrossAxisAlignment, Flex, Label, LineBreaking, List},
-    Insets, LensExt, MouseButton, Widget, WidgetExt,
+    Insets, LensExt, MouseButton, Size, Widget, WidgetExt,
 };
+
+use super::utils::placeholder_widget;
 
 pub fn list_widget() -> impl Widget<State> {
     Async::new(
@@ -38,28 +40,35 @@ pub fn list_widget() -> impl Widget<State> {
     .lens(State::library.then(Library::playlists.in_arc()))
 }
 
-pub fn playlist_widget() -> impl Widget<Ctx<CommonCtx, Playlist>> {
+pub fn playlist_widget() -> impl Widget<Playlist> {
+    let playlist_image = rounded_cover_widget(theme::grid(6.0));
+
     let playlist_name = Label::raw()
         .with_font(theme::UI_FONT_MEDIUM)
         .with_line_break_mode(LineBreaking::Clip)
         .lens(Playlist::name);
 
-    let track_count = Label::dynamic(|&track_count, _| match track_count {
-        0 => format!("Empty"),
-        1 => format!("1 track"),
-        n => format!("{} tracks", n),
-    })
-    .with_text_color(theme::PLACEHOLDER_COLOR)
-    .with_text_size(theme::TEXT_SIZE_SMALL)
-    .lens(Playlist::track_count);
+    let playlist_description = Label::raw()
+        .with_line_break_mode(LineBreaking::WordWrap)
+        .with_text_color(theme::PLACEHOLDER_COLOR)
+        .with_text_size(theme::TEXT_SIZE_SMALL)
+        .lens(Playlist::description);
 
-    Flex::column()
+    let playlist_info = Flex::column()
         .cross_axis_alignment(CrossAxisAlignment::Start)
         .with_child(playlist_name)
         .with_spacer(2.0)
-        .with_child(track_count)
-        .padding(theme::grid(1.0))
+        .with_child(playlist_description);
+
+    let playlist = Flex::row()
+        .with_child(playlist_image)
+        .with_default_spacer()
+        .with_flex_child(playlist_info, 1.0)
+        .padding(theme::grid(1.0));
+
+    playlist
         .link()
+        .rounded(theme::BUTTON_BORDER_RADIUS)
         .on_ex_click(
             move |ctx, event, playlist: &mut Playlist, _| match event.button {
                 MouseButton::Left => {
@@ -69,7 +78,21 @@ pub fn playlist_widget() -> impl Widget<Ctx<CommonCtx, Playlist>> {
                 _ => {}
             },
         )
-        .lens(Ctx::data())
+}
+
+fn cover_widget(size: f64) -> impl Widget<Playlist> {
+    RemoteImage::new(placeholder_widget(), move |playlist: &Playlist, _| {
+        playlist.image(size, size).map(|image| image.url.clone())
+    })
+    .fix_size(size, size)
+}
+
+fn rounded_cover_widget(size: f64) -> impl Widget<Playlist> {
+    // TODO: Take the radius from theme.
+    Clip::new(
+        Size::new(size, size).to_rounded_rect(4.0),
+        cover_widget(size),
+    )
 }
 
 pub fn detail_widget() -> impl Widget<State> {

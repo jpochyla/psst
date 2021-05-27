@@ -52,6 +52,7 @@ pub struct State {
     pub library: Arc<Library>,
     pub common_ctx: CommonCtx,
     pub user_profile: Promise<UserProfile>,
+    pub personalized: Personalized,
 }
 
 impl Default for State {
@@ -104,6 +105,9 @@ impl Default for State {
                 saved_albums: HashSet::new(),
             },
             user_profile: Promise::Empty,
+            personalized: Personalized {
+                made_for_you: Promise::Empty,
+            },
         }
     }
 }
@@ -257,4 +261,9 @@ impl CommonCtx {
     pub fn set_saved_albums(&mut self, albums: &Vector<Album>) {
         self.saved_albums = albums.iter().map(|album| album.id.clone()).collect();
     }
+}
+
+#[derive(Clone, Data, Lens)]
+pub struct Personalized {
+    pub made_for_you: Promise<Vector<Playlist>>,
 }

@@ -75,5 +75,5 @@ fn track_results_widget() -> impl Widget<Ctx<CommonCtx, SearchResults>> {
 }
 
 fn playlist_results_widget() -> impl Widget<Ctx<CommonCtx, SearchResults>> {
-    List::new(playlist_widget).lens(Ctx::map(SearchResults::playlists))
+    List::new(playlist_widget).lens(Ctx::data().then(SearchResults::playlists))
 }

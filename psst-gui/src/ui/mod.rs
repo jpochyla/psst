@@ -14,6 +14,7 @@ use icons::SvgIcon;
 
 pub mod album;
 pub mod artist;
+pub mod home;
 pub mod library;
 pub mod menu;
 pub mod playback;
@@ -66,8 +67,8 @@ fn root_widget() -> impl Widget<State> {
     let playlists = Scroll::new(playlist::list_widget()).vertical();
     let sidebar = Flex::column()
         .must_fill_main_axis(true)
-        .with_child(logo_widget())
-        .with_child(menu_widget())
+        .with_child(sidebar_logo_widget())
+        .with_child(sidebar_menu_widget())
         .with_default_spacer()
         .with_flex_child(playlists.expand_height(), 1.0)
         .with_child(user::user_widget())
@@ -80,8 +81,8 @@ fn root_widget() -> impl Widget<State> {
 
     let topbar = Flex::row()
         .must_fill_main_axis(true)
-        .with_child(back_button_widget())
-        .with_child(title_widget())
+        .with_child(topbar_back_button_widget())
+        .with_child(topbar_title_widget())
         .background(Border::Bottom.with_color(theme::BACKGROUND_DARK));
 
     let main = Flex::column()
@@ -111,7 +112,7 @@ fn root_widget() -> impl Widget<State> {
     // .debug_paint_layout()
 }
 
-fn logo_widget() -> impl Widget<State> {
+fn sidebar_logo_widget() -> impl Widget<State> {
     icons::LOGO
         .scale((29.0, 32.0))
         .with_color(theme::GREY_500)
@@ -120,16 +121,16 @@ fn logo_widget() -> impl Widget<State> {
         .lens(Unit)
 }
 
-fn menu_widget() -> impl Widget<State> {
+fn sidebar_menu_widget() -> impl Widget<State> {
     Flex::column()
         .with_default_spacer()
-        .with_child(menu_link_widget("Home", Nav::Home))
-        .with_child(menu_link_widget("Tracks", Nav::SavedTracks))
-        .with_child(menu_link_widget("Albums", Nav::SavedAlbums))
-        .with_child(menu_search_widget())
+        .with_child(sidebar_link_widget("Home", Nav::Home))
+        .with_child(sidebar_link_widget("Tracks", Nav::SavedTracks))
+        .with_child(sidebar_link_widget("Albums", Nav::SavedAlbums))
+        .with_child(search::input_widget().padding((theme::grid(1.0), theme::grid(1.0))))
 }
 
-fn menu_link_widget(title: &str, nav: Nav) -> impl Widget<State> {
+fn sidebar_link_widget(title: &str, nav: Nav) -> impl Widget<State> {
     Label::new(title)
         .padding((theme::grid(2.0), theme::grid(1.0)))
         .expand_width()
@@ -161,15 +162,13 @@ fn menu_link_widget(title: &str, nav: Nav) -> impl Widget<State> {
         .lens(State::route)
 }
 
-fn menu_search_widget() -> impl Widget<State> {
-    search::input_widget().padding((theme::grid(1.0), theme::grid(1.0)))
-}
-
 fn route_widget() -> impl Widget<State> {
     ViewDispatcher::new(
         |state: &State, _| state.route.clone(),
         |route: &Nav, _, _| match route {
-            Nav::Home => home_widget().padding(theme::grid(1.0)).boxed(),
+            Nav::Home => Scroll::new(home::home_widget().padding(theme::grid(1.0)))
+                .vertical()
+                .boxed(),
             Nav::SavedTracks => {
                 Scroll::new(library::saved_tracks_widget().padding(theme::grid(1.0)))
                     .vertical()
@@ -201,11 +200,7 @@ fn route_widget() -> impl Widget<State> {
     .expand()
 }
 
-fn home_widget() -> impl Widget<State> {
-    Empty
-}
-
-fn back_button_widget() -> impl Widget<State> {
+fn topbar_back_button_widget() -> impl Widget<State> {
     let icon = icons::BACK.scale((10.0, theme::grid(2.0)));
     let disabled = icon
         .clone()
@@ -244,7 +239,7 @@ fn history_menu(state: &State) -> Menu<State> {
     menu
 }
 
-fn title_widget() -> impl Widget<State> {
+fn topbar_title_widget() -> impl Widget<State> {
     Flex::row()
         .cross_axis_alignment(CrossAxisAlignment::Center)
         .with_child(route_title_widget())

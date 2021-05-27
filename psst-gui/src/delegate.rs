@@ -174,6 +174,7 @@ impl Delegate {
     ) -> Handled {
         if cmd.is(cmd::SESSION_CONNECTED) {
             data.library_mut().playlists.defer_default();
+            data.personalized.made_for_you.defer_default();
             data.user_profile.defer_default();
             Handled::Yes
         } else if let Some(link) = cmd.get(cmd::LOAD_PLAYLIST_DETAIL).cloned() {
