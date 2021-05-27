@@ -7,7 +7,7 @@ edition = "2018"
 [dependencies]
 psst-protocol = { path = "../psst-protocol" }
 
-aes = { version = "0.7.0", features = ["ctr"] }
+aes = { version = "0.7", features = ["ctr"] }
 byteorder = "1.4"
 crossbeam-channel = "0.5"
 hmac = "0.11.0"
