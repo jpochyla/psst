@@ -1,5 +1,6 @@
 use std::{
     any::Any,
+    fmt::Debug,
     sync::Arc,
     thread::{self, JoinHandle},
 };
@@ -65,7 +66,7 @@ impl<T, D, E, W> Controller<Promise<T, D, E>, W> for AsyncAction<T, D, E>
 where
     T: Send + Data,
     D: Send + Data + PartialEq,
-    E: Send + Data,
+    E: Send + Data + Debug,
     W: Widget<Promise<T, D, E>>,
 {
     fn event(
@@ -79,10 +80,18 @@ where
         match event {
             Event::Command(cmd) if cmd.is(ASYNC_RESULT) => {
                 let payload = cmd.get_unchecked(ASYNC_RESULT).take().unwrap();
-                let result = payload.result.downcast().unwrap();
                 let deferred = payload.deferred.downcast().unwrap();
+                let result = payload.result.downcast().unwrap();
                 if data.is_deferred(&deferred) {
-                    data.resolve_or_reject(*result);
+                    match *result {
+                        Ok(val) => {
+                            data.resolve(val);
+                        }
+                        Err(err) => {
+                            log::error!("async: {:?}", err);
+                            data.reject(err);
+                        }
+                    }
                 }
                 self.handle.take();
             }
