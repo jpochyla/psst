@@ -46,8 +46,7 @@ pub fn preferences_window() -> WindowDesc<State> {
         .window_size((theme::grid(50.0), theme::grid(69.0)))
         .resizable(false)
         .show_title(false)
-        .transparent_titlebar(true)
-        .set_level(WindowLevel::Modal);
+        .transparent_titlebar(true);
     if cfg!(target_os = "macos") {
         win.menu(menu::main_menu)
     } else {
