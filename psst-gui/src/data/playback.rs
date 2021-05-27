@@ -10,6 +10,7 @@ pub struct Playback {
     pub now_playing: Option<NowPlaying>,
     pub queue_behavior: QueueBehavior,
     pub queue: Vector<QueuedTrack>,
+    pub volume: f64,
 }
 
 #[derive(Clone, Debug, Data, Lens)]
