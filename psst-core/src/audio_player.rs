@@ -264,6 +264,7 @@ impl Player {
             PlayerCommand::Seek { position } => self.seek(position),
             PlayerCommand::Configure { config } => self.configure(config),
             PlayerCommand::SetQueueBehavior { behavior } => self.queue.set_behaviour(behavior),
+            PlayerCommand::SetVolume { volume } => self.set_volume(volume),
         }
     }
 
@@ -407,6 +408,10 @@ impl Player {
             item,
             loading_handle,
         };
+    }
+
+    fn set_volume(&mut self, volume: f32) {
+        self.audio_output_remote.set_volume(volume);
     }
 
     fn play_loaded(&mut self, loaded_item: LoadedPlaybackItem) {
@@ -560,6 +565,10 @@ pub enum PlayerCommand {
     },
     SetQueueBehavior {
         behavior: QueueBehavior,
+    },
+    /// A change in volume given in 0 -> 1
+    SetVolume {
+        volume: f32
     },
 }
 

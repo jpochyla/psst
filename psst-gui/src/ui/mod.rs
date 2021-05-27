@@ -7,7 +7,8 @@ use crate::{
 };
 use druid::{
     lens::Unit,
-    widget::{CrossAxisAlignment, Either, Flex, Label, Scroll, Split, ViewSwitcher},
+    Env,
+    widget::{CrossAxisAlignment, Either, Flex, Label, Scroll, Slider, Split, ViewSwitcher},
     Insets, Menu, MenuItem, MouseButton, Widget, WidgetExt, WindowDesc, WindowLevel,
 };
 use icons::SvgIcon;
@@ -70,6 +71,9 @@ fn root_widget() -> impl Widget<State> {
         .with_child(sidebar_menu_widget())
         .with_default_spacer()
         .with_flex_child(playlists.expand_height(), 1.0)
+        .with_child(
+            volume_slider()
+        )
         .with_child(user::user_widget())
         .padding(if cfg!(target_os = "macos") {
             Insets::new(0.0, 24.0, 0.0, 0.0)
@@ -109,6 +113,22 @@ fn root_widget() -> impl Widget<State> {
     // .debug_invalidation()
     // .debug_widget_id()
     // .debug_paint_layout()
+}
+
+fn volume_slider() -> impl Widget<State> {
+    let slider = Slider::new();
+        let label = Label::new(|d: &State, _: &Env| format!("Volume: {}", d.volume as i32));
+    Flex::column()
+        .cross_axis_alignment(CrossAxisAlignment::Start)
+        .with_child(
+            label
+        )
+        .with_default_spacer()
+        .with_child(
+            slider
+                .with_range(0.0, 100.0)
+                .lens(State::volume)
+        )
 }
 
 fn sidebar_logo_widget() -> impl Widget<State> {
