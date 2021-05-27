@@ -410,7 +410,7 @@ impl Player {
         };
     }
 
-    fn set_volume(&mut self, volume: f32) {
+    fn set_volume(&mut self, volume: f64) {
         self.audio_output_remote.set_volume(volume);
     }
 
@@ -566,9 +566,9 @@ pub enum PlayerCommand {
     SetQueueBehavior {
         behavior: QueueBehavior,
     },
-    /// A change in volume given in 0 -> 1
+    /// Change playback volume to a value in 0.0..=1.0 range.
     SetVolume {
-        volume: f32
+        volume: f64,
     },
 }
 

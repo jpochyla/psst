@@ -1,15 +1,14 @@
 use crate::{
     cmd,
     controller::{NavController, PlaybackController, SessionController},
-    data::{Nav, State},
+    data::{Nav, Playback, State},
     ui::utils::Border,
     widget::{icons, Empty, LinkExt, ThemeScope, ViewDispatcher},
 };
 use druid::{
     lens::Unit,
-    Env,
     widget::{CrossAxisAlignment, Either, Flex, Label, Scroll, Slider, Split, ViewSwitcher},
-    Insets, Menu, MenuItem, MouseButton, Widget, WidgetExt, WindowDesc, WindowLevel,
+    Insets, LensExt, Menu, MenuItem, MouseButton, Widget, WidgetExt, WindowDesc, WindowLevel,
 };
 use icons::SvgIcon;
 
@@ -71,9 +70,8 @@ fn root_widget() -> impl Widget<State> {
         .with_child(sidebar_menu_widget())
         .with_default_spacer()
         .with_flex_child(playlists.expand_height(), 1.0)
-        .with_child(
-            volume_slider()
-        )
+        .with_child(volume_slider())
+        .with_default_spacer()
         .with_child(user::user_widget())
         .padding(if cfg!(target_os = "macos") {
             Insets::new(0.0, 24.0, 0.0, 0.0)
@@ -116,19 +114,25 @@ fn root_widget() -> impl Widget<State> {
 }
 
 fn volume_slider() -> impl Widget<State> {
-    let slider = Slider::new();
-        let label = Label::new(|d: &State, _: &Env| format!("Volume: {}", d.volume as i32));
     Flex::column()
-        .cross_axis_alignment(CrossAxisAlignment::Start)
         .with_child(
-            label
+            Label::dynamic(|&volume: &f64, _| format!("Volume: {}%", (volume * 100.0).floor()))
+                .with_text_color(theme::PLACEHOLDER_COLOR)
+                .with_text_size(theme::TEXT_SIZE_SMALL),
         )
         .with_default_spacer()
         .with_child(
-            slider
-                .with_range(0.0, 100.0)
-                .lens(State::volume)
+            Slider::new()
+                .with_range(0.0, 1.0)
+                .expand_width()
+                .env_scope(|env, _| {
+                    env.set(theme::BASIC_WIDGET_HEIGHT, theme::grid(1.5));
+                    env.set(theme::FOREGROUND_LIGHT, env.get(theme::GREY_400));
+                    env.set(theme::FOREGROUND_DARK, env.get(theme::GREY_400));
+                }),
         )
+        .padding((theme::grid(1.5), 0.0))
+        .lens(State::playback.then(Playback::volume))
 }
 
 fn sidebar_logo_widget() -> impl Widget<State> {

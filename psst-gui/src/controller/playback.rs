@@ -31,7 +31,6 @@ pub struct PlaybackController {
     thread: Option<JoinHandle<()>>,
     output_thread: Option<JoinHandle<()>>,
     media_controls: Option<MediaControls>,
-    volume: f64,
 }
 
 impl PlaybackController {
@@ -41,7 +40,6 @@ impl PlaybackController {
             thread: None,
             output_thread: None,
             media_controls: None,
-            volume: 50.0,
         }
     }
 
@@ -87,8 +85,8 @@ impl PlaybackController {
                     Self::handle_media_control_event(event, &sender);
                 }
             })
-
             .unwrap();
+
         self.sender.replace(sender);
         self.thread.replace(thread);
         self.output_thread.replace(output_thread);
@@ -224,9 +222,8 @@ impl PlaybackController {
         self.send(PlayerEvent::Command(PlayerCommand::Seek { position }));
     }
 
-    fn update_volume(&mut self, volume: f64)  {
-        self.send(PlayerEvent::Command(PlayerCommand::SetVolume { volume: ((volume / 100.0) as f32) }));
-        self.volume = volume;
+    fn set_volume(&mut self, volume: f64) {
+        self.send(PlayerEvent::Command(PlayerCommand::SetVolume { volume }));
     }
 
     fn set_queue_behavior(&mut self, behavior: QueueBehavior) {
@@ -253,9 +250,6 @@ where
         data: &mut State,
         env: &Env,
     ) {
-        if self.volume != data.volume {
-            self.update_volume(data.volume);
-        }
         match event {
             Event::Command(cmd) if cmd.is(cmd::PLAYBACK_LOADING) => {
                 let item = cmd.get_unchecked(cmd::PLAYBACK_LOADING);
@@ -388,5 +382,19 @@ where
             _ => {}
         }
         child.lifecycle(ctx, event, data, env);
+    }
+
+    fn update(
+        &mut self,
+        child: &mut W,
+        ctx: &mut UpdateCtx,
+        old_data: &State,
+        data: &State,
+        env: &Env,
+    ) {
+        if !old_data.playback.volume.same(&data.playback.volume) {
+            self.set_volume(data.playback.volume);
+        }
+        child.update(ctx, old_data, data, env)
     }
 }

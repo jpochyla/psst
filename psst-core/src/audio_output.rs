@@ -28,7 +28,7 @@ impl AudioOutputRemote {
         self.send(InternalEvent::Resume);
     }
 
-    pub fn set_volume(&self, volume: f32) {
+    pub fn set_volume(&self, volume: f64) {
         self.send(InternalEvent::SetVolume(volume));
     }
 
@@ -105,26 +105,32 @@ impl AudioOutput {
                 InternalEvent::Close => {
                     log::debug!("closing audio output");
                     if device.is_started() {
-                        device.stop()?;
+                        if let Err(err) = device.stop() {
+                            log::error!("failed to stop device: {}", err);
+                        }
                     }
                     break;
                 }
                 InternalEvent::Pause => {
                     log::debug!("pausing audio output");
                     if device.is_started() {
-                        device.stop()?;
-                    }
-                }
-                InternalEvent::SetVolume(volume) => {
-                    log::debug!("volume has changed");
-                    if device.is_started() {
-                        device.set_master_volume(volume);
+                        if let Err(err) = device.stop() {
+                            log::error!("failed to stop device: {}", err);
+                        }
                     }
                 }
                 InternalEvent::Resume => {
                     log::debug!("resuming audio output");
                     if !device.is_started() {
-                        device.start()?;
+                        if let Err(err) = device.start() {
+                            log::error!("failed to start device: {}", err);
+                        }
+                    }
+                }
+                InternalEvent::SetVolume(volume) => {
+                    log::debug!("volume has changed");
+                    if let Err(err) = device.set_master_volume(volume as f32) {
+                        log::error!("failed to set volume: {}", err);
                     }
                 }
             }
@@ -138,7 +144,7 @@ enum InternalEvent {
     Close,
     Pause,
     Resume,
-    SetVolume(f32),
+    SetVolume(f64),
 }
 
 impl From<miniaudio::Error> for Error {
