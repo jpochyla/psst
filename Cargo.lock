@@ -1633,6 +1633,7 @@ dependencies = [
  "platform-dirs",
  "psst-core",
  "rand",
+ "raw-window-handle",
  "serde",
  "serde_json",
  "souvlaki",

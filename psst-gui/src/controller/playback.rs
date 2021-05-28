@@ -17,6 +17,8 @@ use psst_core::{
     cdn::Cdn,
     session::SessionHandle,
 };
+#[cfg(target_os = "windows")]
+use raw_window_handle::{HasRawWindowHandle, RawWindowHandle};
 use souvlaki::{MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback};
 
 use crate::{
@@ -74,7 +76,12 @@ impl PlaybackController {
         });
 
         #[cfg(target_os = "windows")]
-        let mut media_controls = MediaControls::for_window(window.raw_window_handle()).unwrap();
+        let mut media_controls = match window.raw_window_handle() {
+            RawWindowHandle::Windows(windows_handle) => {
+                MediaControls::for_window(windows_handle).unwrap()
+            }
+            _ => unreachable!(),
+        };
         #[cfg(not(target_os = "windows"))]
         let mut media_controls = MediaControls::new();
 
