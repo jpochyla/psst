@@ -13,7 +13,7 @@ crossbeam-channel = "0.5"
 hmac = "0.11.0"
 iset = "0.0.3"
 log = "0.4"
-miniaudio = { git = "https://github.com/jpochyla/miniaudio-rs", default-features = false, features = ["ma-log-level-error", "ma-no-flac", "ma-no-mp3", "ma-no-wav"] }
+miniaudio = { git = "https://github.com/jpochyla/miniaudio-rs", default-features = false, features = ["bindgen", "ma-log-level-error", "ma-no-flac", "ma-no-mp3", "ma-no-wav"] }
 minivorbis = { path = "../minivorbis"}
 num-bigint = { version = "0.4", features = ["rand"] }
 num-traits = "0.2"
