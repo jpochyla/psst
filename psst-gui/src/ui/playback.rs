@@ -242,11 +242,11 @@ impl Widget<NowPlaying> for SeekBar {
         &mut self,
         ctx: &mut LifeCycleCtx,
         event: &LifeCycle,
-        data: &NowPlaying,
+        _data: &NowPlaying,
         _env: &Env,
     ) {
         match &event {
-            LifeCycle::Size(bounds) => {
+            LifeCycle::Size(_bounds) => {
                 // self.loudness_path = compute_loudness_path(bounds, &data);
             }
             LifeCycle::HotChanged(_) => {

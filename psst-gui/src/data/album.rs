@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 #[derive(Clone, Data, Lens)]
 pub struct AlbumDetail {
-    pub album: Promise<Cached<Album>, AlbumLink>,
+    pub album: Promise<Cached<Arc<Album>>, AlbumLink>,
 }
 
 #[derive(Clone, Data, Lens, Deserialize)]
@@ -69,6 +69,7 @@ impl Album {
         AlbumLink {
             id: self.id.clone(),
             name: self.name.clone(),
+            images: self.images.clone(),
         }
     }
 }
@@ -77,6 +78,14 @@ impl Album {
 pub struct AlbumLink {
     pub id: Arc<str>,
     pub name: Arc<str>,
+    #[serde(default)]
+    pub images: Vector<Image>,
+}
+
+impl AlbumLink {
+    pub fn image(&self, width: f64, height: f64) -> Option<&Image> {
+        Image::fitting(&self.images, width, height)
+    }
 }
 
 #[derive(Clone, Debug, Data, Eq, PartialEq, Hash, Deserialize)]

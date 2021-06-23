@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::{
     cmd,
     data::{Album, AlbumDetail, ArtistLink, Cached, CommonCtx, Ctx, Nav, State},
@@ -24,7 +26,7 @@ pub fn detail_widget() -> impl Widget<State> {
     )
 }
 
-fn loaded_detail_widget() -> impl Widget<Ctx<CommonCtx, Cached<Album>>> {
+fn loaded_detail_widget() -> impl Widget<Ctx<Arc<CommonCtx>, Cached<Arc<Album>>>> {
     let album_cover = rounded_cover_widget(theme::grid(10.0));
 
     let album_artists = List::new(|| {
@@ -38,9 +40,9 @@ fn loaded_detail_widget() -> impl Widget<Ctx<CommonCtx, Cached<Album>>> {
                 ctx.submit_command(cmd::NAVIGATE.with(nav));
             })
     })
-    .lens(Album::artists);
+    .lens(Album::artists.in_arc());
 
-    let album_date = Label::dynamic(|album: &Album, _| album.release())
+    let album_date = Label::dynamic(|album: &Arc<Album>, _| album.release())
         .with_text_size(theme::TEXT_SIZE_SMALL)
         .with_text_color(theme::PLACEHOLDER_COLOR);
 
@@ -48,7 +50,7 @@ fn loaded_detail_widget() -> impl Widget<Ctx<CommonCtx, Cached<Album>>> {
         .with_line_break_mode(LineBreaking::WordWrap)
         .with_text_size(theme::TEXT_SIZE_SMALL)
         .with_text_color(theme::PLACEHOLDER_COLOR)
-        .lens(Album::label);
+        .lens(Album::label.in_arc());
 
     let album_info = Flex::column()
         .cross_axis_alignment(CrossAxisAlignment::Start)
@@ -80,14 +82,14 @@ fn loaded_detail_widget() -> impl Widget<Ctx<CommonCtx, Cached<Album>>> {
         .lens(Ctx::map(Cached::data))
 }
 
-fn cover_widget(size: f64) -> impl Widget<Album> {
-    RemoteImage::new(placeholder_widget(), move |album: &Album, _| {
+fn cover_widget(size: f64) -> impl Widget<Arc<Album>> {
+    RemoteImage::new(placeholder_widget(), move |album: &Arc<Album>, _| {
         album.image(size, size).map(|image| image.url.clone())
     })
     .fix_size(size, size)
 }
 
-fn rounded_cover_widget(size: f64) -> impl Widget<Album> {
+fn rounded_cover_widget(size: f64) -> impl Widget<Arc<Album>> {
     // TODO: Take the radius from theme.
     Clip::new(
         Size::new(size, size).to_rounded_rect(4.0),
@@ -95,19 +97,19 @@ fn rounded_cover_widget(size: f64) -> impl Widget<Album> {
     )
 }
 
-pub fn album_widget() -> impl Widget<Ctx<CommonCtx, Album>> {
+pub fn album_widget() -> impl Widget<Ctx<Arc<CommonCtx>, Arc<Album>>> {
     let album_cover = cover_widget(theme::grid(7.0));
 
     let album_name = Label::raw()
         .with_font(theme::UI_FONT_MEDIUM)
         .with_line_break_mode(LineBreaking::Clip)
-        .lens(Album::name);
+        .lens(Album::name.in_arc());
 
-    let album_artists = Label::dynamic(|album: &Album, _| album.artist_list())
+    let album_artists = Label::dynamic(|album: &Arc<Album>, _| album.artist_list())
         .with_text_size(theme::TEXT_SIZE_SMALL)
         .with_line_break_mode(LineBreaking::Clip);
 
-    let album_date = Label::dynamic(|album: &Album, _| album.release_year())
+    let album_date = Label::dynamic(|album: &Arc<Album>, _| album.release_year())
         .with_text_size(theme::TEXT_SIZE_SMALL)
         .with_text_color(theme::PLACEHOLDER_COLOR);
 
@@ -125,23 +127,21 @@ pub fn album_widget() -> impl Widget<Ctx<CommonCtx, Album>> {
         .with_flex_child(album_info, 1.0)
         .lens(Ctx::data());
 
-    album
-        .link()
-        .on_ex_click(
-            move |ctx, event, album: &mut Ctx<CommonCtx, Album>, _| match event.button {
-                MouseButton::Left => {
-                    let nav = Nav::AlbumDetail(album.data.link());
-                    ctx.submit_command(cmd::NAVIGATE.with(nav));
-                }
-                MouseButton::Right => {
-                    ctx.show_context_menu(album_menu(&album), event.window_pos);
-                }
-                _ => {}
-            },
-        )
+    album.link().on_ex_click(
+        move |ctx, event, album: &mut Ctx<Arc<CommonCtx>, Arc<Album>>, _| match event.button {
+            MouseButton::Left => {
+                let nav = Nav::AlbumDetail(album.data.link());
+                ctx.submit_command(cmd::NAVIGATE.with(nav));
+            }
+            MouseButton::Right => {
+                ctx.show_context_menu(album_menu(&album), event.window_pos);
+            }
+            _ => {}
+        },
+    )
 }
 
-fn album_menu(album: &Ctx<CommonCtx, Album>) -> Menu<State> {
+fn album_menu(album: &Ctx<Arc<CommonCtx>, Arc<Album>>) -> Menu<State> {
     let mut menu = Menu::empty();
 
     for artist_link in &album.data.artists {

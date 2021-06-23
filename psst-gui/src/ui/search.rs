@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::{
     cmd,
     controller::InputController,
@@ -57,15 +59,15 @@ pub fn results_widget() -> impl Widget<State> {
     .lens(Ctx::make(State::common_ctx, State::search.then(Search::results)).then(Ctx::in_promise()))
 }
 
-fn artist_results_widget() -> impl Widget<Ctx<CommonCtx, SearchResults>> {
+fn artist_results_widget() -> impl Widget<Ctx<Arc<CommonCtx>, SearchResults>> {
     List::new(artist_widget).lens(Ctx::data().then(SearchResults::artists))
 }
 
-fn album_results_widget() -> impl Widget<Ctx<CommonCtx, SearchResults>> {
+fn album_results_widget() -> impl Widget<Ctx<Arc<CommonCtx>, SearchResults>> {
     List::new(album_widget).lens(Ctx::map(SearchResults::albums))
 }
 
-fn track_results_widget() -> impl Widget<Ctx<CommonCtx, SearchResults>> {
+fn track_results_widget() -> impl Widget<Ctx<Arc<CommonCtx>, SearchResults>> {
     tracklist_widget(TrackDisplay {
         title: true,
         artist: true,
@@ -74,6 +76,6 @@ fn track_results_widget() -> impl Widget<Ctx<CommonCtx, SearchResults>> {
     })
 }
 
-fn playlist_results_widget() -> impl Widget<Ctx<CommonCtx, SearchResults>> {
+fn playlist_results_widget() -> impl Widget<Ctx<Arc<CommonCtx>, SearchResults>> {
     List::new(playlist_widget).lens(Ctx::data().then(SearchResults::playlists))
 }

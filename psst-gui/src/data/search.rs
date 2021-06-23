@@ -12,7 +12,7 @@ pub struct Search {
 pub struct SearchResults {
     pub query: String,
     pub artists: Vector<Artist>,
-    pub albums: Vector<Album>,
+    pub albums: Vector<Arc<Album>>,
     pub tracks: Vector<Arc<Track>>,
     pub playlists: Vector<Playlist>,
 }

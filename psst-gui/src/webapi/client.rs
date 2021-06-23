@@ -205,7 +205,7 @@ impl WebApi {
         let request = self
             .get(format!("v1/artists/{}/albums", id))?
             .query("market", "from_token");
-        let result: Vector<Album> = self.load_all_pages(request)?;
+        let result: Vector<Arc<Album>> = self.load_all_pages(request)?;
 
         let mut artist_albums = ArtistAlbums {
             albums: Vector::new(),
@@ -254,7 +254,7 @@ impl WebApi {
 /// Album endpoints.
 impl WebApi {
     // https://developer.spotify.com/documentation/web-api/reference/albums/get-album/
-    pub fn get_album(&self, id: &str) -> Result<Cached<Album>, Error> {
+    pub fn get_album(&self, id: &str) -> Result<Cached<Arc<Album>>, Error> {
         let request = self
             .get(format!("v1/albums/{}", id))?
             .query("market", "from_token");
@@ -266,10 +266,10 @@ impl WebApi {
 /// Library endpoints.
 impl WebApi {
     // https://developer.spotify.com/documentation/web-api/reference/library/get-users-saved-albums/
-    pub fn get_saved_albums(&self) -> Result<Vector<Album>, Error> {
+    pub fn get_saved_albums(&self) -> Result<Vector<Arc<Album>>, Error> {
         #[derive(Clone, Deserialize)]
         struct SavedAlbum {
-            album: Album,
+            album: Arc<Album>,
         }
 
         let request = self.get("v1/me/albums")?.query("market", "from_token");
@@ -377,7 +377,7 @@ impl WebApi {
         #[derive(Deserialize)]
         struct ApiSearchResults {
             artists: Option<Page<Artist>>,
-            albums: Option<Page<Album>>,
+            albums: Option<Page<Arc<Album>>>,
             tracks: Option<Page<Arc<Track>>>,
             playlists: Option<Page<Playlist>>,
         }

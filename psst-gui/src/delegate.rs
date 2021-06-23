@@ -1,13 +1,13 @@
 use crate::{
     cmd,
-    data::{ArtistTracks, PlaylistTracks, SavedTracks, State},
+    data::{ArtistTracks, PlaylistTracks, SavedAlbums, SavedTracks, State},
     ui,
     webapi::WebApi,
     widget::remote_image,
 };
 use druid::{
-    commands, im::Vector, image, AppDelegate, Application, Command, DelegateCtx, Env, Handled,
-    ImageBuf, Target, WindowId,
+    commands, image, AppDelegate, Application, Command, DelegateCtx, Env, Handled, ImageBuf,
+    Target, WindowId,
 };
 use lru_cache::LruCache;
 use std::{sync::Arc, thread};
@@ -235,13 +235,13 @@ impl Delegate {
         } else if let Some(result) = cmd.get(cmd::UPDATE_SAVED_TRACKS).cloned() {
             match result {
                 Ok(tracks) => {
-                    data.common_ctx.set_saved_tracks(&tracks);
-                    data.library_mut()
-                        .saved_tracks
-                        .resolve(SavedTracks { tracks });
+                    let saved = SavedTracks { tracks };
+                    data.common_ctx_mut().set_saved_tracks(&saved);
+                    data.library_mut().saved_tracks.resolve(saved);
                 }
                 Err(err) => {
-                    data.common_ctx.set_saved_tracks(&Vector::new());
+                    data.common_ctx_mut()
+                        .set_saved_tracks(&SavedTracks::default());
                     data.library_mut().saved_tracks.reject(err);
                 }
             };
@@ -249,11 +249,13 @@ impl Delegate {
         } else if let Some(result) = cmd.get(cmd::UPDATE_SAVED_ALBUMS).cloned() {
             match result {
                 Ok(albums) => {
-                    data.common_ctx.set_saved_albums(&albums);
-                    data.library_mut().saved_albums.resolve(albums);
+                    let saved = SavedAlbums { albums };
+                    data.common_ctx_mut().set_saved_albums(&saved);
+                    data.library_mut().saved_albums.resolve(saved);
                 }
                 Err(err) => {
-                    data.common_ctx.set_saved_albums(&Vector::new());
+                    data.common_ctx_mut()
+                        .set_saved_albums(&SavedAlbums::default());
                     data.library_mut().saved_albums.reject(err);
                 }
             };

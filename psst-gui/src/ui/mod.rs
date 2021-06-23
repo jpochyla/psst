@@ -8,7 +8,7 @@ use crate::{
 use druid::{
     lens::Unit,
     widget::{CrossAxisAlignment, Either, Flex, Label, Scroll, Slider, Split, ViewSwitcher},
-    Insets, LensExt, Menu, MenuItem, MouseButton, Widget, WidgetExt, WindowDesc, WindowLevel,
+    Insets, LensExt, Menu, MenuItem, MouseButton, Widget, WidgetExt, WindowDesc,
 };
 use icons::SvgIcon;
 

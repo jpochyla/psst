@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::{
     cmd,
     data::{Artist, ArtistAlbums, ArtistDetail, ArtistTracks, Cached, CommonCtx, Ctx, Nav, State},
@@ -80,7 +82,7 @@ pub fn cover_widget(size: f64) -> impl Widget<Artist> {
     )
 }
 
-fn top_tracks_widget() -> impl Widget<Ctx<CommonCtx, ArtistTracks>> {
+fn top_tracks_widget() -> impl Widget<Ctx<Arc<CommonCtx>, ArtistTracks>> {
     tracklist_widget(TrackDisplay {
         title: true,
         album: true,
@@ -89,7 +91,7 @@ fn top_tracks_widget() -> impl Widget<Ctx<CommonCtx, ArtistTracks>> {
     })
 }
 
-fn albums_widget() -> impl Widget<Ctx<CommonCtx, ArtistAlbums>> {
+fn albums_widget() -> impl Widget<Ctx<Arc<CommonCtx>, ArtistAlbums>> {
     Flex::column()
         .cross_axis_alignment(CrossAxisAlignment::Start)
         .with_child(label_widget("Albums"))

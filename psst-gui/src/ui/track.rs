@@ -43,7 +43,7 @@ impl TrackDisplay {
     }
 }
 
-pub fn tracklist_widget<T>(mode: TrackDisplay) -> impl Widget<Ctx<CommonCtx, T>>
+pub fn tracklist_widget<T>(mode: TrackDisplay) -> impl Widget<Ctx<Arc<CommonCtx>, T>>
 where
     T: TrackIter + Data,
 {
@@ -55,7 +55,7 @@ pub trait TrackIter {
     fn tracks(&self) -> &Vector<Arc<Track>>;
 }
 
-impl TrackIter for Album {
+impl TrackIter for Arc<Album> {
     fn origin(&self) -> PlaybackOrigin {
         PlaybackOrigin::Album(self.link())
     }
@@ -105,7 +105,7 @@ impl TrackIter for SavedTracks {
     }
 }
 
-impl<T> ListIter<TrackRow> for Ctx<CommonCtx, T>
+impl<T> ListIter<TrackRow> for Ctx<Arc<CommonCtx>, T>
 where
     T: TrackIter + Data,
 {
@@ -146,7 +146,7 @@ where
 
 #[derive(Clone, Data, Lens)]
 struct TrackRow {
-    ctx: CommonCtx,
+    ctx: Arc<CommonCtx>,
     track: Arc<Track>,
     origin: PlaybackOrigin,
     position: usize,
@@ -165,17 +165,17 @@ impl TrackRow {
 
 struct PlayController;
 
-impl<T, W> Controller<Ctx<CommonCtx, T>, W> for PlayController
+impl<T, W> Controller<Ctx<Arc<CommonCtx>, T>, W> for PlayController
 where
     T: TrackIter + Data,
-    W: Widget<Ctx<CommonCtx, T>>,
+    W: Widget<Ctx<Arc<CommonCtx>, T>>,
 {
     fn event(
         &mut self,
         child: &mut W,
         ctx: &mut EventCtx,
         event: &Event,
-        data: &mut Ctx<CommonCtx, T>,
+        data: &mut Ctx<Arc<CommonCtx>, T>,
         env: &Env,
     ) {
         match event {

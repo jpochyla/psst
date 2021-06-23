@@ -33,10 +33,10 @@ impl Artist {
 
 #[derive(Clone, Data, Lens)]
 pub struct ArtistAlbums {
-    pub albums: Vector<Album>,
-    pub singles: Vector<Album>,
-    pub compilations: Vector<Album>,
-    pub appears_on: Vector<Album>,
+    pub albums: Vector<Arc<Album>>,
+    pub singles: Vector<Arc<Album>>,
+    pub compilations: Vector<Arc<Album>>,
+    pub appears_on: Vector<Arc<Album>>,
 }
 
 #[derive(Clone, Data, Lens)]
