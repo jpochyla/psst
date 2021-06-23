@@ -6,12 +6,20 @@ use druid::{
 };
 
 #[derive(Clone, Data)]
-pub struct Ctx<C: Data, T: Data> {
+pub struct Ctx<C, T>
+where
+    C: Data,
+    T: Data,
+{
     pub ctx: C,
     pub data: T,
 }
 
-impl<C: Data, T: Data> Ctx<C, T> {
+impl<C, T> Ctx<C, T>
+where
+    C: Data,
+    T: Data,
+{
     pub fn new(c: C, t: T) -> Self {
         Self { ctx: c, data: t }
     }
@@ -28,7 +36,10 @@ impl<C: Data, T: Data> Ctx<C, T> {
         Field::new(|c: &Self| &c.data, |c: &mut Self| &mut c.data)
     }
 
-    pub fn map<U: Data>(map: impl Lens<T, U>) -> impl Lens<Self, Ctx<C, U>> {
+    pub fn map<U>(map: impl Lens<T, U>) -> impl Lens<Self, Ctx<C, U>>
+    where
+        U: Data,
+    {
         CtxMap { map }
     }
 }
@@ -38,19 +49,28 @@ struct CtxMake<CL, TL> {
     tl: TL,
 }
 
-impl<C: Data, T: Data, S: Data, CL, TL> Lens<S, Ctx<C, T>> for CtxMake<CL, TL>
+impl<C, T, S, CL, TL> Lens<S, Ctx<C, T>> for CtxMake<CL, TL>
 where
+    C: Data,
+    T: Data,
+    S: Data,
     CL: Lens<S, C>,
     TL: Lens<S, T>,
 {
-    fn with<V, F: FnOnce(&Ctx<C, T>) -> V>(&self, data: &S, f: F) -> V {
+    fn with<V, F>(&self, data: &S, f: F) -> V
+    where
+        F: FnOnce(&Ctx<C, T>) -> V,
+    {
         let c = self.cl.get(data);
         let t = self.tl.get(data);
         let ct = Ctx::new(c, t);
         f(&ct)
     }
 
-    fn with_mut<V, F: FnOnce(&mut Ctx<C, T>) -> V>(&self, data: &mut S, f: F) -> V {
+    fn with_mut<V, F>(&self, data: &mut S, f: F) -> V
+    where
+        F: FnOnce(&mut Ctx<C, T>) -> V,
+    {
         let c = self.cl.get(data);
         let t = self.tl.get(data);
         let mut ct = Ctx::new(c, t);
@@ -65,18 +85,27 @@ struct CtxMap<Map> {
     map: Map,
 }
 
-impl<C: Data, T: Data, U: Data, Map> Lens<Ctx<C, T>, Ctx<C, U>> for CtxMap<Map>
+impl<C, T, U, Map> Lens<Ctx<C, T>, Ctx<C, U>> for CtxMap<Map>
 where
+    C: Data,
+    T: Data,
+    U: Data,
     Map: Lens<T, U>,
 {
-    fn with<V, F: FnOnce(&Ctx<C, U>) -> V>(&self, c: &Ctx<C, T>, f: F) -> V {
+    fn with<V, F>(&self, c: &Ctx<C, T>, f: F) -> V
+    where
+        F: FnOnce(&Ctx<C, U>) -> V,
+    {
         self.map.with(&c.data, |u| {
             let cu = Ctx::new(c.ctx.to_owned(), u.to_owned());
             f(&cu)
         })
     }
 
-    fn with_mut<V, F: FnOnce(&mut Ctx<C, U>) -> V>(&self, c: &mut Ctx<C, T>, f: F) -> V {
+    fn with_mut<V, F>(&self, c: &mut Ctx<C, T>, f: F) -> V
+    where
+        F: FnOnce(&mut Ctx<C, U>) -> V,
+    {
         let t = &mut c.data;
         let c = &mut c.ctx;
         self.map.with_mut(t, |u| {
@@ -89,7 +118,13 @@ where
     }
 }
 
-impl<C: Data, PT: Data, PD: Data, PE: Data> Ctx<C, Promise<PT, PD, PE>> {
+impl<C, PT, PD, PE> Ctx<C, Promise<PT, PD, PE>>
+where
+    C: Data,
+    PT: Data,
+    PD: Data,
+    PE: Data,
+{
     pub fn in_promise() -> impl Lens<Self, Promise<Ctx<C, PT>, Ctx<C, PD>, Ctx<C, PE>>> {
         Map::new(
             |c: &Self| match &c.data {
@@ -125,7 +160,12 @@ impl<C: Data, PT: Data, PD: Data, PE: Data> Ctx<C, Promise<PT, PD, PE>> {
     }
 }
 
-impl<C: Data, T: Data, L: ListIter<T>> ListIter<Ctx<C, T>> for Ctx<C, L> {
+impl<C, T, L> ListIter<Ctx<C, T>> for Ctx<C, L>
+where
+    C: Data,
+    T: Data,
+    L: ListIter<T>,
+{
     fn for_each(&self, mut cb: impl FnMut(&Ctx<C, T>, usize)) {
         self.data.for_each(|item, index| {
             let d = Ctx::new(self.ctx.to_owned(), item.to_owned());
