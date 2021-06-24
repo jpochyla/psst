@@ -31,6 +31,10 @@ impl Playlist {
     pub fn image(&self, width: f64, height: f64) -> Option<&Image> {
         Image::fitting(&self.images, width, height)
     }
+
+    pub fn url(&self) -> String {
+        format!("https://open.spotify.com/playlist/{id}", id = self.id)
+    }
 }
 
 #[derive(Clone, Debug, Data, Lens)]

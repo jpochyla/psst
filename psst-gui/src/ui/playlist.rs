@@ -11,7 +11,7 @@ use crate::{
 };
 use druid::{
     widget::{CrossAxisAlignment, Flex, Label, LineBreaking, List},
-    Insets, LensExt, MouseButton, Size, Widget, WidgetExt,
+    Insets, LensExt, LocalizedString, Menu, MenuItem, MouseButton, Size, Widget, WidgetExt,
 };
 
 use super::utils::placeholder_widget;
@@ -28,9 +28,15 @@ pub fn list_widget() -> impl Widget<State> {
                     .expand_width()
                     .padding(Insets::uniform_xy(theme::grid(2.0), theme::grid(0.6)))
                     .link()
-                    .on_click(|ctx, playlist, _| {
-                        let nav = Nav::PlaylistDetail(playlist.link());
-                        ctx.submit_command(cmd::NAVIGATE.with(nav));
+                    .on_ex_click(|ctx, event, playlist, _| match event.button {
+                        MouseButton::Left => {
+                            let nav = Nav::PlaylistDetail(playlist.link());
+                            ctx.submit_command(cmd::NAVIGATE.with(nav));
+                        }
+                        MouseButton::Right => {
+                            ctx.show_context_menu(playlist_menu(&playlist), event.window_pos);
+                        }
+                        _ => {}
                     })
             })
         },
@@ -75,6 +81,9 @@ pub fn playlist_widget() -> impl Widget<Playlist> {
                     let nav = Nav::PlaylistDetail(playlist.link());
                     ctx.submit_command(cmd::NAVIGATE.with(nav));
                 }
+                MouseButton::Right => {
+                    ctx.show_context_menu(playlist_menu(&playlist), event.window_pos);
+                }
                 _ => {}
             },
         )
@@ -115,4 +124,17 @@ pub fn detail_widget() -> impl Widget<State> {
         )
         .then(Ctx::in_promise()),
     )
+}
+
+fn playlist_menu(playlist: &Playlist) -> Menu<State> {
+    let mut menu = Menu::empty();
+
+    menu = menu.entry(
+        MenuItem::new(
+            LocalizedString::new("menu-item-copy-link").with_placeholder("Copy Link to Playlist"),
+        )
+        .command(cmd::COPY.with(playlist.url())),
+    );
+
+    menu
 }
