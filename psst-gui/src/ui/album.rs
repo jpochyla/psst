@@ -64,6 +64,7 @@ fn loaded_detail_widget() -> impl Widget<Ctx<Arc<CommonCtx>, Cached<Arc<Album>>>
     let album_tracks = tracklist_widget(TrackDisplay {
         number: true,
         title: true,
+        artist: true,
         ..TrackDisplay::empty()
     });
 
@@ -159,8 +160,10 @@ fn album_menu(album: &Ctx<Arc<CommonCtx>, Arc<Album>>) -> Menu<State> {
     }
 
     menu = menu.entry(
-        MenuItem::new(LocalizedString::new("menu-item-copy-link").with_placeholder("Copy Link"))
-            .command(cmd::COPY.with(album.data.url())),
+        MenuItem::new(
+            LocalizedString::new("menu-item-copy-link").with_placeholder("Copy Link to Album"),
+        )
+        .command(cmd::COPY.with(album.data.url())),
     );
 
     menu = menu.separator();
@@ -169,7 +172,7 @@ fn album_menu(album: &Ctx<Arc<CommonCtx>, Arc<Album>>) -> Menu<State> {
         menu = menu.entry(
             MenuItem::new(
                 LocalizedString::new("menu-item-remove-from-library")
-                    .with_placeholder("Remove from Library"),
+                    .with_placeholder("Remove Album from Library"),
             )
             .command(cmd::UNSAVE_ALBUM.with(album.data.link())),
         );
@@ -177,7 +180,7 @@ fn album_menu(album: &Ctx<Arc<CommonCtx>, Arc<Album>>) -> Menu<State> {
         menu = menu.entry(
             MenuItem::new(
                 LocalizedString::new("menu-item-save-to-library")
-                    .with_placeholder("Save to Library"),
+                    .with_placeholder("Save Album to Library"),
             )
             .command(cmd::SAVE_ALBUM.with(album.data.clone())),
         );

@@ -1,8 +1,8 @@
 use crate::{
     cmd,
     data::{
-        Album, ArtistTracks, CommonCtx, Ctx, Nav, PlaybackOrigin, PlaybackPayload, PlaylistTracks,
-        SavedTracks, SearchResults, State, Track,
+        Album, ArtistLink, ArtistTracks, CommonCtx, Ctx, Nav, PlaybackOrigin, PlaybackPayload,
+        PlaylistTracks, SavedTracks, SearchResults, State, Track,
     },
     ui::theme,
     widget::LinkExt,
@@ -14,6 +14,7 @@ use druid::{
     piet::StrokeStyle,
     widget::{
         Controller, ControllerHost, CrossAxisAlignment, Flex, Label, List, ListIter, Painter,
+        SizedBox,
     },
     Data, Env, Event, EventCtx, Lens, LensExt, LocalizedString, Menu, MenuItem, MouseButton,
     RenderContext, TextAlignment, Widget, WidgetExt,
@@ -208,6 +209,9 @@ fn track_widget(display: TrackDisplay) -> impl Widget<TrackRow> {
             .fix_width(theme::grid(2.0));
         major.add_child(track_number);
         major.add_default_spacer();
+
+        minor.add_child(SizedBox::empty().width(theme::grid(2.0)));
+        minor.add_default_spacer();
     }
 
     if display.title {
@@ -218,9 +222,15 @@ fn track_widget(display: TrackDisplay) -> impl Widget<TrackRow> {
     }
 
     if display.artist {
-        let track_artist = Label::dynamic(|tr: &TrackRow, _| tr.track.artist_name())
-            .with_text_size(theme::TEXT_SIZE_SMALL);
-        minor.add_child(track_artist);
+        let track_artists = List::new(|| {
+            Label::raw()
+                .with_text_size(theme::TEXT_SIZE_SMALL)
+                .lens(ArtistLink::name)
+        })
+        .horizontal()
+        .with_spacing(theme::grid(1.0))
+        .lens(TrackRow::track.then(Track::artists.in_arc()));
+        minor.add_child(track_artists);
     }
 
     if display.album {
@@ -333,8 +343,10 @@ fn track_menu(tr: &TrackRow) -> Menu<State> {
     }
 
     menu = menu.entry(
-        MenuItem::new(LocalizedString::new("menu-item-copy-link").with_placeholder("Copy Link"))
-            .command(cmd::COPY.with(tr.track.url())),
+        MenuItem::new(
+            LocalizedString::new("menu-item-copy-link").with_placeholder("Copy Link to Track"),
+        )
+        .command(cmd::COPY.with(tr.track.url())),
     );
 
     menu = menu.separator();
@@ -343,7 +355,7 @@ fn track_menu(tr: &TrackRow) -> Menu<State> {
         menu = menu.entry(
             MenuItem::new(
                 LocalizedString::new("menu-item-remove-from-library")
-                    .with_placeholder("Remove from Library"),
+                    .with_placeholder("Remove Track from Library"),
             )
             .command(cmd::UNSAVE_TRACK.with(tr.track.id.clone())),
         );
@@ -351,7 +363,7 @@ fn track_menu(tr: &TrackRow) -> Menu<State> {
         menu = menu.entry(
             MenuItem::new(
                 LocalizedString::new("menu-item-save-to-library")
-                    .with_placeholder("Save to Library"),
+                    .with_placeholder("Save Track to Library"),
             )
             .command(cmd::SAVE_TRACK.with(tr.track.clone())),
         );
