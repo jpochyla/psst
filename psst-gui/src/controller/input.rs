@@ -46,6 +46,10 @@ impl Controller<String, TextBox<String>> for InputController {
                     on_submit(ctx, data, env);
                 }
             }
+            Event::KeyDown(k_e) if k_e.key == KbKey::Escape => {
+                ctx.resign_focus();
+                ctx.set_handled();
+            }
             Event::KeyDown(k_e) if HotKey::new(SysMods::Cmd, "c").matches(k_e) => {
                 ctx.submit_command(commands::COPY);
                 ctx.set_handled();
