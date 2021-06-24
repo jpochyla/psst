@@ -2,7 +2,9 @@ use std::sync::Arc;
 
 use crate::{
     cmd,
-    data::{Artist, ArtistAlbums, ArtistDetail, ArtistTracks, Cached, CommonCtx, Ctx, Nav, State},
+    data::{
+        AppState, Artist, ArtistAlbums, ArtistDetail, ArtistTracks, Cached, CommonCtx, Ctx, Nav,
+    },
     ui::{
         album::album_widget,
         theme,
@@ -18,7 +20,7 @@ use druid::{
     Data, Insets, LensExt, Widget, WidgetExt,
 };
 
-pub fn detail_widget() -> impl Widget<State> {
+pub fn detail_widget() -> impl Widget<AppState> {
     let top_tracks = Async::new(
         || spinner_widget(),
         || top_tracks_widget(),
@@ -26,8 +28,8 @@ pub fn detail_widget() -> impl Widget<State> {
     )
     .lens(
         Ctx::make(
-            State::common_ctx,
-            State::artist.then(ArtistDetail::top_tracks),
+            AppState::common_ctx,
+            AppState::artist.then(ArtistDetail::top_tracks),
         )
         .then(Ctx::in_promise()),
     );
@@ -38,13 +40,16 @@ pub fn detail_widget() -> impl Widget<State> {
         || error_widget().lens(Ctx::data()),
     )
     .lens(
-        Ctx::make(State::common_ctx, State::artist.then(ArtistDetail::albums))
-            .then(Ctx::in_promise()),
+        Ctx::make(
+            AppState::common_ctx,
+            AppState::artist.then(ArtistDetail::albums),
+        )
+        .then(Ctx::in_promise()),
     )
     .padding((theme::grid(1.0), 0.0));
 
     let related_artists = Async::new(|| spinner_widget(), || related_widget(), || error_widget())
-        .lens(State::artist.then(ArtistDetail::related_artists))
+        .lens(AppState::artist.then(ArtistDetail::related_artists))
         .padding((theme::grid(1.0), 0.0));
 
     Flex::column()

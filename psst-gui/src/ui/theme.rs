@@ -1,4 +1,4 @@
-use crate::data::{State, Theme};
+use crate::data::{AppState, Theme};
 pub use druid::theme::*;
 use druid::{Color, Env, FontDescriptor, FontFamily, FontWeight, Insets, Key, Size};
 
@@ -37,7 +37,7 @@ pub const ICON_SIZE_LARGE: Size = Size::new(GRID * 2.0, GRID * 2.0);
 pub const LINK_HOT_COLOR: Key<Color> = Key::new("app.link-hot-color");
 pub const LINK_COLD_COLOR: Key<Color> = Key::new("app.link-cold-color");
 
-pub fn setup(env: &mut Env, state: &State) {
+pub fn setup(env: &mut Env, state: &AppState) {
     match state.config.theme {
         Theme::Light => setup_light_theme(env),
         Theme::Dark => setup_dark_theme(env),

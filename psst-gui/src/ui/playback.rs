@@ -2,7 +2,7 @@ use crate::{
     cmd,
     data::{
         AudioAnalysis, NowPlaying, Playback, PlaybackOrigin, PlaybackState, Promise, QueueBehavior,
-        State, Track,
+        AppState, Track,
     },
     ui::theme,
     widget::{icons, Empty, LinkExt, Maybe},
@@ -19,7 +19,7 @@ use std::{sync::Arc, time::Duration};
 
 use super::utils;
 
-pub fn panel_widget() -> impl Widget<State> {
+pub fn panel_widget() -> impl Widget<AppState> {
     Flex::column()
         .with_child(Maybe::or_empty(SeekBar::new).lens(Playback::now_playing))
         .with_child(
@@ -31,7 +31,7 @@ pub fn panel_widget() -> impl Widget<State> {
                 )
                 .with_flex_child(player_widget(), 1.0),
         )
-        .lens(State::playback)
+        .lens(AppState::playback)
 }
 
 fn playback_item_widget() -> impl Widget<NowPlaying> {

@@ -8,7 +8,7 @@ mod webapi;
 mod widget;
 
 use crate::{
-    data::{Config, State},
+    data::{Config, AppState},
     delegate::Delegate,
 };
 use druid::AppLauncher;
@@ -28,9 +28,9 @@ fn main() {
     )
     .init();
 
-    let state = State {
+    let state = AppState {
         config: Config::load().unwrap_or_default(),
-        ..State::default()
+        ..AppState::default()
     };
 
     WebApi::new(

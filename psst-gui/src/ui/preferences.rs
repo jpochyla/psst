@@ -4,7 +4,7 @@ use crate::{
     cmd,
     controller::InputController,
     data::{
-        AudioQuality, Authentication, Config, Preferences, PreferencesTab, Promise, State, Theme,
+        AppState, AudioQuality, Authentication, Config, Preferences, PreferencesTab, Promise, Theme,
     },
     ui::{icons::SvgIcon, theme, utils::Border},
     widget::{icons, Empty, LinkExt},
@@ -19,13 +19,13 @@ use druid::{
 };
 use psst_core::connection::Credentials;
 
-pub fn preferences_widget() -> impl Widget<State> {
+pub fn preferences_widget() -> impl Widget<AppState> {
     let tabs = tabs_widget()
         .padding(theme::grid(2.0))
         .background(theme::BACKGROUND_LIGHT);
 
     let active = ViewSwitcher::new(
-        |state: &State, _env| state.preferences.active,
+        |state: &AppState, _env| state.preferences.active,
         |active: &PreferencesTab, _state, _env| match active {
             PreferencesTab::General => general_tab_widget().boxed(),
             PreferencesTab::Cache => cache_tab_widget().boxed(),
@@ -41,7 +41,7 @@ pub fn preferences_widget() -> impl Widget<State> {
         .with_child(active)
 }
 
-fn tabs_widget() -> impl Widget<State> {
+fn tabs_widget() -> impl Widget<AppState> {
     let label = |text, icon: &SvgIcon, tab: PreferencesTab| {
         Flex::column()
             .with_child(icon.scale(theme::ICON_SIZE_LARGE))
@@ -52,7 +52,7 @@ fn tabs_widget() -> impl Widget<State> {
             .rounded(theme::BUTTON_BORDER_RADIUS)
             .env_scope({
                 let tab = tab.clone();
-                move |env, state: &State| {
+                move |env, state: &AppState| {
                     if tab == state.preferences.active {
                         env.set(theme::LINK_COLD_COLOR, env.get(theme::BACKGROUND_DARK));
                         env.set(theme::TEXT_COLOR, env.get(theme::FOREGROUND_LIGHT));
@@ -61,7 +61,7 @@ fn tabs_widget() -> impl Widget<State> {
                     }
                 }
             })
-            .on_click(move |_ctx, state: &mut State, _env| {
+            .on_click(move |_ctx, state: &mut AppState, _env| {
                 state.preferences.active = tab;
             })
     };
@@ -77,7 +77,7 @@ fn tabs_widget() -> impl Widget<State> {
         .with_child(label("Cache", &icons::STORAGE, PreferencesTab::Cache))
 }
 
-fn general_tab_widget() -> impl Widget<State> {
+fn general_tab_widget() -> impl Widget<AppState> {
     let mut col = Flex::column().cross_axis_alignment(CrossAxisAlignment::Start);
 
     // Theme
@@ -87,7 +87,7 @@ fn general_tab_widget() -> impl Widget<State> {
         .with_child(
             RadioGroup::new(vec![("Light", Theme::Light), ("Dark", Theme::Dark)])
                 .lens(Config::theme)
-                .lens(State::config),
+                .lens(AppState::config),
         );
 
     col = col.with_spacer(theme::grid(3.0));
@@ -103,7 +103,7 @@ fn general_tab_widget() -> impl Widget<State> {
                 .env_scope(|env, _state| env.set(theme::WIDE_WIDGET_WIDTH, theme::grid(16.0)))
                 .lens(Authentication::username)
                 .lens(Preferences::auth)
-                .lens(State::preferences),
+                .lens(AppState::preferences),
         )
         .with_spacer(theme::grid(1.0))
         .with_child(
@@ -113,7 +113,7 @@ fn general_tab_widget() -> impl Widget<State> {
                 .env_scope(|env, _state| env.set(theme::WIDE_WIDGET_WIDTH, theme::grid(16.0)))
                 .lens(Authentication::password)
                 .lens(Preferences::auth)
-                .lens(State::preferences),
+                .lens(AppState::preferences),
         )
         .with_spacer(theme::grid(1.0))
         .with_child(
@@ -140,7 +140,7 @@ fn general_tab_widget() -> impl Widget<State> {
                         },
                     )
                     .lens(Preferences::auth)
-                    .lens(State::preferences),
+                    .lens(AppState::preferences),
                 ),
         );
 
@@ -157,7 +157,7 @@ fn general_tab_widget() -> impl Widget<State> {
                 ("High (320kbit)", AudioQuality::High),
             ])
             .lens(Config::audio_quality)
-            .lens(State::config),
+            .lens(AppState::config),
         );
 
     col = col.with_spacer(theme::grid(3.0));
@@ -173,7 +173,7 @@ fn general_tab_widget() -> impl Widget<State> {
             })
             .fix_width(theme::grid(10.0))
             .align_right()
-            .lens(State::config),
+            .lens(AppState::config),
     );
 
     col.controller(Authenticate::new())
@@ -195,13 +195,13 @@ impl Authenticate {
         Selector::new("app.preferences.authenticate-response");
 }
 
-impl<W: Widget<State>> Controller<State, W> for Authenticate {
+impl<W: Widget<AppState>> Controller<AppState, W> for Authenticate {
     fn event(
         &mut self,
         child: &mut W,
         ctx: &mut EventCtx,
         event: &Event,
-        data: &mut State,
+        data: &mut AppState,
         env: &Env,
     ) {
         match event {
@@ -234,7 +234,7 @@ impl<W: Widget<State>> Controller<State, W> for Authenticate {
     }
 }
 
-fn cache_tab_widget() -> impl Widget<State> {
+fn cache_tab_widget() -> impl Widget<AppState> {
     let mut col = Flex::column().cross_axis_alignment(CrossAxisAlignment::Start);
 
     col = col
@@ -272,7 +272,7 @@ fn cache_tab_widget() -> impl Widget<State> {
         ));
 
     col.controller(MeasureCacheSize::new())
-        .lens(State::preferences)
+        .lens(AppState::preferences)
 }
 
 struct MeasureCacheSize {

@@ -5,16 +5,16 @@ use druid::{
 };
 
 use crate::{
-    data::{State, UserProfile},
+    data::{AppState, UserProfile},
     ui::theme,
     webapi::WebApi,
     widget::{Async, AsyncAction, Empty, LinkExt},
 };
 
-pub fn user_widget() -> impl Widget<State> {
+pub fn user_widget() -> impl Widget<AppState> {
     let is_connected = Either::new(
         // TODO: Avoid the locking here.
-        |state: &State, _| state.session.is_connected(),
+        |state: &AppState, _| state.session.is_connected(),
         Label::new("Connected")
             .with_text_color(theme::PLACEHOLDER_COLOR)
             .with_text_size(theme::TEXT_SIZE_SMALL),
@@ -33,7 +33,7 @@ pub fn user_widget() -> impl Widget<State> {
         || Empty,
     )
     .controller(AsyncAction::new(|_| WebApi::global().get_user_profile()))
-    .lens(State::user_profile);
+    .lens(AppState::user_profile);
 
     Flex::column()
         .with_child(is_connected)

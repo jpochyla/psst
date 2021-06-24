@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::{
     cmd,
-    data::{Album, AlbumDetail, ArtistLink, Cached, CommonCtx, Ctx, Nav, State},
+    data::{Album, AlbumDetail, AppState, ArtistLink, Cached, CommonCtx, Ctx, Nav},
     ui::{
         theme,
         track::{tracklist_widget, TrackDisplay},
@@ -15,14 +15,18 @@ use druid::{
     LensExt, LocalizedString, Menu, MenuItem, MouseButton, Size, Widget, WidgetExt,
 };
 
-pub fn detail_widget() -> impl Widget<State> {
+pub fn detail_widget() -> impl Widget<AppState> {
     Async::new(
         || spinner_widget(),
         || loaded_detail_widget(),
         || error_widget().lens(Ctx::data()),
     )
     .lens(
-        Ctx::make(State::common_ctx, State::album.then(AlbumDetail::album)).then(Ctx::in_promise()),
+        Ctx::make(
+            AppState::common_ctx,
+            AppState::album.then(AlbumDetail::album),
+        )
+        .then(Ctx::in_promise()),
     )
 }
 
@@ -142,7 +146,7 @@ pub fn album_widget() -> impl Widget<Ctx<Arc<CommonCtx>, Arc<Album>>> {
     )
 }
 
-fn album_menu(album: &Ctx<Arc<CommonCtx>, Arc<Album>>) -> Menu<State> {
+fn album_menu(album: &Ctx<Arc<CommonCtx>, Arc<Album>>) -> Menu<AppState> {
     let mut menu = Menu::empty();
 
     for artist_link in &album.data.artists {

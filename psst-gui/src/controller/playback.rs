@@ -24,7 +24,8 @@ use souvlaki::{MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback};
 use crate::{
     cmd,
     data::{
-        Config, Playback, PlaybackOrigin, PlaybackState, QueueBehavior, QueuedTrack, State, TrackId,
+        AppState, Config, Playback, PlaybackOrigin, PlaybackState, QueueBehavior, QueuedTrack,
+        TrackId,
     },
 };
 
@@ -248,16 +249,16 @@ impl PlaybackController {
     }
 }
 
-impl<W> Controller<State, W> for PlaybackController
+impl<W> Controller<AppState, W> for PlaybackController
 where
-    W: Widget<State>,
+    W: Widget<AppState>,
 {
     fn event(
         &mut self,
         child: &mut W,
         ctx: &mut EventCtx,
         event: &Event,
-        data: &mut State,
+        data: &mut AppState,
         env: &Env,
     ) {
         match event {
@@ -376,7 +377,7 @@ where
         child: &mut W,
         ctx: &mut LifeCycleCtx,
         event: &LifeCycle,
-        data: &State,
+        data: &AppState,
         env: &Env,
     ) {
         match event {
@@ -398,8 +399,8 @@ where
         &mut self,
         child: &mut W,
         ctx: &mut UpdateCtx,
-        old_data: &State,
-        data: &State,
+        old_data: &AppState,
+        data: &AppState,
         env: &Env,
     ) {
         if !old_data.playback.volume.same(&data.playback.volume) {

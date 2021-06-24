@@ -1,6 +1,6 @@
 use crate::{
     cmd,
-    data::{Ctx, Library, Nav, Playlist, PlaylistDetail, State},
+    data::{Ctx, Library, Nav, Playlist, PlaylistDetail, AppState},
     ui::{
         theme,
         track::{tracklist_widget, TrackDisplay},
@@ -16,7 +16,7 @@ use druid::{
 
 use super::utils::placeholder_widget;
 
-pub fn list_widget() -> impl Widget<State> {
+pub fn list_widget() -> impl Widget<AppState> {
     Async::new(
         || spinner_widget(),
         || {
@@ -43,7 +43,7 @@ pub fn list_widget() -> impl Widget<State> {
         || error_widget(),
     )
     .controller(AsyncAction::new(|_| WebApi::global().get_playlists()))
-    .lens(State::library.then(Library::playlists.in_arc()))
+    .lens(AppState::library.then(Library::playlists.in_arc()))
 }
 
 pub fn playlist_widget() -> impl Widget<Playlist> {
@@ -104,7 +104,7 @@ fn rounded_cover_widget(size: f64) -> impl Widget<Playlist> {
     )
 }
 
-pub fn detail_widget() -> impl Widget<State> {
+pub fn detail_widget() -> impl Widget<AppState> {
     Async::new(
         || spinner_widget(),
         || {
@@ -119,14 +119,14 @@ pub fn detail_widget() -> impl Widget<State> {
     )
     .lens(
         Ctx::make(
-            State::common_ctx,
-            State::playlist.then(PlaylistDetail::tracks),
+            AppState::common_ctx,
+            AppState::playlist.then(PlaylistDetail::tracks),
         )
         .then(Ctx::in_promise()),
     )
 }
 
-fn playlist_menu(playlist: &Playlist) -> Menu<State> {
+fn playlist_menu(playlist: &Playlist) -> Menu<AppState> {
     let mut menu = Menu::empty();
 
     menu = menu.entry(

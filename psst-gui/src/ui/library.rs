@@ -1,5 +1,5 @@
 use crate::{
-    data::{Ctx, Library, SavedAlbums, State},
+    data::{AppState, Ctx, Library, SavedAlbums},
     ui::{
         album::album_widget,
         track::{tracklist_widget, TrackDisplay},
@@ -9,7 +9,7 @@ use crate::{
 };
 use druid::{widget::List, LensExt, Widget, WidgetExt};
 
-pub fn saved_tracks_widget() -> impl Widget<State> {
+pub fn saved_tracks_widget() -> impl Widget<AppState> {
     Async::new(
         || spinner_widget(),
         || {
@@ -24,14 +24,14 @@ pub fn saved_tracks_widget() -> impl Widget<State> {
     )
     .lens(
         Ctx::make(
-            State::common_ctx,
-            State::library.then(Library::saved_tracks.in_arc()),
+            AppState::common_ctx,
+            AppState::library.then(Library::saved_tracks.in_arc()),
         )
         .then(Ctx::in_promise()),
     )
 }
 
-pub fn saved_albums_widget() -> impl Widget<State> {
+pub fn saved_albums_widget() -> impl Widget<AppState> {
     Async::new(
         || spinner_widget(),
         || List::new(album_widget).lens(Ctx::map(SavedAlbums::albums)),
@@ -39,8 +39,8 @@ pub fn saved_albums_widget() -> impl Widget<State> {
     )
     .lens(
         Ctx::make(
-            State::common_ctx,
-            State::library.then(Library::saved_albums.in_arc()),
+            AppState::common_ctx,
+            AppState::library.then(Library::saved_albums.in_arc()),
         )
         .then(Ctx::in_promise()),
     )

@@ -6,7 +6,7 @@ use druid::{
 };
 use psst_core::session::{SessionConfig, SessionHandle};
 
-use crate::{cmd, data::State};
+use crate::{cmd, data::AppState};
 
 pub struct SessionController {
     thread: Option<JoinHandle<()>>,
@@ -50,16 +50,16 @@ impl SessionController {
     }
 }
 
-impl<W> Controller<State, W> for SessionController
+impl<W> Controller<AppState, W> for SessionController
 where
-    W: Widget<State>,
+    W: Widget<AppState>,
 {
     fn event(
         &mut self,
         child: &mut W,
         ctx: &mut EventCtx,
         event: &Event,
-        data: &mut State,
+        data: &mut AppState,
         env: &Env,
     ) {
         match event {
@@ -84,7 +84,7 @@ where
         child: &mut W,
         ctx: &mut LifeCycleCtx,
         event: &LifeCycle,
-        data: &State,
+        data: &AppState,
         env: &Env,
     ) {
         match event {

@@ -3,7 +3,7 @@ use std::sync::Arc;
 use crate::{
     cmd,
     controller::InputController,
-    data::{CommonCtx, Ctx, Nav, Search, SearchResults, State},
+    data::{AppState, CommonCtx, Ctx, Nav, Search, SearchResults},
     ui::{
         album::album_widget,
         artist::artist_widget,
@@ -20,7 +20,7 @@ use druid::{
 
 use super::playlist::playlist_widget;
 
-pub fn input_widget() -> impl Widget<State> {
+pub fn input_widget() -> impl Widget<AppState> {
     TextBox::new()
         .with_placeholder("Search")
         .controller(InputController::new().on_submit(|ctx, query, _env| {
@@ -29,10 +29,10 @@ pub fn input_widget() -> impl Widget<State> {
         }))
         .with_id(cmd::WIDGET_SEARCH_INPUT)
         .expand_width()
-        .lens(State::search.then(Search::input))
+        .lens(AppState::search.then(Search::input))
 }
 
-pub fn results_widget() -> impl Widget<State> {
+pub fn results_widget() -> impl Widget<AppState> {
     Async::new(
         || spinner_widget(),
         || {
@@ -56,7 +56,10 @@ pub fn results_widget() -> impl Widget<State> {
         },
         || error_widget().lens(Ctx::data()),
     )
-    .lens(Ctx::make(State::common_ctx, State::search.then(Search::results)).then(Ctx::in_promise()))
+    .lens(
+        Ctx::make(AppState::common_ctx, AppState::search.then(Search::results))
+            .then(Ctx::in_promise()),
+    )
 }
 
 fn artist_results_widget() -> impl Widget<Ctx<Arc<CommonCtx>, SearchResults>> {

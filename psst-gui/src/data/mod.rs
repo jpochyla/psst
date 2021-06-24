@@ -36,7 +36,7 @@ use psst_core::session::SessionHandle;
 use std::{sync::Arc, time::Duration};
 
 #[derive(Clone, Data, Lens)]
-pub struct State {
+pub struct AppState {
     #[data(ignore)]
     pub session: SessionHandle,
 
@@ -55,7 +55,7 @@ pub struct State {
     pub personalized: Personalized,
 }
 
-impl Default for State {
+impl Default for AppState {
     fn default() -> Self {
         Self {
             session: SessionHandle::new(),
@@ -113,7 +113,7 @@ impl Default for State {
     }
 }
 
-impl State {
+impl AppState {
     pub fn navigate(&mut self, nav: &Nav) {
         if &self.route != nav {
             self.history.push_back(self.route.clone());
@@ -128,7 +128,7 @@ impl State {
     }
 }
 
-impl State {
+impl AppState {
     pub fn queued_track(&self, track_id: &TrackId) -> Option<QueuedTrack> {
         self.playback
             .queue
@@ -184,7 +184,7 @@ impl State {
     }
 }
 
-impl State {
+impl AppState {
     pub fn save_track(&mut self, track: Arc<Track>) {
         self.library_mut().save_track(track);
         if let Promise::Resolved(saved) = &self.library.saved_tracks {

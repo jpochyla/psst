@@ -2,7 +2,7 @@ use crate::{
     cmd,
     data::{
         Album, ArtistLink, ArtistTracks, CommonCtx, Ctx, Nav, PlaybackOrigin, PlaybackPayload,
-        PlaylistTracks, SavedTracks, SearchResults, State, Track,
+        PlaylistTracks, SavedTracks, SearchResults, AppState, Track,
     },
     ui::theme,
     widget::LinkExt,
@@ -316,7 +316,7 @@ fn popularity_stars(popularity: u32) -> String {
     stars
 }
 
-fn track_menu(tr: &TrackRow) -> Menu<State> {
+fn track_menu(tr: &TrackRow) -> Menu<AppState> {
     let mut menu = Menu::empty();
 
     for artist_link in &tr.track.artists {

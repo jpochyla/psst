@@ -2,13 +2,13 @@ use druid::widget::{prelude::*, Controller};
 
 use crate::{
     cmd,
-    data::{Nav, State},
+    data::{AppState, Nav},
 };
 
 pub struct NavController;
 
 impl NavController {
-    fn load_route_data(&self, ctx: &mut EventCtx, data: &mut State) {
+    fn load_route_data(&self, ctx: &mut EventCtx, data: &mut AppState) {
         match &data.route {
             Nav::Home => {}
             Nav::SavedTracks => {
@@ -33,16 +33,16 @@ impl NavController {
     }
 }
 
-impl<W> Controller<State, W> for NavController
+impl<W> Controller<AppState, W> for NavController
 where
-    W: Widget<State>,
+    W: Widget<AppState>,
 {
     fn event(
         &mut self,
         child: &mut W,
         ctx: &mut EventCtx,
         event: &Event,
-        data: &mut State,
+        data: &mut AppState,
         env: &Env,
     ) {
         match event {

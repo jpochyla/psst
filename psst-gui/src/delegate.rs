@@ -1,6 +1,6 @@
 use crate::{
     cmd,
-    data::{ArtistTracks, PlaylistTracks, SavedAlbums, SavedTracks, State},
+    data::{AppState, ArtistTracks, PlaylistTracks, SavedAlbums, SavedTracks},
     ui,
     webapi::WebApi,
     widget::remote_image,
@@ -53,13 +53,13 @@ impl Delegate {
     }
 }
 
-impl AppDelegate<State> for Delegate {
+impl AppDelegate<AppState> for Delegate {
     fn command(
         &mut self,
         ctx: &mut DelegateCtx,
         target: Target,
         cmd: &Command,
-        data: &mut State,
+        data: &mut AppState,
         _env: &Env,
     ) -> Handled {
         if cmd.is(cmd::SHOW_MAIN) {
@@ -111,7 +111,7 @@ impl AppDelegate<State> for Delegate {
     fn window_removed(
         &mut self,
         id: WindowId,
-        data: &mut State,
+        data: &mut AppState,
         _env: &Env,
         _ctx: &mut DelegateCtx,
     ) {
@@ -131,7 +131,7 @@ impl Delegate {
         ctx: &mut DelegateCtx,
         target: Target,
         cmd: &Command,
-        _data: &mut State,
+        _data: &mut AppState,
     ) -> Handled {
         if let Some(location) = cmd.get(remote_image::REQUEST_DATA).cloned() {
             let sink = ctx.get_external_handle();
@@ -170,7 +170,7 @@ impl Delegate {
         ctx: &mut DelegateCtx,
         _target: Target,
         cmd: &Command,
-        data: &mut State,
+        data: &mut AppState,
     ) -> Handled {
         if cmd.is(cmd::SESSION_CONNECTED) {
             data.library_mut().playlists.defer_default();
@@ -208,7 +208,7 @@ impl Delegate {
         ctx: &mut DelegateCtx,
         _target: Target,
         cmd: &Command,
-        data: &mut State,
+        data: &mut AppState,
     ) -> Handled {
         if cmd.is(cmd::LOAD_SAVED_TRACKS) {
             if data.library.saved_tracks.is_empty() || data.library.saved_tracks.is_rejected() {
@@ -308,7 +308,7 @@ impl Delegate {
         ctx: &mut DelegateCtx,
         _target: Target,
         cmd: &Command,
-        data: &mut State,
+        data: &mut AppState,
     ) -> Handled {
         if let Some(link) = cmd.get(cmd::LOAD_ALBUM_DETAIL).cloned() {
             data.album.album.defer(link.clone());
@@ -334,7 +334,7 @@ impl Delegate {
         ctx: &mut DelegateCtx,
         _target: Target,
         cmd: &Command,
-        data: &mut State,
+        data: &mut AppState,
     ) -> Handled {
         if let Some(album_link) = cmd.get(cmd::LOAD_ARTIST_DETAIL) {
             // Load artist detail
@@ -410,7 +410,7 @@ impl Delegate {
         ctx: &mut DelegateCtx,
         _target: Target,
         cmd: &Command,
-        data: &mut State,
+        data: &mut AppState,
     ) -> Handled {
         if let Some(query) = cmd.get(cmd::LOAD_SEARCH_RESULTS).cloned() {
             let sink = ctx.get_external_handle();
@@ -434,7 +434,7 @@ impl Delegate {
         ctx: &mut DelegateCtx,
         _target: Target,
         cmd: &Command,
-        data: &mut State,
+        data: &mut AppState,
     ) -> Handled {
         if cmd.is(cmd::PLAYBACK_PLAYING) {
             let (item, _progress) = cmd.get_unchecked(cmd::PLAYBACK_PLAYING);

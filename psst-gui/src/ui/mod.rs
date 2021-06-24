@@ -1,7 +1,7 @@
 use crate::{
     cmd,
     controller::{NavController, PlaybackController, SessionController},
-    data::{Nav, Playback, State},
+    data::{AppState, Nav, Playback},
     ui::utils::Border,
     widget::{icons, Empty, LinkExt, ThemeScope, ViewDispatcher},
 };
@@ -26,7 +26,7 @@ pub mod track;
 pub mod user;
 pub mod utils;
 
-pub fn main_window() -> WindowDesc<State> {
+pub fn main_window() -> WindowDesc<AppState> {
     let win = WindowDesc::new(root_widget())
         .title("Psst")
         .with_min_size((theme::grid(25.0), theme::grid(25.0)))
@@ -40,7 +40,7 @@ pub fn main_window() -> WindowDesc<State> {
     }
 }
 
-pub fn preferences_window() -> WindowDesc<State> {
+pub fn preferences_window() -> WindowDesc<AppState> {
     let win = WindowDesc::new(preferences_widget())
         .title("Preferences")
         .window_size((theme::grid(50.0), theme::grid(69.0)))
@@ -54,7 +54,7 @@ pub fn preferences_window() -> WindowDesc<State> {
     }
 }
 
-fn preferences_widget() -> impl Widget<State> {
+fn preferences_widget() -> impl Widget<AppState> {
     ThemeScope::new(
         preferences::preferences_widget()
             .background(theme::BACKGROUND_DARK)
@@ -62,7 +62,7 @@ fn preferences_widget() -> impl Widget<State> {
     )
 }
 
-fn root_widget() -> impl Widget<State> {
+fn root_widget() -> impl Widget<AppState> {
     let playlists = Scroll::new(playlist::list_widget()).vertical();
     let sidebar = Flex::column()
         .must_fill_main_axis(true)
@@ -113,7 +113,7 @@ fn root_widget() -> impl Widget<State> {
     // .debug_paint_layout()
 }
 
-fn volume_slider() -> impl Widget<State> {
+fn volume_slider() -> impl Widget<AppState> {
     Flex::column()
         .with_child(
             Label::dynamic(|&volume: &f64, _| format!("Volume: {}%", (volume * 100.0).floor()))
@@ -132,10 +132,10 @@ fn volume_slider() -> impl Widget<State> {
                 }),
         )
         .padding((theme::grid(1.5), 0.0))
-        .lens(State::playback.then(Playback::volume))
+        .lens(AppState::playback.then(Playback::volume))
 }
 
-fn sidebar_logo_widget() -> impl Widget<State> {
+fn sidebar_logo_widget() -> impl Widget<AppState> {
     icons::LOGO
         .scale((29.0, 32.0))
         .with_color(theme::GREY_500)
@@ -144,7 +144,7 @@ fn sidebar_logo_widget() -> impl Widget<State> {
         .lens(Unit)
 }
 
-fn sidebar_menu_widget() -> impl Widget<State> {
+fn sidebar_menu_widget() -> impl Widget<AppState> {
     Flex::column()
         .with_default_spacer()
         .with_child(sidebar_link_widget("Home", Nav::Home))
@@ -153,7 +153,7 @@ fn sidebar_menu_widget() -> impl Widget<State> {
         .with_child(search::input_widget().padding((theme::grid(1.0), theme::grid(1.0))))
 }
 
-fn sidebar_link_widget(title: &str, nav: Nav) -> impl Widget<State> {
+fn sidebar_link_widget(title: &str, nav: Nav) -> impl Widget<AppState> {
     Label::new(title)
         .padding((theme::grid(2.0), theme::grid(1.0)))
         .expand_width()
@@ -182,12 +182,12 @@ fn sidebar_link_widget(title: &str, nav: Nav) -> impl Widget<State> {
         .on_click(move |ctx, _, _| {
             ctx.submit_command(cmd::NAVIGATE.with(nav.clone()));
         })
-        .lens(State::route)
+        .lens(AppState::route)
 }
 
-fn route_widget() -> impl Widget<State> {
+fn route_widget() -> impl Widget<AppState> {
     ViewDispatcher::new(
-        |state: &State, _| state.route.clone(),
+        |state: &AppState, _| state.route.clone(),
         |route: &Nav, _, _| match route {
             Nav::Home => Scroll::new(home::home_widget().padding(theme::grid(1.0)))
                 .vertical()
@@ -223,7 +223,7 @@ fn route_widget() -> impl Widget<State> {
     .expand()
 }
 
-fn topbar_back_button_widget() -> impl Widget<State> {
+fn topbar_back_button_widget() -> impl Widget<AppState> {
     let icon = icons::BACK.scale((10.0, theme::grid(2.0)));
     let disabled = icon
         .clone()
@@ -243,14 +243,14 @@ fn topbar_back_button_widget() -> impl Widget<State> {
             _ => {}
         });
     Either::new(
-        |state: &State, _| state.history.is_empty(),
+        |state: &AppState, _| state.history.is_empty(),
         disabled,
         enabled,
     )
     .padding(theme::grid(1.0))
 }
 
-fn history_menu(state: &State) -> Menu<State> {
+fn history_menu(state: &AppState) -> Menu<AppState> {
     let mut menu = Menu::empty();
     for (index, history) in state.history.iter().rev().take(10).enumerate() {
         let skip_back_in_history_n_times = index + 1;
@@ -262,13 +262,13 @@ fn history_menu(state: &State) -> Menu<State> {
     menu
 }
 
-fn topbar_title_widget() -> impl Widget<State> {
+fn topbar_title_widget() -> impl Widget<AppState> {
     Flex::row()
         .cross_axis_alignment(CrossAxisAlignment::Center)
         .with_child(route_title_widget())
         .with_spacer(theme::grid(0.5))
         .with_child(route_icon_widget())
-        .lens(State::route)
+        .lens(AppState::route)
 }
 
 fn route_icon_widget() -> impl Widget<Nav> {

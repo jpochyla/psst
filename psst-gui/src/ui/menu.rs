@@ -1,10 +1,10 @@
 use crate::{
     cmd,
-    data::{Nav, State},
+    data::{Nav, AppState},
 };
 use druid::{commands, platform_menus, Env, LocalizedString, Menu, MenuItem, SysMods, WindowId};
 
-pub fn main_menu(_window: Option<WindowId>, _data: &State, _env: &Env) -> Menu<State> {
+pub fn main_menu(_window: Option<WindowId>, _data: &AppState, _env: &Env) -> Menu<AppState> {
     #[allow(unused_mut)]
     let mut menu = Menu::empty();
     #[cfg(target_os = "macos")]
@@ -14,7 +14,7 @@ pub fn main_menu(_window: Option<WindowId>, _data: &State, _env: &Env) -> Menu<S
     menu.entry(edit_menu()).entry(view_menu())
 }
 
-fn mac_app_menu() -> Menu<State> {
+fn mac_app_menu() -> Menu<AppState> {
     Menu::new(LocalizedString::new("macos-menu-application-menu"))
         .entry(platform_menus::mac::application::preferences())
         .separator()
@@ -28,14 +28,14 @@ fn mac_app_menu() -> Menu<State> {
         )
 }
 
-fn edit_menu() -> Menu<State> {
+fn edit_menu() -> Menu<AppState> {
     Menu::new(LocalizedString::new("common-menu-edit-menu").with_placeholder("Edit"))
         .entry(platform_menus::common::cut())
         .entry(platform_menus::common::copy())
         .entry(platform_menus::common::paste())
 }
 
-fn view_menu() -> Menu<State> {
+fn view_menu() -> Menu<AppState> {
     Menu::new(LocalizedString::new("menu-view-menu").with_placeholder("View"))
         .entry(
             MenuItem::new(LocalizedString::new("menu-item-home").with_placeholder("Home"))
