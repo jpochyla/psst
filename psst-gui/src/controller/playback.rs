@@ -166,7 +166,7 @@ impl PlaybackController {
         sender.send(cmd).unwrap();
     }
 
-    fn update_media_controls(&mut self, playback: &Playback) {
+    fn update_media_control_playback(&mut self, playback: &Playback) {
         if let Some(media_controls) = self.media_controls.as_mut() {
             media_controls
                 .set_playback(match playback.state {
@@ -175,14 +175,24 @@ impl PlaybackController {
                     PlaybackState::Paused => MediaPlayback::Paused,
                 })
                 .unwrap();
-            let title = playback.now_playing.as_ref().map(|c| c.item.name.clone());
-            let album = playback.now_playing.as_ref().map(|c| c.item.album_name());
-            let artist = playback.now_playing.as_ref().map(|c| c.item.artist_name());
+        }
+    }
+
+    fn update_media_control_metadata(&mut self, playback: &Playback) {
+        if let Some(media_controls) = self.media_controls.as_mut() {
+            let title = playback.now_playing.as_ref().map(|p| p.item.name.clone());
+            let album = playback.now_playing.as_ref().map(|p| p.item.album_name());
+            let artist = playback.now_playing.as_ref().map(|p| p.item.artist_name());
+            let cover_url = playback
+                .now_playing
+                .as_ref()
+                .and_then(|p| p.cover_image_url());
             media_controls
                 .set_metadata(MediaMetadata {
                     title: title.as_deref(),
                     album: album.as_deref(),
                     artist: artist.as_deref(),
+                    cover_url,
                 })
                 .unwrap();
         }
@@ -267,7 +277,8 @@ where
 
                 if let Some(queued) = data.queued_track(item) {
                     data.loading_playback(queued.track, queued.origin);
-                    self.update_media_controls(&data.playback);
+                    self.update_media_control_playback(&data.playback);
+                    self.update_media_control_metadata(&data.playback);
                 } else {
                     log::warn!("loaded item not found in playback queue");
                 }
@@ -279,7 +290,8 @@ where
 
                 if let Some(queued) = data.queued_track(item) {
                     data.start_playback(queued.track, queued.origin, progress.to_owned());
-                    self.update_media_controls(&data.playback);
+                    self.update_media_control_playback(&data.playback);
+                    self.update_media_control_metadata(&data.playback);
                 } else {
                     log::warn!("played item not found in playback queue");
                 }
@@ -292,12 +304,12 @@ where
             }
             Event::Command(cmd) if cmd.is(cmd::PLAYBACK_PAUSING) => {
                 data.pause_playback();
-                self.update_media_controls(&data.playback);
+                self.update_media_control_playback(&data.playback);
                 ctx.set_handled();
             }
             Event::Command(cmd) if cmd.is(cmd::PLAYBACK_RESUMING) => {
                 data.resume_playback();
-                self.update_media_controls(&data.playback);
+                self.update_media_control_playback(&data.playback);
                 ctx.set_handled();
             }
             Event::Command(cmd) if cmd.is(cmd::PLAYBACK_BLOCKED) => {
@@ -306,7 +318,7 @@ where
             }
             Event::Command(cmd) if cmd.is(cmd::PLAYBACK_STOPPED) => {
                 data.stop_playback();
-                self.update_media_controls(&data.playback);
+                self.update_media_control_playback(&data.playback);
                 ctx.set_handled();
             }
             Event::Command(cmd) if cmd.is(cmd::UPDATE_AUDIO_ANALYSIS) => {

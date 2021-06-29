@@ -43,6 +43,16 @@ pub struct NowPlaying {
     pub analysis: Promise<AudioAnalysis, TrackId>,
 }
 
+impl NowPlaying {
+    pub fn cover_image_url(&self) -> Option<&str> {
+        self.item
+            .album
+            .as_ref()
+            .and_then(|album| album.image(512.0, 512.0))
+            .map(|image| image.url.as_ref())
+    }
+}
+
 #[derive(Clone, Debug, Data)]
 pub enum PlaybackOrigin {
     Library,
