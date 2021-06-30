@@ -82,7 +82,10 @@ impl PlaybackController {
             }
             _ => unreachable!(),
         };
-        #[cfg(not(target_os = "windows"))]
+        #[cfg(target_os = "linux")]
+        let mut media_controls = MediaControls::new_with_name("psst", "Psst");
+
+        #[cfg(all(not(target_os = "windows"), not(target_os = "linux")))]
         let mut media_controls = MediaControls::new();
 
         media_controls
