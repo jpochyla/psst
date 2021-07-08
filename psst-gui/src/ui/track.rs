@@ -1,8 +1,8 @@
 use crate::{
     cmd,
     data::{
-        Album, ArtistLink, ArtistTracks, CommonCtx, Ctx, Nav, PlaybackOrigin, PlaybackPayload,
-        PlaylistTracks, SavedTracks, SearchResults, AppState, Track,
+        Album, AppState, ArtistLink, ArtistTracks, CommonCtx, Ctx, Nav, PlaybackOrigin,
+        PlaybackPayload, PlaylistTracks, SavedTracks, SearchResults, Track,
     },
     ui::theme,
     widget::LinkExt,
@@ -183,7 +183,7 @@ where
             Event::Notification(note) => {
                 if let Some(position) = note.get(cmd::PLAY_TRACK_AT) {
                     let payload = PlaybackPayload {
-                        origin: data.data.origin().to_owned(),
+                        origin: data.data.origin(),
                         tracks: data.data.tracks().to_owned(),
                         position: position.to_owned(),
                     };
@@ -357,7 +357,7 @@ fn track_menu(tr: &TrackRow) -> Menu<AppState> {
                 LocalizedString::new("menu-item-remove-from-library")
                     .with_placeholder("Remove Track from Library"),
             )
-            .command(cmd::UNSAVE_TRACK.with(tr.track.id.clone())),
+            .command(cmd::UNSAVE_TRACK.with(tr.track.id)),
         );
     } else {
         menu = menu.entry(

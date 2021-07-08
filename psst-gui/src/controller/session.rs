@@ -63,14 +63,14 @@ where
         env: &Env,
     ) {
         match event {
-            Event::Command(cmd)
-                if cmd.is(cmd::SESSION_CONNECT) && data.config.has_credentials() =>
-            {
-                self.start_connection_thread(
-                    data.session.clone(),
-                    data.config.session(),
-                    ctx.get_external_handle(),
-                );
+            Event::Command(cmd) if cmd.is(cmd::SESSION_CONNECT) => {
+                if data.config.has_credentials() {
+                    self.start_connection_thread(
+                        data.session.clone(),
+                        data.config.session(),
+                        ctx.get_external_handle(),
+                    );
+                }
                 ctx.set_handled();
             }
             _ => {
@@ -87,17 +87,14 @@ where
         data: &AppState,
         env: &Env,
     ) {
-        match event {
-            LifeCycle::WidgetAdded => {
-                if data.config.has_credentials() {
-                    self.start_connection_thread(
-                        data.session.clone(),
-                        data.config.session(),
-                        ctx.get_external_handle(),
-                    );
-                }
+        if let LifeCycle::WidgetAdded = event {
+            if data.config.has_credentials() {
+                self.start_connection_thread(
+                    data.session.clone(),
+                    data.config.session(),
+                    ctx.get_external_handle(),
+                );
             }
-            _ => {}
         }
         child.lifecycle(ctx, event, data, env)
     }

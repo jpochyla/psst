@@ -16,11 +16,9 @@ use druid::{
 };
 
 pub fn detail_widget() -> impl Widget<AppState> {
-    Async::new(
-        || spinner_widget(),
-        || loaded_detail_widget(),
-        || error_widget().lens(Ctx::data()),
-    )
+    Async::new(spinner_widget, loaded_detail_widget, || {
+        error_widget().lens(Ctx::data())
+    })
     .lens(
         Ctx::make(
             AppState::common_ctx,
@@ -76,7 +74,7 @@ fn loaded_detail_widget() -> impl Widget<Ctx<Arc<CommonCtx>, Cached<Arc<Album>>>
         .cross_axis_alignment(CrossAxisAlignment::Start)
         .with_child(
             Flex::row()
-                .with_spacer(theme::grid(4.0))
+                .with_spacer(theme::grid(4.2))
                 .with_child(album_cover)
                 .with_default_spacer()
                 .with_child(album_info)
@@ -139,7 +137,7 @@ pub fn album_widget() -> impl Widget<Ctx<Arc<CommonCtx>, Arc<Album>>> {
                 ctx.submit_command(cmd::NAVIGATE.with(nav));
             }
             MouseButton::Right => {
-                ctx.show_context_menu(album_menu(&album), event.window_pos);
+                ctx.show_context_menu(album_menu(album), event.window_pos);
             }
             _ => {}
         },

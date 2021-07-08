@@ -160,9 +160,9 @@ impl AppState {
     }
 
     pub fn progress_playback(&mut self, progress: Duration) {
-        self.playback.now_playing.as_mut().map(|current| {
-            current.progress = progress;
-        });
+        if let Some(now_playing) = &mut self.playback.now_playing {
+            now_playing.progress = progress;
+        }
     }
 
     pub fn pause_playback(&mut self) {
@@ -188,28 +188,28 @@ impl AppState {
     pub fn save_track(&mut self, track: Arc<Track>) {
         self.library_mut().save_track(track);
         if let Promise::Resolved(saved) = &self.library.saved_tracks {
-            Arc::make_mut(&mut self.common_ctx).set_saved_tracks(&saved);
+            Arc::make_mut(&mut self.common_ctx).set_saved_tracks(saved);
         }
     }
 
     pub fn unsave_track(&mut self, track_id: &TrackId) {
         self.library_mut().unsave_track(track_id);
         if let Promise::Resolved(saved) = &self.library.saved_tracks {
-            Arc::make_mut(&mut self.common_ctx).set_saved_tracks(&saved);
+            Arc::make_mut(&mut self.common_ctx).set_saved_tracks(saved);
         }
     }
 
     pub fn save_album(&mut self, album: Arc<Album>) {
         self.library_mut().save_album(album);
         if let Promise::Resolved(saved) = &self.library.saved_albums {
-            Arc::make_mut(&mut self.common_ctx).set_saved_albums(&saved);
+            Arc::make_mut(&mut self.common_ctx).set_saved_albums(saved);
         }
     }
 
     pub fn unsave_album(&mut self, album_id: &Arc<str>) {
         self.library_mut().unsave_album(album_id);
         if let Promise::Resolved(saved) = &self.library.saved_albums {
-            Arc::make_mut(&mut self.common_ctx).set_saved_albums(&saved);
+            Arc::make_mut(&mut self.common_ctx).set_saved_albums(saved);
         }
     }
 

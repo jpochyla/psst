@@ -1,7 +1,13 @@
 use crate::error::Error;
 use num_traits::{One, WrappingAdd};
 use quick_protobuf::{BytesReader, MessageRead, MessageWrite, Writer};
-use std::{io, io::SeekFrom, mem, time::Duration};
+use std::{
+    io,
+    io::SeekFrom,
+    mem,
+    net::{Shutdown, TcpStream},
+    time::Duration,
+};
 
 const HTTP_CONNECT_TIMEOUT: Duration = Duration::from_millis(4 * 1000);
 
@@ -74,6 +80,31 @@ impl<T: io::Seek> io::Seek for OffsetFile<T> {
     }
 }
 
+pub struct TcpShutdown {
+    stream: TcpStream,
+    shutdown: bool,
+}
+
+impl TcpShutdown {
+    pub fn new(stream: TcpStream) -> Self {
+        Self {
+            stream,
+            shutdown: false,
+        }
+    }
+
+    pub fn shutdown(&mut self) {
+        if !self.shutdown {
+            self.shutdown = true;
+            let _ = self.stream.shutdown(Shutdown::Both);
+        }
+    }
+
+    pub fn has_been_shut_down(&self) -> bool {
+        self.shutdown
+    }
+}
+
 pub fn serialize_protobuf<T>(msg: &T) -> Result<Vec<u8>, Error>
 where
     T: MessageWrite,
@@ -88,7 +119,7 @@ pub fn deserialize_protobuf<T>(buf: &[u8]) -> Result<T, Error>
 where
     T: MessageRead<'static>,
 {
-    let mut reader = BytesReader::from_bytes(&buf);
+    let mut reader = BytesReader::from_bytes(buf);
     let msg = {
         let static_buf: &'static [u8] = unsafe {
             // Sigh.  While `quick-protobuf` supports `--owned` variations of messages, they

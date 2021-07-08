@@ -16,6 +16,7 @@ use serde::{Deserialize, Serialize};
 use sha1::Sha1;
 use socks::Socks5Stream;
 use std::{
+    convert::TryInto,
     io,
     io::{Read, Write},
     net::TcpStream,
@@ -112,7 +113,7 @@ impl Transport {
     pub fn connect(ap: &str, proxy_url: Option<&str>) -> Result<Self, Error> {
         log::trace!("connecting to: {:?} with proxy: {:?}", ap, proxy_url);
         let stream = if let Some(url) = proxy_url {
-            Self::connect_with_proxy(ap, url)?
+            Self::stream_through_proxy(ap, url)?
         } else {
             TcpStream::connect(ap)?
         };
@@ -120,11 +121,11 @@ impl Transport {
         Self::exchange_keys(stream)
     }
 
-    fn connect_with_proxy(ap: &str, url: &str) -> Result<TcpStream, Error> {
+    fn stream_through_proxy(ap: &str, url: &str) -> Result<TcpStream, Error> {
         match Url::parse(url) {
             Ok(url) if url.scheme() == "socks" || url.scheme() == "socks5" => {
                 // Currently we only support SOCKS5 proxies.
-                Self::connect_with_socks5_proxy(ap, url)
+                Self::stream_through_socks5_proxy(ap, &url)
             }
             _ => {
                 // Proxy URL failed to parse or has unsupported scheme.
@@ -133,10 +134,11 @@ impl Transport {
         }
     }
 
-    fn connect_with_socks5_proxy(ap: &str, url: Url) -> Result<TcpStream, Error> {
+    fn stream_through_socks5_proxy(ap: &str, url: &Url) -> Result<TcpStream, Error> {
         let addrs = url.socket_addrs(|| None)?;
         let username = url.username();
         let password = url.password().unwrap_or("");
+        // TODO: `socks` crate does not support connection timeouts.
         let proxy = if username.is_empty() {
             Socks5Stream::connect(&addrs[..], ap)?
         } else {
@@ -244,9 +246,10 @@ fn read_packet(stream: &mut TcpStream) -> io::Result<Vec<u8>> {
 fn make_packet(prefix: &[u8], data: &[u8]) -> Vec<u8> {
     let size = prefix.len() + 4 + data.len();
     let mut buf = Vec::with_capacity(size);
-    buf.extend_from_slice(prefix);
-    buf.extend_from_slice(&(size as u32).to_be_bytes());
-    buf.extend_from_slice(data);
+    let size_u32: u32 = size.try_into().unwrap();
+    buf.extend(prefix);
+    buf.extend(size_u32.to_be_bytes());
+    buf.extend(data);
     buf
 }
 
@@ -296,25 +299,25 @@ fn compute_keys(
     hello_packet: &[u8],
     apresp_packet: &[u8],
 ) -> (Vec<u8>, Vec<u8>, Vec<u8>) {
-    let mut data = Vec::with_capacity(0x64);
+    let mut data = Vec::with_capacity(5 * 20);
     for i in 1..6 {
         let mut mac: Hmac<Sha1> =
-            Hmac::new_from_slice(&shared_secret).expect("HMAC can take key of any size");
+            Hmac::new_from_slice(shared_secret).expect("HMAC can take key of any size");
         mac.update(hello_packet);
         mac.update(apresp_packet);
         mac.update(&[i]);
-        data.extend_from_slice(&mac.finalize().into_bytes());
+        data.extend(mac.finalize().into_bytes());
     }
     let mut mac: Hmac<Sha1> =
-        Hmac::new_from_slice(&data[..0x14]).expect("HMAC can take key of any size");
+        Hmac::new_from_slice(&data[..20]).expect("HMAC can take key of any size");
     mac.update(hello_packet);
     mac.update(apresp_packet);
     let digest = mac.finalize().into_bytes();
 
     (
         (&*digest).to_vec(),
-        (&data[0x14..0x34]).to_vec(),
-        (&data[0x34..0x54]).to_vec(),
+        (&data[20..52]).to_vec(),
+        (&data[52..84]).to_vec(),
     )
 }
 

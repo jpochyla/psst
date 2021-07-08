@@ -100,14 +100,10 @@ fn root_widget() -> impl Widget<AppState> {
         .min_bar_area(1.0)
         .solid_bar(true);
 
-    let themed = ThemeScope::new(split);
-
-    let controlled = themed
+    ThemeScope::new(split)
         .controller(PlaybackController::new())
         .controller(SessionController::new())
-        .controller(NavController);
-
-    controlled
+        .controller(NavController)
     // .debug_invalidation()
     // .debug_widget_id()
     // .debug_paint_layout()

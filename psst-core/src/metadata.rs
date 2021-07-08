@@ -77,7 +77,7 @@ fn is_restricted_in_region(restriction: &Restriction, country: &str) -> bool {
             return true;
         }
     }
-    return false;
+    false
 }
 
 fn is_country_in_list(countries: &[u8], country: &[u8]) -> bool {

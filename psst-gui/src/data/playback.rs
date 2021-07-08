@@ -2,7 +2,7 @@ use crate::data::{
     AlbumLink, ArtistLink, AudioAnalysis, Nav, PlaylistLink, Promise, Track, TrackId,
 };
 use druid::{im::Vector, Data, Lens};
-use std::{sync::Arc, time::Duration};
+use std::{fmt, sync::Arc, time::Duration};
 
 #[derive(Clone, Debug, Data, Lens)]
 pub struct Playback {
@@ -72,14 +72,16 @@ impl PlaybackOrigin {
             PlaybackOrigin::Search(query) => Nav::SearchResults(query.clone()),
         }
     }
+}
 
-    pub fn to_string(&self) -> String {
+impl fmt::Display for PlaybackOrigin {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self {
-            PlaybackOrigin::Library => "Saved Tracks".to_string(),
-            PlaybackOrigin::Album(link) => link.name.to_string(),
-            PlaybackOrigin::Artist(link) => link.name.to_string(),
-            PlaybackOrigin::Playlist(link) => link.name.to_string(),
-            PlaybackOrigin::Search(query) => query.clone(),
+            PlaybackOrigin::Library => f.write_str("Saved Tracks"),
+            PlaybackOrigin::Album(link) => link.name.fmt(f),
+            PlaybackOrigin::Artist(link) => link.name.fmt(f),
+            PlaybackOrigin::Playlist(link) => link.name.fmt(f),
+            PlaybackOrigin::Search(query) => query.fmt(f),
         }
     }
 }

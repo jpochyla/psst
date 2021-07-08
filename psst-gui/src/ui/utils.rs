@@ -28,9 +28,8 @@ impl Border {
                 Self::Top => h / 2.0,
                 Self::Bottom => ctx.size().height - h / 2.0,
             };
-            let color = color.resolve(&env);
             let line = Line::new((0.0, y), (ctx.size().width, y));
-            ctx.stroke(line, &color, h);
+            ctx.stroke(line, &color.resolve(env), h);
         })
     }
 }

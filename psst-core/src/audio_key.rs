@@ -45,16 +45,16 @@ impl AudioKeyDispatcher {
         let (res_sender, res_receiver) = unbounded();
         let seq = self.sequence.advance();
         self.pending.insert(seq, res_sender);
-        encoder.encode(self.make_key_request(seq, track, file))?;
+        encoder.encode(Self::make_key_request(seq, track, file))?;
         Ok(res_receiver)
     }
 
-    fn make_key_request(&self, seq: u32, track: ItemId, file: FileId) -> ShannonMessage {
+    fn make_key_request(seq: u32, track: ItemId, file: FileId) -> ShannonMessage {
         let mut buf = Vec::new();
-        buf.extend_from_slice(&file);
-        buf.extend_from_slice(&track.to_raw());
-        buf.extend_from_slice(&seq.to_be_bytes());
-        buf.extend_from_slice(&0_u16.to_be_bytes());
+        buf.extend(file.0);
+        buf.extend(track.to_raw());
+        buf.extend(seq.to_be_bytes());
+        buf.extend(0_u16.to_be_bytes());
         ShannonMessage::new(ShannonMessage::REQUEST_KEY, buf)
     }
 

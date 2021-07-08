@@ -72,6 +72,7 @@ impl TokenProvider {
             .lock()
             .expect("Failed to acquire access token lock");
         if token.is_expired() {
+            log::info!("access token expired, requesting");
             *token = AccessToken::request(session)?;
         }
         Ok(token.clone())

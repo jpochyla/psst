@@ -1,8 +1,8 @@
 use crate::{
     cmd,
     data::{
-        AudioAnalysis, NowPlaying, Playback, PlaybackOrigin, PlaybackState, Promise, QueueBehavior,
-        AppState, Track,
+        AppState, AudioAnalysis, NowPlaying, Playback, PlaybackOrigin, PlaybackState, Promise,
+        QueueBehavior, Track,
     },
     ui::theme,
     widget::{icons, Empty, LinkExt, Maybe},
@@ -290,15 +290,15 @@ impl Widget<NowPlaying> for SeekBar {
     }
 }
 
-fn compute_loudness_path(bounds: &Size, data: &NowPlaying) -> BezPath {
+fn _compute_loudness_path(bounds: &Size, data: &NowPlaying) -> BezPath {
     if let Promise::Resolved(analysis) = &data.analysis {
-        compute_loudness_path_from_analysis(&bounds, &data.item.duration, &analysis)
+        _compute_loudness_path_from_analysis(bounds, &data.item.duration, analysis)
     } else {
         BezPath::new()
     }
 }
 
-fn compute_loudness_path_from_analysis(
+fn _compute_loudness_path_from_analysis(
     bounds: &Size,
     total_duration: &Duration,
     analysis: &AudioAnalysis,

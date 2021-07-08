@@ -21,11 +21,9 @@ use druid::{
 };
 
 pub fn detail_widget() -> impl Widget<AppState> {
-    let top_tracks = Async::new(
-        || spinner_widget(),
-        || top_tracks_widget(),
-        || error_widget().lens(Ctx::data()),
-    )
+    let top_tracks = Async::new(spinner_widget, top_tracks_widget, || {
+        error_widget().lens(Ctx::data())
+    })
     .lens(
         Ctx::make(
             AppState::common_ctx,
@@ -34,11 +32,9 @@ pub fn detail_widget() -> impl Widget<AppState> {
         .then(Ctx::in_promise()),
     );
 
-    let albums = Async::new(
-        || spinner_widget(),
-        || albums_widget(),
-        || error_widget().lens(Ctx::data()),
-    )
+    let albums = Async::new(spinner_widget, albums_widget, || {
+        error_widget().lens(Ctx::data())
+    })
     .lens(
         Ctx::make(
             AppState::common_ctx,
@@ -48,7 +44,7 @@ pub fn detail_widget() -> impl Widget<AppState> {
     )
     .padding((theme::grid(1.0), 0.0));
 
-    let related_artists = Async::new(|| spinner_widget(), || related_widget(), || error_widget())
+    let related_artists = Async::new(spinner_widget, related_widget, error_widget)
         .lens(AppState::artist.then(ArtistDetail::related_artists))
         .padding((theme::grid(1.0), 0.0));
 

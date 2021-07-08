@@ -1,6 +1,6 @@
 use crate::{
     cmd,
-    data::{Ctx, Library, Nav, Playlist, PlaylistDetail, AppState},
+    data::{AppState, Ctx, Library, Nav, Playlist, PlaylistDetail},
     ui::{
         theme,
         track::{tracklist_widget, TrackDisplay},
@@ -18,7 +18,7 @@ use super::utils::placeholder_widget;
 
 pub fn list_widget() -> impl Widget<AppState> {
     Async::new(
-        || spinner_widget(),
+        spinner_widget,
         || {
             List::new(|| {
                 Label::raw()
@@ -34,13 +34,13 @@ pub fn list_widget() -> impl Widget<AppState> {
                             ctx.submit_command(cmd::NAVIGATE.with(nav));
                         }
                         MouseButton::Right => {
-                            ctx.show_context_menu(playlist_menu(&playlist), event.window_pos);
+                            ctx.show_context_menu(playlist_menu(playlist), event.window_pos);
                         }
                         _ => {}
                     })
             })
         },
-        || error_widget(),
+        error_widget,
     )
     .controller(AsyncAction::new(|_| WebApi::global().get_playlists()))
     .lens(AppState::library.then(Library::playlists.in_arc()))
@@ -82,7 +82,7 @@ pub fn playlist_widget() -> impl Widget<Playlist> {
                     ctx.submit_command(cmd::NAVIGATE.with(nav));
                 }
                 MouseButton::Right => {
-                    ctx.show_context_menu(playlist_menu(&playlist), event.window_pos);
+                    ctx.show_context_menu(playlist_menu(playlist), event.window_pos);
                 }
                 _ => {}
             },
@@ -106,7 +106,7 @@ fn rounded_cover_widget(size: f64) -> impl Widget<Playlist> {
 
 pub fn detail_widget() -> impl Widget<AppState> {
     Async::new(
-        || spinner_widget(),
+        spinner_widget,
         || {
             tracklist_widget(TrackDisplay {
                 title: true,

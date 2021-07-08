@@ -438,11 +438,10 @@ impl Delegate {
     ) -> Handled {
         if cmd.is(cmd::PLAYBACK_PLAYING) {
             let (item, _progress) = cmd.get_unchecked(cmd::PLAYBACK_PLAYING);
-
-            data.playback.now_playing.as_mut().map(|current| {
-                current.analysis.defer(item.clone());
-            });
-            let item = item.clone();
+            let item = item.to_owned();
+            if let Some(now_playing) = &mut data.playback.now_playing {
+                now_playing.analysis.defer(item);
+            }
             let sink = ctx.get_external_handle();
             self.spawn(move || {
                 let result = WebApi::global().get_audio_analysis(&item.to_base62());

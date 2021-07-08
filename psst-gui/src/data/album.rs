@@ -58,7 +58,7 @@ impl Album {
     }
 
     pub fn image(&self, width: f64, height: f64) -> Option<&Image> {
-        Image::fitting(&self.images, width, height)
+        Image::at_least_of_size(&self.images, width, height)
     }
 
     pub fn url(&self) -> String {
@@ -84,7 +84,7 @@ pub struct AlbumLink {
 
 impl AlbumLink {
     pub fn image(&self, width: f64, height: f64) -> Option<&Image> {
-        Image::fitting(&self.images, width, height)
+        Image::at_least_of_size(&self.images, width, height)
     }
 }
 

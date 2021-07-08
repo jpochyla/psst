@@ -1,6 +1,5 @@
 use crate::error::Error;
-use std::io;
-use std::slice;
+use std::{io, slice};
 
 pub struct VorbisDecoder<R>
 where
@@ -30,7 +29,7 @@ where
     pub fn seek(&mut self, pcm_frame: u64) {
         self.vorbis
             .seek_to_pcm(pcm_frame)
-            .expect("Failed to set current OGG stream position")
+            .expect("Failed to set current OGG stream position");
     }
 
     fn read_next_packet(&mut self) -> Result<usize, minivorbis::Error> {
@@ -44,7 +43,9 @@ where
                     continue;
                 }
                 Ok(len) => {
-                    unsafe { self.packet.set_len(len) };
+                    unsafe {
+                        self.packet.set_len(len);
+                    }
                     return Ok(len);
                 }
                 other_result => {

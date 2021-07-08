@@ -7,13 +7,13 @@ use crate::{
     error::Error,
     item_id::{FileId, ItemId},
     mercury::{MercuryDispatcher, MercuryRequest},
-    util::deserialize_protobuf,
+    util::{deserialize_protobuf, TcpShutdown},
 };
 use quick_protobuf::MessageRead;
 use serde::de::DeserializeOwned;
 use std::{
     io,
-    net::{Shutdown, TcpStream},
+    net::TcpStream,
     sync::{Arc, Mutex, RwLock},
 };
 
@@ -50,11 +50,9 @@ impl SessionHandle {
     pub fn connect(&self, config: SessionConfig) -> Result<Arc<Session>, Error> {
         // First we need to drop the old session, so it counts as disconnected until we
         // successfully connect again.
-        self.session
-            .write()
-            .unwrap()
-            .take()
-            .map(|old_session| old_session.shutdown());
+        if let Some(old_session) = self.session.write().unwrap().take() {
+            old_session.shutdown()
+        }
         // Try to connect and block until it either succeeds or fails.
         let session = Arc::new(Session::connect(config)?);
         // Save the connected session.
@@ -63,20 +61,8 @@ impl SessionHandle {
     }
 }
 
-struct ShutdownSwitch {
-    stream: TcpStream,
-    has_been_shut_down: bool,
-}
-
-impl ShutdownSwitch {
-    fn shutdown(&mut self) {
-        self.has_been_shut_down = true;
-        let _ = self.stream.shutdown(Shutdown::Both);
-    }
-}
-
 pub struct Session {
-    shutdown: Mutex<ShutdownSwitch>,
+    shutdown: Mutex<TcpShutdown>,
     encoder: Mutex<ShannonEncoder<TcpStream>>,
     decoder: Mutex<ShannonDecoder<TcpStream>>,
     mercury: Mutex<MercuryDispatcher>,
@@ -102,10 +88,7 @@ impl Session {
             decoder,
         } = transport;
         Ok(Self {
-            shutdown: Mutex::new(ShutdownSwitch {
-                stream,
-                has_been_shut_down: false,
-            }),
+            shutdown: Mutex::new(TcpShutdown::new(stream)),
             encoder: Mutex::new(encoder),
             decoder: Mutex::new(decoder),
             credentials,
@@ -127,7 +110,7 @@ impl Session {
     }
 
     pub fn has_been_shut_down(&self) -> bool {
-        self.shutdown.lock().unwrap().has_been_shut_down
+        self.shutdown.lock().unwrap().has_been_shut_down()
     }
 
     pub fn credentials(&self) -> &Credentials {
@@ -149,7 +132,7 @@ impl Session {
             .recv()
             .expect("Failed to receive from mercury response channel");
         let payload = response.payload.first().ok_or(Error::UnexpectedResponse)?;
-        let message = deserialize_protobuf(&payload)?;
+        let message = deserialize_protobuf(payload)?;
         Ok(message)
     }
 
@@ -168,7 +151,7 @@ impl Session {
             .recv()
             .expect("Failed to receive from mercury response channel");
         let payload = response.payload.first().ok_or(Error::UnexpectedResponse)?;
-        let message = serde_json::from_slice(&payload)?;
+        let message = serde_json::from_slice(payload)?;
         Ok(message)
     }
 

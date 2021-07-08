@@ -22,6 +22,7 @@ use std::{
 };
 
 const PREVIOUS_TRACK_THRESHOLD: Duration = Duration::from_secs(3);
+const STOP_AFTER_CONSECUTIVE_LOADING_FAILURES: usize = 3;
 
 #[derive(Clone)]
 pub struct PlaybackConfig {
@@ -47,13 +48,13 @@ pub struct PlaybackItem {
 impl PlaybackItem {
     fn load(
         &self,
-        session: SessionHandle,
+        session: &SessionHandle,
         cdn: CdnHandle,
         cache: CacheHandle,
         config: &PlaybackConfig,
     ) -> Result<LoadedPlaybackItem, Error> {
-        let path = load_audio_path(self.item_id, &session, &cache, &config)?;
-        let key = load_audio_key(&path, &session, &cache)?;
+        let path = load_audio_path(self.item_id, session, &cache, config)?;
+        let key = load_audio_key(&path, session, &cache)?;
         let file = AudioFile::open(path, cdn, cache)?;
         let (source, norm_data) = file.audio_source(key)?;
         let norm_factor = norm_data.factor_for_level(self.norm_level, config.pregain);
@@ -75,8 +76,7 @@ fn load_audio_path(
         ItemIdType::Track => {
             load_audio_path_from_track_or_alternative(item_id, session, cache, config)
         }
-        ItemIdType::Podcast => unimplemented!(),
-        ItemIdType::Unknown => unimplemented!(),
+        ItemIdType::Podcast | ItemIdType::Unknown => unimplemented!(),
     }
 }
 
@@ -182,6 +182,7 @@ pub struct Player {
     event_receiver: Receiver<PlayerEvent>,
     audio_source: Arc<Mutex<PlayerAudioSource>>,
     audio_output_remote: AudioOutputRemote,
+    consecutive_loading_failures: usize,
 }
 
 impl Player {
@@ -209,6 +210,7 @@ impl Player {
             state: PlayerState::Stopped,
             preload: PreloadState::None,
             queue: Queue::new(),
+            consecutive_loading_failures: 0,
         }
     }
 
@@ -275,15 +277,22 @@ impl Player {
                 ..
             } if item == requested_item => match result {
                 Ok(loaded_item) => {
+                    self.consecutive_loading_failures = 0;
                     self.play_loaded(loaded_item);
                 }
                 Err(err) => {
-                    log::error!("error while opening: {}", err);
-                    self.stop();
+                    self.consecutive_loading_failures += 1;
+                    if self.consecutive_loading_failures < STOP_AFTER_CONSECUTIVE_LOADING_FAILURES {
+                        log::error!("skipping, error while loading: {}", err);
+                        self.next();
+                    } else {
+                        log::error!("stopping, error while loading: {}", err);
+                        self.stop();
+                    }
                 }
             },
             _ => {
-                log::info!("stale open result received, ignoring");
+                log::info!("stale load result received, ignoring");
             }
         }
     }
@@ -370,7 +379,7 @@ impl Player {
             let cache = self.cache.clone();
             let config = self.config.clone();
             move || {
-                let result = item.load(session, cdn, cache, &config);
+                let result = item.load(&session, cdn, cache, &config);
                 event_sender
                     .send(PlayerEvent::Loaded { item, result })
                     .expect("Failed to send PlayerEvent::Loaded");
@@ -383,7 +392,7 @@ impl Player {
             .expect("Failed to send PlayerEvent::Loading");
         self.state = PlayerState::Loading {
             item,
-            loading_handle,
+            _loading_handle: loading_handle,
         };
     }
 
@@ -398,7 +407,7 @@ impl Player {
             let cache = self.cache.clone();
             let config = self.config.clone();
             move || {
-                let result = item.load(session, cdn, cache, &config);
+                let result = item.load(&session, cdn, cache, &config);
                 event_sender
                     .send(PlayerEvent::Preloaded { item, result })
                     .expect("Failed to send PlayerEvent::Preloaded");
@@ -406,7 +415,7 @@ impl Player {
         });
         self.preload = PreloadState::Preloading {
             item,
-            loading_handle,
+            _loading_handle: loading_handle,
         };
     }
 
@@ -418,24 +427,15 @@ impl Player {
         log::info!("starting playback");
         let path = loaded_item.file.path();
         let duration = Duration::default();
-        let play_res = self
-            .audio_source
+        self.audio_source
             .lock()
             .expect("Failed to acquire audio source lock")
             .play_now(loaded_item);
-        match play_res {
-            Ok(_) => {
-                self.event_sender
-                    .send(PlayerEvent::Playing { path, duration })
-                    .expect("Failed to send PlayerEvent::Playing");
-                self.state = PlayerState::Playing { path, duration };
-                self.audio_output_remote.resume();
-            }
-            Err(err) => {
-                log::error!("error while creating audio source: {}", err);
-                self.stop();
-            }
-        }
+        self.event_sender
+            .send(PlayerEvent::Playing { path, duration })
+            .expect("Failed to send PlayerEvent::Playing");
+        self.state = PlayerState::Playing { path, duration };
+        self.audio_output_remote.resume();
     }
 
     fn pause(&mut self) {
@@ -509,6 +509,7 @@ impl Player {
         self.state = PlayerState::Stopped;
         self.audio_output_remote.pause();
         self.queue.clear();
+        self.consecutive_loading_failures = 0;
     }
 
     fn seek(&mut self, position: Duration) {
@@ -623,7 +624,7 @@ pub enum PlayerEvent {
 enum PlayerState {
     Loading {
         item: PlaybackItem,
-        loading_handle: JoinHandle<()>,
+        _loading_handle: JoinHandle<()>,
     },
     Playing {
         path: AudioPath,
@@ -640,7 +641,7 @@ enum PlayerState {
 enum PreloadState {
     Preloading {
         item: PlaybackItem,
-        loading_handle: JoinHandle<()>,
+        _loading_handle: JoinHandle<()>,
     },
     Preloaded {
         item: PlaybackItem,
@@ -677,26 +678,25 @@ impl PlayerAudioSource {
     fn seek(&mut self, position: Duration) {
         if let Some(current) = &mut self.current {
             let seconds = position.as_secs_f64();
-            let frames = seconds * OUTPUT_SAMPLE_RATE as f64;
-            let samples = frames * OUTPUT_CHANNELS as f64;
+            let frames = seconds * f64::from(OUTPUT_SAMPLE_RATE);
+            let samples = frames * f64::from(OUTPUT_CHANNELS);
             current.source.seek(frames as u64);
             self.samples = samples as u64;
             self.report_audio_position();
         }
     }
 
-    fn play_now(&mut self, item: LoadedPlaybackItem) -> Result<(), Error> {
+    fn play_now(&mut self, item: LoadedPlaybackItem) {
         self.current.replace(CurrentPlaybackItem {
             norm_factor: item.norm_factor,
             source: item.source,
             file: item.file,
         });
         self.samples = 0;
-        Ok(())
     }
 
     fn next_sample(&mut self) -> Option<AudioSample> {
-        if let Some(current) = self.current.as_mut() {
+        if let Some(current) = &mut self.current {
             let sample = current.source.next();
             if sample.is_some() {
                 self.samples += 1;
@@ -710,9 +710,9 @@ impl PlayerAudioSource {
     }
 
     fn report_audio_position(&self) {
-        if let Some(current) = self.current.as_ref() {
+        if let Some(current) = &self.current {
             let duration = Duration::from_secs_f64(
-                self.samples as f64 / OUTPUT_SAMPLE_RATE as f64 / OUTPUT_CHANNELS as f64,
+                self.samples as f64 / f64::from(OUTPUT_SAMPLE_RATE) / f64::from(OUTPUT_CHANNELS),
             );
             let path = current.file.path();
             self.event_sender
@@ -750,7 +750,7 @@ impl Iterator for PlayerAudioSource {
         if sample.is_some() {
             // Report audio progress.
             if self.samples % PROGRESS_PRECISION_SAMPLES == 0 {
-                self.report_audio_position()
+                self.report_audio_position();
             }
         } else {
             // We're at the end of track.  If we still have the source, drop it and report.

@@ -172,14 +172,14 @@ impl StreamedFile {
             // TODO: We spawn threads here without any accounting.  Seems wrong.
             thread::Builder::new().name(thread_name).spawn({
                 // TODO: Do not bury the whole servicing loop in case the URL renewal fails.
-                let url = fresh_url()?.url.clone();
+                let url = fresh_url()?.url;
                 let cdn = self.cdn.clone();
                 let cache = self.cache.clone();
                 let mut writer = self.storage.writer()?;
                 let file_path = self.storage.path().to_path_buf();
                 let file_id = self.path.file_id;
                 move || {
-                    match load_range(&mut writer, cdn, &url, offset, length) {
+                    match load_range(&mut writer, &cdn, &url, offset, length) {
                         Ok(_) => {
                             // If the file is completely downloaded, copy it to cache.
                             if writer.is_complete() && !cache.audio_file_path(file_id).exists() {
@@ -231,7 +231,7 @@ impl CachedFile {
 
 fn load_range(
     writer: &mut StreamWriter,
-    cdn: CdnHandle,
+    cdn: &CdnHandle,
     url: &str,
     offset: u64,
     length: u64,

@@ -11,7 +11,7 @@ use druid::{widget::List, LensExt, Widget, WidgetExt};
 
 pub fn saved_tracks_widget() -> impl Widget<AppState> {
     Async::new(
-        || spinner_widget(),
+        spinner_widget,
         || {
             tracklist_widget(TrackDisplay {
                 title: true,
@@ -33,7 +33,7 @@ pub fn saved_tracks_widget() -> impl Widget<AppState> {
 
 pub fn saved_albums_widget() -> impl Widget<AppState> {
     Async::new(
-        || spinner_widget(),
+        spinner_widget,
         || List::new(album_widget).lens(Ctx::map(SavedAlbums::albums)),
         || error_widget().lens(Ctx::data()),
     )

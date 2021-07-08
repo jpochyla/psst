@@ -34,7 +34,7 @@ pub fn input_widget() -> impl Widget<AppState> {
 
 pub fn results_widget() -> impl Widget<AppState> {
     Async::new(
-        || spinner_widget(),
+        spinner_widget,
         || {
             let label = |text| {
                 Label::new(text)

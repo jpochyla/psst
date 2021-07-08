@@ -53,7 +53,7 @@ impl<W: Widget<AppState>> Widget<AppState> for ThemeScope<W> {
         env: &Env,
     ) -> Size {
         self.inner
-            .layout(ctx, &bc, data, self.cached_env.as_ref().unwrap_or(env))
+            .layout(ctx, bc, data, self.cached_env.as_ref().unwrap_or(env))
     }
 
     fn paint(&mut self, ctx: &mut PaintCtx, data: &AppState, env: &Env) {

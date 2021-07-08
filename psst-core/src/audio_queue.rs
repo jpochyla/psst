@@ -58,10 +58,10 @@ impl Queue {
             // Swap the current position with the first item, so we will start from the
             // beginning, with the full queue ahead of us.  Then shuffle the rest of the
             // items and set the position to 0.
-            self.positions.swap(0, self.position);
-            self.positions.get_mut(1..).map(|except_first| {
-                except_first.shuffle(&mut rand::thread_rng());
-            });
+            if self.positions.len() > 1 {
+                self.positions.swap(0, self.position);
+                self.positions[1..].shuffle(&mut rand::thread_rng());
+            }
             self.position = 0;
         }
     }

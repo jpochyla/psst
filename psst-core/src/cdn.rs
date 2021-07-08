@@ -144,7 +144,7 @@ fn parse_total_content_length(response: &ureq::Response) -> u64 {
 ///                                              ^========^
 fn parse_expiration(url: &str) -> Option<Duration> {
     let first_param = url.split('?').nth(1)?;
-    let expires_millis = first_param.split('_').nth(0)?;
+    let expires_millis = first_param.split('_').next()?;
     let expires_millis = expires_millis.parse().ok()?;
     let expires = Duration::from_millis(expires_millis);
     Some(expires)

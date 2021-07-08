@@ -1,3 +1,5 @@
+#![allow(clippy::new_without_default)]
+
 mod cmd;
 mod controller;
 mod data;
@@ -8,7 +10,7 @@ mod webapi;
 mod widget;
 
 use crate::{
-    data::{Config, AppState},
+    data::{AppState, Config},
     delegate::Delegate,
 };
 use druid::AppLauncher;

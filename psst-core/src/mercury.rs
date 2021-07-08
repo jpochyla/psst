@@ -108,11 +108,9 @@ impl MercuryRequest {
             ..Header::default()
         };
         let header_part = serialize_protobuf(&header).expect("Failed to serialize message header");
-
-        let mut parts = Vec::new();
-        parts.push(header_part);
-        parts.extend(self.payload);
-        parts
+        let mut payload = self.payload;
+        payload.insert(0, header_part);
+        payload
     }
 }
 
@@ -187,14 +185,14 @@ impl MercuryMessage {
 
     fn encode(&self) -> Vec<u8> {
         let mut buf = Vec::new();
-        buf.extend_from_slice(&8_u16.to_be_bytes()); // Sequence length.
-        buf.extend_from_slice(&self.seq.to_be_bytes());
+        buf.extend(8_u16.to_be_bytes()); // Sequence length.
+        buf.extend(self.seq.to_be_bytes());
         buf.push(self.flags);
-        buf.extend_from_slice(&self.count.to_be_bytes());
+        buf.extend(self.count.to_be_bytes());
         for part in &self.parts {
             let len = part.len() as u16;
-            buf.extend_from_slice(&len.to_be_bytes());
-            buf.extend_from_slice(&part);
+            buf.extend(len.to_be_bytes());
+            buf.extend(part);
         }
         buf
     }

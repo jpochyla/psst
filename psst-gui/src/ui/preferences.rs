@@ -51,7 +51,6 @@ fn tabs_widget() -> impl Widget<AppState> {
             .link()
             .rounded(theme::BUTTON_BORDER_RADIUS)
             .env_scope({
-                let tab = tab.clone();
                 move |env, state: &AppState| {
                     if tab == state.preferences.active {
                         env.set(theme::LINK_COLD_COLOR, env.get(theme::BACKGROUND_DARK));
@@ -221,7 +220,7 @@ impl<W: Widget<AppState>> Controller<AppState, W> for Authenticate {
             Event::Command(cmd) if cmd.is(Self::RESPONSE) => {
                 let result = cmd.get_unchecked(Self::RESPONSE);
                 let result = result.to_owned().map(|credentials| {
-                    data.config.store_credentials(credentials.to_owned());
+                    data.config.store_credentials(credentials);
                 });
                 data.preferences.auth.result.resolve_or_reject(result);
                 self.thread.take();
@@ -256,17 +255,11 @@ fn cache_tab_widget() -> impl Widget<AppState> {
         .with_spacer(theme::grid(2.0))
         .with_child(Label::dynamic(
             |preferences: &Preferences, _| match preferences.cache_size {
-                Promise::Empty | Promise::Rejected(_) => {
-                    format!("Unknown")
-                }
-                Promise::Deferred(_) => {
-                    format!("Computing")
-                }
-                Promise::Resolved(0) => {
-                    format!("Empty")
-                }
+                Promise::Empty | Promise::Rejected(_) => "Unknown".to_string(),
+                Promise::Deferred(_) => "Computing".to_string(),
+                Promise::Resolved(0) => "Empty".to_string(),
                 Promise::Resolved(b) => {
-                    format!("{:.2} MB", b as f64 / 1e6 as f64)
+                    format!("{:.2} MB", b as f64 / 1e6_f64)
                 }
             },
         ));

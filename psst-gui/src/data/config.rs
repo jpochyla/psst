@@ -144,7 +144,7 @@ impl Config {
                     None
                 }
             },
-            |url| Some(url),
+            Some,
         )
     }
 }

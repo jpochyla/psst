@@ -323,11 +323,11 @@ where
             }
             Event::Command(cmd) if cmd.is(cmd::UPDATE_AUDIO_ANALYSIS) => {
                 let (track_id, result) = cmd.get_unchecked(cmd::UPDATE_AUDIO_ANALYSIS);
-                data.playback.now_playing.as_mut().map(|current| {
-                    if current.analysis.is_deferred(track_id) {
-                        current.analysis.resolve_or_reject(result.to_owned());
+                if let Some(now_playing) = &mut data.playback.now_playing {
+                    if now_playing.analysis.is_deferred(track_id) {
+                        now_playing.analysis.resolve_or_reject(result.to_owned());
                     }
-                });
+                }
                 ctx.set_handled();
             }
             //
@@ -371,12 +371,12 @@ where
                 ctx.set_handled();
             }
             Event::Command(cmd) if cmd.is(cmd::PLAY_SEEK) => {
-                let fraction = cmd.get_unchecked(cmd::PLAY_SEEK);
-                data.playback.now_playing.as_ref().map(|current| {
+                if let Some(now_playing) = &data.playback.now_playing {
+                    let fraction = cmd.get_unchecked(cmd::PLAY_SEEK);
                     let position =
-                        Duration::from_secs_f64(current.item.duration.as_secs_f64() * fraction);
+                        Duration::from_secs_f64(now_playing.item.duration.as_secs_f64() * fraction);
                     self.seek(position);
-                });
+                }
                 ctx.set_handled();
             }
             //
@@ -392,17 +392,14 @@ where
         data: &AppState,
         env: &Env,
     ) {
-        match event {
-            LifeCycle::WidgetAdded => {
-                self.open_audio_output_and_start_threads(
-                    data.session.clone(),
-                    data.config.playback(),
-                    ctx.get_external_handle(),
-                    ctx.widget_id(),
-                    ctx.window(),
-                );
-            }
-            _ => {}
+        if let LifeCycle::WidgetAdded = event {
+            self.open_audio_output_and_start_threads(
+                data.session.clone(),
+                data.config.playback(),
+                ctx.get_external_handle(),
+                ctx.widget_id(),
+                ctx.window(),
+            );
         }
         child.lifecycle(ctx, event, data, env);
     }

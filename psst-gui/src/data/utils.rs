@@ -65,7 +65,7 @@ impl Image {
         }
     }
 
-    pub fn fitting(images: &Vector<Self>, width: f64, height: f64) -> Option<&Self> {
+    pub fn at_least_of_size(images: &Vector<Self>, width: f64, height: f64) -> Option<&Self> {
         images
             .iter()
             .rev()
@@ -105,7 +105,8 @@ where
     let year = parts.next().and_then(|p| p.parse().ok()).unwrap_or(0);
     let month = parts.next().and_then(|p| p.parse().ok()).unwrap_or(1);
     let day = parts.next().and_then(|p| p.parse().ok()).unwrap_or(1);
-    NaiveDate::from_ymd_opt(year, month, day).ok_or(serde::de::Error::custom("Invalid date"))
+    NaiveDate::from_ymd_opt(year, month, day)
+        .ok_or_else(|| serde::de::Error::custom("Invalid date"))
 }
 
 pub(crate) fn deserialize_date_option<'de, D>(

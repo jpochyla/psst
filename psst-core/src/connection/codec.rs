@@ -1,5 +1,5 @@
 use shannon::Shannon;
-use std::io;
+use std::{convert::TryInto, io};
 
 #[derive(Debug)]
 pub struct ShannonMessage {
@@ -65,9 +65,10 @@ where
     pub fn encode(&mut self, item: ShannonMessage) -> io::Result<()> {
         // Buffer up the whole message.
         let mut buf = Vec::with_capacity(HEADER_SIZE + item.payload.len() + MAC_SIZE);
+        let len_u16: u16 = item.payload.len().try_into().unwrap();
         buf.push(item.cmd);
-        buf.extend_from_slice(&(item.payload.len() as u16).to_be_bytes());
-        buf.extend_from_slice(&item.payload);
+        buf.extend(len_u16.to_be_bytes());
+        buf.extend(item.payload);
 
         // Seed the cipher, rotate the nonce, and encrypt the header and payload.
         self.cipher.nonce_u32(self.nonce);
@@ -77,7 +78,7 @@ where
         // Compute the MAC and append it.
         let mut mac = [0_u8; MAC_SIZE];
         self.cipher.finish(&mut mac);
-        buf.extend_from_slice(&mac);
+        buf.extend(mac);
 
         self.inner.write_all(&buf)
     }
