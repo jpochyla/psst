@@ -1,6 +1,3 @@
-use crate::error::Error;
-use num_traits::{One, WrappingAdd};
-use quick_protobuf::{BytesReader, MessageRead, MessageWrite, Writer};
 use std::{
     io,
     io::SeekFrom,
@@ -9,15 +6,20 @@ use std::{
     time::Duration,
 };
 
-const HTTP_CONNECT_TIMEOUT: Duration = Duration::from_millis(4 * 1000);
+use num_traits::{One, WrappingAdd};
+use quick_protobuf::{BytesReader, MessageRead, MessageWrite, Writer};
 
-const HTTP_IO_TIMEOUT: Duration = Duration::from_millis(4 * 1000);
+use crate::error::Error;
+
+pub const NET_CONNECT_TIMEOUT: Duration = Duration::from_millis(4 * 1000);
+
+pub const NET_IO_TIMEOUT: Duration = Duration::from_millis(4 * 1000);
 
 pub fn default_ureq_agent_builder(proxy_url: Option<&str>) -> Result<ureq::AgentBuilder, Error> {
     let builder = ureq::AgentBuilder::new()
-        .timeout_connect(HTTP_CONNECT_TIMEOUT)
-        .timeout_read(HTTP_IO_TIMEOUT)
-        .timeout_write(HTTP_IO_TIMEOUT);
+        .timeout_connect(NET_CONNECT_TIMEOUT)
+        .timeout_read(NET_IO_TIMEOUT)
+        .timeout_write(NET_IO_TIMEOUT);
     if let Some(url) = proxy_url {
         let proxy = ureq::Proxy::new(url)?;
         Ok(builder.proxy(proxy))

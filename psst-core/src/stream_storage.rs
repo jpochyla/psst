@@ -1,5 +1,3 @@
-use crossbeam_channel::{unbounded, Receiver, Sender};
-use iset::IntervalSet;
 use std::{
     fs::File,
     io,
@@ -8,6 +6,9 @@ use std::{
     path::{Path, PathBuf},
     sync::{Arc, Condvar, Mutex},
 };
+
+use crossbeam_channel::{unbounded, Receiver, Sender};
+use iset::IntervalSet;
 use tempfile::NamedTempFile;
 
 pub enum StreamRequest {

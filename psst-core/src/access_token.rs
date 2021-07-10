@@ -1,9 +1,11 @@
-use crate::{error::Error, session::SessionHandle};
-use serde::Deserialize;
 use std::{
     sync::Mutex,
     time::{Duration, Instant},
 };
+
+use serde::Deserialize;
+
+use crate::{error::Error, session::SessionHandle};
 
 // Client ID of the official Web Spotify front-end.
 const CLIENT_ID: &str = "65b708073fc0480ea92a077233ca87bd";

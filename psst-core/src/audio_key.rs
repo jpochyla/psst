@@ -1,17 +1,17 @@
-use crate::{
-    connection::codec::{ShannonEncoder, ShannonMessage},
-    error::Error,
-    item_id::{FileId, ItemId},
-    util::Sequence,
-};
-use byteorder::{ReadBytesExt, BE};
-use crossbeam_channel::{unbounded, Receiver, Sender};
 use std::{
     collections::HashMap,
     convert::TryInto,
-    io,
     io::{Cursor, Read},
-    net::TcpStream,
+};
+
+use byteorder::{ReadBytesExt, BE};
+use crossbeam_channel::Sender;
+
+use crate::{
+    connection::shannon_codec::ShannonMsg,
+    error::Error,
+    item_id::{FileId, ItemId},
+    util::Sequence,
 };
 
 #[derive(Debug, Hash, PartialEq, Eq, Copy, Clone)]
@@ -36,29 +36,27 @@ impl AudioKeyDispatcher {
         }
     }
 
-    pub fn request(
+    pub fn enqueue_request(
         &mut self,
-        encoder: &mut ShannonEncoder<TcpStream>,
+        callback: Sender<Result<AudioKey, Error>>,
         track: ItemId,
         file: FileId,
-    ) -> io::Result<Receiver<Result<AudioKey, Error>>> {
-        let (res_sender, res_receiver) = unbounded();
+    ) -> ShannonMsg {
         let seq = self.sequence.advance();
-        self.pending.insert(seq, res_sender);
-        encoder.encode(Self::make_key_request(seq, track, file))?;
-        Ok(res_receiver)
+        self.pending.insert(seq, callback);
+        Self::make_key_request(seq, track, file)
     }
 
-    fn make_key_request(seq: u32, track: ItemId, file: FileId) -> ShannonMessage {
+    fn make_key_request(seq: u32, track: ItemId, file: FileId) -> ShannonMsg {
         let mut buf = Vec::new();
         buf.extend(file.0);
         buf.extend(track.to_raw());
         buf.extend(seq.to_be_bytes());
         buf.extend(0_u16.to_be_bytes());
-        ShannonMessage::new(ShannonMessage::REQUEST_KEY, buf)
+        ShannonMsg::new(ShannonMsg::REQUEST_KEY, buf)
     }
 
-    pub fn handle_aes_key(&mut self, msg: ShannonMessage) {
+    pub fn handle_aes_key(&mut self, msg: ShannonMsg) {
         let mut payload = Cursor::new(msg.payload);
         let seq = payload.read_u32::<BE>().unwrap();
 
@@ -74,7 +72,7 @@ impl AudioKeyDispatcher {
         }
     }
 
-    pub fn handle_aes_key_error(&mut self, msg: ShannonMessage) {
+    pub fn handle_aes_key_error(&mut self, msg: ShannonMsg) {
         let mut payload = Cursor::new(msg.payload);
         let seq = payload.read_u32::<BE>().unwrap();
 

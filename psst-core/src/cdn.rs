@@ -1,12 +1,14 @@
-use crate::{
-    access_token::TokenProvider, error::Error, item_id::FileId, session::SessionHandle,
-    util::default_ureq_agent_builder,
-};
-use serde::Deserialize;
 use std::{
     io::Read,
     sync::Arc,
     time::{Duration, Instant},
+};
+
+use serde::Deserialize;
+
+use crate::{
+    access_token::TokenProvider, error::Error, item_id::FileId, session::SessionHandle,
+    util::default_ureq_agent_builder,
 };
 
 pub type CdnHandle = Arc<Cdn>;

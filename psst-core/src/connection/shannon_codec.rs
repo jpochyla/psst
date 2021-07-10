@@ -1,13 +1,14 @@
-use shannon::Shannon;
 use std::{convert::TryInto, io};
 
+use shannon::Shannon;
+
 #[derive(Debug)]
-pub struct ShannonMessage {
+pub struct ShannonMsg {
     pub cmd: u8,
     pub payload: Vec<u8>,
 }
 
-impl ShannonMessage {
+impl ShannonMsg {
     pub const SECRET_BLOCK: u8 = 0x02;
     pub const PING: u8 = 0x04;
     pub const STREAM_CHUNK: u8 = 0x08;
@@ -62,7 +63,7 @@ where
         }
     }
 
-    pub fn encode(&mut self, item: ShannonMessage) -> io::Result<()> {
+    pub fn encode(&mut self, item: ShannonMsg) -> io::Result<()> {
         // Buffer up the whole message.
         let mut buf = Vec::with_capacity(HEADER_SIZE + item.payload.len() + MAC_SIZE);
         let len_u16: u16 = item.payload.len().try_into().unwrap();
@@ -83,8 +84,8 @@ where
         self.inner.write_all(&buf)
     }
 
-    pub fn as_inner(&self) -> &T {
-        &self.inner
+    pub fn as_inner_mut(&mut self) -> &mut T {
+        &mut self.inner
     }
 }
 
@@ -106,7 +107,7 @@ where
         }
     }
 
-    pub fn decode(&mut self) -> io::Result<ShannonMessage> {
+    pub fn decode(&mut self) -> io::Result<ShannonMsg> {
         // Seed the cipher and rotate the nonce.
         self.cipher.nonce_u32(self.nonce);
         self.nonce += 1;
@@ -131,7 +132,7 @@ where
         self.inner.read_exact(&mut mac)?;
         self.cipher.check_mac(&mac)?;
 
-        Ok(ShannonMessage::new(cmd, payload))
+        Ok(ShannonMsg::new(cmd, payload))
     }
 
     pub fn as_inner(&self) -> &T {

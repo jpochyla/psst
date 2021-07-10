@@ -1,9 +1,11 @@
-use crate::audio_key::AudioKey;
+use std::io;
+
 use aes::{
     cipher::{generic_array::GenericArray, NewCipher, StreamCipher, StreamCipherSeek},
     Aes128Ctr,
 };
-use std::io;
+
+use crate::audio_key::AudioKey;
 
 const AUDIO_AESIV: [u8; 16] = [
     0x72, 0xe0, 0x67, 0xfb, 0xdd, 0xcb, 0xcf, 0x77, 0xeb, 0xe8, 0xbc, 0x64, 0x3f, 0x63, 0x0d, 0x93,

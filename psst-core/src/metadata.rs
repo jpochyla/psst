@@ -1,3 +1,7 @@
+use std::time::Duration;
+
+use quick_protobuf::MessageRead;
+
 use crate::{
     audio_file::{AudioFile, AudioPath},
     error::Error,
@@ -5,8 +9,6 @@ use crate::{
     protocol::metadata::{Restriction, Track},
     session::SessionHandle,
 };
-use quick_protobuf::MessageRead;
-use std::time::Duration;
 
 pub trait Fetch: MessageRead<'static> {
     fn uri(id: ItemId) -> String;

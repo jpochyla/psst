@@ -1,5 +1,6 @@
-use crate::error::Error;
 use std::{io, slice};
+
+use crate::error::Error;
 
 pub struct VorbisDecoder<R>
 where

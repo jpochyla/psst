@@ -1,20 +1,27 @@
+use std::{
+    io,
+    net::TcpStream,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc, Mutex,
+    },
+    thread::{self, JoinHandle},
+};
+
+use crossbeam_channel::unbounded;
+use quick_protobuf::MessageRead;
+use serde::de::DeserializeOwned;
+
 use crate::{
     audio_key::{AudioKey, AudioKeyDispatcher},
     connection::{
-        codec::{ShannonDecoder, ShannonEncoder, ShannonMessage},
+        shannon_codec::{ShannonDecoder, ShannonEncoder, ShannonMsg},
         Credentials, Transport,
     },
     error::Error,
     item_id::{FileId, ItemId},
-    mercury::{MercuryDispatcher, MercuryRequest},
+    mercury::{self, MercuryDispatcher, MercuryRequest},
     util::{deserialize_protobuf, TcpShutdown},
-};
-use quick_protobuf::MessageRead;
-use serde::de::DeserializeOwned;
-use std::{
-    io,
-    net::TcpStream,
-    sync::{Arc, Mutex, RwLock},
 };
 
 #[derive(Clone)]
@@ -25,39 +32,79 @@ pub struct SessionConfig {
 
 #[derive(Clone)]
 pub struct SessionHandle {
-    session: Arc<RwLock<Option<Arc<Session>>>>,
+    inner: Arc<Mutex<InnerHandle>>,
+}
+
+struct InnerHandle {
+    config: Option<SessionConfig>,
+    session: Option<Arc<Session>>,
+    thread: Option<JoinHandle<()>>,
+}
+
+impl InnerHandle {
+    fn set_config(&mut self, config: SessionConfig) {
+        self.config.replace(config);
+        self.disconnect();
+    }
+
+    fn connected(&mut self) -> Result<Arc<Session>, Error> {
+        if !self.is_connected() {
+            let session = Arc::new(Session::connect(
+                self.config.clone().ok_or(Error::SessionDisconnected)?,
+            )?);
+            self.session.replace(Arc::clone(&session));
+            self.thread.replace(thread::spawn({
+                let session = Arc::clone(&session);
+                move || match session.service() {
+                    Ok(_) => {
+                        log::info!("connection shutdown");
+                    }
+                    Err(err) => {
+                        log::error!("connection error: {:?}", err);
+                    }
+                }
+            }));
+        }
+        self.session.clone().ok_or(Error::SessionDisconnected)
+    }
+
+    fn disconnect(&mut self) {
+        if let Some(session) = self.session.take() {
+            session.shutdown();
+        }
+        if let Some(thread) = self.thread.take() {
+            if let Err(err) = thread.join() {
+                log::error!("connection thread panicked: {:?}", err);
+            }
+        }
+    }
+
+    fn is_connected(&self) -> bool {
+        matches!(self.session.as_ref(), Some(session) if session.is_serviced())
+    }
 }
 
 impl SessionHandle {
     pub fn new() -> Self {
         Self {
-            session: Default::default(),
+            inner: Arc::new(Mutex::new(InnerHandle {
+                config: None,
+                session: None,
+                thread: None,
+            })),
         }
     }
 
-    pub fn is_connected(&self) -> bool {
-        self.session.read().unwrap().is_some()
+    pub fn set_config(&self, config: SessionConfig) {
+        self.inner.lock().unwrap().set_config(config);
     }
 
     pub fn connected(&self) -> Result<Arc<Session>, Error> {
-        self.session
-            .read()
-            .unwrap()
-            .clone()
-            .ok_or(Error::SessionDisconnected)
+        self.inner.lock().unwrap().connected()
     }
 
-    pub fn connect(&self, config: SessionConfig) -> Result<Arc<Session>, Error> {
-        // First we need to drop the old session, so it counts as disconnected until we
-        // successfully connect again.
-        if let Some(old_session) = self.session.write().unwrap().take() {
-            old_session.shutdown()
-        }
-        // Try to connect and block until it either succeeds or fails.
-        let session = Arc::new(Session::connect(config)?);
-        // Save the connected session.
-        self.session.write().unwrap().replace(session.clone());
-        Ok(session)
+    pub fn is_connected(&self) -> bool {
+        self.inner.lock().unwrap().is_connected()
     }
 }
 
@@ -69,6 +116,7 @@ pub struct Session {
     audio_key: Mutex<AudioKeyDispatcher>,
     country_code: Mutex<Option<String>>,
     credentials: Credentials,
+    is_serviced: AtomicBool,
 }
 
 impl Session {
@@ -94,15 +142,20 @@ impl Session {
             credentials,
             country_code: Mutex::new(None),
             audio_key: Mutex::new(AudioKeyDispatcher::new()),
-            mercury: Mutex::new(MercuryDispatcher::new()),
+            mercury: Mutex::new(mercury::MercuryDispatcher::new()),
+            is_serviced: AtomicBool::new(false),
         })
     }
 
     pub fn service(&self) -> Result<(), Error> {
-        loop {
+        let service = || loop {
             let msg = self.receive()?;
             self.dispatch(msg)?;
-        }
+        };
+        self.is_serviced.store(true, Ordering::SeqCst);
+        let result = service();
+        self.is_serviced.store(false, Ordering::SeqCst);
+        result
     }
 
     pub fn shutdown(&self) {
@@ -113,6 +166,10 @@ impl Session {
         self.shutdown.lock().unwrap().has_been_shut_down()
     }
 
+    pub fn is_serviced(&self) -> bool {
+        self.is_serviced.load(Ordering::SeqCst)
+    }
+
     pub fn credentials(&self) -> &Credentials {
         &self.credentials
     }
@@ -121,18 +178,8 @@ impl Session {
     where
         T: MessageRead<'static>,
     {
-        let request = {
-            let mut encoder = self.encoder.lock().unwrap();
-            self.mercury
-                .lock()
-                .unwrap()
-                .request(&mut encoder, MercuryRequest::get(uri))?
-        };
-        let response = request
-            .recv()
-            .expect("Failed to receive from mercury response channel");
-        let payload = response.payload.first().ok_or(Error::UnexpectedResponse)?;
-        let message = deserialize_protobuf(payload)?;
+        let payload = self.get_mercury_bytes(uri)?;
+        let message = deserialize_protobuf(&payload)?;
         Ok(message)
     }
 
@@ -140,53 +187,57 @@ impl Session {
     where
         T: DeserializeOwned,
     {
-        let request = {
-            let mut encoder = self.encoder.lock().unwrap();
-            self.mercury
-                .lock()
-                .unwrap()
-                .request(&mut encoder, MercuryRequest::get(uri))?
-        };
-        let response = request
-            .recv()
-            .expect("Failed to receive from mercury response channel");
-        let payload = response.payload.first().ok_or(Error::UnexpectedResponse)?;
-        let message = serde_json::from_slice(payload)?;
+        let payload = self.get_mercury_bytes(uri)?;
+        let message = serde_json::from_slice(&payload)?;
         Ok(message)
     }
 
+    pub fn get_mercury_bytes(&self, uri: String) -> Result<Vec<u8>, Error> {
+        let (sender, receiver) = unbounded();
+        self.encoder.lock().unwrap().encode(
+            self.mercury
+                .lock()
+                .unwrap()
+                .enqueue_request(sender, MercuryRequest::get(uri)),
+        )?;
+        let response = receiver.recv().ok().ok_or(Error::SessionDisconnected)?;
+        response
+            .payload
+            .into_iter()
+            .next()
+            .ok_or(Error::UnexpectedResponse)
+    }
+
     pub fn get_audio_key(&self, track: ItemId, file: FileId) -> Result<AudioKey, Error> {
-        let request = {
-            let mut encoder = self.encoder.lock().unwrap();
+        let (sender, receiver) = unbounded();
+        self.encoder.lock().unwrap().encode(
             self.audio_key
                 .lock()
                 .unwrap()
-                .request(&mut encoder, track, file)?
-        };
-        request
-            .recv()
-            .expect("Failed to receive from audio key response channel")
+                .enqueue_request(sender, track, file),
+        )?;
+        receiver.recv().ok().ok_or(Error::SessionDisconnected)?
     }
 
     pub fn get_country_code(&self) -> Option<String> {
         self.country_code.lock().unwrap().clone()
     }
 
-    fn dispatch(&self, msg: ShannonMessage) -> Result<(), Error> {
+    fn dispatch(&self, msg: ShannonMsg) -> Result<(), Error> {
         match msg.cmd {
-            ShannonMessage::PING => {
+            ShannonMsg::PING => {
                 self.handle_ping()?;
             }
-            ShannonMessage::COUNTRY_CODE => {
+            ShannonMsg::COUNTRY_CODE => {
                 self.handle_country_code(msg.payload)?;
             }
-            ShannonMessage::AES_KEY => {
+            ShannonMsg::AES_KEY => {
                 self.audio_key.lock().unwrap().handle_aes_key(msg);
             }
-            ShannonMessage::AES_KEY_ERROR => {
+            ShannonMsg::AES_KEY_ERROR => {
                 self.audio_key.lock().unwrap().handle_aes_key_error(msg);
             }
-            ShannonMessage::MERCURY_REQ => {
+            ShannonMsg::MERCURY_REQ => {
                 self.mercury.lock().unwrap().handle_mercury_req(msg);
             }
             _ => {
@@ -197,7 +248,7 @@ impl Session {
     }
 
     fn handle_ping(&self) -> Result<(), Error> {
-        self.send(ShannonMessage::new(ShannonMessage::PONG, vec![0, 0, 0, 0]))?;
+        self.send(ShannonMsg::new(ShannonMsg::PONG, vec![0, 0, 0, 0]))?;
         Ok(())
     }
 
@@ -209,11 +260,11 @@ impl Session {
         Ok(())
     }
 
-    fn send(&self, msg: ShannonMessage) -> io::Result<()> {
+    fn send(&self, msg: ShannonMsg) -> io::Result<()> {
         self.encoder.lock().unwrap().encode(msg)
     }
 
-    fn receive(&self) -> io::Result<ShannonMessage> {
+    fn receive(&self) -> io::Result<ShannonMsg> {
         self.decoder.lock().unwrap().decode()
     }
 }

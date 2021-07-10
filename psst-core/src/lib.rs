@@ -17,6 +17,7 @@ pub mod item_id;
 pub mod mercury;
 pub mod metadata;
 pub mod session;
+mod session_ng;
 pub mod stream_storage;
 pub mod util;
 

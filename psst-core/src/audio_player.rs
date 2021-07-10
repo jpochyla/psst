@@ -1,3 +1,13 @@
+use std::{
+    mem,
+    sync::{Arc, Mutex},
+    thread,
+    thread::JoinHandle,
+    time::Duration,
+};
+
+use crossbeam_channel::{unbounded, Receiver, Sender};
+
 use crate::{
     audio_file::{AudioFile, AudioPath, FileAudioSource},
     audio_key::AudioKey,
@@ -11,14 +21,6 @@ use crate::{
     metadata::{Fetch, ToAudioPath},
     protocol::metadata::Track,
     session::SessionHandle,
-};
-use crossbeam_channel::{unbounded, Receiver, Sender};
-use std::{
-    mem,
-    sync::{Arc, Mutex},
-    thread,
-    thread::JoinHandle,
-    time::Duration,
 };
 
 const PREVIOUS_TRACK_THRESHOLD: Duration = Duration::from_secs(3);

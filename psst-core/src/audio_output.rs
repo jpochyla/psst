@@ -1,7 +1,9 @@
-use crate::error::Error;
+use std::sync::{Arc, Mutex};
+
 use crossbeam_channel::{unbounded, Receiver, Sender};
 use miniaudio::{Context, Device, DeviceConfig, DeviceType, Format};
-use std::sync::{Arc, Mutex};
+
+use crate::error::Error;
 
 pub type AudioSample = f32;
 

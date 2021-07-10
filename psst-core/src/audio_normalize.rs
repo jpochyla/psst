@@ -1,8 +1,9 @@
-use byteorder::{ReadBytesExt, LE};
 use std::{
     io,
     io::{Read, Seek, SeekFrom},
 };
+
+use byteorder::{ReadBytesExt, LE};
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum NormalizationLevel {

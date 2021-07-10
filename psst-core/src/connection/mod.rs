@@ -1,27 +1,31 @@
-pub mod codec;
 pub mod diffie_hellman;
+pub mod shannon_codec;
 
-use crate::{
-    connection::{
-        codec::{ShannonDecoder, ShannonEncoder, ShannonMessage},
-        diffie_hellman::DHLocalKeys,
-    },
-    error::Error,
-    protocol::authentication::AuthenticationType,
-    util::{default_ureq_agent_builder, deserialize_protobuf, serialize_protobuf},
+use std::{
+    convert::TryInto,
+    io,
+    io::{Read, Write},
+    net::{TcpStream, ToSocketAddrs},
 };
+
 use byteorder::{ReadBytesExt, BE};
 use hmac::{Hmac, Mac, NewMac};
 use serde::{Deserialize, Serialize};
 use sha1::Sha1;
 use socks::Socks5Stream;
-use std::{
-    convert::TryInto,
-    io,
-    io::{Read, Write},
-    net::TcpStream,
-};
 use url::Url;
+
+use crate::{
+    connection::{
+        diffie_hellman::DHLocalKeys,
+        shannon_codec::{ShannonDecoder, ShannonEncoder, ShannonMsg},
+    },
+    error::Error,
+    protocol::authentication::AuthenticationType,
+    util::{
+        default_ureq_agent_builder, deserialize_protobuf, serialize_protobuf, NET_CONNECT_TIMEOUT,
+    },
+};
 
 // Device ID used for authentication message.
 const DEVICE_ID: &str = "Psst";
@@ -115,10 +119,30 @@ impl Transport {
         let stream = if let Some(url) = proxy_url {
             Self::stream_through_proxy(ap, url)?
         } else {
-            TcpStream::connect(ap)?
+            Self::stream_without_proxy(ap)?
         };
         log::trace!("connected");
         Self::exchange_keys(stream)
+    }
+
+    fn stream_without_proxy(ap: &str) -> Result<TcpStream, io::Error> {
+        let mut last_err = None;
+        for addr in ap.to_socket_addrs()? {
+            match TcpStream::connect_timeout(&addr, NET_CONNECT_TIMEOUT) {
+                Ok(stream) => {
+                    return Ok(stream);
+                }
+                Err(err) => {
+                    last_err.replace(err);
+                }
+            }
+        }
+        Err(last_err.unwrap_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "could not resolve to any addresses",
+            )
+        }))
     }
 
     fn stream_through_proxy(ap: &str, url: &str) -> Result<TcpStream, Error> {
@@ -211,7 +235,7 @@ impl Transport {
         let response = self.decoder.decode()?;
 
         match response.cmd {
-            ShannonMessage::AP_WELCOME => {
+            ShannonMsg::AP_WELCOME => {
                 let welcome_data: APWelcome =
                     deserialize_protobuf(&response.payload).expect("Missing data");
                 Ok(Credentials {
@@ -220,7 +244,7 @@ impl Transport {
                     auth_type: welcome_data.reusable_auth_credentials_type,
                 })
             }
-            ShannonMessage::AUTH_FAILURE => {
+            ShannonMsg::AUTH_FAILURE => {
                 let error_data: APLoginFailed =
                     deserialize_protobuf(&response.payload).expect("Missing data");
                 Err(Error::AuthFailed {
@@ -321,7 +345,7 @@ fn compute_keys(
     )
 }
 
-fn client_response_encrypted(credentials: Credentials) -> ShannonMessage {
+fn client_response_encrypted(credentials: Credentials) -> ShannonMsg {
     use crate::protocol::authentication::{ClientResponseEncrypted, LoginCredentials, SystemInfo};
 
     let response = ClientResponseEncrypted {
@@ -338,5 +362,5 @@ fn client_response_encrypted(credentials: Credentials) -> ShannonMessage {
     };
 
     let buf = serialize_protobuf(&response).expect("Failed to serialize");
-    ShannonMessage::new(ShannonMessage::LOGIN, buf)
+    ShannonMsg::new(ShannonMsg::LOGIN, buf)
 }

@@ -1,3 +1,13 @@
+use std::{
+    io,
+    io::{BufReader, Seek, SeekFrom},
+    path::PathBuf,
+    sync::Arc,
+    thread,
+    thread::JoinHandle,
+    time::Duration,
+};
+
 use crate::{
     audio_decode::VorbisDecoder,
     audio_decrypt::AudioDecrypt,
@@ -10,15 +20,6 @@ use crate::{
     protocol::metadata::mod_AudioFile::Format,
     stream_storage::{StreamReader, StreamRequest, StreamStorage, StreamWriter},
     util::OffsetFile,
-};
-use std::{
-    io,
-    io::{BufReader, Seek, SeekFrom},
-    path::PathBuf,
-    sync::Arc,
-    thread,
-    thread::JoinHandle,
-    time::Duration,
 };
 
 pub type FileAudioSource = VorbisDecoder<OffsetFile<AudioDecrypt<BufReader<StreamReader>>>>;

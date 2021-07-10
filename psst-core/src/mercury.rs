@@ -1,16 +1,16 @@
+use std::{
+    collections::HashMap,
+    io::{Cursor, Read},
+};
+
+use byteorder::{ReadBytesExt, BE};
+use crossbeam_channel::Sender;
+
 use crate::{
-    connection::codec::{ShannonEncoder, ShannonMessage},
+    connection::shannon_codec::ShannonMsg,
     error::Error,
     protocol::mercury::Header,
     util::{deserialize_protobuf, serialize_protobuf, Sequence},
-};
-use byteorder::{ReadBytesExt, BE};
-use crossbeam_channel::{unbounded, Receiver, Sender};
-use std::{
-    collections::HashMap,
-    io,
-    io::{Cursor, Read},
-    net::TcpStream,
 };
 
 pub struct MercuryDispatcher {
@@ -26,48 +26,40 @@ impl MercuryDispatcher {
         }
     }
 
-    pub fn request(
+    pub fn enqueue_request(
         &mut self,
-        encoder: &mut ShannonEncoder<TcpStream>,
+        callback: Sender<MercuryResponse>,
         req: MercuryRequest,
-    ) -> io::Result<Receiver<Response>> {
-        let (res_sender, res_receiver) = unbounded();
-        // Save a new pending ticket.
+    ) -> ShannonMsg {
         let seq = self.sequence.advance();
         self.pending.insert(
             seq,
             Pending {
+                callback,
                 messages: Vec::new(),
-                callback: Some(res_sender),
             },
         );
-        // Send the request message.
-        encoder.encode(ShannonMessage::new(
-            ShannonMessage::MERCURY_REQ,
-            req.encode_to_mercury_message(seq),
-        ))?;
-        Ok(res_receiver)
+        ShannonMsg::new(ShannonMsg::MERCURY_REQ, req.encode_to_mercury_message(seq))
     }
 
-    pub fn handle_mercury_req(&mut self, shannon_msg: ShannonMessage) {
-        let msg = MercuryMessage::decode(shannon_msg.payload);
+    pub fn handle_mercury_req(&mut self, shannon_msg: ShannonMsg) {
+        let msg = Msg::decode(shannon_msg.payload);
         let msg_flags = msg.flags;
         let msg_seq = msg.seq;
-        let mut pending = self.pending.remove(&msg_seq).unwrap_or_default();
-
-        pending.messages.push(msg);
-
-        if msg_flags == MercuryMessage::FINAL {
-            // This is the final message.  Aggregate all pending parts and process further.
-            let parts = MercuryMessage::collect(pending.messages);
-            let response = Response::decode_from_parts(parts);
-            if let Some(callback) = pending.callback {
+        if let Some(mut pending) = self.pending.remove(&msg_seq) {
+            pending.messages.push(msg);
+            if msg_flags == Msg::FINAL {
+                // This is the final message.  Aggregate all pending parts and process further.
+                let parts = Msg::collect(pending.messages);
+                let response = MercuryResponse::decode_from_parts(parts);
                 // Send the response.  If the response channel is closed, ignore it.
-                let _ = callback.send(response);
+                let _ = pending.callback.send(response);
+            } else {
+                // This is not the final message of this sequence, but it back as pending.
+                self.pending.insert(msg_seq, pending);
             }
         } else {
-            // This is not the final message of this sequence, but it back as pending.
-            self.pending.insert(msg_seq, pending);
+            log::warn!("received unexpected mercury msg, seq: {}", msg_seq);
         }
     }
 }
@@ -97,7 +89,8 @@ impl MercuryRequest {
     }
 
     fn encode_to_mercury_message(self, seq: u64) -> Vec<u8> {
-        let msg = MercuryMessage::new(seq, MercuryMessage::FINAL, self.encode_to_parts());
+        let parts = self.encode_to_parts();
+        let msg = Msg::new(seq, Msg::FINAL, parts);
         msg.encode()
     }
 
@@ -108,20 +101,20 @@ impl MercuryRequest {
             ..Header::default()
         };
         let header_part = serialize_protobuf(&header).expect("Failed to serialize message header");
-        let mut payload = self.payload;
-        payload.insert(0, header_part);
-        payload
+        let mut parts = self.payload;
+        parts.insert(0, header_part);
+        parts
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct Response {
+pub struct MercuryResponse {
     pub uri: String,
     pub status_code: i32,
     pub payload: Vec<Vec<u8>>,
 }
 
-impl Response {
+impl MercuryResponse {
     fn decode_from_parts(mut parts: Vec<Vec<u8>>) -> Self {
         let header_part = parts.remove(0);
         let header: Header =
@@ -134,21 +127,21 @@ impl Response {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 struct Pending {
-    messages: Vec<MercuryMessage>,
-    callback: Option<Sender<Response>>,
+    messages: Vec<Msg>,
+    callback: Sender<MercuryResponse>,
 }
 
 #[derive(Debug, Default)]
-struct MercuryMessage {
+struct Msg {
     seq: u64,
     flags: u8,
     count: u16,
     parts: Vec<Vec<u8>>,
 }
 
-impl MercuryMessage {
+impl Msg {
     const FINAL: u8 = 0x01;
     const PARTIAL: u8 = 0x02;
 
