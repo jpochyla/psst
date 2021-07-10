@@ -7,12 +7,12 @@ use crate::{
     error::Error,
     item_id::{FileId, ItemId, ItemIdType},
     protocol::metadata::{Restriction, Track},
-    session::SessionHandle,
+    session::SessionService,
 };
 
 pub trait Fetch: MessageRead<'static> {
     fn uri(id: ItemId) -> String;
-    fn fetch(session: &SessionHandle, id: ItemId) -> Result<Self, Error> {
+    fn fetch(session: &SessionService, id: ItemId) -> Result<Self, Error> {
         session.connected()?.get_mercury_protobuf(Self::uri(id))
     }
 }

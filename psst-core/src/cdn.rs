@@ -7,20 +7,20 @@ use std::{
 use serde::Deserialize;
 
 use crate::{
-    access_token::TokenProvider, error::Error, item_id::FileId, session::SessionHandle,
+    access_token::TokenProvider, error::Error, item_id::FileId, session::SessionService,
     util::default_ureq_agent_builder,
 };
 
 pub type CdnHandle = Arc<Cdn>;
 
 pub struct Cdn {
-    session: SessionHandle,
+    session: SessionService,
     agent: ureq::Agent,
     token_provider: TokenProvider,
 }
 
 impl Cdn {
-    pub fn new(session: SessionHandle, proxy_url: Option<&str>) -> Result<CdnHandle, Error> {
+    pub fn new(session: SessionService, proxy_url: Option<&str>) -> Result<CdnHandle, Error> {
         let agent = default_ureq_agent_builder(proxy_url)?.build();
         Ok(Arc::new(Self {
             session,

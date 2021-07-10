@@ -20,7 +20,7 @@ use crate::{
     item_id::{ItemId, ItemIdType},
     metadata::{Fetch, ToAudioPath},
     protocol::metadata::Track,
-    session::SessionHandle,
+    session::SessionService,
 };
 
 const PREVIOUS_TRACK_THRESHOLD: Duration = Duration::from_secs(3);
@@ -50,7 +50,7 @@ pub struct PlaybackItem {
 impl PlaybackItem {
     fn load(
         &self,
-        session: &SessionHandle,
+        session: &SessionService,
         cdn: CdnHandle,
         cache: CacheHandle,
         config: &PlaybackConfig,
@@ -70,7 +70,7 @@ impl PlaybackItem {
 
 fn load_audio_path(
     item_id: ItemId,
-    session: &SessionHandle,
+    session: &SessionService,
     cache: &CacheHandle,
     config: &PlaybackConfig,
 ) -> Result<AudioPath, Error> {
@@ -84,7 +84,7 @@ fn load_audio_path(
 
 fn load_audio_path_from_track_or_alternative(
     item_id: ItemId,
-    session: &SessionHandle,
+    session: &SessionService,
     cache: &CacheHandle,
     config: &PlaybackConfig,
 ) -> Result<AudioPath, Error> {
@@ -120,7 +120,7 @@ fn load_audio_path_from_track_or_alternative(
     Ok(path)
 }
 
-fn get_country_code(session: &SessionHandle, cache: &CacheHandle) -> Option<String> {
+fn get_country_code(session: &SessionService, cache: &CacheHandle) -> Option<String> {
     if let Some(cached_country_code) = cache.get_country_code() {
         Some(cached_country_code)
     } else {
@@ -134,7 +134,7 @@ fn get_country_code(session: &SessionHandle, cache: &CacheHandle) -> Option<Stri
 
 fn load_track(
     item_id: ItemId,
-    session: &SessionHandle,
+    session: &SessionService,
     cache: &CacheHandle,
 ) -> Result<Track, Error> {
     if let Some(cached_track) = cache.get_track(item_id) {
@@ -150,7 +150,7 @@ fn load_track(
 
 fn load_audio_key(
     path: &AudioPath,
-    session: &SessionHandle,
+    session: &SessionService,
     cache: &CacheHandle,
 ) -> Result<AudioKey, Error> {
     if let Some(cached_key) = cache.get_audio_key(path.item_id, path.file_id) {
@@ -175,7 +175,7 @@ pub struct LoadedPlaybackItem {
 pub struct Player {
     state: PlayerState,
     preload: PreloadState,
-    session: SessionHandle,
+    session: SessionService,
     cdn: CdnHandle,
     cache: CacheHandle,
     config: PlaybackConfig,
@@ -189,7 +189,7 @@ pub struct Player {
 
 impl Player {
     pub fn new(
-        session: SessionHandle,
+        session: SessionService,
         cdn: CdnHandle,
         cache: CacheHandle,
         config: PlaybackConfig,

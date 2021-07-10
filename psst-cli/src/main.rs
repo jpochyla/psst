@@ -7,7 +7,7 @@ use psst_core::{
     connection::Credentials,
     error::Error,
     item_id::{ItemId, ItemIdType},
-    session::{SessionConfig, SessionHandle},
+    session::{SessionConfig, SessionService},
 };
 use std::{env, io, io::BufRead, path::PathBuf, thread};
 
@@ -22,7 +22,7 @@ fn main() {
         env::var("SPOTIFY_USERNAME").unwrap(),
         env::var("SPOTIFY_PASSWORD").unwrap(),
     );
-    let session = SessionHandle::new();
+    let session = SessionService::new();
 
     let connection = session
         .connect(SessionConfig {
@@ -40,7 +40,7 @@ fn main() {
     processing.join().unwrap();
 }
 
-fn start(track_id: &str, session: SessionHandle) -> Result<(), Error> {
+fn start(track_id: &str, session: SessionService) -> Result<(), Error> {
     let cdn = Cdn::new(session.clone(), None)?;
     let cache = Cache::new(PathBuf::from("cache"))?;
     let item_id = ItemId::from_base62(track_id, ItemIdType::Track).unwrap();
@@ -56,7 +56,7 @@ fn start(track_id: &str, session: SessionHandle) -> Result<(), Error> {
 }
 
 fn play_item(
-    session: SessionHandle,
+    session: SessionService,
     cdn: CdnHandle,
     cache: CacheHandle,
     item: PlaybackItem,

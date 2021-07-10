@@ -5,7 +5,7 @@ use std::{
 
 use serde::Deserialize;
 
-use crate::{error::Error, session::SessionHandle};
+use crate::{error::Error, session::SessionService};
 
 // Client ID of the official Web Spotify front-end.
 const CLIENT_ID: &str = "65b708073fc0480ea92a077233ca87bd";
@@ -32,7 +32,7 @@ impl AccessToken {
         }
     }
 
-    pub fn request(session: &SessionHandle) -> Result<Self, Error> {
+    pub fn request(session: &SessionService) -> Result<Self, Error> {
         #[derive(Deserialize)]
         struct MercuryAccessToken {
             #[serde(rename = "expiresIn")]
@@ -68,7 +68,7 @@ impl TokenProvider {
         }
     }
 
-    pub fn get(&self, session: &SessionHandle) -> Result<AccessToken, Error> {
+    pub fn get(&self, session: &SessionService) -> Result<AccessToken, Error> {
         let mut token = self
             .token
             .lock()

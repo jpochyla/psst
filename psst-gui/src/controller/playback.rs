@@ -15,7 +15,7 @@ use psst_core::{
     audio_player::{PlaybackConfig, PlaybackItem, Player, PlayerCommand, PlayerEvent},
     cache::Cache,
     cdn::Cdn,
-    session::SessionHandle,
+    session::SessionService,
 };
 #[cfg(target_os = "windows")]
 use raw_window_handle::{HasRawWindowHandle, RawWindowHandle};
@@ -48,7 +48,7 @@ impl PlaybackController {
 
     fn open_audio_output_and_start_threads(
         &mut self,
-        session: SessionHandle,
+        session: SessionService,
         config: PlaybackConfig,
         event_sink: ExtEventSink,
         widget_id: WidgetId,

@@ -31,7 +31,7 @@ pub struct SessionConfig {
 }
 
 #[derive(Clone)]
-pub struct SessionHandle {
+pub struct SessionService {
     inner: Arc<Mutex<InnerHandle>>,
 }
 
@@ -84,7 +84,7 @@ impl InnerHandle {
     }
 }
 
-impl SessionHandle {
+impl SessionService {
     pub fn new() -> Self {
         Self {
             inner: Arc::new(Mutex::new(InnerHandle {

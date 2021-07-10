@@ -8,7 +8,7 @@ use crate::{
 use druid::{im::Vector, image, Data};
 use once_cell::sync::OnceCell;
 use psst_core::{
-    access_token::TokenProvider, session::SessionHandle, util::default_ureq_agent_builder,
+    access_token::TokenProvider, session::SessionService, util::default_ureq_agent_builder,
 };
 use serde::{de::DeserializeOwned, Deserialize};
 use std::{
@@ -24,7 +24,7 @@ use ureq::{Agent, Request, Response};
 use super::cache::WebApiCache;
 
 pub struct WebApi {
-    session: SessionHandle,
+    session: SessionService,
     agent: Agent,
     cache: WebApiCache,
     token_provider: TokenProvider,
@@ -32,7 +32,7 @@ pub struct WebApi {
 
 impl WebApi {
     pub fn new(
-        session: SessionHandle,
+        session: SessionService,
         proxy_url: Option<&str>,
         cache_base: Option<PathBuf>,
     ) -> Self {

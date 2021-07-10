@@ -32,13 +32,13 @@ use druid::{
     im::{HashSet, Vector},
     Data, Lens,
 };
-use psst_core::session::SessionHandle;
+use psst_core::session::SessionService;
 use std::{sync::Arc, time::Duration};
 
 #[derive(Clone, Data, Lens)]
 pub struct AppState {
     #[data(ignore)]
-    pub session: SessionHandle,
+    pub session: SessionService,
 
     pub route: Nav,
     pub history: Vector<Nav>,
@@ -58,7 +58,7 @@ pub struct AppState {
 impl Default for AppState {
     fn default() -> Self {
         Self {
-            session: SessionHandle::new(),
+            session: SessionService::new(),
             route: Nav::Home,
             history: Vector::new(),
             config: Config::default(),
