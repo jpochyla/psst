@@ -6,3 +6,4 @@ cache
 .DS_Store
 .env
 *.iml
+rust-toolchain
