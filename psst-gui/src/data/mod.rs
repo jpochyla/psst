@@ -58,7 +58,7 @@ pub struct AppState {
 impl Default for AppState {
     fn default() -> Self {
         Self {
-            session: SessionService::new(),
+            session: SessionService::empty(),
             route: Nav::Home,
             history: Vector::new(),
             config: Config::default(),

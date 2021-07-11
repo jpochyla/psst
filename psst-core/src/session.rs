@@ -43,12 +43,20 @@ pub struct SessionService {
 }
 
 impl SessionService {
-    /// Create a new session service.  To open a session, a config needs to be
-    /// set up first using `update_config`.
-    pub fn new() -> Self {
+    /// Create a new session service without any configuration.  To open a
+    /// session, a config needs to be set up first using `update_config`.
+    pub fn empty() -> Self {
         Self {
             connected: Arc::default(),
             config: Arc::default(),
+        }
+    }
+
+    /// Create a new session service with pre-set configuration.
+    pub fn with_config(config: SessionConfig) -> Self {
+        Self {
+            connected: Arc::default(),
+            config: Arc::new(Mutex::new(Some(config))),
         }
     }
 

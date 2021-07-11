@@ -22,22 +22,12 @@ fn main() {
         env::var("SPOTIFY_USERNAME").unwrap(),
         env::var("SPOTIFY_PASSWORD").unwrap(),
     );
-    let session = SessionService::new();
-
-    let connection = session
-        .connect(SessionConfig {
-            login_creds,
-            proxy_url: None,
-        })
-        .unwrap();
-    let processing = thread::spawn({
-        move || {
-            connection.service().unwrap();
-        }
+    let session = SessionService::with_config(SessionConfig {
+        login_creds,
+        proxy_url: None,
     });
 
-    start(&track_id, session).unwrap();
-    processing.join().unwrap();
+    start(track_id, session).unwrap();
 }
 
 fn start(track_id: &str, session: SessionService) -> Result<(), Error> {
