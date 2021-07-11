@@ -15,6 +15,8 @@ use druid::{
     LensExt, LocalizedString, Menu, MenuItem, MouseButton, Size, Widget, WidgetExt,
 };
 
+use super::artist::artist_link_widget;
+
 pub fn detail_widget() -> impl Widget<AppState> {
     Async::new(spinner_widget, loaded_detail_widget, || {
         error_widget().lens(Ctx::data())
@@ -31,18 +33,7 @@ pub fn detail_widget() -> impl Widget<AppState> {
 fn loaded_detail_widget() -> impl Widget<Ctx<Arc<CommonCtx>, Cached<Arc<Album>>>> {
     let album_cover = rounded_cover_widget(theme::grid(10.0));
 
-    let album_artists = List::new(|| {
-        Label::raw()
-            .with_line_break_mode(LineBreaking::WordWrap)
-            .with_font(theme::UI_FONT_MEDIUM)
-            .link()
-            .lens(ArtistLink::name)
-            .on_click(|ctx, artist_link: &mut ArtistLink, _| {
-                let nav = Nav::ArtistDetail(artist_link.to_owned());
-                ctx.submit_command(cmd::NAVIGATE.with(nav));
-            })
-    })
-    .lens(Album::artists.in_arc());
+    let album_artists = List::new(artist_link_widget).lens(Album::artists.in_arc());
 
     let album_date = Label::dynamic(|album: &Arc<Album>, _| album.release())
         .with_text_size(theme::TEXT_SIZE_SMALL)
@@ -72,6 +63,7 @@ fn loaded_detail_widget() -> impl Widget<Ctx<Arc<CommonCtx>, Cached<Arc<Album>>>
 
     Flex::column()
         .cross_axis_alignment(CrossAxisAlignment::Start)
+        .with_spacer(theme::grid(1.0))
         .with_child(
             Flex::row()
                 .with_spacer(theme::grid(4.2))
@@ -133,8 +125,7 @@ pub fn album_widget() -> impl Widget<Ctx<Arc<CommonCtx>, Arc<Album>>> {
     album.link().on_ex_click(
         move |ctx, event, album: &mut Ctx<Arc<CommonCtx>, Arc<Album>>, _| match event.button {
             MouseButton::Left => {
-                let nav = Nav::AlbumDetail(album.data.link());
-                ctx.submit_command(cmd::NAVIGATE.with(nav));
+                ctx.submit_command(cmd::NAVIGATE.with(Nav::AlbumDetail(album.data.link())));
             }
             MouseButton::Right => {
                 ctx.show_context_menu(album_menu(album), event.window_pos);

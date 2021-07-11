@@ -3,7 +3,8 @@ use std::sync::Arc;
 use crate::{
     cmd,
     data::{
-        AppState, Artist, ArtistAlbums, ArtistDetail, ArtistTracks, Cached, CommonCtx, Ctx, Nav,
+        AppState, Artist, ArtistAlbums, ArtistDetail, ArtistLink, ArtistTracks, Cached, CommonCtx,
+        Ctx, Nav,
     },
     ui::{
         album::album_widget,
@@ -16,8 +17,8 @@ use crate::{
 use druid::{
     im::Vector,
     kurbo::Circle,
-    widget::{CrossAxisAlignment, Flex, Label, LabelText, List},
-    Data, Insets, LensExt, Widget, WidgetExt,
+    widget::{CrossAxisAlignment, Flex, Label, LabelText, LineBreaking, List},
+    Data, Insets, LensExt, LocalizedString, Menu, MenuItem, MouseButton, Widget, WidgetExt,
 };
 
 pub fn detail_widget() -> impl Widget<AppState> {
@@ -66,9 +67,31 @@ pub fn artist_widget() -> impl Widget<Artist> {
     artist
         .padding(theme::grid(0.5))
         .link()
-        .on_click(|ctx, artist, _| {
-            let nav = Nav::ArtistDetail(artist.link());
-            ctx.submit_command(cmd::NAVIGATE.with(nav));
+        .on_ex_click(|ctx, event, artist, _| match event.button {
+            druid::MouseButton::Left => {
+                ctx.submit_command(cmd::NAVIGATE.with(Nav::ArtistDetail(artist.link())));
+            }
+            druid::MouseButton::Right => {
+                ctx.show_context_menu(artist_menu(&artist.link()), event.window_pos);
+            }
+            _ => {}
+        })
+}
+
+pub fn artist_link_widget() -> impl Widget<ArtistLink> {
+    Label::raw()
+        .with_line_break_mode(LineBreaking::WordWrap)
+        .with_font(theme::UI_FONT_MEDIUM)
+        .link()
+        .lens(ArtistLink::name)
+        .on_ex_click(|ctx, event, link, _| match event.button {
+            MouseButton::Left => {
+                ctx.submit_command(cmd::NAVIGATE.with(Nav::ArtistDetail(link.to_owned())));
+            }
+            MouseButton::Right => {
+                ctx.show_context_menu(artist_menu(link), event.window_pos);
+            }
+            _ => {}
         })
 }
 
@@ -117,4 +140,17 @@ fn label_widget<T: Data>(text: impl Into<LabelText<T>>) -> impl Widget<T> {
         .with_text_color(theme::PLACEHOLDER_COLOR)
         .with_text_size(theme::TEXT_SIZE_SMALL)
         .padding(Insets::new(0.0, theme::grid(2.0), 0.0, theme::grid(1.0)))
+}
+
+fn artist_menu(artist: &ArtistLink) -> Menu<AppState> {
+    let mut menu = Menu::empty();
+
+    menu = menu.entry(
+        MenuItem::new(
+            LocalizedString::new("menu-item-copy-link").with_placeholder("Copy Link to Artist"),
+        )
+        .command(cmd::COPY.with(artist.url())),
+    );
+
+    menu
 }

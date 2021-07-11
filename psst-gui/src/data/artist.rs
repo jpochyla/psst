@@ -60,3 +60,9 @@ pub struct ArtistLink {
     pub id: Arc<str>,
     pub name: Arc<str>,
 }
+
+impl ArtistLink {
+    pub fn url(&self) -> String {
+        format!("https://open.spotify.com/artist/{id}", id = self.id)
+    }
+}
