@@ -65,9 +65,9 @@ impl AudioFile {
     }
 
     pub fn open(path: AudioPath, cdn: CdnHandle, cache: CacheHandle) -> Result<Self, Error> {
-        let cached_file = cache.audio_file_path(path.file_id);
-        if cached_file.exists() {
-            let cached_file = CachedFile::open(path, cached_file)?;
+        let cached_path = cache.audio_file_path(path.file_id);
+        if cached_path.exists() {
+            let cached_file = CachedFile::open(path, cached_path)?;
             Ok(Self::Cached { cached_file })
         } else {
             let streamed_file = Arc::new(StreamedFile::open(path, cdn, cache)?);
@@ -162,8 +162,6 @@ impl StreamedFile {
             Ok(last_url.clone())
         };
         let mut download_range = |offset, length| -> Result<(), Error> {
-            log::trace!("downloading {}..{}", offset, offset + length);
-
             let thread_name = format!(
                 "cdn-{}-{}..{}",
                 self.path.file_id.to_base16(),
@@ -172,7 +170,6 @@ impl StreamedFile {
             );
             // TODO: We spawn threads here without any accounting.  Seems wrong.
             thread::Builder::new().name(thread_name).spawn({
-                // TODO: Do not bury the whole servicing loop in case the URL renewal fails.
                 let url = fresh_url()?.url;
                 let cdn = self.cdn.clone();
                 let cache = self.cache.clone();
@@ -205,7 +202,9 @@ impl StreamedFile {
         while let Ok(req) = self.storage.receiver().recv() {
             match req {
                 StreamRequest::Preload { offset, length } => {
-                    download_range(offset, length)?;
+                    if let Err(err) = download_range(offset, length) {
+                        log::error!("failed to request audio range: {:?}", err);
+                    }
                 }
                 StreamRequest::Blocked { offset } => {
                     log::info!("blocked at {}", offset);
@@ -237,6 +236,8 @@ fn load_range(
     offset: u64,
     length: u64,
 ) -> Result<(), Error> {
+    log::trace!("downloading {}..{}", offset, offset + length);
+
     // Download range of data from the CDN.  Block until we a have reader of the
     // request body.
     let (_total_length, mut reader) = cdn.fetch_file_range(url, offset, length)?;
