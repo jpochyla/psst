@@ -1,6 +1,6 @@
 use std::{
     io,
-    net::TcpStream,
+    net::{Shutdown, TcpStream},
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc, Mutex,
@@ -8,7 +8,7 @@ use std::{
     thread::{self, JoinHandle},
 };
 
-use crossbeam_channel::unbounded;
+use crossbeam_channel::{unbounded, Receiver, Sender};
 use quick_protobuf::MessageRead;
 use serde::de::DeserializeOwned;
 
@@ -20,160 +20,181 @@ use crate::{
     },
     error::Error,
     item_id::{FileId, ItemId},
-    mercury::{self, MercuryDispatcher, MercuryRequest},
-    util::{deserialize_protobuf, TcpShutdown},
+    mercury::{MercuryDispatcher, MercuryRequest, MercuryResponse},
+    util::deserialize_protobuf,
 };
 
+/// Configuration values needed to open the session connection.
 #[derive(Clone)]
 pub struct SessionConfig {
     pub login_creds: Credentials,
     pub proxy_url: Option<String>,
 }
 
+/// Cheap to clone, shareable service handle that holds the active session
+/// worker.  Session connection is lazily opened in  `connected()`, using config
+/// values set in `update_config()`.  In case the session dies or is explicitly
+/// shut down, worker is disposed of, and a new session is opened on the next
+/// request.
 #[derive(Clone)]
 pub struct SessionService {
-    inner: Arc<Mutex<InnerHandle>>,
-}
-
-struct InnerHandle {
-    config: Option<SessionConfig>,
-    session: Option<Arc<Session>>,
-    thread: Option<JoinHandle<()>>,
-}
-
-impl InnerHandle {
-    fn set_config(&mut self, config: SessionConfig) {
-        self.config.replace(config);
-        self.disconnect();
-    }
-
-    fn connected(&mut self) -> Result<Arc<Session>, Error> {
-        if !self.is_connected() {
-            let session = Arc::new(Session::connect(
-                self.config.clone().ok_or(Error::SessionDisconnected)?,
-            )?);
-            self.session.replace(Arc::clone(&session));
-            self.thread.replace(thread::spawn({
-                let session = Arc::clone(&session);
-                move || match session.service() {
-                    Ok(_) => {
-                        log::info!("connection shutdown");
-                    }
-                    Err(err) => {
-                        log::error!("connection error: {:?}", err);
-                    }
-                }
-            }));
-        }
-        self.session.clone().ok_or(Error::SessionDisconnected)
-    }
-
-    fn disconnect(&mut self) {
-        if let Some(session) = self.session.take() {
-            session.shutdown();
-        }
-        if let Some(thread) = self.thread.take() {
-            if let Err(err) = thread.join() {
-                log::error!("connection thread panicked: {:?}", err);
-            }
-        }
-    }
-
-    fn is_connected(&self) -> bool {
-        matches!(self.session.as_ref(), Some(session) if session.is_serviced())
-    }
+    connected: Arc<Mutex<Option<SessionWorker>>>,
+    config: Arc<Mutex<Option<SessionConfig>>>,
 }
 
 impl SessionService {
+    /// Create a new session service.  To open a session, a config needs to be
+    /// set up first using `update_config`.
     pub fn new() -> Self {
         Self {
-            inner: Arc::new(Mutex::new(InnerHandle {
-                config: None,
-                session: None,
-                thread: None,
-            })),
+            connected: Arc::default(),
+            config: Arc::default(),
         }
     }
 
-    pub fn set_config(&self, config: SessionConfig) {
-        self.inner.lock().unwrap().set_config(config);
+    /// Replace the active session config.  If a session is already connected,
+    /// shut it down and wait until it's terminated.
+    pub fn update_config(&self, config: SessionConfig) {
+        self.config.lock().unwrap().replace(config);
+        self.shutdown();
     }
 
-    pub fn connected(&self) -> Result<Arc<Session>, Error> {
-        self.inner.lock().unwrap().connected()
-    }
-
+    /// Returns true if a session worker is actively servicing the connected
+    /// session.  We return false here after any case of I/O errors or an
+    /// explicit session shutdown.
     pub fn is_connected(&self) -> bool {
-        self.inner.lock().unwrap().is_connected()
+        matches!(self.connected.lock().unwrap().as_ref(), Some(worker) if !worker.has_terminated())
+    }
+
+    /// Return a handle for the connected session.  In case no connection is
+    /// open, *synchronously* connect, start the worker and keep it as active.
+    /// Although a lock is held for the whole duration  of connection setup,
+    /// `SessionConnection::open` has an internal timeout, and should give up in
+    /// a timely manner.
+    pub fn connected(&self) -> Result<SessionHandle, Error> {
+        let mut connected = self.connected.lock().unwrap();
+        let is_connected_and_not_terminated =
+            matches!(connected.as_ref(), Some(worker) if !worker.has_terminated());
+        if !is_connected_and_not_terminated {
+            let connection = SessionConnection::open(
+                self.config
+                    .lock()
+                    .unwrap()
+                    .as_ref()
+                    .ok_or(Error::SessionDisconnected)?
+                    .clone(),
+            )?;
+            let worker = SessionWorker::run(connection.transport);
+            connected.replace(worker);
+        }
+        connected
+            .as_ref()
+            .map(SessionWorker::handle)
+            .ok_or(Error::SessionDisconnected)
+    }
+
+    /// Signal a shutdown to the active worker and wait until it terminates.
+    pub fn shutdown(&self) {
+        if let Some(worker) = self.connected.lock().unwrap().take() {
+            worker.handle().request_shutdown();
+            worker.join();
+        }
     }
 }
 
-pub struct Session {
-    shutdown: Mutex<TcpShutdown>,
-    encoder: Mutex<ShannonEncoder<TcpStream>>,
-    decoder: Mutex<ShannonDecoder<TcpStream>>,
-    mercury: Mutex<MercuryDispatcher>,
-    audio_key: Mutex<AudioKeyDispatcher>,
-    country_code: Mutex<Option<String>>,
-    credentials: Credentials,
-    is_serviced: AtomicBool,
+/// Successful connection through the Spotify Shannon-encrypted TCP channel.
+pub struct SessionConnection {
+    /// Credentials re-usable in the next authentication (i.e. username and
+    /// password are not required anymore).
+    pub credentials: Credentials,
+    /// I/O codec for the Shannon messages.
+    pub transport: Transport,
 }
 
-impl Session {
-    pub fn connect(config: SessionConfig) -> Result<Self, Error> {
+impl SessionConnection {
+    /// Synchronously connect to the Spotify servers and authenticate with
+    /// credentials provided in `config`.
+    pub fn open(config: SessionConfig) -> Result<Self, Error> {
         // Connect to the server and exchange keys.
         let proxy_url = config.proxy_url.as_deref();
-        let mut transport =
-            Transport::connect(&Transport::resolve_ap_with_fallback(proxy_url), proxy_url)?;
+        let ap_url = Transport::resolve_ap_with_fallback(proxy_url);
+        let mut transport = Transport::connect(&ap_url, proxy_url)?;
         // Authenticate with provided credentials (either username/password, or saved,
         // reusable credential blob from an earlier run).
         let credentials = transport.authenticate(config.login_creds)?;
-        // Split transport into encoding/decoding parts, so we can read/write/shutdown
-        // in parallel.
-        let Transport {
-            stream,
-            encoder,
-            decoder,
-        } = transport;
         Ok(Self {
-            shutdown: Mutex::new(TcpShutdown::new(stream)),
-            encoder: Mutex::new(encoder),
-            decoder: Mutex::new(decoder),
             credentials,
-            country_code: Mutex::new(None),
-            audio_key: Mutex::new(AudioKeyDispatcher::new()),
-            mercury: Mutex::new(mercury::MercuryDispatcher::new()),
-            is_serviced: AtomicBool::new(false),
+            transport,
         })
     }
+}
 
-    pub fn service(&self) -> Result<(), Error> {
-        let service = || loop {
-            let msg = self.receive()?;
-            self.dispatch(msg)?;
-        };
-        self.is_serviced.store(true, Ordering::SeqCst);
-        let result = service();
-        self.is_serviced.store(false, Ordering::SeqCst);
-        result
+pub struct SessionWorker {
+    sender: Sender<DispatchCmd>,
+    decoding_thread: JoinHandle<()>,
+    encoding_thread: JoinHandle<()>,
+    dispatching_thread: JoinHandle<()>,
+    terminated: Arc<AtomicBool>,
+}
+
+impl SessionWorker {
+    pub fn run(transport: Transport) -> Self {
+        let (disp_send, disp_recv) = unbounded();
+        let (msg_send, msg_recv) = unbounded();
+        let terminated = Arc::new(AtomicBool::new(false));
+        SessionWorker {
+            decoding_thread: {
+                let decoder = transport.decoder;
+                let disp_send = disp_send.clone();
+                thread::spawn(move || decode_shannon_messages(decoder, disp_send))
+            },
+            encoding_thread: {
+                let encoder = transport.encoder;
+                let disp_send = disp_send.clone();
+                thread::spawn(move || encode_shannon_messages(encoder, msg_recv, disp_send))
+            },
+            dispatching_thread: {
+                let stream = transport.stream;
+                let terminated = terminated.clone();
+                thread::spawn(move || {
+                    dispatch_messages(disp_recv, msg_send, stream);
+                    terminated.store(true, Ordering::SeqCst);
+                })
+            },
+            sender: disp_send,
+            terminated,
+        }
     }
 
-    pub fn shutdown(&self) {
-        self.shutdown.lock().unwrap().shutdown();
+    pub fn handle(&self) -> SessionHandle {
+        SessionHandle {
+            sender: self.sender.clone(),
+        }
     }
 
-    pub fn has_been_shut_down(&self) -> bool {
-        self.shutdown.lock().unwrap().has_been_shut_down()
+    pub fn join(self) {
+        if let Err(err) = self.dispatching_thread.join() {
+            log::error!("session dispatching thread panicked: {:?}", err);
+        }
+        if let Err(err) = self.encoding_thread.join() {
+            log::error!("session encoding thread panicked: {:?}", err);
+        }
+        if let Err(err) = self.decoding_thread.join() {
+            log::error!("session decoding thread panicked: {:?}", err);
+        }
     }
 
-    pub fn is_serviced(&self) -> bool {
-        self.is_serviced.load(Ordering::SeqCst)
+    pub fn has_terminated(&self) -> bool {
+        self.terminated.load(Ordering::SeqCst)
     }
+}
 
-    pub fn credentials(&self) -> &Credentials {
-        &self.credentials
-    }
+#[derive(Clone)]
+pub struct SessionHandle {
+    sender: Sender<DispatchCmd>,
+}
 
+impl SessionHandle {
     pub fn get_mercury_protobuf<T>(&self, uri: String) -> Result<T, Error>
     where
         T: MessageRead<'static>,
@@ -193,80 +214,181 @@ impl Session {
     }
 
     pub fn get_mercury_bytes(&self, uri: String) -> Result<Vec<u8>, Error> {
-        let (sender, receiver) = unbounded();
-        self.encoder.lock().unwrap().encode(
-            self.mercury
-                .lock()
-                .unwrap()
-                .enqueue_request(sender, MercuryRequest::get(uri)),
-        )?;
+        let (callback, receiver) = unbounded();
+        let request = MercuryRequest::get(uri);
+        self.sender
+            .send(DispatchCmd::MercuryReq { callback, request })
+            .ok()
+            .ok_or(Error::SessionDisconnected)?;
         let response = receiver.recv().ok().ok_or(Error::SessionDisconnected)?;
-        response
+        let first_part = response
             .payload
             .into_iter()
             .next()
-            .ok_or(Error::UnexpectedResponse)
+            .ok_or(Error::UnexpectedResponse)?;
+        Ok(first_part)
     }
 
     pub fn get_audio_key(&self, track: ItemId, file: FileId) -> Result<AudioKey, Error> {
-        let (sender, receiver) = unbounded();
-        self.encoder.lock().unwrap().encode(
-            self.audio_key
-                .lock()
-                .unwrap()
-                .enqueue_request(sender, track, file),
-        )?;
+        let (callback, receiver) = unbounded();
+        self.sender
+            .send(DispatchCmd::AudioKeyReq {
+                callback,
+                track,
+                file,
+            })
+            .ok()
+            .ok_or(Error::SessionDisconnected)?;
         receiver.recv().ok().ok_or(Error::SessionDisconnected)?
     }
 
     pub fn get_country_code(&self) -> Option<String> {
-        self.country_code.lock().unwrap().clone()
+        let (callback, receiver) = unbounded();
+        self.sender
+            .send(DispatchCmd::CountryCodeReq { callback })
+            .ok()?;
+        receiver.recv().ok()?
     }
 
-    fn dispatch(&self, msg: ShannonMsg) -> Result<(), Error> {
-        match msg.cmd {
-            ShannonMsg::PING => {
-                self.handle_ping()?;
+    pub fn request_shutdown(&self) {
+        let _ = self.sender.send(DispatchCmd::Shutdown);
+    }
+}
+
+/// Read Shannon messages from the TCP stream one by one and send them to
+/// dispatcher for further processing.  In case the decoding fails with an error
+/// (this happens also in case we explicitly shutdown the connection), report
+/// the error to the dispatcher and quit.  If the dispatcher has already dropped
+/// its receiving part, quit silently as well.
+fn decode_shannon_messages(mut decoder: ShannonDecoder<TcpStream>, dispatch: Sender<DispatchCmd>) {
+    loop {
+        match decoder.decode() {
+            Ok(msg) => {
+                if dispatch.send(DispatchCmd::DecodedMsg(msg)).is_err() {
+                    break;
+                }
             }
-            ShannonMsg::COUNTRY_CODE => {
-                self.handle_country_code(msg.payload)?;
+            Err(err) => {
+                let _ = dispatch.send(DispatchCmd::DecoderError(err));
+                break;
             }
-            ShannonMsg::AES_KEY => {
-                self.audio_key.lock().unwrap().handle_aes_key(msg);
+        };
+    }
+}
+
+/// Receive Shannon messages from `messages` and encode them into the TCP stream
+/// through `encoder`.  In case the encoding fails with an error (this happens
+/// also in case we explicitly shutdown the connection), report the error to the
+/// dispatcher and quit.  If the dispatcher has already dropped the
+/// corresponding sender of `messages`, quit as well.
+fn encode_shannon_messages(
+    mut encoder: ShannonEncoder<TcpStream>,
+    messages: Receiver<ShannonMsg>,
+    dispatch: Sender<DispatchCmd>,
+) {
+    for msg in messages {
+        match encoder.encode(msg) {
+            Ok(_) => {
+                // Message encoded, continue.
             }
-            ShannonMsg::AES_KEY_ERROR => {
-                self.audio_key.lock().unwrap().handle_aes_key_error(msg);
-            }
-            ShannonMsg::MERCURY_REQ => {
-                self.mercury.lock().unwrap().handle_mercury_req(msg);
-            }
-            _ => {
-                log::debug!("ignored message: {:?}", msg.cmd);
+            Err(err) => {
+                let _ = dispatch.send(DispatchCmd::EncoderError(err));
+                break;
             }
         }
-        Ok(())
     }
+}
 
-    fn handle_ping(&self) -> Result<(), Error> {
-        self.send(ShannonMsg::new(ShannonMsg::PONG, vec![0, 0, 0, 0]))?;
-        Ok(())
-    }
+enum DispatchCmd {
+    MercuryReq {
+        request: MercuryRequest,
+        callback: Sender<MercuryResponse>,
+    },
+    AudioKeyReq {
+        track: ItemId,
+        file: FileId,
+        callback: Sender<Result<AudioKey, Error>>,
+    },
+    CountryCodeReq {
+        callback: Sender<Option<String>>,
+    },
+    DecodedMsg(ShannonMsg),
+    DecoderError(io::Error),
+    EncoderError(io::Error),
+    Shutdown,
+}
 
-    fn handle_country_code(&self, payload: Vec<u8>) -> Result<(), Error> {
-        self.country_code
-            .lock()
-            .unwrap()
-            .replace(String::from_utf8(payload).map_err(|_| Error::UnexpectedResponse)?);
-        Ok(())
-    }
+fn dispatch_messages(
+    dispatch: Receiver<DispatchCmd>,
+    messages: Sender<ShannonMsg>,
+    stream: TcpStream,
+) {
+    let mut mercury = MercuryDispatcher::new();
+    let mut audio_key = AudioKeyDispatcher::new();
+    let mut country_code = None;
 
-    fn send(&self, msg: ShannonMsg) -> io::Result<()> {
-        self.encoder.lock().unwrap().encode(msg)
+    for disp in dispatch {
+        match disp {
+            DispatchCmd::MercuryReq { request, callback } => {
+                let msg = mercury.enqueue_request(request, callback);
+                let _ = messages.send(msg);
+            }
+            DispatchCmd::AudioKeyReq {
+                track,
+                file,
+                callback,
+            } => {
+                let msg = audio_key.enqueue_request(track, file, callback);
+                let _ = messages.send(msg);
+            }
+            DispatchCmd::CountryCodeReq { callback } => {
+                let _ = callback.send(country_code.clone());
+            }
+            DispatchCmd::DecodedMsg(msg) if msg.cmd == ShannonMsg::PING => {
+                let _ = messages.send(pong_message());
+            }
+            DispatchCmd::DecodedMsg(msg) if msg.cmd == ShannonMsg::COUNTRY_CODE => {
+                country_code.replace(parse_country_code(msg).unwrap());
+            }
+            DispatchCmd::DecodedMsg(msg) if msg.cmd == ShannonMsg::AES_KEY => {
+                audio_key.handle_aes_key(msg)
+            }
+            DispatchCmd::DecodedMsg(msg) if msg.cmd == ShannonMsg::AES_KEY_ERROR => {
+                audio_key.handle_aes_key_error(msg)
+            }
+            DispatchCmd::DecodedMsg(msg) if msg.cmd == ShannonMsg::MERCURY_REQ => {
+                mercury.handle_mercury_req(msg)
+            }
+            DispatchCmd::DecodedMsg(msg) => {
+                log::debug!("ignored message: {:?}", msg.cmd);
+            }
+            DispatchCmd::DecoderError(err) => {
+                log::error!("connection error: {:?}", err);
+                let _ = stream.shutdown(Shutdown::Write);
+                break;
+            }
+            DispatchCmd::EncoderError(err) => {
+                log::error!("connection error: {:?}", err);
+                let _ = stream.shutdown(Shutdown::Read);
+                break;
+            }
+            DispatchCmd::Shutdown => {
+                log::info!("connection shutdown");
+                let _ = stream.shutdown(Shutdown::Both);
+                break;
+            }
+        }
     }
+}
 
-    fn receive(&self) -> io::Result<ShannonMsg> {
-        self.decoder.lock().unwrap().decode()
-    }
+fn pong_message() -> ShannonMsg {
+    ShannonMsg::new(ShannonMsg::PONG, vec![0, 0, 0, 0])
+}
+
+fn parse_country_code(msg: ShannonMsg) -> Result<String, Error> {
+    String::from_utf8(msg.payload)
+        .ok()
+        .ok_or(Error::UnexpectedResponse)
 }
 
 impl From<serde_json::Error> for Error {

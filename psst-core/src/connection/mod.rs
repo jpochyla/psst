@@ -24,6 +24,7 @@ use crate::{
     protocol::authentication::AuthenticationType,
     util::{
         default_ureq_agent_builder, deserialize_protobuf, serialize_protobuf, NET_CONNECT_TIMEOUT,
+        NET_IO_TIMEOUT,
     },
 };
 
@@ -121,6 +122,9 @@ impl Transport {
         } else {
             Self::stream_without_proxy(ap)?
         };
+        if let Err(err) = stream.set_write_timeout(Some(NET_IO_TIMEOUT)) {
+            log::warn!("failed to set TCP write timeout: {:?}", err);
+        }
         log::trace!("connected");
         Self::exchange_keys(stream)
     }

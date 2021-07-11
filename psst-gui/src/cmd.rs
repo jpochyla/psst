@@ -21,8 +21,6 @@ pub const COPY: Selector<String> = Selector::new("app.copy-to-clipboard");
 // Session
 
 pub const SESSION_CONNECT: Selector = Selector::new("app.session-connect");
-pub const SESSION_CONNECTED: Selector = Selector::new("app.session-connected");
-pub const SESSION_DISCONNECTED: Selector = Selector::new("app.session-disconnected");
 
 // Navigation
 

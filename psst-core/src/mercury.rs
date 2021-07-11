@@ -28,8 +28,8 @@ impl MercuryDispatcher {
 
     pub fn enqueue_request(
         &mut self,
-        callback: Sender<MercuryResponse>,
         req: MercuryRequest,
+        callback: Sender<MercuryResponse>,
     ) -> ShannonMsg {
         let seq = self.sequence.advance();
         self.pending.insert(
@@ -50,7 +50,7 @@ impl MercuryDispatcher {
             pending.messages.push(msg);
             if msg_flags == Msg::FINAL {
                 // This is the final message.  Aggregate all pending parts and process further.
-                let parts = Msg::collect(pending.messages);
+                let parts = Msg::aggregate(pending.messages);
                 let response = MercuryResponse::decode_from_parts(parts);
                 // Send the response.  If the response channel is closed, ignore it.
                 let _ = pending.callback.send(response);
@@ -190,7 +190,7 @@ impl Msg {
         buf
     }
 
-    fn collect(msgs: impl IntoIterator<Item = Self>) -> Vec<Vec<u8>> {
+    fn aggregate(msgs: impl IntoIterator<Item = Self>) -> Vec<Vec<u8>> {
         let mut results = Vec::new();
         let mut partial: Option<Vec<u8>> = None;
 

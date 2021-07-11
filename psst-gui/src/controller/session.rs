@@ -8,6 +8,16 @@ impl SessionController {
     pub fn new() -> Self {
         Self
     }
+
+    fn connect(&self, data: &mut AppState) {
+        // Update the session configuration, any active session will get shut down.
+        data.session.update_config(data.config.session());
+
+        // Reload the global, usually visible data.
+        data.library_mut().playlists.defer_default();
+        data.personalized.made_for_you.defer_default();
+        data.user_profile.defer_default();
+    }
 }
 
 impl<W> Controller<AppState, W> for SessionController
@@ -25,8 +35,7 @@ where
         match event {
             Event::Command(cmd) if cmd.is(cmd::SESSION_CONNECT) => {
                 if data.config.has_credentials() {
-                    data.session.set_config(data.config.session());
-                    ctx.submit_command(cmd::SESSION_CONNECTED);
+                    self.connect(data);
                 }
                 ctx.set_handled();
             }
@@ -45,10 +54,7 @@ where
         env: &Env,
     ) {
         if let LifeCycle::WidgetAdded = event {
-            if data.config.has_credentials() {
-                data.session.set_config(data.config.session());
-                ctx.submit_command(cmd::SESSION_CONNECTED);
-            }
+            ctx.submit_command(cmd::SESSION_CONNECT);
         }
         child.lifecycle(ctx, event, data, env)
     }

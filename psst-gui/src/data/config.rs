@@ -5,7 +5,7 @@ use psst_core::{
     audio_player::PlaybackConfig,
     cache::mkdir_if_not_exists,
     connection::Credentials,
-    session::{Session, SessionConfig},
+    session::{SessionConfig, SessionConnection},
 };
 use serde::{Deserialize, Serialize};
 use std::{env, fs::File, path::PathBuf};
@@ -55,11 +55,8 @@ impl Authentication {
     }
 
     pub fn authenticate_and_get_credentials(config: SessionConfig) -> Result<Credentials, String> {
-        let credentials = Session::connect(config)
-            .map_err(|err| err.to_string())?
-            .credentials()
-            .to_owned();
-        Ok(credentials)
+        let connection = SessionConnection::open(config).map_err(|err| err.to_string())?;
+        Ok(connection.credentials)
     }
 }
 

@@ -38,9 +38,9 @@ impl AudioKeyDispatcher {
 
     pub fn enqueue_request(
         &mut self,
-        callback: Sender<Result<AudioKey, Error>>,
         track: ItemId,
         file: FileId,
+        callback: Sender<Result<AudioKey, Error>>,
     ) -> ShannonMsg {
         let seq = self.sequence.advance();
         self.pending.insert(seq, callback);
