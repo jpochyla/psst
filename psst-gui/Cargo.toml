@@ -9,8 +9,8 @@ psst-core = { path = "../psst-core" }
 
 chrono = { version = "0.4", features = ["serde"] }
 crossbeam-channel = "0.5"
-druid-shell = { git = "https://github.com/jpochyla/druid", branch = "mac-transparent-titlebar", features = ["raw-win-handle"] }
-druid = { git = "https://github.com/jpochyla/druid", branch = "mac-transparent-titlebar", features = ["im", "image", "jpeg", "png", "serde"] }
+druid-shell = { git = "https://github.com/jpochyla/druid", branch = "psst", features = ["raw-win-handle"] }
+druid = { git = "https://github.com/jpochyla/druid", branch = "psst", features = ["im", "image", "jpeg", "png", "serde"] }
 env_logger = "0.8"
 fs_extra = "1.2"
 itertools = "0.10"
