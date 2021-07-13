@@ -1,6 +1,6 @@
 use crate::{
     cmd,
-    data::{Nav, AppState},
+    data::{AppState, Nav},
 };
 use druid::{commands, platform_menus, Env, LocalizedString, Menu, MenuItem, SysMods, WindowId};
 
