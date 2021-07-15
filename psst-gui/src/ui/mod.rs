@@ -41,9 +41,14 @@ pub fn main_window() -> WindowDesc<AppState> {
 }
 
 pub fn preferences_window() -> WindowDesc<AppState> {
+    let win_size = if cfg!(target_os = "windows") {
+        (theme::grid(50.0), theme::grid(75.0))
+    } else {
+        (theme::grid(50.0), theme::grid(69.0))
+    };
     let win = WindowDesc::new(preferences_widget())
         .title("Preferences")
-        .window_size((theme::grid(50.0), theme::grid(69.0)))
+        .window_size(win_size)
         .resizable(false)
         .show_title(false)
         .transparent_titlebar(true);
