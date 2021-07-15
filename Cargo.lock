@@ -2081,7 +2081,7 @@ dependencies = [
 [[package]]
 name = "souvlaki"
 version = "0.3.0"
-source = "git+https://github.com/Sinono3/souvlaki#dfcd45bdecc9668cc7f48eca44e6e9193216d87d"
+source = "git+https://github.com/Sinono3/souvlaki#40a0cc38f0c2f48bc3a464f4b5e0d9278debcc5c"
 dependencies = [
  "block",
  "cocoa",
@@ -2711,9 +2711,9 @@ checksum = "712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f"
 
 [[package]]
 name = "windows"
-version = "0.8.0"
+version = "0.17.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2e50fd72a86bac7e21de2ce132629b7921e57b75ed607025f850a97a7ce2aec3"
+checksum = "5f1c7f11b289e450f78d55dd9dc09ae91c6ae8faed980bbf3e3a4c8f166ac259"
 dependencies = [
  "const-sha1",
  "windows_gen",
@@ -2722,18 +2722,15 @@ dependencies = [
 
 [[package]]
 name = "windows_gen"
-version = "0.8.0"
+version = "0.17.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b41030a241566acc784e1883355aebf4fb87bae609682a613ce62bf7639d5ec5"
-dependencies = [
- "syn",
-]
+checksum = "57f5facfb04bc84b5fcd27018266d90ce272e11f8b91745dfdd47282e8e0607e"
 
 [[package]]
 name = "windows_macros"
-version = "0.8.0"
+version = "0.17.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "25eb153f12764a88cd8f6898ba9b4b03b57704b26289a15c66495923d23e4208"
+checksum = "7c32753c378262520a4fa70c2e4389f4649e751faab2a887090567cff192d299"
 dependencies = [
  "syn",
  "windows_gen",

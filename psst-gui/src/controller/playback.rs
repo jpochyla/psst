@@ -19,7 +19,7 @@ use psst_core::{
 };
 #[cfg(target_os = "windows")]
 use raw_window_handle::{HasRawWindowHandle, RawWindowHandle};
-use souvlaki::{MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback};
+use souvlaki::{MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback, MediaPosition};
 
 use crate::{
     cmd,
@@ -162,17 +162,24 @@ impl PlaybackController {
             MediaControlEvent::Toggle => PlayerEvent::Command(PlayerCommand::PauseOrResume),
             MediaControlEvent::Next => PlayerEvent::Command(PlayerCommand::Next),
             MediaControlEvent::Previous => PlayerEvent::Command(PlayerCommand::Previous),
+            _ => {
+                return;
+            }
         };
         sender.send(cmd).unwrap();
     }
 
     fn update_media_control_playback(&mut self, playback: &Playback) {
         if let Some(media_controls) = self.media_controls.as_mut() {
+            let progress = playback
+                .now_playing
+                .as_ref()
+                .map(|now_playing| MediaPosition(now_playing.progress));
             media_controls
                 .set_playback(match playback.state {
                     PlaybackState::Loading | PlaybackState::Stopped => MediaPlayback::Stopped,
-                    PlaybackState::Playing => MediaPlayback::Playing,
-                    PlaybackState::Paused => MediaPlayback::Paused,
+                    PlaybackState::Playing => MediaPlayback::Playing { progress },
+                    PlaybackState::Paused => MediaPlayback::Paused { progress },
                 })
                 .unwrap();
         }
@@ -183,6 +190,7 @@ impl PlaybackController {
             let title = playback.now_playing.as_ref().map(|p| p.item.name.clone());
             let album = playback.now_playing.as_ref().map(|p| p.item.album_name());
             let artist = playback.now_playing.as_ref().map(|p| p.item.artist_name());
+            let duration = playback.now_playing.as_ref().map(|p| p.item.duration);
             let cover_url = playback
                 .now_playing
                 .as_ref()
@@ -192,6 +200,7 @@ impl PlaybackController {
                     title: title.as_deref(),
                     album: album.as_deref(),
                     artist: artist.as_deref(),
+                    duration,
                     cover_url,
                 })
                 .unwrap();
