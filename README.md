@@ -42,14 +42,14 @@ $ cargo run
 - [x] Save / unsave albums and tracks
 - [x] Browsing followed playlists
 - [x] Search for artist, albums, and tracks
-- [ ] Resilience to network errors
+- [ ] Resilience to network errors (automatically retry timed-out requests)
 - [ ] Managing playlists
     - Follow / unfollow
     - Add / remove track
     - Reorder tracks
     - Rename playlist
 - [ ] Playback queue
-- [ ] Audio volume control
+- [x] Audio volume control
 - [x] Audio loudness normalization
 - [ ] React to audio output device events
     - Pause after disconnecting headphones
@@ -59,10 +59,10 @@ $ cargo run
     - Visualize cache utilization
         - Total cache usage in the config dialog
         - Show time origin of cached data, allow to refresh
-- [ ] Media keys control
-- [ ] Open Spotify links
+- [x] Media keys control
+- [x] Open Spotify links
 - [ ] Trivia on the artist page, Wikipedia links
-- [ ] Genre playlists and "For You" content
+- [x] Genre playlists and "For You" content
 - [ ] Downloading encrypted tracks
 - [ ] Reporting played tracks to Spotify servers
 - [ ] OS-specific application bundles
@@ -81,7 +81,7 @@ $ cargo run
     - [ ] Paging or virtualized lists for albums and tracks
     - [ ] Grid for albums and artists
     - [ ] Robust active/inactive menu visualization
-    - [ ] Save last route and the last playback state
+    - [ ] Save last route, volume, playback state
 
 ##### Development
 
