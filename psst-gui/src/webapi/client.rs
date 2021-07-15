@@ -360,16 +360,14 @@ impl WebApi {
 impl WebApi {
     // https://developer.spotify.com/documentation/web-api/reference/#endpoint-get-a-list-of-current-users-playlists
     pub fn get_playlists(&self) -> Result<Vector<Playlist>, Error> {
-        let request = self.get("v1/me/playlists")?.query("fields", "!tracks");
+        let request = self.get("v1/me/playlists")?;
         let result = self.load_all_pages(request)?;
         Ok(result)
     }
 
     // https://developer.spotify.com/documentation/web-api/reference/#endpoint-get-playlist
     pub fn get_playlist(&self, id: &str) -> Result<Playlist, Error> {
-        let request = self
-            .get(format!("v1/me/playlists/{}", id))?
-            .query("fields", "!tracks");
+        let request = self.get(format!("v1/me/playlists/{}", id))?;
         let result = self.load(request)?;
         Ok(result)
     }
