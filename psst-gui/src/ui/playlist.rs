@@ -120,7 +120,7 @@ pub fn detail_widget() -> impl Widget<AppState> {
     .lens(
         Ctx::make(
             AppState::common_ctx,
-            AppState::playlist.then(PlaylistDetail::tracks),
+            AppState::playlist_detail.then(PlaylistDetail::tracks),
         )
         .then(Ctx::in_promise()),
     )

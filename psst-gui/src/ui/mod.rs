@@ -6,6 +6,7 @@ use crate::{
     widget::{icons, Empty, LinkExt, ThemeScope, ViewDispatcher},
 };
 use druid::{
+    im::Vector,
     lens::Unit,
     widget::{CrossAxisAlignment, Either, Flex, Label, Scroll, Slider, Split, ViewSwitcher},
     Insets, LensExt, Menu, MenuItem, MouseButton, Widget, WidgetExt, WindowDesc,
@@ -234,26 +235,27 @@ fn topbar_back_button_widget() -> impl Widget<AppState> {
         .padding(theme::grid(1.0))
         .link()
         .rounded(theme::BUTTON_BORDER_RADIUS)
-        .on_ex_click(|ctx, event, state, _env| match event.button {
+        .on_ex_click(|ctx, event, history, _env| match event.button {
             MouseButton::Left => {
                 ctx.submit_command(cmd::NAVIGATE_BACK.with(1));
             }
             MouseButton::Right => {
-                ctx.show_context_menu(history_menu(state), event.window_pos);
+                ctx.show_context_menu(history_menu(history), event.window_pos);
             }
             _ => {}
         });
     Either::new(
-        |state: &AppState, _| state.history.is_empty(),
+        |history: &Vector<Nav>, _| history.is_empty(),
         disabled,
         enabled,
     )
     .padding(theme::grid(1.0))
+    .lens(AppState::history)
 }
 
-fn history_menu(state: &AppState) -> Menu<AppState> {
+fn history_menu(history: &Vector<Nav>) -> Menu<AppState> {
     let mut menu = Menu::empty();
-    for (index, history) in state.history.iter().rev().take(10).enumerate() {
+    for (index, history) in history.iter().rev().take(10).enumerate() {
         let skip_back_in_history_n_times = index + 1;
         menu = menu.entry(
             MenuItem::new(history.to_full_title())

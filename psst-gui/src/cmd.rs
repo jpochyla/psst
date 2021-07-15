@@ -29,9 +29,10 @@ pub const NAVIGATE_BACK: Selector<usize> = Selector::new("app.navigate-back");
 
 // Search
 
-pub const LOAD_SEARCH_RESULTS: Selector<String> = Selector::new("app.load-search-results");
+pub const LOAD_SEARCH_RESULTS: Selector<Arc<str>> = Selector::new("app.load-search-results");
 pub const UPDATE_SEARCH_RESULTS: Selector<Result<SearchResults, Error>> =
     Selector::new("app.update-search-results");
+pub const OPEN_LINK: Selector<Result<Nav, Error>> = Selector::new("app.open-link");
 
 // Library
 

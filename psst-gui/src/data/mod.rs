@@ -16,7 +16,7 @@ pub use crate::data::{
     artist::{Artist, ArtistAlbums, ArtistDetail, ArtistLink, ArtistTracks},
     config::{AudioQuality, Authentication, Config, Preferences, PreferencesTab, Theme},
     ctx::Ctx,
-    nav::Nav,
+    nav::{Nav, SpotifyUrl},
     playback::{
         NowPlaying, Playback, PlaybackOrigin, PlaybackPayload, PlaybackState, QueueBehavior,
         QueuedTrack,
@@ -46,9 +46,9 @@ pub struct AppState {
     pub preferences: Preferences,
     pub playback: Playback,
     pub search: Search,
-    pub album: AlbumDetail,
-    pub artist: ArtistDetail,
-    pub playlist: PlaylistDetail,
+    pub album_detail: AlbumDetail,
+    pub artist_detail: ArtistDetail,
+    pub playlist_detail: PlaylistDetail,
     pub library: Arc<Library>,
     pub common_ctx: Arc<CommonCtx>,
     pub user_profile: Promise<UserProfile>,
@@ -82,16 +82,16 @@ impl Default for AppState {
                 input: "".into(),
                 results: Promise::Empty,
             },
-            album: AlbumDetail {
+            album_detail: AlbumDetail {
                 album: Promise::Empty,
             },
-            artist: ArtistDetail {
+            artist_detail: ArtistDetail {
                 artist: Promise::Empty,
                 albums: Promise::Empty,
                 top_tracks: Promise::Empty,
                 related_artists: Promise::Empty,
             },
-            playlist: PlaylistDetail {
+            playlist_detail: PlaylistDetail {
                 playlist: Promise::Empty,
                 tracks: Promise::Empty,
             },

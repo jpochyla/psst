@@ -1,12 +1,49 @@
-use crate::data::{AlbumLink, ArtistLink, PlaylistLink};
+use std::sync::Arc;
+
 use druid::Data;
+use url::Url;
+
+use crate::data::{AlbumLink, ArtistLink, PlaylistLink};
+
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+pub enum SpotifyUrl {
+    Playlist(Arc<str>),
+    Artist(Arc<str>),
+    Album(Arc<str>),
+    Track(Arc<str>),
+}
+
+impl SpotifyUrl {
+    pub fn parse(url: &str) -> Option<Self> {
+        let url = Url::parse(url).ok()?;
+        let mut segments = url.path_segments()?;
+        let entity = segments.next()?;
+        let id = segments.next()?;
+        match entity {
+            "playlist" => Some(Self::Playlist(id.into())),
+            "artist" => Some(Self::Artist(id.into())),
+            "album" => Some(Self::Album(id.into())),
+            "track" => Some(Self::Track(id.into())),
+            _ => None,
+        }
+    }
+
+    pub fn id(&self) -> Arc<str> {
+        match self {
+            SpotifyUrl::Playlist(id) => id.clone(),
+            SpotifyUrl::Artist(id) => id.clone(),
+            SpotifyUrl::Album(id) => id.clone(),
+            SpotifyUrl::Track(id) => id.clone(),
+        }
+    }
+}
 
 #[derive(Clone, Debug, Data, Eq, PartialEq, Hash)]
 pub enum Nav {
     Home,
     SavedTracks,
     SavedAlbums,
-    SearchResults(String),
+    SearchResults(Arc<str>),
     ArtistDetail(ArtistLink),
     AlbumDetail(AlbumLink),
     PlaylistDetail(PlaylistLink),
@@ -18,7 +55,7 @@ impl Nav {
             Nav::Home => "Home".to_string(),
             Nav::SavedTracks => "Saved Tracks".to_string(),
             Nav::SavedAlbums => "Saved Albums".to_string(),
-            Nav::SearchResults(query) => query.to_owned(),
+            Nav::SearchResults(query) => query.to_string(),
             Nav::AlbumDetail(link) => link.name.to_string(),
             Nav::ArtistDetail(link) => link.name.to_string(),
             Nav::PlaylistDetail(link) => link.name.to_string(),

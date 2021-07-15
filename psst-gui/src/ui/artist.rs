@@ -28,7 +28,7 @@ pub fn detail_widget() -> impl Widget<AppState> {
     .lens(
         Ctx::make(
             AppState::common_ctx,
-            AppState::artist.then(ArtistDetail::top_tracks),
+            AppState::artist_detail.then(ArtistDetail::top_tracks),
         )
         .then(Ctx::in_promise()),
     );
@@ -39,14 +39,14 @@ pub fn detail_widget() -> impl Widget<AppState> {
     .lens(
         Ctx::make(
             AppState::common_ctx,
-            AppState::artist.then(ArtistDetail::albums),
+            AppState::artist_detail.then(ArtistDetail::albums),
         )
         .then(Ctx::in_promise()),
     )
     .padding((theme::grid(1.0), 0.0));
 
     let related_artists = Async::new(spinner_widget, related_widget, error_widget)
-        .lens(AppState::artist.then(ArtistDetail::related_artists))
+        .lens(AppState::artist_detail.then(ArtistDetail::related_artists))
         .padding((theme::grid(1.0), 0.0));
 
     Flex::column()
@@ -68,10 +68,10 @@ pub fn artist_widget() -> impl Widget<Artist> {
         .padding(theme::grid(0.5))
         .link()
         .on_ex_click(|ctx, event, artist, _| match event.button {
-            druid::MouseButton::Left => {
+            MouseButton::Left => {
                 ctx.submit_command(cmd::NAVIGATE.with(Nav::ArtistDetail(artist.link())));
             }
-            druid::MouseButton::Right => {
+            MouseButton::Right => {
                 ctx.show_context_menu(artist_menu(&artist.link()), event.window_pos);
             }
             _ => {}

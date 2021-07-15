@@ -59,7 +59,7 @@ pub enum PlaybackOrigin {
     Album(AlbumLink),
     Artist(ArtistLink),
     Playlist(PlaylistLink),
-    Search(String),
+    Search(Arc<str>),
 }
 
 impl PlaybackOrigin {

@@ -201,12 +201,13 @@ fn track_widget(display: TrackDisplay) -> impl Widget<TrackRow> {
     let mut minor = Flex::row();
 
     if display.number {
-        let track_number = Label::dynamic(|tr: &TrackRow, _| tr.track.track_number.to_string())
+        let track_number = Label::dynamic(|track: &Arc<Track>, _| track.track_number.to_string())
             .with_text_size(theme::TEXT_SIZE_SMALL)
             .with_text_color(theme::PLACEHOLDER_COLOR)
             .with_text_alignment(TextAlignment::Center)
             .center()
-            .fix_width(theme::grid(2.0));
+            .fix_width(theme::grid(2.0))
+            .lens(TrackRow::track);
         major.add_child(track_number);
         major.add_default_spacer();
 
@@ -234,9 +235,10 @@ fn track_widget(display: TrackDisplay) -> impl Widget<TrackRow> {
     }
 
     if display.album {
-        let track_album = Label::dynamic(|tr: &TrackRow, _| tr.track.album_name())
+        let track_album = Label::dynamic(|track: &Arc<Track>, _| track.album_name())
             .with_text_size(theme::TEXT_SIZE_SMALL)
-            .with_text_color(theme::PLACEHOLDER_COLOR);
+            .with_text_color(theme::PLACEHOLDER_COLOR)
+            .lens(TrackRow::track);
         if display.artist {
             minor.add_default_spacer();
         }
@@ -260,22 +262,21 @@ fn track_widget(display: TrackDisplay) -> impl Widget<TrackRow> {
     major.add_flex_child(line_painter, 1.0);
 
     if display.popularity {
-        let track_popularity = Label::dynamic(|tr: &TrackRow, _| {
-            tr.track
-                .popularity
-                .map(popularity_stars)
-                .unwrap_or_default()
+        let track_popularity = Label::dynamic(|track: &Arc<Track>, _| {
+            track.popularity.map(popularity_stars).unwrap_or_default()
         })
         .with_text_size(theme::TEXT_SIZE_SMALL)
-        .with_text_color(theme::PLACEHOLDER_COLOR);
+        .with_text_color(theme::PLACEHOLDER_COLOR)
+        .lens(TrackRow::track);
         major.add_default_spacer();
         major.add_child(track_popularity);
     }
 
     let track_duration =
-        Label::dynamic(|tr: &TrackRow, _| utils::as_minutes_and_seconds(&tr.track.duration))
+        Label::dynamic(|track: &Arc<Track>, _| utils::as_minutes_and_seconds(&track.duration))
             .with_text_size(theme::TEXT_SIZE_SMALL)
-            .with_text_color(theme::PLACEHOLDER_COLOR);
+            .with_text_color(theme::PLACEHOLDER_COLOR)
+            .lens(TrackRow::track);
     major.add_default_spacer();
     major.add_child(track_duration);
 

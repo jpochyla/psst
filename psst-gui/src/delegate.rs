@@ -1,6 +1,6 @@
 use crate::{
     cmd,
-    data::{AppState, ArtistTracks, PlaylistTracks, SavedAlbums, SavedTracks},
+    data::{AppState, ArtistTracks, PlaylistTracks, SavedAlbums, SavedTracks, SpotifyUrl},
     ui,
     webapi::WebApi,
     widget::remote_image,
@@ -174,8 +174,8 @@ impl Delegate {
     ) -> Handled {
         if let Some(link) = cmd.get(cmd::LOAD_PLAYLIST_DETAIL).cloned() {
             let sink = ctx.get_external_handle();
-            data.playlist.playlist.defer(link.clone());
-            data.playlist.tracks.defer(link.clone());
+            data.playlist_detail.playlist.defer(link.clone());
+            data.playlist_detail.tracks.defer(link.clone());
             self.spawn(move || {
                 let result = WebApi::global().get_playlist_tracks(&link.id);
                 sink.submit_command(cmd::UPDATE_PLAYLIST_TRACKS, (link, result), Target::Auto)
@@ -183,8 +183,8 @@ impl Delegate {
             });
             Handled::Yes
         } else if let Some((link, result)) = cmd.get(cmd::UPDATE_PLAYLIST_TRACKS).cloned() {
-            if data.playlist.tracks.is_deferred(&link) {
-                data.playlist
+            if data.playlist_detail.tracks.is_deferred(&link) {
+                data.playlist_detail
                     .tracks
                     .resolve_or_reject(result.map(|tracks| PlaylistTracks {
                         id: link.id,
@@ -306,7 +306,7 @@ impl Delegate {
         data: &mut AppState,
     ) -> Handled {
         if let Some(link) = cmd.get(cmd::LOAD_ALBUM_DETAIL).cloned() {
-            data.album.album.defer(link.clone());
+            data.album_detail.album.defer(link.clone());
             let sink = ctx.get_external_handle();
             self.spawn(move || {
                 let result = WebApi::global().get_album(&link.id);
@@ -315,8 +315,8 @@ impl Delegate {
             });
             Handled::Yes
         } else if let Some((link, result)) = cmd.get(cmd::UPDATE_ALBUM_DETAIL).cloned() {
-            if data.album.album.is_deferred(&link) {
-                data.album.album.resolve_or_reject(result);
+            if data.album_detail.album.is_deferred(&link) {
+                data.album_detail.album.resolve_or_reject(result);
             }
             Handled::Yes
         } else {
@@ -333,7 +333,7 @@ impl Delegate {
     ) -> Handled {
         if let Some(album_link) = cmd.get(cmd::LOAD_ARTIST_DETAIL) {
             // Load artist detail
-            data.artist.artist.defer(album_link.clone());
+            data.artist_detail.artist.defer(album_link.clone());
             let link = album_link.clone();
             let sink = ctx.get_external_handle();
             self.spawn(move || {
@@ -342,7 +342,7 @@ impl Delegate {
                     .unwrap();
             });
             // Load artist top tracks
-            data.artist.top_tracks.defer(album_link.clone());
+            data.artist_detail.top_tracks.defer(album_link.clone());
             let link = album_link.clone();
             let sink = ctx.get_external_handle();
             self.spawn(move || {
@@ -351,7 +351,7 @@ impl Delegate {
                     .unwrap();
             });
             // Load artist's related artists
-            data.artist.related_artists.defer(album_link.clone());
+            data.artist_detail.related_artists.defer(album_link.clone());
             let link = album_link.clone();
             let sink = ctx.get_external_handle();
             self.spawn(move || {
@@ -360,7 +360,7 @@ impl Delegate {
                     .unwrap();
             });
             // Load artist albums
-            data.artist.albums.defer(album_link.clone());
+            data.artist_detail.albums.defer(album_link.clone());
             let link = album_link.clone();
             let sink = ctx.get_external_handle();
             self.spawn(move || {
@@ -370,18 +370,18 @@ impl Delegate {
             });
             Handled::Yes
         } else if let Some((link, result)) = cmd.get(cmd::UPDATE_ARTIST_DETAIL).cloned() {
-            if data.artist.artist.is_deferred(&link) {
-                data.artist.artist.resolve_or_reject(result);
+            if data.artist_detail.artist.is_deferred(&link) {
+                data.artist_detail.artist.resolve_or_reject(result);
             }
             Handled::Yes
         } else if let Some((link, result)) = cmd.get(cmd::UPDATE_ARTIST_ALBUMS).cloned() {
-            if data.artist.albums.is_deferred(&link) {
-                data.artist.albums.resolve_or_reject(result);
+            if data.artist_detail.albums.is_deferred(&link) {
+                data.artist_detail.albums.resolve_or_reject(result);
             }
             Handled::Yes
         } else if let Some((link, result)) = cmd.get(cmd::UPDATE_ARTIST_TOP_TRACKS).cloned() {
-            if data.artist.top_tracks.is_deferred(&link) {
-                data.artist
+            if data.artist_detail.top_tracks.is_deferred(&link) {
+                data.artist_detail
                     .top_tracks
                     .resolve_or_reject(result.map(|tracks| ArtistTracks {
                         id: link.id,
@@ -391,8 +391,8 @@ impl Delegate {
             }
             Handled::Yes
         } else if let Some((link, result)) = cmd.get(cmd::UPDATE_ARTIST_RELATED).cloned() {
-            if data.artist.related_artists.is_deferred(&link) {
-                data.artist.related_artists.resolve_or_reject(result);
+            if data.artist_detail.related_artists.is_deferred(&link) {
+                data.artist_detail.related_artists.resolve_or_reject(result);
             }
             Handled::Yes
         } else {
@@ -408,13 +408,34 @@ impl Delegate {
         data: &mut AppState,
     ) -> Handled {
         if let Some(query) = cmd.get(cmd::LOAD_SEARCH_RESULTS).cloned() {
-            let sink = ctx.get_external_handle();
-            data.search.results.defer(query.clone());
-            self.spawn(move || {
-                let result = WebApi::global().search(&query);
-                sink.submit_command(cmd::UPDATE_SEARCH_RESULTS, result, Target::Auto)
-                    .unwrap();
-            });
+            if let Some(link) = SpotifyUrl::parse(&query) {
+                let sink = ctx.get_external_handle();
+                data.search.results.defer(link.id());
+                self.spawn(move || {
+                    let result = WebApi::global().load_spotify_link(&link);
+                    sink.submit_command(cmd::OPEN_LINK, result, Target::Auto)
+                        .unwrap();
+                });
+            } else {
+                let sink = ctx.get_external_handle();
+                data.search.results.defer(query.clone());
+                self.spawn(move || {
+                    let result = WebApi::global().search(&query);
+                    sink.submit_command(cmd::UPDATE_SEARCH_RESULTS, result, Target::Auto)
+                        .unwrap();
+                });
+            }
+            Handled::Yes
+        } else if let Some(result) = cmd.get(cmd::OPEN_LINK).cloned() {
+            match result {
+                Ok(nav) => {
+                    data.search.results.clear();
+                    ctx.submit_command(cmd::NAVIGATE.with(nav));
+                }
+                Err(err) => {
+                    data.search.results.reject(err);
+                }
+            }
             Handled::Yes
         } else if let Some(result) = cmd.get(cmd::UPDATE_SEARCH_RESULTS).cloned() {
             data.search.results.resolve_or_reject(result);

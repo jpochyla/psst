@@ -1753,6 +1753,7 @@ dependencies = [
  "serde_json",
  "souvlaki",
  "ureq",
+ "url",
 ]
 
 [[package]]

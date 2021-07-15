@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::{
     cmd,
-    data::{Album, AlbumDetail, AppState, ArtistLink, Cached, CommonCtx, Ctx, Nav},
+    data::{Album, AlbumDetail, AppState, Cached, CommonCtx, Ctx, Nav},
     ui::{
         theme,
         track::{tracklist_widget, TrackDisplay},
@@ -24,7 +24,7 @@ pub fn detail_widget() -> impl Widget<AppState> {
     .lens(
         Ctx::make(
             AppState::common_ctx,
-            AppState::album.then(AlbumDetail::album),
+            AppState::album_detail.then(AlbumDetail::album),
         )
         .then(Ctx::in_promise()),
     )
@@ -36,8 +36,7 @@ fn loaded_detail_widget() -> impl Widget<Ctx<Arc<CommonCtx>, Cached<Arc<Album>>>
     let album_artists = List::new(artist_link_widget).lens(Album::artists.in_arc());
 
     let album_date = Label::dynamic(|album: &Arc<Album>, _| album.release())
-        .with_text_size(theme::TEXT_SIZE_SMALL)
-        .with_text_color(theme::PLACEHOLDER_COLOR);
+        .with_text_size(theme::TEXT_SIZE_SMALL);
 
     let album_label = Label::raw()
         .with_line_break_mode(LineBreaking::WordWrap)

@@ -1,7 +1,7 @@
 use crate::{
     data::{
-        Album, AlbumType, Artist, ArtistAlbums, AudioAnalysis, Cached, Page, Playlist,
-        SearchResults, Track, UserProfile,
+        Album, AlbumType, Artist, ArtistAlbums, AudioAnalysis, Cached, Nav, Page, Playlist,
+        SearchResults, SpotifyUrl, Track, UserProfile,
     },
     error::Error,
 };
@@ -263,6 +263,18 @@ impl WebApi {
     }
 }
 
+/// Track endpoints.
+impl WebApi {
+    // https://developer.spotify.com/documentation/web-api/reference/#endpoint-get-track
+    pub fn get_track(&self, id: &str) -> Result<Arc<Track>, Error> {
+        let request = self
+            .get(format!("v1/tracks/{}", id))?
+            .query("market", "from_token");
+        let result = self.load(request)?;
+        Ok(result)
+    }
+}
+
 /// Library endpoints.
 impl WebApi {
     // https://developer.spotify.com/documentation/web-api/reference/library/get-users-saved-albums/
@@ -346,14 +358,23 @@ impl WebApi {
 
 /// Playlist endpoints.
 impl WebApi {
-    // https://developer.spotify.com/documentation/web-api/reference/playlists/get-a-list-of-current-users-playlists/
+    // https://developer.spotify.com/documentation/web-api/reference/#endpoint-get-a-list-of-current-users-playlists
     pub fn get_playlists(&self) -> Result<Vector<Playlist>, Error> {
-        let request = self.get("v1/me/playlists")?;
+        let request = self.get("v1/me/playlists")?.query("fields", "!tracks");
         let result = self.load_all_pages(request)?;
         Ok(result)
     }
 
-    // https://developer.spotify.com/documentation/web-api/reference/playlists/get-playlist-tracks/
+    // https://developer.spotify.com/documentation/web-api/reference/#endpoint-get-playlist
+    pub fn get_playlist(&self, id: &str) -> Result<Playlist, Error> {
+        let request = self
+            .get(format!("v1/me/playlists/{}", id))?
+            .query("fields", "!tracks");
+        let result = self.load(request)?;
+        Ok(result)
+    }
+
+    // https://developer.spotify.com/documentation/web-api/reference/#endpoint-get-playlists-tracks
     pub fn get_playlist_tracks(&self, id: &str) -> Result<Vector<Arc<Track>>, Error> {
         #[derive(Clone, Deserialize)]
         struct PlaylistItem {
@@ -394,12 +415,27 @@ impl WebApi {
         let tracks = result.tracks.map_or_else(Vector::new, |page| page.items);
         let playlists = result.playlists.map_or_else(Vector::new, |page| page.items);
         Ok(SearchResults {
-            query: query.to_string(),
+            query: query.into(),
             artists,
             albums,
             tracks,
             playlists,
         })
+    }
+
+    pub fn load_spotify_link(&self, link: &SpotifyUrl) -> Result<Nav, Error> {
+        let nav = match link {
+            SpotifyUrl::Playlist(id) => Nav::PlaylistDetail(self.get_playlist(id)?.link()),
+            SpotifyUrl::Artist(id) => Nav::ArtistDetail(self.get_artist(id)?.link()),
+            SpotifyUrl::Album(id) => Nav::AlbumDetail(self.get_album(id)?.data.link()),
+            SpotifyUrl::Track(id) => Nav::AlbumDetail(
+                // TODO: We should highlight the exact track in the album.
+                self.get_track(id)?.album.clone().ok_or_else(|| {
+                    Error::WebApiError("Track was found but has no album".to_string())
+                })?,
+            ),
+        };
+        Ok(nav)
     }
 }
 
