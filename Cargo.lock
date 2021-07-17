@@ -1753,6 +1753,7 @@ dependencies = [
  "serde_json",
  "souvlaki",
  "ureq",
+ "winres",
 ]
 
 [[package]]
@@ -2736,6 +2737,15 @@ checksum = "25eb153f12764a88cd8f6898ba9b4b03b57704b26289a15c66495923d23e4208"
 dependencies = [
  "syn",
  "windows_gen",
+]
+
+[[package]]
+name = "winres"
+version = "0.1.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ff4fb510bbfe5b8992ff15f77a2e6fe6cf062878f0eda00c0f44963a807ca5dc"
+dependencies = [
+ "toml",
 ]
 
 [[package]]
