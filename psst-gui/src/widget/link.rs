@@ -9,6 +9,7 @@ pub struct Link<T> {
     border_color: KeyOrValue<Color>,
     border_width: KeyOrValue<f64>,
     corner_radius: KeyOrValue<f64>,
+    active_background: Option<(Box<dyn Fn(&T, &Env) -> bool>, KeyOrValue<Color>)>,
 }
 
 impl<T: Data> Link<T> {
@@ -18,6 +19,7 @@ impl<T: Data> Link<T> {
             border_color: theme::LINK_HOT_COLOR.into(),
             border_width: 0.0.into(),
             corner_radius: 0.0.into(),
+            active_background: None,
         }
     }
 
@@ -52,6 +54,11 @@ impl<T: Data> Link<T> {
     pub fn set_rounded(&mut self, radius: impl Into<KeyOrValue<f64>>) {
         self.corner_radius = radius.into();
     }
+
+    pub fn active_background(mut self, predicate: impl Fn(&T, &Env) -> bool + 'static, color: impl Into<KeyOrValue<Color>>) -> Self {
+        self.active_background = Some((Box::new(predicate), color.into()));
+        self
+    }
 }
 
 impl<T: Data> Widget<T> for Link<T> {
@@ -80,7 +87,15 @@ impl<T: Data> Widget<T> for Link<T> {
         let background = if ctx.is_hot() {
             env.get(theme::LINK_HOT_COLOR)
         } else {
-            env.get(theme::LINK_COLD_COLOR)
+            if let Some((predicate, active_background)) = &self.active_background {
+                if (predicate)(data, env) {
+                    active_background.resolve(env)
+                } else {
+                    env.get(theme::LINK_COLD_COLOR)
+                }
+            } else {
+                env.get(theme::LINK_COLD_COLOR)
+            }
         };
         let border_color = self.border_color.resolve(env);
         let border_width = self.border_width.resolve(env);
