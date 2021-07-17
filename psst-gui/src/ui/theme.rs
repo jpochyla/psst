@@ -35,6 +35,7 @@ pub const ICON_SIZE: Size = Size::new(12.0, 12.0);
 pub const ICON_SIZE_LARGE: Size = Size::new(GRID * 2.0, GRID * 2.0);
 
 pub const LINK_HOT_COLOR: Key<Color> = Key::new("app.link-hot-color");
+pub const LINK_ACTIVE_COLOR: Key<Color> = Key::new("app.link-active-color");
 pub const LINK_COLD_COLOR: Key<Color> = Key::new("app.link-cold-color");
 
 pub fn setup(env: &mut Env, state: &AppState) {
@@ -138,6 +139,7 @@ fn setup_light_theme(env: &mut Env) {
     env.set(RED, Color::rgba8(0xEB, 0x57, 0x57, 0xFF));
 
     env.set(LINK_HOT_COLOR, Color::rgba(0.0, 0.0, 0.0, 0.05));
+    env.set(LINK_ACTIVE_COLOR, Color::rgba(0.0, 0.0, 0.0, 0.025));
     env.set(LINK_COLD_COLOR, Color::rgba(0.0, 0.0, 0.0, 0.0));
 }
 
@@ -156,5 +158,6 @@ fn setup_dark_theme(env: &mut Env) {
     env.set(RED, Color::rgba8(0xEB, 0x57, 0x57, 0xFF));
 
     env.set(LINK_HOT_COLOR, Color::rgba(1.0, 1.0, 1.0, 0.05));
+    env.set(LINK_ACTIVE_COLOR, Color::rgba(1.0, 1.0, 1.0, 0.025));
     env.set(LINK_COLD_COLOR, Color::rgba(1.0, 1.0, 1.0, 0.0));
 }
