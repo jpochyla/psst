@@ -1754,6 +1754,7 @@ dependencies = [
  "souvlaki",
  "ureq",
  "url",
+ "winres",
 ]
 
 [[package]]
@@ -2734,6 +2735,15 @@ checksum = "7c32753c378262520a4fa70c2e4389f4649e751faab2a887090567cff192d299"
 dependencies = [
  "syn",
  "windows_gen",
+]
+
+[[package]]
+name = "winres"
+version = "0.1.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ff4fb510bbfe5b8992ff15f77a2e6fe6cf062878f0eda00c0f44963a807ca5dc"
+dependencies = [
+ "toml",
 ]
 
 [[package]]
