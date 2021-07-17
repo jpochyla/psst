@@ -8,7 +8,7 @@ use crate::{
 use druid::{
     lens::Unit,
     widget::{CrossAxisAlignment, Either, Flex, Label, Scroll, Slider, Split, ViewSwitcher},
-    Insets, LensExt, Menu, MenuItem, MouseButton, Widget, WidgetExt, WindowDesc,
+    Env, Insets, LensExt, Menu, MenuItem, MouseButton, Widget, WidgetExt, WindowDesc,
 };
 use icons::SvgIcon;
 
@@ -28,7 +28,7 @@ pub mod utils;
 
 pub fn main_window() -> WindowDesc<AppState> {
     let win = WindowDesc::new(root_widget())
-        .title("Psst")
+        .title(compute_main_window_title)
         .with_min_size((theme::grid(25.0), theme::grid(25.0)))
         .window_size((theme::grid(80.0), theme::grid(100.0)))
         .show_title(false)
@@ -289,4 +289,12 @@ fn route_title_widget() -> impl Widget<Nav> {
     Label::dynamic(|route: &Nav, _| route.to_title())
         .with_font(theme::UI_FONT_MEDIUM)
         .with_text_size(theme::TEXT_SIZE_LARGE)
+}
+
+fn compute_main_window_title(data: &AppState, _env: &Env) -> String {
+    if let Some(now_playing) = &data.playback.now_playing {
+        format!("Psst - {} - {}", now_playing.item.artist_name(), now_playing.item.name)
+    } else {
+        "Psst".to_owned()
+    }
 }
