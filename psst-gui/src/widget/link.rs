@@ -9,7 +9,7 @@ pub struct Link<T> {
     border_color: KeyOrValue<Color>,
     border_width: KeyOrValue<f64>,
     corner_radius: KeyOrValue<f64>,
-    active_background: Option<(Box<dyn Fn(&T, &Env) -> bool>, KeyOrValue<Color>)>,
+    is_active: Option<Box<dyn Fn(&T, &Env) -> bool>>,
 }
 
 impl<T: Data> Link<T> {
@@ -19,7 +19,7 @@ impl<T: Data> Link<T> {
             border_color: theme::LINK_HOT_COLOR.into(),
             border_width: 0.0.into(),
             corner_radius: 0.0.into(),
-            active_background: None,
+            is_active: None,
         }
     }
 
@@ -28,35 +28,22 @@ impl<T: Data> Link<T> {
         color: impl Into<KeyOrValue<Color>>,
         width: impl Into<KeyOrValue<f64>>,
     ) -> Self {
-        self.set_border(color, width);
-        self
-    }
-
-    pub fn set_border(
-        &mut self,
-        color: impl Into<KeyOrValue<Color>>,
-        width: impl Into<KeyOrValue<f64>>,
-    ) {
         self.border_color = color.into();
         self.border_width = width.into();
-    }
-
-    pub fn circle(mut self) -> Self {
-        self.set_rounded(64.0);
         self
     }
 
     pub fn rounded(mut self, radius: impl Into<KeyOrValue<f64>>) -> Self {
-        self.set_rounded(radius);
+        self.corner_radius = radius.into();
         self
     }
 
-    pub fn set_rounded(&mut self, radius: impl Into<KeyOrValue<f64>>) {
-        self.corner_radius = radius.into();
+    pub fn circle(self) -> Self {
+        self.rounded(f64::INFINITY)
     }
 
-    pub fn active_background(mut self, predicate: impl Fn(&T, &Env) -> bool + 'static, color: impl Into<KeyOrValue<Color>>) -> Self {
-        self.active_background = Some((Box::new(predicate), color.into()));
+    pub fn active(mut self, predicate: impl Fn(&T, &Env) -> bool + 'static) -> Self {
+        self.is_active = Some(Box::new(predicate));
         self
     }
 }
@@ -87,12 +74,13 @@ impl<T: Data> Widget<T> for Link<T> {
         let background = if ctx.is_hot() {
             env.get(theme::LINK_HOT_COLOR)
         } else {
-            if let Some((predicate, active_background)) = &self.active_background {
-                if (predicate)(data, env) {
-                    active_background.resolve(env)
-                } else {
-                    env.get(theme::LINK_COLD_COLOR)
-                }
+            let is_active = self
+                .is_active
+                .as_ref()
+                .map(|predicate| predicate(data, env))
+                .unwrap_or(false);
+            if is_active {
+                env.get(theme::LINK_ACTIVE_COLOR)
             } else {
                 env.get(theme::LINK_COLD_COLOR)
             }
