@@ -29,7 +29,14 @@ pub fn panel_widget() -> impl Widget<AppState> {
                     Maybe::or_empty(playback_item_widget).lens(Playback::now_playing),
                     1.0,
                 )
-                .with_flex_child(player_widget(), 1.0),
+                .with_flex_child(
+                    Either::new(
+                        |playback, _| playback.now_playing.is_some(),
+                        player_widget(),
+                        Empty,
+                    ),
+                    1.0,
+                ),
         )
         .lens(AppState::playback)
 }
@@ -65,7 +72,7 @@ fn playback_item_widget() -> impl Widget<NowPlaying> {
                         PlaybackOrigin::Playlist { .. } => &icons::PLAYLIST,
                         PlaybackOrigin::Search { .. } => &icons::SEARCH,
                     }
-                    .scale(theme::ICON_SIZE),
+                    .scale(theme::ICON_SIZE_SMALL),
                 )
                 .boxed()
         },
@@ -82,26 +89,32 @@ fn playback_item_widget() -> impl Widget<NowPlaying> {
         .padding(theme::grid(2.0))
         .expand_width()
         .link()
-        .on_ex_click(|ctx, _event, now_playing: &mut NowPlaying, _| {
-            let nav = now_playing.origin.to_nav();
-            ctx.submit_command(cmd::NAVIGATE.with(nav));
+        .on_ex_click(|ctx, _, now_playing, _| {
+            ctx.submit_command(cmd::NAVIGATE.with(now_playing.origin.to_nav()));
         })
 }
 
 fn player_widget() -> impl Widget<Playback> {
-    let play_previous = icons::SKIP_BACK
-        .scale((theme::grid(2.0), theme::grid(2.0)))
-        .padding(theme::grid(1.0))
-        .link()
-        .rounded(theme::BUTTON_BORDER_RADIUS)
-        .on_click(|ctx, _, _| ctx.submit_command(cmd::PLAY_PREVIOUS));
-    let play_previous = Either::new(
-        |playback: &Playback, _| playback.now_playing.is_some(),
-        play_previous,
-        Empty,
-    );
+    Flex::row()
+        .with_child(
+            small_button_widget(&icons::SKIP_BACK)
+                .on_click(|ctx, _, _| ctx.submit_command(cmd::PLAY_PREVIOUS)),
+        )
+        .with_default_spacer()
+        .with_child(player_play_pause_widget())
+        .with_default_spacer()
+        .with_child(
+            small_button_widget(&icons::SKIP_FORWARD)
+                .on_click(|ctx, _, _| ctx.submit_command(cmd::PLAY_NEXT)),
+        )
+        .with_default_spacer()
+        .with_child(queue_behavior_widget())
+        .with_default_spacer()
+        .with_child(Maybe::or_empty(durations_widget).lens(Playback::now_playing))
+}
 
-    let play_pause = ViewSwitcher::new(
+fn player_play_pause_widget() -> impl Widget<Playback> {
+    ViewSwitcher::new(
         |playback: &Playback, _| playback.state,
         |&state, _, _| match state {
             PlaybackState::Loading => Spinner::new()
@@ -131,29 +144,15 @@ fn player_widget() -> impl Widget<Playback> {
                 .boxed(),
             PlaybackState::Stopped => Empty.boxed(),
         },
-    );
+    )
+}
 
-    let play_next = icons::SKIP_FORWARD
-        .scale((theme::grid(2.0), theme::grid(2.0)))
-        .padding(theme::grid(1.0))
-        .link()
-        .rounded(theme::BUTTON_BORDER_RADIUS)
-        .on_click(|ctx, _, _| ctx.submit_command(cmd::PLAY_NEXT));
-    let play_next = Either::new(
-        |playback: &Playback, _| playback.now_playing.is_some(),
-        play_next,
-        Empty,
-    );
-
-    let queue_behavior = ViewSwitcher::new(
+fn queue_behavior_widget() -> impl Widget<Playback> {
+    ViewSwitcher::new(
         |playback: &Playback, _| playback.queue_behavior.to_owned(),
         |behavior, _, _| {
-            let icon = |svg: &SvgIcon| {
-                svg.scale((theme::grid(2.0), theme::grid(2.0)))
-                    .with_color(theme::PLACEHOLDER_COLOR)
-                    .padding(theme::grid(1.0))
-                    .link()
-                    .rounded(theme::BUTTON_BORDER_RADIUS)
+            let button = |svg: &SvgIcon| {
+                faded_button_widget(svg)
                     .on_click(|ctx: &mut EventCtx, playback: &mut Playback, _| {
                         let new_behavior = match playback.queue_behavior {
                             QueueBehavior::Sequential => QueueBehavior::Random,
@@ -166,34 +165,31 @@ fn player_widget() -> impl Widget<Playback> {
                     .boxed()
             };
             match behavior {
-                QueueBehavior::Sequential => icon(&icons::PLAY_SEQUENTIAL),
-                QueueBehavior::Random => icon(&icons::PLAY_SHUFFLE),
-                QueueBehavior::LoopTrack => icon(&icons::PLAY_LOOP_TRACK),
-                QueueBehavior::LoopAll => icon(&icons::PLAY_LOOP_ALL),
+                QueueBehavior::Sequential => button(&icons::PLAY_SEQUENTIAL),
+                QueueBehavior::Random => button(&icons::PLAY_SHUFFLE),
+                QueueBehavior::LoopTrack => button(&icons::PLAY_LOOP_TRACK),
+                QueueBehavior::LoopAll => button(&icons::PLAY_LOOP_ALL),
             }
         },
-    );
-    let queue_behavior = Either::new(
-        |playback: &Playback, _| playback.now_playing.is_some(),
-        queue_behavior,
-        Empty,
-    );
-
-    let times = Maybe::or_empty(player_times_widget).lens(Playback::now_playing);
-
-    Flex::row()
-        .with_child(play_previous)
-        .with_default_spacer()
-        .with_child(play_pause)
-        .with_default_spacer()
-        .with_child(play_next)
-        .with_default_spacer()
-        .with_child(queue_behavior)
-        .with_default_spacer()
-        .with_child(times)
+    )
 }
 
-fn player_times_widget() -> impl Widget<NowPlaying> {
+fn small_button_widget<T: Data>(svg: &SvgIcon) -> impl Widget<T> {
+    svg.scale((theme::grid(2.0), theme::grid(2.0)))
+        .padding(theme::grid(1.0))
+        .link()
+        .rounded(theme::BUTTON_BORDER_RADIUS)
+}
+
+fn faded_button_widget<T: Data>(svg: &SvgIcon) -> impl Widget<T> {
+    svg.scale((theme::grid(2.0), theme::grid(2.0)))
+        .with_color(theme::PLACEHOLDER_COLOR)
+        .padding(theme::grid(1.0))
+        .link()
+        .rounded(theme::BUTTON_BORDER_RADIUS)
+}
+
+fn durations_widget() -> impl Widget<NowPlaying> {
     Label::dynamic(|now_playing: &NowPlaying, _| {
         format!(
             "{} / {}",

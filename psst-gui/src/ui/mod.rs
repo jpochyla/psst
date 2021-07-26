@@ -278,7 +278,7 @@ fn route_icon_widget() -> impl Widget<Nav> {
     ViewSwitcher::new(
         |route: &Nav, _| route.clone(),
         |route: &Nav, _, _| {
-            let icon = |icon: &SvgIcon| icon.scale(theme::ICON_SIZE);
+            let icon = |icon: &SvgIcon| icon.scale(theme::ICON_SIZE_SMALL);
             match &route {
                 Nav::Home => Empty.boxed(),
                 Nav::SavedTracks => Empty.boxed(),
@@ -300,7 +300,11 @@ fn route_title_widget() -> impl Widget<Nav> {
 
 fn compute_main_window_title(data: &AppState, _env: &Env) -> String {
     if let Some(now_playing) = &data.playback.now_playing {
-        format!("Psst - {} - {}", now_playing.item.artist_name(), now_playing.item.name)
+        format!(
+            "Psst - {} - {}",
+            now_playing.item.artist_name(),
+            now_playing.item.name
+        )
     } else {
         "Psst".to_owned()
     }

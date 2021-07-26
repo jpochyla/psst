@@ -103,7 +103,7 @@ pub fn spinner_widget<T: Data>() -> impl Widget<T> {
 }
 
 pub fn error_widget() -> impl Widget<Error> {
-    let icon = icons::SAD_FACE
+    let icon = icons::ERROR
         .scale((theme::grid(3.0), theme::grid(3.0)))
         .with_color(theme::PLACEHOLDER_COLOR);
     let error = Flex::column()

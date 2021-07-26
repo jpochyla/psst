@@ -31,8 +31,8 @@ pub const UI_FONT_MONO: Key<FontDescriptor> = Key::new("app.ui-font-mono");
 pub const TEXT_SIZE_SMALL: Key<f64> = Key::new("app.text-size-small");
 
 pub const ICON_COLOR: Key<Color> = Key::new("app.icon-color");
-pub const ICON_SIZE: Size = Size::new(12.0, 12.0);
-pub const ICON_SIZE_LARGE: Size = Size::new(GRID * 2.0, GRID * 2.0);
+pub const ICON_SIZE_SMALL: Size = Size::new(16.0, 16.0);
+pub const ICON_SIZE: Size = Size::new(22.0, 22.0);
 
 pub const LINK_HOT_COLOR: Key<Color> = Key::new("app.link-hot-color");
 pub const LINK_ACTIVE_COLOR: Key<Color> = Key::new("app.link-active-color");
