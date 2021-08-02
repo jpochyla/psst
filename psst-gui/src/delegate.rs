@@ -1,6 +1,6 @@
 use crate::{
     cmd,
-    data::{AppState, ArtistTracks, PlaylistTracks, SavedAlbums, SavedTracks, SpotifyUrl},
+    data::{AppState, ArtistTracks, Nav, PlaylistTracks, SavedAlbums, SavedTracks, SpotifyUrl},
     ui,
     webapi::WebApi,
     widget::remote_image,
@@ -439,6 +439,24 @@ impl Delegate {
             Handled::Yes
         } else if let Some(result) = cmd.get(cmd::UPDATE_SEARCH_RESULTS).cloned() {
             data.search.results.resolve_or_reject(result);
+            Handled::Yes
+        } else if let Some(request) = cmd.get(cmd::LOAD_RECOMMENDATIONS).cloned() {
+            let sink = ctx.get_external_handle();
+            let id = data.recommend.counter;
+            data.recommend.counter += 1;
+            data.recommend.results.defer(id);
+            data.recommend.request.replace(request.clone());
+            // TODO: Do this some other way, this is extremely inconsistent.
+            sink.submit_command(cmd::NAVIGATE, Nav::Recommendations, Target::Auto)
+                .unwrap();
+            self.spawn(move || {
+                let result = WebApi::global().get_recommendations(request);
+                sink.submit_command(cmd::UPDATE_RECOMMENDATIONS, result, Target::Auto)
+                    .unwrap();
+            });
+            Handled::Yes
+        } else if let Some(result) = cmd.get(cmd::UPDATE_RECOMMENDATIONS).cloned() {
+            data.recommend.results.resolve_or_reject(result);
             Handled::Yes
         } else {
             Handled::No

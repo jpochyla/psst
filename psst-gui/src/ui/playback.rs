@@ -71,6 +71,7 @@ fn playback_item_widget() -> impl Widget<NowPlaying> {
                         PlaybackOrigin::Artist { .. } => &icons::ARTIST,
                         PlaybackOrigin::Playlist { .. } => &icons::PLAYLIST,
                         PlaybackOrigin::Search { .. } => &icons::SEARCH,
+                        PlaybackOrigin::Recommendations => &icons::SEARCH,
                     }
                     .scale(theme::ICON_SIZE_SMALL),
                 )

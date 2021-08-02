@@ -1,8 +1,10 @@
-use crate::data::{AlbumLink, ArtistLink};
+use std::{convert::TryFrom, ops::Deref, str::FromStr, sync::Arc, time::Duration};
+
 use druid::{im::Vector, Data, Lens};
 use psst_core::item_id::{ItemId, ItemIdType};
 use serde::Deserialize;
-use std::{convert::TryFrom, ops::Deref, str::FromStr, sync::Arc, time::Duration};
+
+use crate::data::{AlbumLink, ArtistLink};
 
 #[derive(Clone, Debug, Data, Lens, Deserialize)]
 pub struct Track {

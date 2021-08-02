@@ -47,6 +47,7 @@ pub enum Nav {
     ArtistDetail(ArtistLink),
     AlbumDetail(AlbumLink),
     PlaylistDetail(PlaylistLink),
+    Recommendations,
 }
 
 impl Nav {
@@ -59,6 +60,7 @@ impl Nav {
             Nav::AlbumDetail(link) => link.name.to_string(),
             Nav::ArtistDetail(link) => link.name.to_string(),
             Nav::PlaylistDetail(link) => link.name.to_string(),
+            Nav::Recommendations => "Recommended".to_string(),
         }
     }
 
@@ -71,6 +73,7 @@ impl Nav {
             Nav::AlbumDetail(link) => format!("Album “{}”", link.name),
             Nav::ArtistDetail(link) => format!("Artist “{}”", link.name),
             Nav::PlaylistDetail(link) => format!("Playlist “{}”", link.name),
+            Nav::Recommendations => "Recommended".to_string(),
         }
     }
 }

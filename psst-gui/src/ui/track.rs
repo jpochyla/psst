@@ -2,13 +2,14 @@ use crate::{
     cmd,
     data::{
         Album, AppState, ArtistLink, ArtistTracks, CommonCtx, Ctx, Nav, PlaybackOrigin,
-        PlaybackPayload, PlaylistTracks, SavedTracks, SearchResults, Track,
+        PlaybackPayload, PlaylistTracks, Recommendations, RecommendationsRequest, SavedTracks,
+        SearchResults, Track,
     },
     ui::theme,
     widget::LinkExt,
 };
 use druid::{
-    im::Vector,
+    im::{vector, Vector},
     kurbo::Line,
     lens::Map,
     piet::StrokeStyle,
@@ -79,6 +80,16 @@ impl TrackIter for ArtistTracks {
 impl TrackIter for SearchResults {
     fn origin(&self) -> PlaybackOrigin {
         PlaybackOrigin::Search(self.query.clone())
+    }
+
+    fn tracks(&self) -> &Vector<Arc<Track>> {
+        &self.tracks
+    }
+}
+
+impl TrackIter for Recommendations {
+    fn origin(&self) -> PlaybackOrigin {
+        PlaybackOrigin::Recommendations
     }
 
     fn tracks(&self) -> &Vector<Arc<Track>> {
@@ -343,6 +354,17 @@ fn track_menu(tr: &TrackRow) -> Menu<AppState> {
             .command(cmd::NAVIGATE.with(Nav::AlbumDetail(album_link.to_owned()))),
         )
     }
+
+    menu = menu.entry(
+        MenuItem::new(
+            LocalizedString::new("menu-item-show-recommended")
+                .with_placeholder("Show Similar Tracks"),
+        )
+        .command(cmd::LOAD_RECOMMENDATIONS.with(RecommendationsRequest {
+            seed_tracks: vector![tr.track.id],
+            ..RecommendationsRequest::default()
+        })),
+    );
 
     menu = menu.entry(
         MenuItem::new(

@@ -6,6 +6,7 @@ mod nav;
 mod playback;
 mod playlist;
 mod promise;
+mod recommend;
 mod search;
 mod track;
 mod user;
@@ -23,6 +24,7 @@ pub use crate::data::{
     },
     playlist::{Playlist, PlaylistDetail, PlaylistLink, PlaylistTracks},
     promise::{Promise, PromiseState},
+    recommend::{Recommend, Recommendations, RecommendationsRequest},
     search::{Search, SearchResults},
     track::{AudioAnalysis, AudioSegment, TimeInterval, Track, TrackId},
     user::UserProfile,
@@ -46,6 +48,7 @@ pub struct AppState {
     pub preferences: Preferences,
     pub playback: Playback,
     pub search: Search,
+    pub recommend: Recommend,
     pub album_detail: AlbumDetail,
     pub artist_detail: ArtistDetail,
     pub playlist_detail: PlaylistDetail,
@@ -80,6 +83,11 @@ impl Default for AppState {
             },
             search: Search {
                 input: "".into(),
+                results: Promise::Empty,
+            },
+            recommend: Recommend {
+                counter: 0,
+                request: None,
                 results: Promise::Empty,
             },
             album_detail: AlbumDetail {

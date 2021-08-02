@@ -1,11 +1,12 @@
 use crate::{
     data::{
         Album, AlbumType, Artist, ArtistAlbums, AudioAnalysis, Cached, Nav, Page, Playlist,
-        SearchResults, SpotifyUrl, Track, UserProfile,
+        Recommendations, RecommendationsRequest, SearchResults, SpotifyUrl, Track, UserProfile,
     },
     error::Error,
 };
 use druid::{im::Vector, image, Data};
+use itertools::Itertools;
 use once_cell::sync::OnceCell;
 use psst_core::{
     access_token::TokenProvider, session::SessionService, util::default_ureq_agent_builder,
@@ -434,6 +435,33 @@ impl WebApi {
             ),
         };
         Ok(nav)
+    }
+}
+
+/// Recommendation endpoints.
+impl WebApi {
+    // https://developer.spotify.com/documentation/web-api/reference/#endpoint-get-recommendations
+    pub fn get_recommendations(
+        &self,
+        data: RecommendationsRequest,
+    ) -> Result<Recommendations, Error> {
+        let seed_artists = data.seed_artists.into_iter().map(|link| link.id).join(", ");
+        let seed_tracks = data
+            .seed_tracks
+            .into_iter()
+            .map(|track| track.to_base62())
+            .join(", ");
+
+        let request = self
+            .get("v1/recommendations")?
+            .query("marker", "from_token")
+            .query("limit", "100")
+            .query("seed_artists", &seed_artists)
+            .query("seed_tracks", &seed_tracks);
+        // TODO: insert the rest of `data` as query parameters.
+
+        let result = self.load(request)?;
+        Ok(result)
     }
 }
 

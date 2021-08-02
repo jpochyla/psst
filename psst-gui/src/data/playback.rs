@@ -60,6 +60,7 @@ pub enum PlaybackOrigin {
     Artist(ArtistLink),
     Playlist(PlaylistLink),
     Search(Arc<str>),
+    Recommendations,
 }
 
 impl PlaybackOrigin {
@@ -70,6 +71,7 @@ impl PlaybackOrigin {
             PlaybackOrigin::Artist(link) => Nav::ArtistDetail(link.clone()),
             PlaybackOrigin::Playlist(link) => Nav::PlaylistDetail(link.clone()),
             PlaybackOrigin::Search(query) => Nav::SearchResults(query.clone()),
+            PlaybackOrigin::Recommendations => Nav::Recommendations,
         }
     }
 }
@@ -82,6 +84,7 @@ impl fmt::Display for PlaybackOrigin {
             PlaybackOrigin::Artist(link) => link.name.fmt(f),
             PlaybackOrigin::Playlist(link) => link.name.fmt(f),
             PlaybackOrigin::Search(query) => query.fmt(f),
+            PlaybackOrigin::Recommendations => f.write_str("Recommended"),
         }
     }
 }

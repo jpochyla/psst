@@ -1,7 +1,8 @@
 use crate::{
     data::{
         Album, AlbumLink, Artist, ArtistAlbums, ArtistLink, AudioAnalysis, Cached, Nav,
-        PlaybackPayload, PlaylistLink, QueueBehavior, SearchResults, Track, TrackId,
+        PlaybackPayload, PlaylistLink, QueueBehavior, Recommendations, RecommendationsRequest,
+        SearchResults, Track, TrackId,
     },
     error::Error,
 };
@@ -33,6 +34,13 @@ pub const LOAD_SEARCH_RESULTS: Selector<Arc<str>> = Selector::new("app.load-sear
 pub const UPDATE_SEARCH_RESULTS: Selector<Result<SearchResults, Error>> =
     Selector::new("app.update-search-results");
 pub const OPEN_LINK: Selector<Result<Nav, Error>> = Selector::new("app.open-link");
+
+// Recommend
+
+pub const LOAD_RECOMMENDATIONS: Selector<RecommendationsRequest> =
+    Selector::new("app.load-recommendations");
+pub const UPDATE_RECOMMENDATIONS: Selector<Result<Recommendations, Error>> =
+    Selector::new("app.update-recommendations");
 
 // Library
 
