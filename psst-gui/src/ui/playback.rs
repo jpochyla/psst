@@ -96,32 +96,14 @@ where
 pub fn panel_widget() -> impl Widget<AppState> {
     Flex::column()
         .with_child(Maybe::or_empty(SeekBar::new).lens(Playback::now_playing))
-        .with_child(
-            // Flex::row()
-            //     .must_fill_main_axis(true)
-            //     .with_flex_child(
-            //         Maybe::or_empty(playback_item_widget).lens(Playback::now_playing),
-            //         1.0,
-            //     )
-            //     .with_flex_child(
-            //         Either::new(
-            //             |playback, _| playback.now_playing.is_some(),
-            //             player_widget(),
-            //             Empty,
-            //         ),
-            //         1.0,
-            //     ),
-            BarLayout {
-                item: WidgetPod::new(
-                    Maybe::or_empty(playback_item_widget).lens(Playback::now_playing),
-                ),
-                player: WidgetPod::new(Either::new(
-                    |playback, _| playback.now_playing.is_some(),
-                    player_widget(),
-                    Empty,
-                )),
-            },
-        )
+        .with_child(BarLayout {
+            item: WidgetPod::new(Maybe::or_empty(playback_item_widget).lens(Playback::now_playing)),
+            player: WidgetPod::new(Either::new(
+                |playback, _| playback.now_playing.is_some(),
+                player_widget(),
+                Empty,
+            )),
+        })
         .lens(AppState::playback)
 }
 
