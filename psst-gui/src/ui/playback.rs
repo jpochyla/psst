@@ -12,6 +12,7 @@ use druid::{
     widget::{CrossAxisAlignment, Either, Flex, Label, LineBreaking, Spinner, ViewSwitcher},
     BoxConstraints, Data, Env, Event, EventCtx, LayoutCtx, LensExt, LifeCycle, LifeCycleCtx,
     MouseButton, PaintCtx, Point, Rect, RenderContext, Size, UpdateCtx, Widget, WidgetExt,
+    WidgetPod,
 };
 use icons::SvgIcon;
 use itertools::Itertools;
@@ -19,24 +20,107 @@ use std::{sync::Arc, time::Duration};
 
 use super::utils;
 
+struct BarLayout<T, I, P> {
+    item: WidgetPod<T, I>,
+    player: WidgetPod<T, P>,
+}
+
+impl<T, I, P> Widget<T> for BarLayout<T, I, P>
+where
+    T: Data,
+    I: Widget<T>,
+    P: Widget<T>,
+{
+    fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut T, env: &Env) {
+        self.item.event(ctx, event, data, env);
+        self.player.event(ctx, event, data, env);
+    }
+
+    fn lifecycle(&mut self, ctx: &mut LifeCycleCtx, event: &LifeCycle, data: &T, env: &Env) {
+        self.item.lifecycle(ctx, event, data, env);
+        self.player.lifecycle(ctx, event, data, env);
+    }
+
+    fn update(&mut self, ctx: &mut UpdateCtx, _old_data: &T, data: &T, env: &Env) {
+        self.item.update(ctx, data, env);
+        self.player.update(ctx, data, env);
+    }
+
+    fn layout(&mut self, ctx: &mut LayoutCtx, bc: &BoxConstraints, data: &T, env: &Env) -> Size {
+        let max = bc.max();
+
+        const PLAYER_OPTICAL_CENTER: f64 = 60.0 + theme::GRID * 2.0;
+
+        // Layout the player with loose constraints.
+        let player = self.player.layout(ctx, &bc.loosen(), data, env);
+        let player_centered = max.width > player.width * 2.25;
+
+        // Layout the item to the available space.
+        let item_max = if player_centered {
+            Size::new(max.width * 0.5 - PLAYER_OPTICAL_CENTER, max.height)
+        } else {
+            Size::new(max.width - player.width, max.height)
+        };
+        let item = self
+            .item
+            .layout(ctx, &BoxConstraints::new(Size::ZERO, item_max), data, env);
+
+        let total = Size::new(max.width, player.height.max(item.height));
+
+        // Put the item to the top left.
+        self.item.set_origin(ctx, data, env, Point::ORIGIN);
+
+        // Put the player either to the center or to the right.
+        let player_pos = if player_centered {
+            Point::new(
+                total.width * 0.5 - PLAYER_OPTICAL_CENTER,
+                total.height * 0.5 - player.height * 0.5,
+            )
+        } else {
+            Point::new(
+                total.width - player.width,
+                total.height * 0.5 - player.height * 0.5,
+            )
+        };
+        self.player.set_origin(ctx, data, env, player_pos);
+
+        total
+    }
+
+    fn paint(&mut self, ctx: &mut PaintCtx, data: &T, env: &Env) {
+        self.item.paint(ctx, data, env);
+        self.player.paint(ctx, data, env);
+    }
+}
+
 pub fn panel_widget() -> impl Widget<AppState> {
     Flex::column()
         .with_child(Maybe::or_empty(SeekBar::new).lens(Playback::now_playing))
         .with_child(
-            Flex::row()
-                .must_fill_main_axis(true)
-                .with_flex_child(
+            // Flex::row()
+            //     .must_fill_main_axis(true)
+            //     .with_flex_child(
+            //         Maybe::or_empty(playback_item_widget).lens(Playback::now_playing),
+            //         1.0,
+            //     )
+            //     .with_flex_child(
+            //         Either::new(
+            //             |playback, _| playback.now_playing.is_some(),
+            //             player_widget(),
+            //             Empty,
+            //         ),
+            //         1.0,
+            //     ),
+            BarLayout {
+                item: WidgetPod::new(
                     Maybe::or_empty(playback_item_widget).lens(Playback::now_playing),
-                    1.0,
-                )
-                .with_flex_child(
-                    Either::new(
-                        |playback, _| playback.now_playing.is_some(),
-                        player_widget(),
-                        Empty,
-                    ),
-                    1.0,
                 ),
+                player: WidgetPod::new(Either::new(
+                    |playback, _| playback.now_playing.is_some(),
+                    player_widget(),
+                    Empty,
+                )),
+            },
         )
         .lens(AppState::playback)
 }
@@ -88,7 +172,6 @@ fn playback_item_widget() -> impl Widget<NowPlaying> {
         .with_spacer(2.0)
         .with_child(track_origin)
         .padding(theme::grid(2.0))
-        .expand_width()
         .link()
         .on_ex_click(|ctx, _, now_playing, _| {
             ctx.submit_command(cmd::NAVIGATE.with(now_playing.origin.to_nav()));
@@ -112,6 +195,7 @@ fn player_widget() -> impl Widget<Playback> {
         .with_child(queue_behavior_widget())
         .with_default_spacer()
         .with_child(Maybe::or_empty(durations_widget).lens(Playback::now_playing))
+        .padding(theme::grid(2.0))
 }
 
 fn player_play_pause_widget() -> impl Widget<Playback> {
@@ -200,6 +284,7 @@ fn durations_widget() -> impl Widget<NowPlaying> {
     })
     .with_text_size(theme::TEXT_SIZE_SMALL)
     .with_text_color(theme::PLACEHOLDER_COLOR)
+    .fix_width(theme::grid(8.0))
 }
 
 struct SeekBar {
