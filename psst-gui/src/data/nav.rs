@@ -51,7 +51,7 @@ pub enum Nav {
 }
 
 impl Nav {
-    pub fn to_title(&self) -> String {
+    pub fn title(&self) -> String {
         match self {
             Nav::Home => "Home".to_string(),
             Nav::SavedTracks => "Saved Tracks".to_string(),
@@ -64,7 +64,7 @@ impl Nav {
         }
     }
 
-    pub fn to_full_title(&self) -> String {
+    pub fn full_title(&self) -> String {
         match self {
             Nav::Home => "Home".to_string(),
             Nav::SavedTracks => "Saved Tracks".to_string(),

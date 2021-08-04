@@ -1,3 +1,5 @@
+use druid::{widget::List, LensExt, Widget, WidgetExt};
+
 use crate::{
     data::{AppState, Ctx, Library, SavedAlbums},
     ui::{
@@ -7,7 +9,6 @@ use crate::{
     },
     widget::Async,
 };
-use druid::{widget::List, LensExt, Widget, WidgetExt};
 
 pub fn saved_tracks_widget() -> impl Widget<AppState> {
     Async::new(

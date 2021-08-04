@@ -1,20 +1,19 @@
+use druid::{
+    widget::{CrossAxisAlignment, Flex, Label, LineBreaking, List},
+    Insets, LensExt, LocalizedString, Menu, MenuItem, MouseButton, Size, Widget, WidgetExt,
+};
+
 use crate::{
     cmd,
     data::{AppState, Ctx, Library, Nav, Playlist, PlaylistDetail},
     ui::{
         theme,
         track::{tracklist_widget, TrackDisplay},
-        utils::{error_widget, spinner_widget},
+        utils::{error_widget, placeholder_widget, spinner_widget},
     },
     webapi::WebApi,
     widget::{Async, AsyncAction, Clip, LinkExt, RemoteImage},
 };
-use druid::{
-    widget::{CrossAxisAlignment, Flex, Label, LineBreaking, List},
-    Insets, LensExt, LocalizedString, Menu, MenuItem, MouseButton, Size, Widget, WidgetExt,
-};
-
-use super::utils::placeholder_widget;
 
 pub fn list_widget() -> impl Widget<AppState> {
     Async::new(
@@ -30,8 +29,9 @@ pub fn list_widget() -> impl Widget<AppState> {
                     .link()
                     .on_ex_click(|ctx, event, playlist, _| match event.button {
                         MouseButton::Left => {
-                            let nav = Nav::PlaylistDetail(playlist.link());
-                            ctx.submit_command(cmd::NAVIGATE.with(nav));
+                            ctx.submit_command(
+                                cmd::NAVIGATE.with(Nav::PlaylistDetail(playlist.link())),
+                            );
                         }
                         MouseButton::Right => {
                             ctx.show_context_menu(playlist_menu(playlist), event.window_pos);
@@ -76,10 +76,9 @@ pub fn playlist_widget() -> impl Widget<Playlist> {
         .link()
         .rounded(theme::BUTTON_BORDER_RADIUS)
         .on_ex_click(
-            move |ctx, event, playlist: &mut Playlist, _| match event.button {
+            |ctx, event, playlist: &mut Playlist, _| match event.button {
                 MouseButton::Left => {
-                    let nav = Nav::PlaylistDetail(playlist.link());
-                    ctx.submit_command(cmd::NAVIGATE.with(nav));
+                    ctx.submit_command(cmd::NAVIGATE.with(Nav::PlaylistDetail(playlist.link())));
                 }
                 MouseButton::Right => {
                     ctx.show_context_menu(playlist_menu(playlist), event.window_pos);

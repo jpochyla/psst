@@ -1,17 +1,17 @@
-use crate::{
-    cmd,
-    controller::{NavController, PlaybackController, SessionController},
-    data::{AppState, Nav, Playback},
-    ui::utils::Border,
-    widget::{icons, Empty, LinkExt, ThemeScope, ViewDispatcher},
-};
 use druid::{
     im::Vector,
     lens::Unit,
     widget::{CrossAxisAlignment, Either, Flex, Label, Scroll, Slider, Split, ViewSwitcher},
     Env, Insets, LensExt, Menu, MenuItem, MouseButton, Widget, WidgetExt, WindowDesc,
 };
-use icons::SvgIcon;
+
+use crate::{
+    cmd,
+    controller::{NavController, PlaybackController, SessionController},
+    data::{AppState, Nav, Playback},
+    ui::utils::Border,
+    widget::{icons, icons::SvgIcon, Empty, LinkExt, ThemeScope, ViewDispatcher},
+};
 
 pub mod album;
 pub mod artist;
@@ -70,17 +70,20 @@ fn preferences_widget() -> impl Widget<AppState> {
 }
 
 fn root_widget() -> impl Widget<AppState> {
-    let playlists = Scroll::new(playlist::list_widget()).vertical();
+    let playlists = Scroll::new(playlist::list_widget())
+        .vertical()
+        .expand_height();
     let sidebar = Flex::column()
         .must_fill_main_axis(true)
         .with_child(sidebar_logo_widget())
         .with_child(sidebar_menu_widget())
         .with_default_spacer()
-        .with_flex_child(playlists.expand_height(), 1.0)
+        .with_flex_child(playlists, 1.0)
         .with_child(volume_slider())
         .with_default_spacer()
         .with_child(user::user_widget())
         .padding(if cfg!(target_os = "macos") {
+            // Accommodate the window controls on Mac.
             Insets::new(0.0, 24.0, 0.0, 0.0)
         } else {
             Insets::ZERO
@@ -261,13 +264,15 @@ fn topbar_back_button_widget() -> impl Widget<AppState> {
 
 fn history_menu(history: &Vector<Nav>) -> Menu<AppState> {
     let mut menu = Menu::empty();
+
     for (index, history) in history.iter().rev().take(10).enumerate() {
         let skip_back_in_history_n_times = index + 1;
         menu = menu.entry(
-            MenuItem::new(history.to_full_title())
+            MenuItem::new(history.full_title())
                 .command(cmd::NAVIGATE_BACK.with(skip_back_in_history_n_times)),
         );
     }
+
     menu
 }
 
@@ -300,7 +305,7 @@ fn route_icon_widget() -> impl Widget<Nav> {
 }
 
 fn route_title_widget() -> impl Widget<Nav> {
-    Label::dynamic(|route: &Nav, _| route.to_title())
+    Label::dynamic(|route: &Nav, _| route.title())
         .with_font(theme::UI_FONT_MEDIUM)
         .with_text_size(theme::TEXT_SIZE_LARGE)
 }

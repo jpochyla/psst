@@ -1,5 +1,12 @@
 use std::sync::Arc;
 
+use druid::{
+    im::Vector,
+    kurbo::Circle,
+    widget::{CrossAxisAlignment, Flex, Label, LabelText, LineBreaking, List},
+    Data, Insets, LensExt, LocalizedString, Menu, MenuItem, MouseButton, Widget, WidgetExt,
+};
+
 use crate::{
     cmd,
     data::{
@@ -13,12 +20,6 @@ use crate::{
         utils::{error_widget, placeholder_widget, spinner_widget},
     },
     widget::{Async, Clip, LinkExt, RemoteImage},
-};
-use druid::{
-    im::Vector,
-    kurbo::Circle,
-    widget::{CrossAxisAlignment, Flex, Label, LabelText, LineBreaking, List},
-    Data, Insets, LensExt, LocalizedString, Menu, MenuItem, MouseButton, Widget, WidgetExt,
 };
 
 pub fn detail_widget() -> impl Widget<AppState> {
@@ -118,23 +119,23 @@ fn top_tracks_widget() -> impl Widget<Ctx<Arc<CommonCtx>, ArtistTracks>> {
 fn albums_widget() -> impl Widget<Ctx<Arc<CommonCtx>, ArtistAlbums>> {
     Flex::column()
         .cross_axis_alignment(CrossAxisAlignment::Start)
-        .with_child(label_widget("Albums"))
+        .with_child(header_widget("Albums"))
         .with_child(List::new(album_widget).lens(Ctx::map(ArtistAlbums::albums)))
-        .with_child(label_widget("Singles"))
+        .with_child(header_widget("Singles"))
         .with_child(List::new(album_widget).lens(Ctx::map(ArtistAlbums::singles)))
-        .with_child(label_widget("Compilations"))
+        .with_child(header_widget("Compilations"))
         .with_child(List::new(album_widget).lens(Ctx::map(ArtistAlbums::compilations)))
 }
 
 fn related_widget() -> impl Widget<Cached<Vector<Artist>>> {
     Flex::column()
         .cross_axis_alignment(CrossAxisAlignment::Start)
-        .with_child(label_widget("Related Artists"))
+        .with_child(header_widget("Related Artists"))
         .with_child(List::new(artist_widget))
         .lens(Cached::data)
 }
 
-fn label_widget<T: Data>(text: impl Into<LabelText<T>>) -> impl Widget<T> {
+fn header_widget<T: Data>(text: impl Into<LabelText<T>>) -> impl Widget<T> {
     Label::new(text)
         .with_font(theme::UI_FONT_MEDIUM)
         .with_text_color(theme::PLACEHOLDER_COLOR)

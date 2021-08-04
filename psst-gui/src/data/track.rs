@@ -1,6 +1,6 @@
 use std::{convert::TryFrom, ops::Deref, str::FromStr, sync::Arc, time::Duration};
 
-use druid::{im::Vector, Data, Lens};
+use druid::{im::Vector, lens::Map, Data, Lens};
 use psst_core::item_id::{ItemId, ItemIdType};
 use serde::Deserialize;
 
@@ -25,18 +25,36 @@ pub struct Track {
 }
 
 impl Track {
-    pub fn artist_name(&self) -> String {
-        self.artists
-            .front()
-            .map(|artist| artist.name.to_string())
-            .unwrap_or_else(|| "Unknown".to_string())
+    pub fn lens_artist_name() -> impl Lens<Self, Arc<str>> {
+        Map::new(
+            |track: &Self| track.artist_name(),
+            |_, _| {
+                // Immutable.
+            },
+        )
     }
 
-    pub fn album_name(&self) -> String {
+    pub fn lens_album_name() -> impl Lens<Self, Arc<str>> {
+        Map::new(
+            |track: &Self| track.album_name(),
+            |_, _| {
+                // Immutable.
+            },
+        )
+    }
+
+    pub fn artist_name(&self) -> Arc<str> {
+        self.artists
+            .front()
+            .map(|artist| artist.name.clone())
+            .unwrap_or_else(|| "Unknown".into())
+    }
+
+    pub fn album_name(&self) -> Arc<str> {
         self.album
             .as_ref()
-            .map(|album| album.name.to_string())
-            .unwrap_or_else(|| "Unknown".to_string())
+            .map(|album| album.name.clone())
+            .unwrap_or_else(|| "Unknown".into())
     }
 
     pub fn url(&self) -> String {

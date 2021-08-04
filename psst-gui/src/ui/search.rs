@@ -1,5 +1,10 @@
 use std::sync::Arc;
 
+use druid::{
+    widget::{CrossAxisAlignment, Flex, Label, LabelText, List, TextBox},
+    Data, LensExt, Widget, WidgetExt,
+};
+
 use crate::{
     cmd,
     controller::InputController,
@@ -13,17 +18,13 @@ use crate::{
     },
     widget::Async,
 };
-use druid::{
-    widget::{CrossAxisAlignment, Flex, Label, List, TextBox},
-    LensExt, Widget, WidgetExt,
-};
 
 use super::playlist::playlist_widget;
 
 pub fn input_widget() -> impl Widget<AppState> {
     TextBox::new()
         .with_placeholder("Search")
-        .controller(InputController::new().on_submit(|ctx, query, _env| {
+        .controller(InputController::new().on_submit(|ctx, query, _| {
             ctx.submit_command(cmd::NAVIGATE.with(Nav::SearchResults(query.clone().into())));
         }))
         .with_id(cmd::WIDGET_SEARCH_INPUT)
@@ -35,22 +36,15 @@ pub fn results_widget() -> impl Widget<AppState> {
     Async::new(
         spinner_widget,
         || {
-            let label = |text| {
-                Label::new(text)
-                    .with_font(theme::UI_FONT_MEDIUM)
-                    .with_text_color(theme::PLACEHOLDER_COLOR)
-                    .with_text_size(theme::TEXT_SIZE_SMALL)
-                    .padding((0.0, theme::grid(2.0), 0.0, theme::grid(1.0)))
-            };
             Flex::column()
                 .cross_axis_alignment(CrossAxisAlignment::Fill)
-                .with_child(label("Artists"))
+                .with_child(header_widget("Artists"))
                 .with_child(artist_results_widget())
-                .with_child(label("Albums"))
+                .with_child(header_widget("Albums"))
                 .with_child(album_results_widget())
-                .with_child(label("Tracks"))
+                .with_child(header_widget("Tracks"))
                 .with_child(track_results_widget())
-                .with_child(label("Playlists"))
+                .with_child(header_widget("Playlists"))
                 .with_child(playlist_results_widget())
         },
         || error_widget().lens(Ctx::data()),
@@ -80,4 +74,12 @@ fn track_results_widget() -> impl Widget<Ctx<Arc<CommonCtx>, SearchResults>> {
 
 fn playlist_results_widget() -> impl Widget<Ctx<Arc<CommonCtx>, SearchResults>> {
     List::new(playlist_widget).lens(Ctx::data().then(SearchResults::playlists))
+}
+
+fn header_widget<T: Data>(text: impl Into<LabelText<T>>) -> impl Widget<T> {
+    Label::new(text)
+        .with_font(theme::UI_FONT_MEDIUM)
+        .with_text_color(theme::PLACEHOLDER_COLOR)
+        .with_text_size(theme::TEXT_SIZE_SMALL)
+        .padding((0.0, theme::grid(2.0), 0.0, theme::grid(1.0)))
 }

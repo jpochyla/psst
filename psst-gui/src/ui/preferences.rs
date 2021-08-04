@@ -1,5 +1,15 @@
 use std::thread::{self, JoinHandle};
 
+use druid::{
+    commands,
+    widget::{
+        Button, Controller, CrossAxisAlignment, Flex, Label, LineBreaking, MainAxisAlignment,
+        RadioGroup, TextBox, ViewSwitcher,
+    },
+    Env, Event, EventCtx, LensExt, LifeCycle, LifeCycleCtx, Selector, Widget, WidgetExt,
+};
+use psst_core::connection::Credentials;
+
 use crate::{
     cmd,
     controller::InputController,
@@ -9,15 +19,6 @@ use crate::{
     ui::{icons::SvgIcon, theme, utils::Border},
     widget::{icons, Empty, LinkExt},
 };
-use druid::{
-    commands,
-    widget::{
-        Button, Controller, CrossAxisAlignment, Flex, Label, LineBreaking, MainAxisAlignment,
-        RadioGroup, TextBox, ViewSwitcher,
-    },
-    Env, Event, EventCtx, LifeCycle, LifeCycleCtx, Selector, Widget, WidgetExt,
-};
-use psst_core::connection::Credentials;
 
 pub fn preferences_widget() -> impl Widget<AppState> {
     let tabs = tabs_widget()
@@ -25,8 +26,8 @@ pub fn preferences_widget() -> impl Widget<AppState> {
         .background(theme::BACKGROUND_LIGHT);
 
     let active = ViewSwitcher::new(
-        |state: &AppState, _env| state.preferences.active,
-        |active: &PreferencesTab, _state, _env| match active {
+        |state: &AppState, _| state.preferences.active,
+        |active: &PreferencesTab, _, _| match active {
             PreferencesTab::General => general_tab_widget().boxed(),
             PreferencesTab::Cache => cache_tab_widget().boxed(),
         },
@@ -42,7 +43,7 @@ pub fn preferences_widget() -> impl Widget<AppState> {
 }
 
 fn tabs_widget() -> impl Widget<AppState> {
-    let label = |text, icon: &SvgIcon, tab: PreferencesTab| {
+    let tab_widget = |text, icon: &SvgIcon, tab: PreferencesTab| {
         Flex::column()
             .with_child(icon.scale(theme::ICON_SIZE))
             .with_default_spacer()
@@ -60,20 +61,20 @@ fn tabs_widget() -> impl Widget<AppState> {
                     }
                 }
             })
-            .on_click(move |_ctx, state: &mut AppState, _env| {
+            .on_click(move |_, state: &mut AppState, _| {
                 state.preferences.active = tab;
             })
     };
     Flex::row()
         .must_fill_main_axis(true)
         .main_axis_alignment(MainAxisAlignment::Center)
-        .with_child(label(
+        .with_child(tab_widget(
             "General",
             &icons::PREFERENCES,
             PreferencesTab::General,
         ))
         .with_default_spacer()
-        .with_child(label("Cache", &icons::STORAGE, PreferencesTab::Cache))
+        .with_child(tab_widget("Cache", &icons::STORAGE, PreferencesTab::Cache))
 }
 
 fn general_tab_widget() -> impl Widget<AppState> {
@@ -85,8 +86,7 @@ fn general_tab_widget() -> impl Widget<AppState> {
         .with_spacer(theme::grid(2.0))
         .with_child(
             RadioGroup::new(vec![("Light", Theme::Light), ("Dark", Theme::Dark)])
-                .lens(Config::theme)
-                .lens(AppState::config),
+                .lens(AppState::config.then(Config::theme)),
         );
 
     col = col.with_spacer(theme::grid(3.0));
@@ -99,20 +99,24 @@ fn general_tab_widget() -> impl Widget<AppState> {
             TextBox::new()
                 .with_placeholder("Username")
                 .controller(InputController::new())
-                .env_scope(|env, _state| env.set(theme::WIDE_WIDGET_WIDTH, theme::grid(16.0)))
-                .lens(Authentication::username)
-                .lens(Preferences::auth)
-                .lens(AppState::preferences),
+                .env_scope(|env, _| env.set(theme::WIDE_WIDGET_WIDTH, theme::grid(16.0)))
+                .lens(
+                    AppState::preferences
+                        .then(Preferences::auth)
+                        .then(Authentication::username),
+                ),
         )
         .with_spacer(theme::grid(1.0))
         .with_child(
             TextBox::new()
                 .with_placeholder("Password")
                 .controller(InputController::new())
-                .env_scope(|env, _state| env.set(theme::WIDE_WIDGET_WIDTH, theme::grid(16.0)))
-                .lens(Authentication::password)
-                .lens(Preferences::auth)
-                .lens(AppState::preferences),
+                .env_scope(|env, _| env.set(theme::WIDE_WIDGET_WIDTH, theme::grid(16.0)))
+                .lens(
+                    AppState::preferences
+                        .then(Preferences::auth)
+                        .then(Authentication::password),
+                ),
         )
         .with_spacer(theme::grid(1.0))
         .with_child(
@@ -138,8 +142,7 @@ fn general_tab_widget() -> impl Widget<AppState> {
                                 .boxed(),
                         },
                     )
-                    .lens(Preferences::auth)
-                    .lens(AppState::preferences),
+                    .lens(AppState::preferences.then(Preferences::auth)),
                 ),
         );
 
@@ -164,7 +167,7 @@ fn general_tab_widget() -> impl Widget<AppState> {
     // Save
     col = col.with_child(
         Button::new("Save")
-            .on_click(move |ctx, config: &mut Config, _env| {
+            .on_click(|ctx, config: &mut Config, _| {
                 config.save();
                 ctx.submit_command(cmd::SESSION_CONNECT);
                 ctx.submit_command(cmd::SHOW_MAIN);

@@ -1,5 +1,10 @@
 use std::sync::Arc;
 
+use druid::{
+    widget::{CrossAxisAlignment, Flex, Label, LineBreaking, List},
+    LensExt, LocalizedString, Menu, MenuItem, MouseButton, Size, Widget, WidgetExt,
+};
+
 use crate::{
     cmd,
     data::{Album, AlbumDetail, AppState, Cached, CommonCtx, Ctx, Nav},
@@ -9,10 +14,6 @@ use crate::{
         utils::{error_widget, placeholder_widget, spinner_widget},
     },
     widget::{Async, Clip, LinkExt, RemoteImage},
-};
-use druid::{
-    widget::{CrossAxisAlignment, Flex, Label, LineBreaking, List},
-    LensExt, LocalizedString, Menu, MenuItem, MouseButton, Size, Widget, WidgetExt,
 };
 
 use super::artist::artist_link_widget;
@@ -122,7 +123,7 @@ pub fn album_widget() -> impl Widget<Ctx<Arc<CommonCtx>, Arc<Album>>> {
         .lens(Ctx::data());
 
     album.link().on_ex_click(
-        move |ctx, event, album: &mut Ctx<Arc<CommonCtx>, Arc<Album>>, _| match event.button {
+        |ctx, event, album: &mut Ctx<Arc<CommonCtx>, Arc<Album>>, _| match event.button {
             MouseButton::Left => {
                 ctx.submit_command(cmd::NAVIGATE.with(Nav::AlbumDetail(album.data.link())));
             }

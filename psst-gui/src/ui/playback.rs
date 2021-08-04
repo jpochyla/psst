@@ -1,12 +1,5 @@
-use crate::{
-    cmd,
-    data::{
-        AppState, AudioAnalysis, NowPlaying, Playback, PlaybackOrigin, PlaybackState, Promise,
-        QueueBehavior, Track,
-    },
-    ui::theme,
-    widget::{icons, Empty, LinkExt, Maybe},
-};
+use std::time::Duration;
+
 use druid::{
     kurbo::{Affine, BezPath},
     widget::{CrossAxisAlignment, Either, Flex, Label, LineBreaking, Spinner, ViewSwitcher},
@@ -14,15 +7,221 @@ use druid::{
     MouseButton, PaintCtx, Point, Rect, RenderContext, Size, UpdateCtx, Widget, WidgetExt,
     WidgetPod,
 };
-use icons::SvgIcon;
 use itertools::Itertools;
-use std::{sync::Arc, time::Duration};
+
+use crate::{
+    cmd,
+    data::{
+        AppState, AudioAnalysis, NowPlaying, Playback, PlaybackOrigin, PlaybackState, Promise,
+        QueueBehavior, Track,
+    },
+    ui::theme,
+    widget::{icons, icons::SvgIcon, Empty, LinkExt, Maybe},
+};
 
 use super::utils;
+
+pub fn panel_widget() -> impl Widget<AppState> {
+    let seek_bar = Maybe::or_empty(SeekBar::new).lens(Playback::now_playing);
+    let item_info = Maybe::or_empty(playback_item_widget).lens(Playback::now_playing);
+    let controls = Either::new(
+        |playback, _| playback.now_playing.is_some(),
+        player_widget(),
+        Empty,
+    );
+    Flex::column()
+        .with_child(seek_bar)
+        .with_child(BarLayout::new(item_info, controls))
+        .lens(AppState::playback)
+}
+
+fn playback_item_widget() -> impl Widget<NowPlaying> {
+    let track_name = Label::raw()
+        .with_line_break_mode(LineBreaking::Clip)
+        .with_font(theme::UI_FONT_MEDIUM)
+        .lens(NowPlaying::item.then(Track::name.in_arc()));
+
+    let track_artist = Label::raw()
+        .with_line_break_mode(LineBreaking::Clip)
+        .with_text_size(theme::TEXT_SIZE_SMALL)
+        .lens(NowPlaying::item.then(Track::lens_artist_name().in_arc()));
+
+    let track_origin = ViewSwitcher::new(
+        |origin: &PlaybackOrigin, _| origin.clone(),
+        |origin, _, _| {
+            Flex::row()
+                .cross_axis_alignment(CrossAxisAlignment::Center)
+                .with_flex_child(
+                    Label::dynamic(|origin: &PlaybackOrigin, _| origin.to_string())
+                        .with_line_break_mode(LineBreaking::Clip)
+                        .with_text_size(theme::TEXT_SIZE_SMALL),
+                    1.0,
+                )
+                .with_spacer(theme::grid(0.25))
+                .with_child(playback_origin_icon(origin).scale(theme::ICON_SIZE_SMALL))
+                .boxed()
+        },
+    )
+    .lens(NowPlaying::origin);
+
+    Flex::column()
+        .cross_axis_alignment(CrossAxisAlignment::Start)
+        .with_child(track_name)
+        .with_spacer(2.0)
+        .with_child(track_artist)
+        .with_spacer(2.0)
+        .with_child(track_origin)
+        .padding(theme::grid(2.0))
+        .link()
+        .on_ex_click(|ctx, _, now_playing, _| {
+            ctx.submit_command(cmd::NAVIGATE.with(now_playing.origin.to_nav()));
+        })
+}
+
+fn playback_origin_icon(origin: &PlaybackOrigin) -> &'static SvgIcon {
+    match origin {
+        PlaybackOrigin::Library => &icons::HEART,
+        PlaybackOrigin::Album { .. } => &icons::ALBUM,
+        PlaybackOrigin::Artist { .. } => &icons::ARTIST,
+        PlaybackOrigin::Playlist { .. } => &icons::PLAYLIST,
+        PlaybackOrigin::Search { .. } => &icons::SEARCH,
+        PlaybackOrigin::Recommendations => &icons::SEARCH,
+    }
+}
+
+fn player_widget() -> impl Widget<Playback> {
+    Flex::row()
+        .with_child(
+            small_button_widget(&icons::SKIP_BACK)
+                .on_click(|ctx, _, _| ctx.submit_command(cmd::PLAY_PREVIOUS)),
+        )
+        .with_default_spacer()
+        .with_child(player_play_pause_widget())
+        .with_default_spacer()
+        .with_child(
+            small_button_widget(&icons::SKIP_FORWARD)
+                .on_click(|ctx, _, _| ctx.submit_command(cmd::PLAY_NEXT)),
+        )
+        .with_default_spacer()
+        .with_child(queue_behavior_widget())
+        .with_default_spacer()
+        .with_child(Maybe::or_empty(durations_widget).lens(Playback::now_playing))
+        .padding(theme::grid(2.0))
+}
+
+fn player_play_pause_widget() -> impl Widget<Playback> {
+    ViewSwitcher::new(
+        |playback: &Playback, _| playback.state,
+        |state, _, _| match state {
+            PlaybackState::Loading => Spinner::new()
+                .with_color(theme::GREY_400)
+                .fix_size(theme::grid(3.0), theme::grid(3.0))
+                .padding(theme::grid(1.0))
+                .link()
+                .circle()
+                .border(theme::GREY_600, 1.0)
+                .on_click(|ctx, _, _| ctx.submit_command(cmd::PLAY_STOP))
+                .boxed(),
+            PlaybackState::Playing => icons::PAUSE
+                .scale((theme::grid(3.0), theme::grid(3.0)))
+                .padding(theme::grid(1.0))
+                .link()
+                .circle()
+                .border(theme::GREY_500, 1.0)
+                .on_click(|ctx, _, _| ctx.submit_command(cmd::PLAY_PAUSE))
+                .boxed(),
+            PlaybackState::Paused => icons::PLAY
+                .scale((theme::grid(3.0), theme::grid(3.0)))
+                .padding(theme::grid(1.0))
+                .link()
+                .circle()
+                .border(theme::GREY_500, 1.0)
+                .on_click(|ctx, _, _| ctx.submit_command(cmd::PLAY_RESUME))
+                .boxed(),
+            PlaybackState::Stopped => Empty.boxed(),
+        },
+    )
+}
+
+fn queue_behavior_widget() -> impl Widget<Playback> {
+    ViewSwitcher::new(
+        |playback: &Playback, _| playback.queue_behavior,
+        |behavior, _, _| {
+            faded_button_widget(queue_behavior_icon(behavior))
+                .on_click(|ctx, playback: &mut Playback, _| {
+                    ctx.submit_command(
+                        cmd::PLAY_QUEUE_BEHAVIOR
+                            .with(cycle_queue_behavior(&playback.queue_behavior)),
+                    );
+                })
+                .boxed()
+        },
+    )
+}
+
+fn cycle_queue_behavior(qb: &QueueBehavior) -> QueueBehavior {
+    match qb {
+        QueueBehavior::Sequential => QueueBehavior::Random,
+        QueueBehavior::Random => QueueBehavior::LoopTrack,
+        QueueBehavior::LoopTrack => QueueBehavior::LoopAll,
+        QueueBehavior::LoopAll => QueueBehavior::Sequential,
+    }
+}
+
+fn queue_behavior_icon(qb: &QueueBehavior) -> &'static SvgIcon {
+    match qb {
+        QueueBehavior::Sequential => &icons::PLAY_SEQUENTIAL,
+        QueueBehavior::Random => &icons::PLAY_SHUFFLE,
+        QueueBehavior::LoopTrack => &icons::PLAY_LOOP_TRACK,
+        QueueBehavior::LoopAll => &icons::PLAY_LOOP_ALL,
+    }
+}
+
+fn small_button_widget<T: Data>(svg: &SvgIcon) -> impl Widget<T> {
+    svg.scale((theme::grid(2.0), theme::grid(2.0)))
+        .padding(theme::grid(1.0))
+        .link()
+        .rounded(theme::BUTTON_BORDER_RADIUS)
+}
+
+fn faded_button_widget<T: Data>(svg: &SvgIcon) -> impl Widget<T> {
+    svg.scale((theme::grid(2.0), theme::grid(2.0)))
+        .with_color(theme::PLACEHOLDER_COLOR)
+        .padding(theme::grid(1.0))
+        .link()
+        .rounded(theme::BUTTON_BORDER_RADIUS)
+}
+
+fn durations_widget() -> impl Widget<NowPlaying> {
+    Label::dynamic(|now_playing: &NowPlaying, _| {
+        format!(
+            "{} / {}",
+            utils::as_minutes_and_seconds(&now_playing.progress),
+            utils::as_minutes_and_seconds(&now_playing.item.duration)
+        )
+    })
+    .with_text_size(theme::TEXT_SIZE_SMALL)
+    .with_text_color(theme::PLACEHOLDER_COLOR)
+    .fix_width(theme::grid(8.0))
+}
 
 struct BarLayout<T, I, P> {
     item: WidgetPod<T, I>,
     player: WidgetPod<T, P>,
+}
+
+impl<T, I, P> BarLayout<T, I, P>
+where
+    T: Data,
+    I: Widget<T>,
+    P: Widget<T>,
+{
+    fn new(item: I, player: P) -> Self {
+        Self {
+            item: WidgetPod::new(item),
+            player: WidgetPod::new(player),
+        }
+    }
 }
 
 impl<T, I, P> Widget<T> for BarLayout<T, I, P>
@@ -91,182 +290,6 @@ where
         self.item.paint(ctx, data, env);
         self.player.paint(ctx, data, env);
     }
-}
-
-pub fn panel_widget() -> impl Widget<AppState> {
-    Flex::column()
-        .with_child(Maybe::or_empty(SeekBar::new).lens(Playback::now_playing))
-        .with_child(BarLayout {
-            item: WidgetPod::new(Maybe::or_empty(playback_item_widget).lens(Playback::now_playing)),
-            player: WidgetPod::new(Either::new(
-                |playback, _| playback.now_playing.is_some(),
-                player_widget(),
-                Empty,
-            )),
-        })
-        .lens(AppState::playback)
-}
-
-fn playback_item_widget() -> impl Widget<NowPlaying> {
-    let track_name = Label::raw()
-        .with_line_break_mode(LineBreaking::Clip)
-        .with_font(theme::UI_FONT_MEDIUM)
-        .lens(NowPlaying::item.then(Track::name.in_arc()));
-
-    let track_artist = Label::dynamic(|track: &Arc<Track>, _| track.artist_name())
-        .with_line_break_mode(LineBreaking::Clip)
-        .with_text_size(theme::TEXT_SIZE_SMALL)
-        .lens(NowPlaying::item);
-
-    let track_origin = ViewSwitcher::new(
-        |origin: &PlaybackOrigin, _| origin.clone(),
-        |origin, _, _| {
-            Flex::row()
-                .cross_axis_alignment(CrossAxisAlignment::Center)
-                .with_flex_child(
-                    Label::dynamic(|origin: &PlaybackOrigin, _| origin.to_string())
-                        .with_line_break_mode(LineBreaking::Clip)
-                        .with_text_size(theme::TEXT_SIZE_SMALL),
-                    1.0,
-                )
-                .with_spacer(theme::grid(0.25))
-                .with_child(
-                    match origin {
-                        PlaybackOrigin::Library => &icons::HEART,
-                        PlaybackOrigin::Album { .. } => &icons::ALBUM,
-                        PlaybackOrigin::Artist { .. } => &icons::ARTIST,
-                        PlaybackOrigin::Playlist { .. } => &icons::PLAYLIST,
-                        PlaybackOrigin::Search { .. } => &icons::SEARCH,
-                        PlaybackOrigin::Recommendations => &icons::SEARCH,
-                    }
-                    .scale(theme::ICON_SIZE_SMALL),
-                )
-                .boxed()
-        },
-    )
-    .lens(NowPlaying::origin);
-
-    Flex::column()
-        .cross_axis_alignment(CrossAxisAlignment::Start)
-        .with_child(track_name)
-        .with_spacer(2.0)
-        .with_child(track_artist)
-        .with_spacer(2.0)
-        .with_child(track_origin)
-        .padding(theme::grid(2.0))
-        .link()
-        .on_ex_click(|ctx, _, now_playing, _| {
-            ctx.submit_command(cmd::NAVIGATE.with(now_playing.origin.to_nav()));
-        })
-}
-
-fn player_widget() -> impl Widget<Playback> {
-    Flex::row()
-        .with_child(
-            small_button_widget(&icons::SKIP_BACK)
-                .on_click(|ctx, _, _| ctx.submit_command(cmd::PLAY_PREVIOUS)),
-        )
-        .with_default_spacer()
-        .with_child(player_play_pause_widget())
-        .with_default_spacer()
-        .with_child(
-            small_button_widget(&icons::SKIP_FORWARD)
-                .on_click(|ctx, _, _| ctx.submit_command(cmd::PLAY_NEXT)),
-        )
-        .with_default_spacer()
-        .with_child(queue_behavior_widget())
-        .with_default_spacer()
-        .with_child(Maybe::or_empty(durations_widget).lens(Playback::now_playing))
-        .padding(theme::grid(2.0))
-}
-
-fn player_play_pause_widget() -> impl Widget<Playback> {
-    ViewSwitcher::new(
-        |playback: &Playback, _| playback.state,
-        |&state, _, _| match state {
-            PlaybackState::Loading => Spinner::new()
-                .with_color(theme::GREY_400)
-                .fix_size(theme::grid(3.0), theme::grid(3.0))
-                .padding(theme::grid(1.0))
-                .link()
-                .circle()
-                .border(theme::GREY_600, 1.0)
-                .on_click(|ctx, _, _| ctx.submit_command(cmd::PLAY_STOP))
-                .boxed(),
-            PlaybackState::Playing => icons::PAUSE
-                .scale((theme::grid(3.0), theme::grid(3.0)))
-                .padding(theme::grid(1.0))
-                .link()
-                .circle()
-                .border(theme::GREY_500, 1.0)
-                .on_click(|ctx, _, _| ctx.submit_command(cmd::PLAY_PAUSE))
-                .boxed(),
-            PlaybackState::Paused => icons::PLAY
-                .scale((theme::grid(3.0), theme::grid(3.0)))
-                .padding(theme::grid(1.0))
-                .link()
-                .circle()
-                .border(theme::GREY_500, 1.0)
-                .on_click(|ctx, _, _| ctx.submit_command(cmd::PLAY_RESUME))
-                .boxed(),
-            PlaybackState::Stopped => Empty.boxed(),
-        },
-    )
-}
-
-fn queue_behavior_widget() -> impl Widget<Playback> {
-    ViewSwitcher::new(
-        |playback: &Playback, _| playback.queue_behavior.to_owned(),
-        |behavior, _, _| {
-            let button = |svg: &SvgIcon| {
-                faded_button_widget(svg)
-                    .on_click(|ctx: &mut EventCtx, playback: &mut Playback, _| {
-                        let new_behavior = match playback.queue_behavior {
-                            QueueBehavior::Sequential => QueueBehavior::Random,
-                            QueueBehavior::Random => QueueBehavior::LoopTrack,
-                            QueueBehavior::LoopTrack => QueueBehavior::LoopAll,
-                            QueueBehavior::LoopAll => QueueBehavior::Sequential,
-                        };
-                        ctx.submit_command(cmd::PLAY_QUEUE_BEHAVIOR.with(new_behavior));
-                    })
-                    .boxed()
-            };
-            match behavior {
-                QueueBehavior::Sequential => button(&icons::PLAY_SEQUENTIAL),
-                QueueBehavior::Random => button(&icons::PLAY_SHUFFLE),
-                QueueBehavior::LoopTrack => button(&icons::PLAY_LOOP_TRACK),
-                QueueBehavior::LoopAll => button(&icons::PLAY_LOOP_ALL),
-            }
-        },
-    )
-}
-
-fn small_button_widget<T: Data>(svg: &SvgIcon) -> impl Widget<T> {
-    svg.scale((theme::grid(2.0), theme::grid(2.0)))
-        .padding(theme::grid(1.0))
-        .link()
-        .rounded(theme::BUTTON_BORDER_RADIUS)
-}
-
-fn faded_button_widget<T: Data>(svg: &SvgIcon) -> impl Widget<T> {
-    svg.scale((theme::grid(2.0), theme::grid(2.0)))
-        .with_color(theme::PLACEHOLDER_COLOR)
-        .padding(theme::grid(1.0))
-        .link()
-        .rounded(theme::BUTTON_BORDER_RADIUS)
-}
-
-fn durations_widget() -> impl Widget<NowPlaying> {
-    Label::dynamic(|now_playing: &NowPlaying, _| {
-        format!(
-            "{} / {}",
-            utils::as_minutes_and_seconds(&now_playing.progress),
-            utils::as_minutes_and_seconds(&now_playing.item.duration)
-        )
-    })
-    .with_text_size(theme::TEXT_SIZE_SMALL)
-    .with_text_color(theme::PLACEHOLDER_COLOR)
-    .fix_width(theme::grid(8.0))
 }
 
 struct SeekBar {

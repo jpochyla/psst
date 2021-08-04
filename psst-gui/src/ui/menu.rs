@@ -1,17 +1,18 @@
+use druid::{commands, platform_menus, Env, LocalizedString, Menu, MenuItem, SysMods, WindowId};
+
 use crate::{
     cmd,
     data::{AppState, Nav},
 };
-use druid::{commands, platform_menus, Env, LocalizedString, Menu, MenuItem, SysMods, WindowId};
 
 pub fn main_menu(_window: Option<WindowId>, _data: &AppState, _env: &Env) -> Menu<AppState> {
-    #[allow(unused_mut)]
-    let mut menu = Menu::empty();
-    #[cfg(target_os = "macos")]
-    {
-        menu = menu.entry(mac_app_menu());
+    if cfg!(target_os = "macos") {
+        Menu::empty().entry(mac_app_menu())
+    } else {
+        Menu::empty()
     }
-    menu.entry(edit_menu()).entry(view_menu())
+    .entry(edit_menu())
+    .entry(view_menu())
 }
 
 fn mac_app_menu() -> Menu<AppState> {

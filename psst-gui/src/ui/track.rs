@@ -1,3 +1,17 @@
+use std::sync::Arc;
+
+use druid::{
+    im::{vector, Vector},
+    kurbo::Line,
+    lens::Map,
+    piet::StrokeStyle,
+    widget::{
+        Controller, ControllerHost, CrossAxisAlignment, Flex, Label, List, ListIter, Painter,
+    },
+    Data, Env, Event, EventCtx, Lens, LensExt, LocalizedString, Menu, MenuItem, MouseButton,
+    RenderContext, TextAlignment, Widget, WidgetExt,
+};
+
 use crate::{
     cmd,
     data::{
@@ -8,19 +22,6 @@ use crate::{
     ui::theme,
     widget::LinkExt,
 };
-use druid::{
-    im::{vector, Vector},
-    kurbo::Line,
-    lens::Map,
-    piet::StrokeStyle,
-    widget::{
-        Controller, ControllerHost, CrossAxisAlignment, Flex, Label, List, ListIter, Painter,
-        SizedBox,
-    },
-    Data, Env, Event, EventCtx, Lens, LensExt, LocalizedString, Menu, MenuItem, MouseButton,
-    RenderContext, TextAlignment, Widget, WidgetExt,
-};
-use std::sync::Arc;
 
 use super::utils;
 
@@ -45,11 +46,11 @@ impl TrackDisplay {
     }
 }
 
-pub fn tracklist_widget<T>(mode: TrackDisplay) -> impl Widget<Ctx<Arc<CommonCtx>, T>>
+pub fn tracklist_widget<T>(display: TrackDisplay) -> impl Widget<Ctx<Arc<CommonCtx>, T>>
 where
     T: TrackIter + Data,
 {
-    ControllerHost::new(List::new(move || track_widget(mode)), PlayController)
+    ControllerHost::new(List::new(move || track_widget(display)), PlayController)
 }
 
 pub trait TrackIter {
@@ -168,8 +169,8 @@ impl TrackRow {
     fn is_playing() -> impl Lens<TrackRow, bool> {
         Map::new(
             |tr: &TrackRow| tr.ctx.is_track_playing(&tr.track),
-            |_tr: &mut TrackRow, _is_playing| {
-                // Mutation intentionally ignored.
+            |_, _| {
+                // Immutable.
             },
         )
     }
@@ -222,7 +223,8 @@ fn track_widget(display: TrackDisplay) -> impl Widget<TrackRow> {
         major.add_child(track_number);
         major.add_default_spacer();
 
-        minor.add_child(SizedBox::empty().width(theme::grid(2.0)));
+        // Align the bottom line content.
+        minor.add_spacer(theme::grid(2.0));
         minor.add_default_spacer();
     }
 
@@ -246,17 +248,17 @@ fn track_widget(display: TrackDisplay) -> impl Widget<TrackRow> {
     }
 
     if display.album {
-        let track_album = Label::dynamic(|track: &Arc<Track>, _| track.album_name())
+        let track_album = Label::raw()
             .with_text_size(theme::TEXT_SIZE_SMALL)
             .with_text_color(theme::PLACEHOLDER_COLOR)
-            .lens(TrackRow::track);
+            .lens(TrackRow::track.then(Track::lens_album_name().in_arc()));
         if display.artist {
             minor.add_default_spacer();
         }
         minor.add_child(track_album);
     }
 
-    let line_painter = Painter::new(move |ctx, is_playing: &bool, env| {
+    let line_painter = Painter::new(|ctx, is_playing, env| {
         const STYLE: StrokeStyle = StrokeStyle::new().dash_pattern(&[1.0, 2.0]);
 
         let line = Line::new((0.0, 0.0), (ctx.size().width, 0.0));
@@ -300,7 +302,7 @@ fn track_widget(display: TrackDisplay) -> impl Widget<TrackRow> {
         .link()
         .active(|tr: &TrackRow, _| tr.ctx.is_track_playing(&tr.track))
         .rounded(theme::BUTTON_BORDER_RADIUS)
-        .on_ex_click(move |ctx, event, tr: &mut TrackRow, _| match event.button {
+        .on_ex_click(|ctx, event, tr: &mut TrackRow, _| match event.button {
             MouseButton::Left => {
                 ctx.submit_notification(cmd::PLAY_TRACK_AT.with(tr.position));
             }
