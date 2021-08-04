@@ -16,7 +16,7 @@ use crate::{
         QueueBehavior, Track,
     },
     ui::theme,
-    widget::{icons, icons::SvgIcon, Empty, LinkExt, Maybe},
+    widget::{icons, icons::SvgIcon, Empty, Maybe, MyWidgetExt},
 };
 
 use super::utils;

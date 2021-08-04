@@ -20,7 +20,7 @@ use crate::{
         SearchResults, Track,
     },
     ui::theme,
-    widget::LinkExt,
+    widget::MyWidgetExt,
 };
 
 use super::utils;

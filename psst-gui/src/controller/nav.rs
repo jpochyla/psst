@@ -21,13 +21,15 @@ impl NavController {
                 ctx.submit_command(cmd::LOAD_SEARCH_RESULTS.with(query.to_owned()));
             }
             Nav::AlbumDetail(link) => {
-                ctx.submit_command(cmd::LOAD_ALBUM_DETAIL.with(link.to_owned()));
+                data.album_detail.album.defer(link.to_owned());
             }
             Nav::ArtistDetail(link) => {
-                ctx.submit_command(cmd::LOAD_ARTIST_DETAIL.with(link.to_owned()));
+                data.artist_detail.top_tracks.defer(link.to_owned());
+                data.artist_detail.albums.defer(link.to_owned());
+                data.artist_detail.related_artists.defer(link.to_owned());
             }
             Nav::PlaylistDetail(link) => {
-                ctx.submit_command(cmd::LOAD_PLAYLIST_DETAIL.with(link.to_owned()));
+                data.playlist_detail.tracks.defer(link.to_owned());
             }
             Nav::Recommendations => {}
         }

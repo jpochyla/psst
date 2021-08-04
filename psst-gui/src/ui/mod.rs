@@ -10,7 +10,7 @@ use crate::{
     controller::{NavController, PlaybackController, SessionController},
     data::{AppState, Nav, Playback},
     ui::utils::Border,
-    widget::{icons, icons::SvgIcon, Empty, LinkExt, ThemeScope, ViewDispatcher},
+    widget::{icons, icons::SvgIcon, Empty, MyWidgetExt, ThemeScope, ViewDispatcher},
 };
 
 pub mod album;

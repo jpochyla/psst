@@ -1,8 +1,9 @@
+use std::sync::Arc;
+
 use druid::{
     widget::{prelude::*, Image},
     Data, ImageBuf, Point, Selector, WidgetPod,
 };
-use std::sync::Arc;
 
 pub const REQUEST_DATA: Selector<Arc<str>> = Selector::new("remote-image.request-data");
 pub const PROVIDE_DATA: Selector<ImagePayload> = Selector::new("remote-image.provide-data");

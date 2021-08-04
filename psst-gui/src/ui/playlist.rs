@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use druid::{
     widget::{CrossAxisAlignment, Flex, Label, LineBreaking, List},
     Insets, LensExt, LocalizedString, Menu, MenuItem, MouseButton, Size, Widget, WidgetExt,
@@ -5,14 +7,17 @@ use druid::{
 
 use crate::{
     cmd,
-    data::{AppState, Ctx, Library, Nav, Playlist, PlaylistDetail},
+    data::{
+        AppState, CommonCtx, Ctx, Library, Nav, Playlist, PlaylistDetail, PlaylistLink,
+        PlaylistTracks,
+    },
     ui::{
         theme,
         track::{tracklist_widget, TrackDisplay},
         utils::{error_widget, placeholder_widget, spinner_widget},
     },
     webapi::WebApi,
-    widget::{Async, AsyncAction, Clip, LinkExt, RemoteImage},
+    widget::{Async, Clip, MyWidgetExt, RemoteImage},
 };
 
 pub fn list_widget() -> impl Widget<AppState> {
@@ -42,7 +47,7 @@ pub fn list_widget() -> impl Widget<AppState> {
         },
         error_widget,
     )
-    .controller(AsyncAction::new(|_| WebApi::global().get_playlists()))
+    .on_deferred(|_| WebApi::global().get_playlists())
     .lens(AppState::library.then(Library::playlists.in_arc()))
 }
 
@@ -116,6 +121,18 @@ pub fn detail_widget() -> impl Widget<AppState> {
         },
         || error_widget().lens(Ctx::data()),
     )
+    .on_deferred(|c: &Ctx<Arc<CommonCtx>, PlaylistLink>| {
+        WebApi::global()
+            .get_playlist_tracks(&c.data.id)
+            .map(|tracks| {
+                c.replace(PlaylistTracks {
+                    id: c.data.id.to_owned(),
+                    name: c.data.name.to_owned(),
+                    tracks,
+                })
+            })
+            .map_err(|err| c.replace(err))
+    })
     .lens(
         Ctx::make(
             AppState::common_ctx,

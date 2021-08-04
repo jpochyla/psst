@@ -1,5 +1,6 @@
-use druid::{widget::prelude::*, Data, Point, WidgetPod};
 use std::{collections::HashMap, hash::Hash};
+
+use druid::{widget::prelude::*, Data, Point, WidgetPod};
 
 type ChildPicker<T, U> = dyn Fn(&T, &Env) -> U;
 type ChildBuilder<T, U> = dyn Fn(&U, &T, &Env) -> Box<dyn Widget<T>>;

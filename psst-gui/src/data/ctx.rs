@@ -1,3 +1,5 @@
+use std::fmt;
+
 use crate::data::Promise;
 use druid::{
     lens::{Field, Map},
@@ -6,11 +8,7 @@ use druid::{
 };
 
 #[derive(Clone, Data)]
-pub struct Ctx<C, T>
-where
-    C: Data,
-    T: Data,
-{
+pub struct Ctx<C, T> {
     pub ctx: C,
     pub data: T,
 }
@@ -41,6 +39,13 @@ where
         U: Data,
     {
         CtxMap { map }
+    }
+
+    pub fn replace<U: Data>(&self, data: U) -> Ctx<C, U> {
+        Ctx {
+            ctx: self.ctx.to_owned(),
+            data,
+        }
     }
 }
 
@@ -190,5 +195,23 @@ where
 
     fn data_len(&self) -> usize {
         self.data.data_len()
+    }
+}
+
+impl<C, L> fmt::Debug for Ctx<C, L>
+where
+    L: fmt::Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.data.fmt(f)
+    }
+}
+
+impl<C, L> PartialEq for Ctx<C, L>
+where
+    L: PartialEq,
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.data.eq(&other.data)
     }
 }

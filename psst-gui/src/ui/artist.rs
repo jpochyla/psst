@@ -19,12 +19,32 @@ use crate::{
         track::{tracklist_widget, TrackDisplay},
         utils::{error_widget, placeholder_widget, spinner_widget},
     },
-    widget::{Async, Clip, LinkExt, RemoteImage},
+    webapi::WebApi,
+    widget::{Async, Clip, MyWidgetExt, RemoteImage},
 };
 
 pub fn detail_widget() -> impl Widget<AppState> {
-    let top_tracks = Async::new(spinner_widget, top_tracks_widget, || {
+    Flex::column()
+        .with_child(async_top_tracks_widget())
+        .with_child(async_albums_widget().padding((theme::grid(1.0), 0.0)))
+        .with_child(async_related_artists_widget().padding((theme::grid(1.0), 0.0)))
+}
+
+fn async_top_tracks_widget() -> impl Widget<AppState> {
+    Async::new(spinner_widget, top_tracks_widget, || {
         error_widget().lens(Ctx::data())
+    })
+    .on_deferred(|c: &Ctx<Arc<CommonCtx>, ArtistLink>| {
+        WebApi::global()
+            .get_artist_top_tracks(&c.data.id)
+            .map(|tracks| {
+                c.replace(ArtistTracks {
+                    id: c.data.id.to_owned(),
+                    name: c.data.name.to_owned(),
+                    tracks,
+                })
+            })
+            .map_err(|err| c.replace(err))
     })
     .lens(
         Ctx::make(
@@ -32,10 +52,18 @@ pub fn detail_widget() -> impl Widget<AppState> {
             AppState::artist_detail.then(ArtistDetail::top_tracks),
         )
         .then(Ctx::in_promise()),
-    );
+    )
+}
 
-    let albums = Async::new(spinner_widget, albums_widget, || {
+fn async_albums_widget() -> impl Widget<AppState> {
+    Async::new(spinner_widget, albums_widget, || {
         error_widget().lens(Ctx::data())
+    })
+    .on_deferred(|c: &Ctx<Arc<CommonCtx>, ArtistLink>| {
+        WebApi::global()
+            .get_artist_albums(&c.data.id)
+            .map(|albums| c.replace(albums))
+            .map_err(|err| c.replace(err))
     })
     .lens(
         Ctx::make(
@@ -44,16 +72,12 @@ pub fn detail_widget() -> impl Widget<AppState> {
         )
         .then(Ctx::in_promise()),
     )
-    .padding((theme::grid(1.0), 0.0));
+}
 
-    let related_artists = Async::new(spinner_widget, related_widget, error_widget)
+fn async_related_artists_widget() -> impl Widget<AppState> {
+    Async::new(spinner_widget, related_widget, error_widget)
+        .on_deferred(|link: &ArtistLink| WebApi::global().get_related_artists(&link.id))
         .lens(AppState::artist_detail.then(ArtistDetail::related_artists))
-        .padding((theme::grid(1.0), 0.0));
-
-    Flex::column()
-        .with_child(top_tracks)
-        .with_child(albums)
-        .with_child(related_artists)
 }
 
 pub fn artist_widget() -> impl Widget<Artist> {

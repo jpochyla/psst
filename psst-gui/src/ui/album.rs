@@ -7,13 +7,14 @@ use druid::{
 
 use crate::{
     cmd,
-    data::{Album, AlbumDetail, AppState, Cached, CommonCtx, Ctx, Nav},
+    data::{Album, AlbumDetail, AlbumLink, AppState, Cached, CommonCtx, Ctx, Nav},
     ui::{
         theme,
         track::{tracklist_widget, TrackDisplay},
         utils::{error_widget, placeholder_widget, spinner_widget},
     },
-    widget::{Async, Clip, LinkExt, RemoteImage},
+    webapi::WebApi,
+    widget::{Async, Clip, MyWidgetExt, RemoteImage},
 };
 
 use super::artist::artist_link_widget;
@@ -21,6 +22,12 @@ use super::artist::artist_link_widget;
 pub fn detail_widget() -> impl Widget<AppState> {
     Async::new(spinner_widget, loaded_detail_widget, || {
         error_widget().lens(Ctx::data())
+    })
+    .on_deferred(|c: &Ctx<Arc<CommonCtx>, AlbumLink>| {
+        WebApi::global()
+            .get_album(&c.data.id)
+            .map(|album| c.replace(album))
+            .map_err(|err| c.replace(err))
     })
     .lens(
         Ctx::make(

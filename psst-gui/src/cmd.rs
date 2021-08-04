@@ -1,8 +1,7 @@
 use crate::{
     data::{
-        Album, AlbumLink, Artist, ArtistAlbums, ArtistLink, AudioAnalysis, Cached, Nav,
-        PlaybackPayload, PlaylistLink, QueueBehavior, Recommendations, RecommendationsRequest,
-        SearchResults, Track, TrackId,
+        Album, AlbumLink, AudioAnalysis, Nav, PlaybackPayload, QueueBehavior, Recommendations,
+        RecommendationsRequest, SearchResults, Track, TrackId,
     },
     error::Error,
 };
@@ -54,30 +53,6 @@ pub const SAVE_TRACK: Selector<Arc<Track>> = Selector::new("app.save-track");
 pub const UNSAVE_TRACK: Selector<TrackId> = Selector::new("app.unsave-track");
 pub const SAVE_ALBUM: Selector<Arc<Album>> = Selector::new("app.save-album");
 pub const UNSAVE_ALBUM: Selector<AlbumLink> = Selector::new("app.unsave-album");
-
-// Album detail
-
-pub const LOAD_ALBUM_DETAIL: Selector<AlbumLink> = Selector::new("app.load-album-detail");
-pub const UPDATE_ALBUM_DETAIL: Selector<(AlbumLink, Result<Cached<Arc<Album>>, Error>)> =
-    Selector::new("app.update-album-detail");
-
-// Artist detail
-
-pub const LOAD_ARTIST_DETAIL: Selector<ArtistLink> = Selector::new("app.load-artist-detail");
-pub const UPDATE_ARTIST_DETAIL: Selector<(ArtistLink, Result<Artist, Error>)> =
-    Selector::new("app.update-artist-detail");
-pub const UPDATE_ARTIST_ALBUMS: Selector<(ArtistLink, Result<ArtistAlbums, Error>)> =
-    Selector::new("app.update-artist-album");
-pub const UPDATE_ARTIST_TOP_TRACKS: Selector<(ArtistLink, Result<Vector<Arc<Track>>, Error>)> =
-    Selector::new("app.update-artist-top_tracks");
-pub const UPDATE_ARTIST_RELATED: Selector<(ArtistLink, Result<Cached<Vector<Artist>>, Error>)> =
-    Selector::new("app.update-artist-related");
-
-// Playlist detail
-
-pub const LOAD_PLAYLIST_DETAIL: Selector<PlaylistLink> = Selector::new("app.load-playlist-detail");
-pub const UPDATE_PLAYLIST_TRACKS: Selector<(PlaylistLink, Result<Vector<Arc<Track>>, Error>)> =
-    Selector::new("app.update-playlist-tracks");
 
 // Playback state
 

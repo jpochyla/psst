@@ -5,11 +5,12 @@ use std::{
     thread::{self, JoinHandle},
 };
 
-use crate::data::{Promise, PromiseState};
 use druid::{
-    widget::{prelude::*, Controller},
+    widget::{prelude::*, Controller, ControllerHost},
     Data, ExtEventSink, Point, Selector, SingleUse, Target, WidgetExt, WidgetPod,
 };
+
+use crate::data::{Promise, PromiseState};
 
 pub struct AsyncAction<T, D, E> {
     func: Arc<dyn Fn(&D) -> Result<T, E> + Sync + Send + 'static>,
@@ -212,8 +213,8 @@ impl<D: Data, T: Data, E: Data> Widget<Promise<T, D, E>> for Async<T, D, E> {
         env: &Env,
     ) {
         if data.state() != self.widget.state() {
-            // possible if getting lifecycle after an event that changed the data,
-            // or on WidgetAdded
+            // Possible if getting lifecycle after an event that changed the data,
+            // or on WidgetAdded.
             self.rebuild_widget(data.state());
         }
         assert_eq!(data.state(), self.widget.state(), "{:?}", event);
@@ -345,5 +346,19 @@ impl<T, D, E> PromiseWidget<T, D, E> {
         } else {
             None
         }
+    }
+}
+
+impl<T, D, E> Async<T, D, E>
+where
+    T: Send + Data,
+    D: Send + Data + PartialEq,
+    E: Send + Data + Debug,
+{
+    pub fn on_deferred<F>(self, func: F) -> ControllerHost<Self, AsyncAction<T, D, E>>
+    where
+        F: Fn(&D) -> Result<T, E> + Sync + Send + 'static,
+    {
+        ControllerHost::new(self, AsyncAction::new(func))
     }
 }

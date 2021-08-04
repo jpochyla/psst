@@ -468,7 +468,7 @@ impl WebApi {
 /// Track endpoints.
 impl WebApi {
     // https://developer.spotify.com/documentation/web-api/reference/tracks/get-audio-analysis/
-    pub fn get_audio_analysis(&self, track_id: &str) -> Result<AudioAnalysis, Error> {
+    pub fn _get_audio_analysis(&self, track_id: &str) -> Result<AudioAnalysis, Error> {
         let request = self.get(format!("v1/audio-analysis/{}", track_id))?;
         let result = self.load_cached(request, "audio-analysis", track_id)?;
         Ok(result.data)

@@ -1,6 +1,6 @@
 use crate::{
     cmd,
-    data::{AppState, ArtistTracks, Nav, PlaylistTracks, SavedAlbums, SavedTracks, SpotifyUrl},
+    data::{AppState, Nav, SavedAlbums, SavedTracks, SpotifyUrl},
     ui,
     webapi::WebApi,
     widget::remote_image,
@@ -91,15 +91,7 @@ impl AppDelegate<AppState> for Delegate {
             Handled::Yes
         } else if let Handled::Yes = self.command_image(ctx, target, cmd, data) {
             Handled::Yes
-        } else if let Handled::Yes = self.command_playback(ctx, target, cmd, data) {
-            Handled::Yes
-        } else if let Handled::Yes = self.command_playlist(ctx, target, cmd, data) {
-            Handled::Yes
         } else if let Handled::Yes = self.command_library(ctx, target, cmd, data) {
-            Handled::Yes
-        } else if let Handled::Yes = self.command_album(ctx, target, cmd, data) {
-            Handled::Yes
-        } else if let Handled::Yes = self.command_artist(ctx, target, cmd, data) {
             Handled::Yes
         } else if let Handled::Yes = self.command_search(ctx, target, cmd, data) {
             Handled::Yes
@@ -160,39 +152,6 @@ impl Delegate {
         } else if let Some(payload) = cmd.get(remote_image::PROVIDE_DATA).cloned() {
             self.image_cache.insert(payload.location, payload.image_buf);
             Handled::No
-        } else {
-            Handled::No
-        }
-    }
-
-    fn command_playlist(
-        &mut self,
-        ctx: &mut DelegateCtx,
-        _target: Target,
-        cmd: &Command,
-        data: &mut AppState,
-    ) -> Handled {
-        if let Some(link) = cmd.get(cmd::LOAD_PLAYLIST_DETAIL).cloned() {
-            let sink = ctx.get_external_handle();
-            data.playlist_detail.playlist.defer(link.clone());
-            data.playlist_detail.tracks.defer(link.clone());
-            self.spawn(move || {
-                let result = WebApi::global().get_playlist_tracks(&link.id);
-                sink.submit_command(cmd::UPDATE_PLAYLIST_TRACKS, (link, result), Target::Auto)
-                    .unwrap();
-            });
-            Handled::Yes
-        } else if let Some((link, result)) = cmd.get(cmd::UPDATE_PLAYLIST_TRACKS).cloned() {
-            if data.playlist_detail.tracks.is_deferred(&link) {
-                data.playlist_detail
-                    .tracks
-                    .resolve_or_reject(result.map(|tracks| PlaylistTracks {
-                        id: link.id,
-                        name: link.name,
-                        tracks,
-                    }));
-            }
-            Handled::Yes
         } else {
             Handled::No
         }
@@ -298,108 +257,6 @@ impl Delegate {
         }
     }
 
-    fn command_album(
-        &mut self,
-        ctx: &mut DelegateCtx,
-        _target: Target,
-        cmd: &Command,
-        data: &mut AppState,
-    ) -> Handled {
-        if let Some(link) = cmd.get(cmd::LOAD_ALBUM_DETAIL).cloned() {
-            data.album_detail.album.defer(link.clone());
-            let sink = ctx.get_external_handle();
-            self.spawn(move || {
-                let result = WebApi::global().get_album(&link.id);
-                sink.submit_command(cmd::UPDATE_ALBUM_DETAIL, (link, result), Target::Auto)
-                    .unwrap();
-            });
-            Handled::Yes
-        } else if let Some((link, result)) = cmd.get(cmd::UPDATE_ALBUM_DETAIL).cloned() {
-            if data.album_detail.album.is_deferred(&link) {
-                data.album_detail.album.resolve_or_reject(result);
-            }
-            Handled::Yes
-        } else {
-            Handled::No
-        }
-    }
-
-    fn command_artist(
-        &mut self,
-        ctx: &mut DelegateCtx,
-        _target: Target,
-        cmd: &Command,
-        data: &mut AppState,
-    ) -> Handled {
-        if let Some(album_link) = cmd.get(cmd::LOAD_ARTIST_DETAIL) {
-            // Load artist detail
-            data.artist_detail.artist.defer(album_link.clone());
-            let link = album_link.clone();
-            let sink = ctx.get_external_handle();
-            self.spawn(move || {
-                let result = WebApi::global().get_artist(&link.id);
-                sink.submit_command(cmd::UPDATE_ARTIST_DETAIL, (link, result), Target::Auto)
-                    .unwrap();
-            });
-            // Load artist top tracks
-            data.artist_detail.top_tracks.defer(album_link.clone());
-            let link = album_link.clone();
-            let sink = ctx.get_external_handle();
-            self.spawn(move || {
-                let result = WebApi::global().get_artist_top_tracks(&link.id);
-                sink.submit_command(cmd::UPDATE_ARTIST_TOP_TRACKS, (link, result), Target::Auto)
-                    .unwrap();
-            });
-            // Load artist's related artists
-            data.artist_detail.related_artists.defer(album_link.clone());
-            let link = album_link.clone();
-            let sink = ctx.get_external_handle();
-            self.spawn(move || {
-                let result = WebApi::global().get_related_artists(&link.id);
-                sink.submit_command(cmd::UPDATE_ARTIST_RELATED, (link, result), Target::Auto)
-                    .unwrap();
-            });
-            // Load artist albums
-            data.artist_detail.albums.defer(album_link.clone());
-            let link = album_link.clone();
-            let sink = ctx.get_external_handle();
-            self.spawn(move || {
-                let result = WebApi::global().get_artist_albums(&link.id);
-                sink.submit_command(cmd::UPDATE_ARTIST_ALBUMS, (link, result), Target::Auto)
-                    .unwrap();
-            });
-            Handled::Yes
-        } else if let Some((link, result)) = cmd.get(cmd::UPDATE_ARTIST_DETAIL).cloned() {
-            if data.artist_detail.artist.is_deferred(&link) {
-                data.artist_detail.artist.resolve_or_reject(result);
-            }
-            Handled::Yes
-        } else if let Some((link, result)) = cmd.get(cmd::UPDATE_ARTIST_ALBUMS).cloned() {
-            if data.artist_detail.albums.is_deferred(&link) {
-                data.artist_detail.albums.resolve_or_reject(result);
-            }
-            Handled::Yes
-        } else if let Some((link, result)) = cmd.get(cmd::UPDATE_ARTIST_TOP_TRACKS).cloned() {
-            if data.artist_detail.top_tracks.is_deferred(&link) {
-                data.artist_detail
-                    .top_tracks
-                    .resolve_or_reject(result.map(|tracks| ArtistTracks {
-                        id: link.id,
-                        name: link.name,
-                        tracks,
-                    }));
-            }
-            Handled::Yes
-        } else if let Some((link, result)) = cmd.get(cmd::UPDATE_ARTIST_RELATED).cloned() {
-            if data.artist_detail.related_artists.is_deferred(&link) {
-                data.artist_detail.related_artists.resolve_or_reject(result);
-            }
-            Handled::Yes
-        } else {
-            Handled::No
-        }
-    }
-
     fn command_search(
         &mut self,
         ctx: &mut DelegateCtx,
@@ -458,32 +315,6 @@ impl Delegate {
         } else if let Some(result) = cmd.get(cmd::UPDATE_RECOMMENDATIONS).cloned() {
             data.recommend.results.resolve_or_reject(result);
             Handled::Yes
-        } else {
-            Handled::No
-        }
-    }
-
-    fn command_playback(
-        &mut self,
-        ctx: &mut DelegateCtx,
-        _target: Target,
-        cmd: &Command,
-        data: &mut AppState,
-    ) -> Handled {
-        if cmd.is(cmd::PLAYBACK_PLAYING) {
-            let (item, _progress) = cmd.get_unchecked(cmd::PLAYBACK_PLAYING);
-            let item = item.to_owned();
-            if let Some(now_playing) = &mut data.playback.now_playing {
-                now_playing.analysis.defer(item);
-            }
-            let sink = ctx.get_external_handle();
-            self.spawn(move || {
-                let result = WebApi::global().get_audio_analysis(&item.to_base62());
-                sink.submit_command(cmd::UPDATE_AUDIO_ANALYSIS, (item, result), Target::Auto)
-                    .unwrap();
-            });
-
-            Handled::No
         } else {
             Handled::No
         }

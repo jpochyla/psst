@@ -8,7 +8,7 @@ use crate::{
     data::{AppState, UserProfile},
     ui::theme,
     webapi::WebApi,
-    widget::{Async, AsyncAction, Empty, LinkExt},
+    widget::{Async, Empty, MyWidgetExt},
 };
 
 pub fn user_widget() -> impl Widget<AppState> {
@@ -32,7 +32,7 @@ pub fn user_widget() -> impl Widget<AppState> {
         },
         || Empty,
     )
-    .controller(AsyncAction::new(|_| WebApi::global().get_user_profile()))
+    .on_deferred(|_| WebApi::global().get_user_profile())
     .lens(AppState::user_profile);
 
     Flex::column()

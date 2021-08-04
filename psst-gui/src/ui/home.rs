@@ -7,7 +7,7 @@ use crate::{
         utils::{error_widget, spinner_widget},
     },
     webapi::WebApi,
-    widget::{Async, AsyncAction},
+    widget::Async,
 };
 
 pub fn home_widget() -> impl Widget<AppState> {
@@ -16,6 +16,6 @@ pub fn home_widget() -> impl Widget<AppState> {
         || List::new(playlist::playlist_widget),
         error_widget,
     )
-    .controller(AsyncAction::new(|_| WebApi::global().get_made_for_you()))
+    .on_deferred(|_| WebApi::global().get_made_for_you())
     .lens(AppState::personalized.then(Personalized::made_for_you))
 }

@@ -1,8 +1,6 @@
-use crate::{ui::theme, widget::ExClick};
-use druid::{
-    widget::{prelude::*, ControllerHost},
-    Color, Data, KeyOrValue, MouseEvent, Point, WidgetPod,
-};
+use druid::{widget::prelude::*, Color, Data, KeyOrValue, Point, WidgetPod};
+
+use crate::ui::theme;
 
 pub struct Link<T> {
     inner: WidgetPod<T, Box<dyn Widget<T>>>,
@@ -106,18 +104,3 @@ impl<T: Data> Widget<T> for Link<T> {
         self.inner.paint(ctx, data, env);
     }
 }
-
-pub trait LinkExt<T: Data>: Widget<T> + Sized + 'static {
-    fn link(self) -> Link<T> {
-        Link::new(self)
-    }
-
-    fn on_ex_click(
-        self,
-        f: impl Fn(&mut EventCtx, &MouseEvent, &mut T, &Env) + 'static,
-    ) -> ControllerHost<Self, ExClick<T>> {
-        ControllerHost::new(self, ExClick::new(f))
-    }
-}
-
-impl<T: Data, W: Widget<T> + 'static> LinkExt<T> for W {}
