@@ -1,52 +1,25 @@
-use crate::{error::Error, ui::theme, widget::icons};
+use std::{f64::consts::PI, time::Duration};
+
 use druid::{
-    image,
-    kurbo::Line,
-    widget::{
-        prelude::*, BackgroundBrush, CrossAxisAlignment, FillStrat, Flex, Image, Label, Painter,
-        SizedBox,
-    },
-    Affine, Color, Data, ImageBuf, KeyOrValue, RenderContext, Widget, WidgetExt,
+    kurbo::Circle,
+    widget::{prelude::*, CrossAxisAlignment, Flex, Label, SizedBox},
+    Data, Vec2, Widget, WidgetExt,
 };
-use std::{f64::consts::TAU, time::Duration};
 
-pub enum Border {
-    Top,
-    Bottom,
-}
+use crate::{error::Error, ui::theme, widget::icons};
 
-impl Border {
-    pub fn with_color<T: Data>(
-        self,
-        color: impl Into<KeyOrValue<Color>>,
-    ) -> impl Into<BackgroundBrush<T>> {
-        let color = color.into();
-
-        Painter::new(move |ctx, _, env| {
-            let h = 1.0;
-            let y = match self {
-                Self::Top => h / 2.0,
-                Self::Bottom => ctx.size().height - h / 2.0,
-            };
-            let line = Line::new((0.0, y), (ctx.size().width, y));
-            ctx.stroke(line, &color.resolve(env), h);
-        })
-    }
-}
-
-struct WashingMachine<W> {
-    inner: W,
+struct Spinner {
     t: f64,
 }
 
-impl<W> WashingMachine<W> {
-    pub fn new(inner: W) -> Self {
-        Self { inner, t: 0.0 }
+impl Spinner {
+    pub fn new() -> Self {
+        Self { t: 0.0 }
     }
 }
 
-impl<T: Data, W: Widget<T>> Widget<T> for WashingMachine<W> {
-    fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut T, env: &Env) {
+impl<T: Data> Widget<T> for Spinner {
+    fn event(&mut self, ctx: &mut EventCtx, event: &Event, _data: &mut T, _env: &Env) {
         if let Event::AnimFrame(interval) = event {
             self.t += (*interval as f64) * 1e-9;
             if self.t >= 1.0 {
@@ -55,34 +28,43 @@ impl<T: Data, W: Widget<T>> Widget<T> for WashingMachine<W> {
             ctx.request_anim_frame();
             ctx.request_paint();
         }
-        self.inner.event(ctx, event, data, env);
     }
 
-    fn lifecycle(&mut self, ctx: &mut LifeCycleCtx, event: &LifeCycle, data: &T, env: &Env) {
+    fn lifecycle(&mut self, ctx: &mut LifeCycleCtx, event: &LifeCycle, _data: &T, _env: &Env) {
         if let LifeCycle::WidgetAdded = event {
             ctx.request_anim_frame();
             ctx.request_paint();
         }
-        self.inner.lifecycle(ctx, event, data, env);
     }
 
-    fn update(&mut self, ctx: &mut UpdateCtx, old_data: &T, data: &T, env: &Env) {
-        self.inner.update(ctx, old_data, data, env);
+    fn update(&mut self, _ctx: &mut UpdateCtx, _old_data: &T, _data: &T, _env: &Env) {}
+
+    fn layout(
+        &mut self,
+        _layout_ctx: &mut LayoutCtx,
+        bc: &BoxConstraints,
+        _data: &T,
+        _env: &Env,
+    ) -> Size {
+        bc.constrain(Size::new(theme::grid(6.0), theme::grid(16.0)))
     }
 
-    fn layout(&mut self, ctx: &mut LayoutCtx, bc: &BoxConstraints, data: &T, env: &Env) -> Size {
-        self.inner.layout(ctx, bc, data, env)
-    }
-
-    fn paint(&mut self, ctx: &mut PaintCtx, data: &T, env: &Env) {
-        ctx.with_save(|ctx| {
-            let s = ctx.size();
-            let tx = Affine::translate((s.width / 2.0, s.height / 2.0))
-                * Affine::rotate(TAU * self.t)
-                * Affine::translate((-s.width / 2.0, -s.height / 2.0));
-            ctx.transform(tx);
-            self.inner.paint(ctx, data, env);
-        });
+    fn paint(&mut self, ctx: &mut PaintCtx, _data: &T, env: &Env) {
+        let center = ctx.size().to_rect().center();
+        let c0 = env.get(theme::GREY_500);
+        let c1 = env.get(theme::GREY_400);
+        let active = 7 - (1 + (6.0 * self.t).floor() as i32);
+        for i in 1..=6 {
+            let step = f64::from(i);
+            let angle = Vec2::from_angle((step / 6.0) * -2.0 * PI);
+            let dot_center = center + angle * theme::grid(2.0);
+            let dot = Circle::new(dot_center, theme::grid(0.8));
+            if i == active {
+                ctx.fill(dot, &c1);
+            } else {
+                ctx.fill(dot, &c0);
+            }
+        }
     }
 }
 
@@ -91,15 +73,7 @@ pub fn placeholder_widget<T: Data>() -> impl Widget<T> {
 }
 
 pub fn spinner_widget<T: Data>() -> impl Widget<T> {
-    let bytes = include_bytes!("../../assets/loader.png");
-    let img = image::load_from_memory_with_format(&bytes[..], image::ImageFormat::Png).unwrap();
-    let buf = ImageBuf::from_dynamic_image_with_alpha(img);
-    let loader = Image::new(buf).fill_mode(FillStrat::None);
-    let rotating = WashingMachine::new(loader);
-    rotating
-        .fix_size(theme::grid(4.0), theme::grid(4.0))
-        .padding((0.0, theme::grid(10.0)))
-        .center()
+    Spinner::new().center()
 }
 
 pub fn error_widget() -> impl Widget<Error> {

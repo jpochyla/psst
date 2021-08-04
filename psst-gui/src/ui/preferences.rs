@@ -16,8 +16,8 @@ use crate::{
     data::{
         AppState, AudioQuality, Authentication, Config, Preferences, PreferencesTab, Promise, Theme,
     },
-    ui::{icons::SvgIcon, theme, utils::Border},
-    widget::{icons, Empty, MyWidgetExt},
+    ui::{icons::SvgIcon, theme},
+    widget::{icons, Border, Empty, MyWidgetExt},
 };
 
 pub fn preferences_widget() -> impl Widget<AppState> {

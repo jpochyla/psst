@@ -20,7 +20,7 @@ pub use maybe::Maybe;
 pub use promise::{Async, AsyncAction};
 pub use remote_image::RemoteImage;
 pub use theme::ThemeScope;
-pub use utils::{Clip, Logger};
+pub use utils::{Border, Clip, Logger};
 
 pub trait MyWidgetExt<T: Data>: Widget<T> + Sized + 'static {
     fn link(self) -> Link<T> {

@@ -1,4 +1,8 @@
-use druid::{kurbo::Shape, widget::prelude::*, Data};
+use druid::{
+    kurbo::{Line, Shape},
+    widget::{prelude::*, BackgroundBrush, Painter},
+    Color, Data, KeyOrValue,
+};
 
 pub struct Clip<S, W> {
     shape: S,
@@ -34,6 +38,30 @@ impl<T: Data, S: Shape, W: Widget<T>> Widget<T> for Clip<S, W> {
             ctx.clip(&self.shape);
             self.inner.paint(ctx, data, env);
         });
+    }
+}
+
+pub enum Border {
+    Top,
+    Bottom,
+}
+
+impl Border {
+    pub fn with_color<T: Data>(
+        self,
+        color: impl Into<KeyOrValue<Color>>,
+    ) -> impl Into<BackgroundBrush<T>> {
+        let color = color.into();
+
+        Painter::new(move |ctx, _, env| {
+            let h = 1.0;
+            let y = match self {
+                Self::Top => h / 2.0,
+                Self::Bottom => ctx.size().height - h / 2.0,
+            };
+            let line = Line::new((0.0, y), (ctx.size().width, y));
+            ctx.stroke(line, &color.resolve(env), h);
+        })
     }
 }
 
