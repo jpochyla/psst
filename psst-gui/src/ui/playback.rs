@@ -73,8 +73,16 @@ fn playback_item_widget() -> impl Widget<NowPlaying> {
         .with_child(track_origin)
         .padding(theme::grid(2.0))
         .link()
-        .on_ex_click(|ctx, _, now_playing, _| {
-            ctx.submit_command(cmd::NAVIGATE.with(now_playing.origin.to_nav()));
+        .on_ex_click(|ctx, event, now_playing, _| {
+            match event.button {
+                MouseButton::Left => {
+                    ctx.submit_command(cmd::NAVIGATE.with(now_playing.origin.to_nav()));
+                }
+                MouseButton::Right => {
+                    // TODO: Show menu.
+                }
+                _ => {}
+            }
         })
 }
 

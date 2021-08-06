@@ -5,7 +5,7 @@ use crate::{
     },
     error::Error,
 };
-use druid::{im::Vector, Selector, WidgetId};
+use druid::{Selector, WidgetId};
 use std::{sync::Arc, time::Duration};
 
 // Widget IDs
@@ -43,12 +43,6 @@ pub const UPDATE_RECOMMENDATIONS: Selector<Result<Recommendations, Error>> =
 
 // Library
 
-pub const LOAD_SAVED_TRACKS: Selector = Selector::new("app.load-saved-tracks");
-pub const LOAD_SAVED_ALBUMS: Selector = Selector::new("app.load-saved-albums");
-pub const UPDATE_SAVED_ALBUMS: Selector<Result<Vector<Arc<Album>>, Error>> =
-    Selector::new("app.update-saved-albums");
-pub const UPDATE_SAVED_TRACKS: Selector<Result<Vector<Arc<Track>>, Error>> =
-    Selector::new("app.update-saved-tracks");
 pub const SAVE_TRACK: Selector<Arc<Track>> = Selector::new("app.save-track");
 pub const UNSAVE_TRACK: Selector<TrackId> = Selector::new("app.unsave-track");
 pub const SAVE_ALBUM: Selector<Arc<Album>> = Selector::new("app.save-album");

@@ -1,10 +1,11 @@
-use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
-use druid::{im::Vector, Data, Lens};
-use serde::{Deserialize, Deserializer};
 use std::{
     sync::Arc,
     time::{Duration, SystemTime},
 };
+
+use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
+use druid::{im::Vector, Data, Lens};
+use serde::{Deserialize, Deserializer};
 
 #[derive(Clone, Data, Lens)]
 pub struct Cached<T: Data> {

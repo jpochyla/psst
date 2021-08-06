@@ -1,8 +1,10 @@
+use std::{fmt, sync::Arc, time::Duration};
+
+use druid::{im::Vector, Data, Lens};
+
 use crate::data::{
     AlbumLink, ArtistLink, AudioAnalysis, Nav, PlaylistLink, Promise, Track, TrackId,
 };
-use druid::{im::Vector, Data, Lens};
-use std::{fmt, sync::Arc, time::Duration};
 
 #[derive(Clone, Debug, Data, Lens)]
 pub struct Playback {
@@ -44,11 +46,11 @@ pub struct NowPlaying {
 }
 
 impl NowPlaying {
-    pub fn cover_image_url(&self) -> Option<&str> {
+    pub fn cover_image_url(&self, width: f64, height: f64) -> Option<&str> {
         self.item
             .album
             .as_ref()
-            .and_then(|album| album.image(512.0, 512.0))
+            .and_then(|album| album.image(width, height))
             .map(|image| image.url.as_ref())
     }
 }

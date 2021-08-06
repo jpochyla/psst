@@ -1,6 +1,8 @@
-use crate::data::{Album, Artist, Playlist, Promise, Track};
-use druid::{im::Vector, Data, Lens};
 use std::sync::Arc;
+
+use druid::{im::Vector, Data, Lens};
+
+use crate::data::{Album, Artist, Playlist, Promise, Track};
 
 #[derive(Clone, Data, Lens)]
 pub struct Search {

@@ -1,5 +1,6 @@
+use std::{env, env::VarError, fs::File, path::PathBuf};
+
 use druid::{Data, Lens};
-use env::VarError;
 use platform_dirs::AppDirs;
 use psst_core::{
     audio_player::PlaybackConfig,
@@ -8,7 +9,6 @@ use psst_core::{
     session::{SessionConfig, SessionConnection},
 };
 use serde::{Deserialize, Serialize};
-use std::{env, fs::File, path::PathBuf};
 
 use super::Promise;
 

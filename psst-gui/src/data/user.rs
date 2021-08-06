@@ -1,6 +1,7 @@
+use std::sync::Arc;
+
 use druid::{Data, Lens};
 use serde::Deserialize;
-use std::sync::Arc;
 
 #[derive(Clone, Data, Lens, Deserialize)]
 pub struct UserProfile {

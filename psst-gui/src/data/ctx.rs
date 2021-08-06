@@ -1,11 +1,12 @@
 use std::fmt;
 
-use crate::data::Promise;
 use druid::{
     lens::{Field, Map},
     widget::ListIter,
     Data, Lens, LensExt,
 };
+
+use crate::data::Promise;
 
 #[derive(Clone, Data)]
 pub struct Ctx<C, T> {

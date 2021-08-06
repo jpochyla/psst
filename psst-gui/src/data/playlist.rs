@@ -1,7 +1,9 @@
-use crate::data::{Image, Promise, Track};
+use std::sync::Arc;
+
 use druid::{im::Vector, Data, Lens};
 use serde::{Deserialize, Deserializer};
-use std::sync::Arc;
+
+use crate::data::{Image, Promise, Track};
 
 #[derive(Clone, Debug, Data, Lens)]
 pub struct PlaylistDetail {

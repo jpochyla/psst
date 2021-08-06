@@ -7,7 +7,7 @@ use druid::{
 
 use crate::{
     cmd,
-    data::{Album, AlbumDetail, AlbumLink, AppState, Cached, CommonCtx, Ctx, Nav},
+    data::{Album, AlbumDetail, AlbumLink, AppState, ArtistLink, Cached, CommonCtx, Ctx, Nav},
     ui::{
         theme,
         track::{tracklist_widget, TrackDisplay},
@@ -107,9 +107,15 @@ pub fn album_widget() -> impl Widget<Ctx<Arc<CommonCtx>, Arc<Album>>> {
         .with_line_break_mode(LineBreaking::Clip)
         .lens(Album::name.in_arc());
 
-    let album_artists = Label::dynamic(|album: &Arc<Album>, _| album.artist_list())
-        .with_text_size(theme::TEXT_SIZE_SMALL)
-        .with_line_break_mode(LineBreaking::Clip);
+    let album_artists = List::new(|| {
+        Label::raw()
+            .with_text_size(theme::TEXT_SIZE_SMALL)
+            .with_line_break_mode(LineBreaking::Clip)
+            .lens(ArtistLink::name)
+    })
+    .horizontal()
+    .with_spacing(theme::grid(1.0))
+    .lens(Album::artists.in_arc());
 
     let album_date = Label::dynamic(|album: &Arc<Album>, _| album.release_year())
         .with_text_size(theme::TEXT_SIZE_SMALL)

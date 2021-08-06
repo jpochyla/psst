@@ -159,64 +159,14 @@ impl Delegate {
 
     fn command_library(
         &mut self,
-        ctx: &mut DelegateCtx,
+        _ctx: &mut DelegateCtx,
         _target: Target,
         cmd: &Command,
         data: &mut AppState,
     ) -> Handled {
-        if cmd.is(cmd::LOAD_SAVED_TRACKS) {
-            if data.library.saved_tracks.is_empty() || data.library.saved_tracks.is_rejected() {
-                data.library_mut().saved_tracks.defer_default();
-                let sink = ctx.get_external_handle();
-                self.spawn(move || {
-                    let result = WebApi::global().get_saved_tracks();
-                    sink.submit_command(cmd::UPDATE_SAVED_TRACKS, result, Target::Auto)
-                        .unwrap();
-                });
-            }
-            Handled::Yes
-        } else if cmd.is(cmd::LOAD_SAVED_ALBUMS) {
-            if data.library.saved_albums.is_empty() || data.library.saved_albums.is_rejected() {
-                data.library_mut().saved_albums.defer_default();
-                let sink = ctx.get_external_handle();
-                self.spawn(move || {
-                    let result = WebApi::global().get_saved_albums();
-                    sink.submit_command(cmd::UPDATE_SAVED_ALBUMS, result, Target::Auto)
-                        .unwrap();
-                });
-            }
-            Handled::Yes
-        } else if let Some(result) = cmd.get(cmd::UPDATE_SAVED_TRACKS).cloned() {
-            match result {
-                Ok(tracks) => {
-                    let saved = SavedTracks { tracks };
-                    data.common_ctx_mut().set_saved_tracks(&saved);
-                    data.library_mut().saved_tracks.resolve(saved);
-                }
-                Err(err) => {
-                    data.common_ctx_mut()
-                        .set_saved_tracks(&SavedTracks::default());
-                    data.library_mut().saved_tracks.reject(err);
-                }
-            };
-            Handled::Yes
-        } else if let Some(result) = cmd.get(cmd::UPDATE_SAVED_ALBUMS).cloned() {
-            match result {
-                Ok(albums) => {
-                    let saved = SavedAlbums { albums };
-                    data.common_ctx_mut().set_saved_albums(&saved);
-                    data.library_mut().saved_albums.resolve(saved);
-                }
-                Err(err) => {
-                    data.common_ctx_mut()
-                        .set_saved_albums(&SavedAlbums::default());
-                    data.library_mut().saved_albums.reject(err);
-                }
-            };
-            Handled::Yes
-        } else if let Some(track) = cmd.get(cmd::SAVE_TRACK).cloned() {
+        if let Some(track) = cmd.get(cmd::SAVE_TRACK).cloned() {
             let track_id = track.id.to_base62();
-            data.save_track(track);
+            data.library_mut().add_track(track);
             self.spawn(move || {
                 let result = WebApi::global().save_track(&track_id);
                 if result.is_err() {
@@ -225,7 +175,7 @@ impl Delegate {
             });
             Handled::Yes
         } else if let Some(track_id) = cmd.get(cmd::UNSAVE_TRACK).cloned() {
-            data.unsave_track(&track_id);
+            data.library_mut().remove_track(&track_id);
             self.spawn(move || {
                 let result = WebApi::global().unsave_track(&track_id.to_base62());
                 if result.is_err() {
@@ -235,7 +185,7 @@ impl Delegate {
             Handled::Yes
         } else if let Some(album) = cmd.get(cmd::SAVE_ALBUM).cloned() {
             let album_id = album.id.clone();
-            data.save_album(album);
+            data.library_mut().add_album(album);
             self.spawn(move || {
                 let result = WebApi::global().save_album(&album_id);
                 if result.is_err() {
@@ -244,7 +194,7 @@ impl Delegate {
             });
             Handled::Yes
         } else if let Some(link) = cmd.get(cmd::UNSAVE_ALBUM).cloned() {
-            data.unsave_album(&link.id);
+            data.library_mut().remove_album(&link.id);
             self.spawn(move || {
                 let result = WebApi::global().unsave_album(&link.id);
                 if result.is_err() {

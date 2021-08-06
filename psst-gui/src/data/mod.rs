@@ -12,6 +12,14 @@ mod track;
 mod user;
 mod utils;
 
+use std::{mem, sync::Arc, time::Duration};
+
+use druid::{
+    im::{HashSet, Vector},
+    Data, Lens,
+};
+use psst_core::session::SessionService;
+
 pub use crate::data::{
     album::{Album, AlbumDetail, AlbumLink, AlbumType, Copyright, CopyrightType},
     artist::{Artist, ArtistAlbums, ArtistDetail, ArtistLink, ArtistTracks},
@@ -30,12 +38,6 @@ pub use crate::data::{
     user::UserProfile,
     utils::{Cached, Image, Page},
 };
-use druid::{
-    im::{HashSet, Vector},
-    Data, Lens,
-};
-use psst_core::session::SessionService;
-use std::{sync::Arc, time::Duration};
 
 #[derive(Clone, Data, Lens)]
 pub struct AppState {
@@ -60,6 +62,15 @@ pub struct AppState {
 
 impl Default for AppState {
     fn default() -> Self {
+        let library = Arc::new(Library {
+            saved_albums: Promise::Empty,
+            saved_tracks: Promise::Empty,
+            playlists: Promise::Empty,
+        });
+        let common_ctx = Arc::new(CommonCtx {
+            playback_item: None,
+            library: Arc::clone(&library),
+        });
         Self {
             session: SessionService::empty(),
             route: Nav::Home,
@@ -103,16 +114,8 @@ impl Default for AppState {
                 playlist: Promise::Empty,
                 tracks: Promise::Empty,
             },
-            library: Arc::new(Library {
-                saved_albums: Promise::Empty,
-                saved_tracks: Promise::Empty,
-                playlists: Promise::Empty,
-            }),
-            common_ctx: Arc::new(CommonCtx {
-                playback_item: None,
-                saved_tracks: HashSet::new(),
-                saved_albums: HashSet::new(),
-            }),
+            library,
+            common_ctx,
             user_profile: Promise::Empty,
             personalized: Personalized {
                 made_for_you: Promise::Empty,
@@ -124,8 +127,8 @@ impl Default for AppState {
 impl AppState {
     pub fn navigate(&mut self, nav: &Nav) {
         if &self.route != nav {
-            self.history.push_back(self.route.clone());
-            self.route = nav.to_owned();
+            let previous = mem::replace(&mut self.route, nav.to_owned());
+            self.history.push_back(previous);
         }
     }
 
@@ -193,32 +196,8 @@ impl AppState {
 }
 
 impl AppState {
-    pub fn save_track(&mut self, track: Arc<Track>) {
-        self.library_mut().save_track(track);
-        if let Promise::Resolved(saved) = &self.library.saved_tracks {
-            Arc::make_mut(&mut self.common_ctx).set_saved_tracks(saved);
-        }
-    }
-
-    pub fn unsave_track(&mut self, track_id: &TrackId) {
-        self.library_mut().unsave_track(track_id);
-        if let Promise::Resolved(saved) = &self.library.saved_tracks {
-            Arc::make_mut(&mut self.common_ctx).set_saved_tracks(saved);
-        }
-    }
-
-    pub fn save_album(&mut self, album: Arc<Album>) {
-        self.library_mut().save_album(album);
-        if let Promise::Resolved(saved) = &self.library.saved_albums {
-            Arc::make_mut(&mut self.common_ctx).set_saved_albums(saved);
-        }
-    }
-
-    pub fn unsave_album(&mut self, album_id: &Arc<str>) {
-        self.library_mut().unsave_album(album_id);
-        if let Promise::Resolved(saved) = &self.library.saved_albums {
-            Arc::make_mut(&mut self.common_ctx).set_saved_albums(saved);
-        }
+    pub fn update_common_ctx(&mut self) {
+        self.common_ctx_mut().library = Arc::clone(&self.library);
     }
 
     pub fn common_ctx_mut(&mut self) -> &mut CommonCtx {
@@ -238,27 +217,47 @@ pub struct Library {
 }
 
 impl Library {
-    pub fn save_track(&mut self, track: Arc<Track>) {
+    pub fn add_track(&mut self, track: Arc<Track>) {
         if let Promise::Resolved(saved) = &mut self.saved_tracks {
+            saved.set.insert(track.id);
             saved.tracks.push_front(track);
         }
     }
 
-    pub fn unsave_track(&mut self, track_id: &TrackId) {
+    pub fn remove_track(&mut self, track_id: &TrackId) {
         if let Promise::Resolved(saved) = &mut self.saved_tracks {
+            saved.set.remove(track_id);
             saved.tracks.retain(|t| &t.id != track_id);
         }
     }
 
-    pub fn save_album(&mut self, album: Arc<Album>) {
+    pub fn contains_track(&self, track: &Track) -> bool {
+        if let Promise::Resolved(saved) = &self.saved_tracks {
+            saved.set.contains(&track.id)
+        } else {
+            false
+        }
+    }
+
+    pub fn add_album(&mut self, album: Arc<Album>) {
         if let Promise::Resolved(saved) = &mut self.saved_albums {
+            saved.set.insert(album.id.clone());
             saved.albums.push_front(album);
         }
     }
 
-    pub fn unsave_album(&mut self, album_id: &Arc<str>) {
+    pub fn remove_album(&mut self, album_id: &Arc<str>) {
         if let Promise::Resolved(saved) = &mut self.saved_albums {
-            saved.albums.retain(|a| &a.id != album_id)
+            saved.set.remove(album_id);
+            saved.albums.retain(|a| &a.id != album_id);
+        }
+    }
+
+    pub fn contains_album(&self, album: &Album) -> bool {
+        if let Promise::Resolved(saved) = &self.saved_albums {
+            saved.set.contains(&album.id)
+        } else {
+            false
         }
     }
 }
@@ -266,18 +265,33 @@ impl Library {
 #[derive(Clone, Default, Data, Lens)]
 pub struct SavedTracks {
     pub tracks: Vector<Arc<Track>>,
+    pub set: HashSet<TrackId>,
+}
+
+impl SavedTracks {
+    pub fn new(tracks: Vector<Arc<Track>>) -> Self {
+        let set = tracks.iter().map(|t| t.id).collect();
+        Self { tracks, set }
+    }
 }
 
 #[derive(Clone, Default, Data, Lens)]
 pub struct SavedAlbums {
     pub albums: Vector<Arc<Album>>,
+    pub set: HashSet<Arc<str>>,
+}
+
+impl SavedAlbums {
+    pub fn new(albums: Vector<Arc<Album>>) -> Self {
+        let set = albums.iter().map(|a| a.id.clone()).collect();
+        Self { albums, set }
+    }
 }
 
 #[derive(Clone, Data)]
 pub struct CommonCtx {
     pub playback_item: Option<Arc<Track>>,
-    pub saved_tracks: HashSet<TrackId>,
-    pub saved_albums: HashSet<Arc<str>>,
+    pub library: Arc<Library>,
 }
 
 impl CommonCtx {
@@ -289,19 +303,11 @@ impl CommonCtx {
     }
 
     pub fn is_track_saved(&self, track: &Track) -> bool {
-        self.saved_tracks.contains(&track.id)
-    }
-
-    pub fn set_saved_tracks(&mut self, saved: &SavedTracks) {
-        self.saved_tracks = saved.tracks.iter().map(|t| t.id).collect();
+        self.library.contains_track(track)
     }
 
     pub fn is_album_saved(&self, album: &Album) -> bool {
-        self.saved_albums.contains(&album.id)
-    }
-
-    pub fn set_saved_albums(&mut self, saved: &SavedAlbums) {
-        self.saved_albums = saved.albums.iter().map(|a| a.id.clone()).collect();
+        self.library.contains_album(album)
     }
 }
 

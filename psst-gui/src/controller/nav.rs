@@ -12,24 +12,34 @@ impl NavController {
         match &data.route {
             Nav::Home => {}
             Nav::SavedTracks => {
-                ctx.submit_command(cmd::LOAD_SAVED_TRACKS);
+                if data.library.saved_tracks.is_empty() {
+                    data.library_mut().saved_tracks.defer_default();
+                }
             }
             Nav::SavedAlbums => {
-                ctx.submit_command(cmd::LOAD_SAVED_ALBUMS);
+                if data.library.saved_albums.is_empty() {
+                    data.library_mut().saved_albums.defer_default();
+                }
             }
             Nav::SearchResults(query) => {
                 ctx.submit_command(cmd::LOAD_SEARCH_RESULTS.with(query.to_owned()));
             }
             Nav::AlbumDetail(link) => {
-                data.album_detail.album.defer(link.to_owned());
+                if !data.album_detail.album.is_deferred(link) {
+                    data.album_detail.album.defer(link.to_owned());
+                }
             }
             Nav::ArtistDetail(link) => {
-                data.artist_detail.top_tracks.defer(link.to_owned());
-                data.artist_detail.albums.defer(link.to_owned());
-                data.artist_detail.related_artists.defer(link.to_owned());
+                if !data.artist_detail.top_tracks.is_deferred(link) {
+                    data.artist_detail.top_tracks.defer(link.to_owned());
+                    data.artist_detail.albums.defer(link.to_owned());
+                    data.artist_detail.related_artists.defer(link.to_owned());
+                }
             }
             Nav::PlaylistDetail(link) => {
-                data.playlist_detail.tracks.defer(link.to_owned());
+                if !data.playlist_detail.tracks.is_deferred(link) {
+                    data.playlist_detail.tracks.defer(link.to_owned());
+                }
             }
             Nav::Recommendations => {}
         }

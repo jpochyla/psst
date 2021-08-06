@@ -194,7 +194,7 @@ impl PlaybackController {
             let cover_url = playback
                 .now_playing
                 .as_ref()
-                .and_then(|p| p.cover_image_url());
+                .and_then(|p| p.cover_image_url(512.0, 512.0));
             media_controls
                 .set_metadata(MediaMetadata {
                     title: title.as_deref(),
@@ -241,7 +241,7 @@ impl PlaybackController {
     }
 
     fn next(&mut self) {
-        self.send(PlayerEvent::Command(PlayerCommand::Next))
+        self.send(PlayerEvent::Command(PlayerCommand::Next));
     }
 
     fn stop(&mut self) {
@@ -424,6 +424,6 @@ where
         if !old_data.playback.volume.same(&data.playback.volume) {
             self.set_volume(data.playback.volume);
         }
-        child.update(ctx, old_data, data, env)
+        child.update(ctx, old_data, data, env);
     }
 }

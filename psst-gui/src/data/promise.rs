@@ -1,5 +1,6 @@
-use crate::error::Error;
 use druid::Data;
+
+use crate::error::Error;
 
 #[derive(Clone, Debug, Data)]
 pub enum Promise<T: Data, D: Data = (), E: Data = Error> {

@@ -1,9 +1,10 @@
-use crate::cmd;
 use druid::{
     commands,
     widget::{prelude::*, Controller, TextBox},
     HotKey, KbKey, SysMods,
 };
+
+use crate::cmd;
 
 pub struct InputController {
     on_submit: Option<Box<dyn Fn(&mut EventCtx, &mut String, &Env)>>,

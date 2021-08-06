@@ -1,7 +1,9 @@
-use crate::data::{Album, Cached, Image, Promise, Track};
+use std::sync::Arc;
+
 use druid::{im::Vector, Data, Lens};
 use serde::Deserialize;
-use std::sync::Arc;
+
+use crate::data::{Album, Cached, Image, Promise, Track};
 
 #[derive(Clone, Data, Lens)]
 pub struct ArtistDetail {

@@ -1,9 +1,10 @@
-use crate::data::{ArtistLink, Cached, Image, Promise, Track};
+use std::sync::Arc;
+
 use chrono::NaiveDate;
 use druid::{im::Vector, Data, Lens};
-use itertools::Itertools;
 use serde::Deserialize;
-use std::sync::Arc;
+
+use crate::data::{ArtistLink, Cached, Image, Promise, Track};
 
 #[derive(Clone, Data, Lens)]
 pub struct AlbumDetail {
@@ -34,10 +35,6 @@ pub struct Album {
 }
 
 impl Album {
-    pub fn artist_list(&self) -> String {
-        self.artists.iter().map(|artist| &artist.name).join(", ")
-    }
-
     pub fn release(&self) -> String {
         self.release_with_format(match self.release_date_precision {
             Some(DatePrecision::Year) | None => "%Y",
