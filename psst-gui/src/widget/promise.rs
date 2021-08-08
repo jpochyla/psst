@@ -112,7 +112,7 @@ where
         env: &Env,
     ) {
         if let LifeCycle::WidgetAdded = event {
-            if let Promise::Deferred(def) = data {
+            if let Promise::Deferred { def } = data {
                 self.spawn_action(ctx.widget_id(), ctx.get_external_handle(), def.to_owned());
             }
         }
@@ -128,7 +128,7 @@ where
         env: &Env,
     ) {
         if !old_data.same(data) {
-            if let Promise::Deferred(def) = data {
+            if let Promise::Deferred { def } = data {
                 self.spawn_action(ctx.widget_id(), ctx.get_external_handle(), def.to_owned());
             }
         }
@@ -185,7 +185,7 @@ impl<D: Data, T: Data, E: Data> Widget<Promise<T, D, E>> for Async<T, D, E> {
         if data.state() == self.widget.state() {
             match data {
                 Promise::Empty => {}
-                Promise::Deferred(def) => {
+                Promise::Deferred { def } => {
                     self.widget.with_deferred(|w| w.event(ctx, event, def, env));
                 }
                 Promise::Resolved { val, .. } => {
@@ -213,7 +213,7 @@ impl<D: Data, T: Data, E: Data> Widget<Promise<T, D, E>> for Async<T, D, E> {
         assert_eq!(data.state(), self.widget.state(), "{:?}", event);
         match data {
             Promise::Empty => {}
-            Promise::Deferred(def) => {
+            Promise::Deferred { def } => {
                 self.widget
                     .with_deferred(|w| w.lifecycle(ctx, event, def, env));
             }
@@ -241,7 +241,7 @@ impl<D: Data, T: Data, E: Data> Widget<Promise<T, D, E>> for Async<T, D, E> {
         } else {
             match data {
                 Promise::Empty => {}
-                Promise::Deferred(def) => {
+                Promise::Deferred { def } => {
                     self.widget.with_deferred(|w| w.update(ctx, def, env));
                 }
                 Promise::Resolved { val, .. } => {
@@ -263,7 +263,7 @@ impl<D: Data, T: Data, E: Data> Widget<Promise<T, D, E>> for Async<T, D, E> {
     ) -> Size {
         match data {
             Promise::Empty => None,
-            Promise::Deferred(def) => self.widget.with_deferred(|w| {
+            Promise::Deferred { def } => self.widget.with_deferred(|w| {
                 let size = w.layout(ctx, bc, def, env);
                 w.set_origin(ctx, def, env, Point::ORIGIN);
                 size
@@ -285,7 +285,7 @@ impl<D: Data, T: Data, E: Data> Widget<Promise<T, D, E>> for Async<T, D, E> {
     fn paint(&mut self, ctx: &mut PaintCtx, data: &Promise<T, D, E>, env: &Env) {
         match data {
             Promise::Empty => {}
-            Promise::Deferred(def) => {
+            Promise::Deferred { def } => {
                 self.widget.with_deferred(|w| w.paint(ctx, def, env));
             }
             Promise::Resolved { val, .. } => {

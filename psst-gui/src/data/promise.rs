@@ -5,7 +5,7 @@ use crate::error::Error;
 #[derive(Clone, Debug, Data)]
 pub enum Promise<T: Data, D: Data = (), E: Data = Error> {
     Empty,
-    Deferred(D),
+    Deferred { def: D },
     Resolved { def: D, val: T },
     Rejected { def: D, err: E },
 }
@@ -28,13 +28,6 @@ impl<T: Data, D: Data, E: Data> Promise<T, D, E> {
         }
     }
 
-    pub fn contains(&self, d: &D) -> bool
-    where
-        D: PartialEq,
-    {
-        matches!(self, Self::Resolved { def, .. } if def == d)
-    }
-
     pub fn is_resolved(&self) -> bool {
         self.state() == PromiseState::Resolved
     }
@@ -43,7 +36,14 @@ impl<T: Data, D: Data, E: Data> Promise<T, D, E> {
     where
         D: PartialEq,
     {
-        matches!(self, Self::Deferred(def) if def == d)
+        matches!(self, Self::Deferred { def } if def == d)
+    }
+
+    pub fn contains(&self, d: &D) -> bool
+    where
+        D: PartialEq,
+    {
+        matches!(self, Self::Resolved { def, .. } if def == d)
     }
 
     pub fn resolved(&self) -> Option<&T> {
@@ -67,7 +67,7 @@ impl<T: Data, D: Data, E: Data> Promise<T, D, E> {
     }
 
     pub fn defer(&mut self, def: D) {
-        *self = Self::Deferred(def);
+        *self = Self::Deferred { def };
     }
 
     pub fn resolve(&mut self, def: D, val: T) {
@@ -99,7 +99,7 @@ impl<T: Data, D: Data, E: Data> Promise<T, D, E> {
 
 impl<D: Data + Default, T: Data, E: Data> Promise<T, D, E> {
     pub fn defer_default(&mut self) {
-        *self = Self::Deferred(D::default())
+        *self = Self::Deferred { def: D::default() };
     }
 }
 

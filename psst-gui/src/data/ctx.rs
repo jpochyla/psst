@@ -128,7 +128,9 @@ where
         Map::new(
             |c: &Self| match &c.data {
                 Promise::Empty => Promise::Empty,
-                Promise::Deferred(def) => Promise::Deferred(def.to_owned()),
+                Promise::Deferred { def } => Promise::Deferred {
+                    def: def.to_owned(),
+                },
                 Promise::Resolved { def, val } => Promise::Resolved {
                     def: def.to_owned(),
                     val: Ctx::new(c.ctx.to_owned(), val.to_owned()),
@@ -142,8 +144,8 @@ where
                 Promise::Empty => {
                     c.data = Promise::Empty;
                 }
-                Promise::Deferred(def) => {
-                    c.data = Promise::Deferred(def);
+                Promise::Deferred { def } => {
+                    c.data = Promise::Deferred { def };
                 }
                 Promise::Resolved { def, val } => {
                     c.data = Promise::Resolved { def, val: val.data };

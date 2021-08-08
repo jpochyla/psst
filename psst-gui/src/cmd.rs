@@ -2,10 +2,7 @@ use std::time::Duration;
 
 use druid::{Selector, WidgetId};
 
-use crate::{
-    data::{AudioAnalysis, Nav, PlaybackPayload, QueueBehavior, TrackId},
-    error::Error,
-};
+use crate::data::{Nav, PlaybackPayload, QueueBehavior, TrackId};
 
 // Widget IDs
 
