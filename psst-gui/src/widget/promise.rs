@@ -112,12 +112,8 @@ where
         env: &Env,
     ) {
         if let LifeCycle::WidgetAdded = event {
-            if let Promise::Deferred(deferred) = data {
-                self.spawn_action(
-                    ctx.widget_id(),
-                    ctx.get_external_handle(),
-                    deferred.to_owned(),
-                );
+            if let Promise::Deferred(def) = data {
+                self.spawn_action(ctx.widget_id(), ctx.get_external_handle(), def.to_owned());
             }
         }
         child.lifecycle(ctx, event, data, env)
@@ -132,12 +128,8 @@ where
         env: &Env,
     ) {
         if !old_data.same(data) {
-            if let Promise::Deferred(deferred) = data {
-                self.spawn_action(
-                    ctx.widget_id(),
-                    ctx.get_external_handle(),
-                    deferred.to_owned(),
-                );
+            if let Promise::Deferred(def) = data {
+                self.spawn_action(ctx.widget_id(), ctx.get_external_handle(), def.to_owned());
             }
         }
         child.update(ctx, old_data, data, env)

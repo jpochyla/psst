@@ -1,12 +1,11 @@
+use std::time::Duration;
+
+use druid::{Selector, WidgetId};
+
 use crate::{
-    data::{
-        Album, AlbumLink, AudioAnalysis, Nav, PlaybackPayload, QueueBehavior, Recommendations,
-        RecommendationsRequest, SearchResults, Track, TrackId,
-    },
+    data::{AudioAnalysis, Nav, PlaybackPayload, QueueBehavior, TrackId},
     error::Error,
 };
-use druid::{Selector, WidgetId};
-use std::{sync::Arc, time::Duration};
 
 // Widget IDs
 
@@ -26,27 +25,6 @@ pub const SESSION_CONNECT: Selector = Selector::new("app.session-connect");
 
 pub const NAVIGATE: Selector<Nav> = Selector::new("app.navigates");
 pub const NAVIGATE_BACK: Selector<usize> = Selector::new("app.navigate-back");
-
-// Search
-
-pub const LOAD_SEARCH_RESULTS: Selector<Arc<str>> = Selector::new("app.load-search-results");
-pub const UPDATE_SEARCH_RESULTS: Selector<Result<SearchResults, Error>> =
-    Selector::new("app.update-search-results");
-pub const OPEN_LINK: Selector<Result<Nav, Error>> = Selector::new("app.open-link");
-
-// Recommend
-
-pub const LOAD_RECOMMENDATIONS: Selector<RecommendationsRequest> =
-    Selector::new("app.load-recommendations");
-pub const UPDATE_RECOMMENDATIONS: Selector<Result<Recommendations, Error>> =
-    Selector::new("app.update-recommendations");
-
-// Library
-
-pub const SAVE_TRACK: Selector<Arc<Track>> = Selector::new("app.save-track");
-pub const UNSAVE_TRACK: Selector<TrackId> = Selector::new("app.unsave-track");
-pub const SAVE_ALBUM: Selector<Arc<Album>> = Selector::new("app.save-album");
-pub const UNSAVE_ALBUM: Selector<AlbumLink> = Selector::new("app.unsave-album");
 
 // Playback state
 

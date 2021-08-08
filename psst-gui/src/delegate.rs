@@ -1,16 +1,12 @@
-use crate::{
-    cmd,
-    data::{AppState, Nav, SavedAlbums, SavedTracks, SpotifyUrl},
-    ui,
-    webapi::WebApi,
-    widget::remote_image,
-};
+use std::{sync::Arc, thread};
+
 use druid::{
     commands, image, AppDelegate, Application, Command, DelegateCtx, Env, Handled, ImageBuf,
     Target, WindowId,
 };
 use lru_cache::LruCache;
-use std::{sync::Arc, thread};
+
+use crate::{cmd, data::AppState, ui, webapi::WebApi, widget::remote_image};
 
 pub struct Delegate {
     image_cache: LruCache<Arc<str>, ImageBuf>,
@@ -91,10 +87,6 @@ impl AppDelegate<AppState> for Delegate {
             Handled::Yes
         } else if let Handled::Yes = self.command_image(ctx, target, cmd, data) {
             Handled::Yes
-        } else if let Handled::Yes = self.command_library(ctx, target, cmd, data) {
-            Handled::Yes
-        } else if let Handled::Yes = self.command_search(ctx, target, cmd, data) {
-            Handled::Yes
         } else {
             Handled::No
         }
@@ -152,119 +144,6 @@ impl Delegate {
         } else if let Some(payload) = cmd.get(remote_image::PROVIDE_DATA).cloned() {
             self.image_cache.insert(payload.location, payload.image_buf);
             Handled::No
-        } else {
-            Handled::No
-        }
-    }
-
-    fn command_library(
-        &mut self,
-        _ctx: &mut DelegateCtx,
-        _target: Target,
-        cmd: &Command,
-        data: &mut AppState,
-    ) -> Handled {
-        if let Some(track) = cmd.get(cmd::SAVE_TRACK).cloned() {
-            let track_id = track.id.to_base62();
-            data.library_mut().add_track(track);
-            self.spawn(move || {
-                let result = WebApi::global().save_track(&track_id);
-                if result.is_err() {
-                    // TODO: Refresh saved tracks.
-                }
-            });
-            Handled::Yes
-        } else if let Some(track_id) = cmd.get(cmd::UNSAVE_TRACK).cloned() {
-            data.library_mut().remove_track(&track_id);
-            self.spawn(move || {
-                let result = WebApi::global().unsave_track(&track_id.to_base62());
-                if result.is_err() {
-                    // TODO: Refresh saved tracks.
-                }
-            });
-            Handled::Yes
-        } else if let Some(album) = cmd.get(cmd::SAVE_ALBUM).cloned() {
-            let album_id = album.id.clone();
-            data.library_mut().add_album(album);
-            self.spawn(move || {
-                let result = WebApi::global().save_album(&album_id);
-                if result.is_err() {
-                    // TODO: Refresh saved albums.
-                }
-            });
-            Handled::Yes
-        } else if let Some(link) = cmd.get(cmd::UNSAVE_ALBUM).cloned() {
-            data.library_mut().remove_album(&link.id);
-            self.spawn(move || {
-                let result = WebApi::global().unsave_album(&link.id);
-                if result.is_err() {
-                    // TODO: Refresh saved albums.
-                }
-            });
-            Handled::Yes
-        } else {
-            Handled::No
-        }
-    }
-
-    fn command_search(
-        &mut self,
-        ctx: &mut DelegateCtx,
-        _target: Target,
-        cmd: &Command,
-        data: &mut AppState,
-    ) -> Handled {
-        if let Some(query) = cmd.get(cmd::LOAD_SEARCH_RESULTS).cloned() {
-            if let Some(link) = SpotifyUrl::parse(&query) {
-                let sink = ctx.get_external_handle();
-                data.search.results.defer(link.id());
-                self.spawn(move || {
-                    let result = WebApi::global().load_spotify_link(&link);
-                    sink.submit_command(cmd::OPEN_LINK, result, Target::Auto)
-                        .unwrap();
-                });
-            } else {
-                let sink = ctx.get_external_handle();
-                data.search.results.defer(query.clone());
-                self.spawn(move || {
-                    let result = WebApi::global().search(&query);
-                    sink.submit_command(cmd::UPDATE_SEARCH_RESULTS, result, Target::Auto)
-                        .unwrap();
-                });
-            }
-            Handled::Yes
-        } else if let Some(result) = cmd.get(cmd::OPEN_LINK).cloned() {
-            match result {
-                Ok(nav) => {
-                    data.search.results.clear();
-                    ctx.submit_command(cmd::NAVIGATE.with(nav));
-                }
-                Err(err) => {
-                    data.search.results.reject(err);
-                }
-            }
-            Handled::Yes
-        } else if let Some(result) = cmd.get(cmd::UPDATE_SEARCH_RESULTS).cloned() {
-            data.search.results.resolve_or_reject(result);
-            Handled::Yes
-        } else if let Some(request) = cmd.get(cmd::LOAD_RECOMMENDATIONS).cloned() {
-            let sink = ctx.get_external_handle();
-            let id = data.recommend.counter;
-            data.recommend.counter += 1;
-            data.recommend.results.defer(id);
-            data.recommend.request.replace(request.clone());
-            // TODO: Do this some other way, this is extremely inconsistent.
-            sink.submit_command(cmd::NAVIGATE, Nav::Recommendations, Target::Auto)
-                .unwrap();
-            self.spawn(move || {
-                let result = WebApi::global().get_recommendations(request);
-                sink.submit_command(cmd::UPDATE_RECOMMENDATIONS, result, Target::Auto)
-                    .unwrap();
-            });
-            Handled::Yes
-        } else if let Some(result) = cmd.get(cmd::UPDATE_RECOMMENDATIONS).cloned() {
-            data.recommend.results.resolve_or_reject(result);
-            Handled::Yes
         } else {
             Handled::No
         }

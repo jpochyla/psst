@@ -6,7 +6,9 @@ use druid::{
     Data, Vec2, Widget, WidgetExt,
 };
 
-use crate::{error::Error, ui::theme, widget::icons};
+use crate::{error::Error, widget::icons};
+
+use super::theme;
 
 struct Spinner {
     t: f64,

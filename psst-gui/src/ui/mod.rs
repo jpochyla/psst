@@ -2,7 +2,7 @@ use druid::{
     im::Vector,
     lens::Unit,
     widget::{CrossAxisAlignment, Either, Flex, Label, Scroll, Slider, Split, ViewSwitcher},
-    Env, Insets, LensExt, Menu, MenuItem, MouseButton, Widget, WidgetExt, WindowDesc,
+    Env, Insets, LensExt, Menu, MenuItem, Widget, WidgetExt, WindowDesc,
 };
 
 use crate::{
@@ -224,7 +224,7 @@ fn route_widget() -> impl Widget<AppState> {
                     .vertical()
                     .boxed()
             }
-            Nav::Recommendations => {
+            Nav::Recommendations(_) => {
                 Scroll::new(recommend::results_widget().padding(theme::grid(1.0)))
                     .vertical()
                     .boxed()
@@ -244,15 +244,10 @@ fn topbar_back_button_widget() -> impl Widget<AppState> {
         .padding(theme::grid(1.0))
         .link()
         .rounded(theme::BUTTON_BORDER_RADIUS)
-        .on_ex_click(|ctx, event, history, _env| match event.button {
-            MouseButton::Left => {
-                ctx.submit_command(cmd::NAVIGATE_BACK.with(1));
-            }
-            MouseButton::Right => {
-                ctx.show_context_menu(history_menu(history), event.window_pos);
-            }
-            _ => {}
-        });
+        .on_click(|ctx, _, _| {
+            ctx.submit_command(cmd::NAVIGATE_BACK.with(1));
+        })
+        .context_menu(history_menu);
     Either::new(
         |history: &Vector<Nav>, _| history.is_empty(),
         disabled,
@@ -298,7 +293,7 @@ fn route_icon_widget() -> impl Widget<Nav> {
                 Nav::AlbumDetail(_) => icon(&icons::ALBUM).boxed(),
                 Nav::ArtistDetail(_) => icon(&icons::ARTIST).boxed(),
                 Nav::PlaylistDetail(_) => icon(&icons::PLAYLIST).boxed(),
-                Nav::Recommendations => icon(&icons::SEARCH).boxed(),
+                Nav::Recommendations(_) => icon(&icons::SEARCH).boxed(),
             }
         },
     )

@@ -32,6 +32,10 @@ impl<T: Data, D: Data, E: Data> Promise<T, D, E> {
         matches!(self, Self::Empty)
     }
 
+    pub fn is_resolved(&self) -> bool {
+        matches!(self, Self::Resolved(_))
+    }
+
     pub fn is_rejected(&self) -> bool {
         matches!(self, Self::Rejected(_))
     }
@@ -64,6 +68,15 @@ impl<T: Data, D: Data, E: Data> Promise<T, D, E> {
             Ok(ok) => Self::Resolved(ok),
             Err(err) => Self::Rejected(err),
         };
+    }
+
+    pub fn update(&mut self, (def, res): (D, Result<T, E>))
+    where
+        D: PartialEq,
+    {
+        if self.is_deferred(&def) {
+            self.resolve_or_reject(res);
+        }
     }
 }
 

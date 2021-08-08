@@ -1,5 +1,6 @@
-use druid::Data;
 use std::{error, fmt};
+
+use druid::Data;
 
 #[derive(Clone, Debug, Data)]
 pub enum Error {

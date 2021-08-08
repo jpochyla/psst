@@ -1,24 +1,22 @@
-use std::sync::Arc;
-
 use druid::{
     widget::{CrossAxisAlignment, Flex, Label, LineBreaking, List},
-    Insets, LensExt, LocalizedString, Menu, MenuItem, MouseButton, Size, Widget, WidgetExt,
+    Insets, LensExt, LocalizedString, Menu, MenuItem, Selector, Size, Widget, WidgetExt,
 };
 
 use crate::{
     cmd,
-    data::{
-        AppState, CommonCtx, Ctx, Library, Nav, Playlist, PlaylistDetail, PlaylistLink,
-        PlaylistTracks,
-    },
-    ui::{
-        theme,
-        track::{tracklist_widget, TrackDisplay},
-        utils::{error_widget, placeholder_widget, spinner_widget},
-    },
+    data::{AppState, Ctx, Library, Nav, Playlist, PlaylistDetail, PlaylistLink, PlaylistTracks},
     webapi::WebApi,
-    widget::{Async, Clip, MyWidgetExt, RemoteImage},
+    widget::{Async, MyWidgetExt, RemoteImage},
 };
+
+use super::{
+    theme,
+    track::{tracklist_widget, TrackDisplay},
+    utils::{error_widget, placeholder_widget, spinner_widget},
+};
+
+pub const LOAD_DETAIL: Selector<PlaylistLink> = Selector::new("app.playlist.load-detail");
 
 pub fn list_widget() -> impl Widget<AppState> {
     Async::new(
@@ -32,17 +30,12 @@ pub fn list_widget() -> impl Widget<AppState> {
                     .expand_width()
                     .padding(Insets::uniform_xy(theme::grid(2.0), theme::grid(0.6)))
                     .link()
-                    .on_ex_click(|ctx, event, playlist, _| match event.button {
-                        MouseButton::Left => {
-                            ctx.submit_command(
-                                cmd::NAVIGATE.with(Nav::PlaylistDetail(playlist.link())),
-                            );
-                        }
-                        MouseButton::Right => {
-                            ctx.show_context_menu(playlist_menu(playlist), event.window_pos);
-                        }
-                        _ => {}
+                    .on_click(|ctx, playlist, _| {
+                        ctx.submit_command(
+                            cmd::NAVIGATE.with(Nav::PlaylistDetail(playlist.link())),
+                        );
                     })
+                    .context_menu(playlist_menu)
             })
         },
         error_widget,
@@ -80,17 +73,10 @@ pub fn playlist_widget() -> impl Widget<Playlist> {
     playlist
         .link()
         .rounded(theme::BUTTON_BORDER_RADIUS)
-        .on_ex_click(
-            |ctx, event, playlist: &mut Playlist, _| match event.button {
-                MouseButton::Left => {
-                    ctx.submit_command(cmd::NAVIGATE.with(Nav::PlaylistDetail(playlist.link())));
-                }
-                MouseButton::Right => {
-                    ctx.show_context_menu(playlist_menu(playlist), event.window_pos);
-                }
-                _ => {}
-            },
-        )
+        .on_click(|ctx, playlist, _| {
+            ctx.submit_command(cmd::NAVIGATE.with(Nav::PlaylistDetail(playlist.link())));
+        })
+        .context_menu(playlist_menu)
 }
 
 fn cover_widget(size: f64) -> impl Widget<Playlist> {
@@ -102,10 +88,7 @@ fn cover_widget(size: f64) -> impl Widget<Playlist> {
 
 fn rounded_cover_widget(size: f64) -> impl Widget<Playlist> {
     // TODO: Take the radius from theme.
-    Clip::new(
-        Size::new(size, size).to_rounded_rect(4.0),
-        cover_widget(size),
-    )
+    cover_widget(size).clip(Size::new(size, size).to_rounded_rect(4.0))
 }
 
 pub fn detail_widget() -> impl Widget<AppState> {
@@ -119,26 +102,27 @@ pub fn detail_widget() -> impl Widget<AppState> {
                 ..TrackDisplay::empty()
             })
         },
-        || error_widget().lens(Ctx::data()),
+        error_widget,
     )
-    .on_deferred(|c: &Ctx<Arc<CommonCtx>, PlaylistLink>| {
-        WebApi::global()
-            .get_playlist_tracks(&c.data.id)
-            .map(|tracks| {
-                c.replace(PlaylistTracks {
-                    id: c.data.id.to_owned(),
-                    name: c.data.name.to_owned(),
-                    tracks,
-                })
-            })
-            .map_err(|err| c.replace(err))
-    })
     .lens(
         Ctx::make(
             AppState::common_ctx,
             AppState::playlist_detail.then(PlaylistDetail::tracks),
         )
         .then(Ctx::in_promise()),
+    )
+    .on_cmd_async(
+        LOAD_DETAIL,
+        |d| WebApi::global().get_playlist_tracks(&d.id),
+        |_, data, d| data.playlist_detail.tracks.defer(d),
+        |_, data, (d, r)| {
+            let r = r.map(|tracks| PlaylistTracks {
+                id: d.id.clone(),
+                name: d.name.clone(),
+                tracks,
+            });
+            data.playlist_detail.tracks.update((d, r))
+        },
     )
 }
 

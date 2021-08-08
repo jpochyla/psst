@@ -16,9 +16,10 @@ use crate::{
     data::{
         AppState, AudioQuality, Authentication, Config, Preferences, PreferencesTab, Promise, Theme,
     },
-    ui::{icons::SvgIcon, theme},
     widget::{icons, Border, Empty, MyWidgetExt},
 };
+
+use super::{icons::SvgIcon, theme};
 
 pub fn preferences_widget() -> impl Widget<AppState> {
     let tabs = tabs_widget()

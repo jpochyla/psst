@@ -6,10 +6,11 @@ use druid::{
 
 use crate::{
     data::{AppState, UserProfile},
-    ui::theme,
     webapi::WebApi,
     widget::{Async, Empty, MyWidgetExt},
 };
+
+use super::theme;
 
 pub fn user_widget() -> impl Widget<AppState> {
     let is_connected = Either::new(

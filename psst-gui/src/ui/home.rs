@@ -2,12 +2,13 @@ use druid::{widget::List, LensExt, Widget, WidgetExt};
 
 use crate::{
     data::{AppState, Personalized},
-    ui::{
-        playlist,
-        utils::{error_widget, spinner_widget},
-    },
     webapi::WebApi,
     widget::Async,
+};
+
+use super::{
+    playlist,
+    utils::{error_widget, spinner_widget},
 };
 
 pub fn home_widget() -> impl Widget<AppState> {

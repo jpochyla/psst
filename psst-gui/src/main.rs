@@ -10,13 +10,14 @@ mod ui;
 mod webapi;
 mod widget;
 
+use druid::AppLauncher;
+use env_logger::{Builder, Env};
+use webapi::WebApi;
+
 use crate::{
     data::{AppState, Config},
     delegate::Delegate,
 };
-use druid::AppLauncher;
-use env_logger::{Builder, Env};
-use webapi::WebApi;
 
 const ENV_LOG: &str = "PSST_LOG";
 const ENV_LOG_STYLE: &str = "PSST_LOG_STYLE";

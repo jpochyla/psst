@@ -2,24 +2,28 @@ use std::sync::Arc;
 
 use druid::{
     widget::{CrossAxisAlignment, Flex, Label, LabelText, List, TextBox},
-    Data, LensExt, Widget, WidgetExt,
+    Data, LensExt, Selector, Widget, WidgetExt,
 };
 
 use crate::{
     cmd,
     controller::InputController,
-    data::{AppState, CommonCtx, Ctx, Nav, Search, SearchResults},
-    ui::{
-        album::album_widget,
-        artist::artist_widget,
-        theme,
-        track::{tracklist_widget, TrackDisplay},
-        utils::{error_widget, spinner_widget},
-    },
-    widget::Async,
+    data::{AppState, Ctx, Nav, Search, SearchResults, SpotifyUrl, WithCtx},
+    webapi::WebApi,
+    widget::{Async, MyWidgetExt},
 };
 
-use super::playlist::playlist_widget;
+use super::{
+    album::album_widget,
+    artist::artist_widget,
+    playlist::playlist_widget,
+    theme,
+    track::{tracklist_widget, TrackDisplay},
+    utils::{error_widget, spinner_widget},
+};
+
+pub const LOAD_RESULTS: Selector<Arc<str>> = Selector::new("app.search.load-results");
+pub const OPEN_LINK: Selector<SpotifyUrl> = Selector::new("app.search.open-link");
 
 pub fn input_widget() -> impl Widget<AppState> {
     TextBox::new()
@@ -47,23 +51,43 @@ pub fn results_widget() -> impl Widget<AppState> {
                 .with_child(header_widget("Playlists"))
                 .with_child(playlist_results_widget())
         },
-        || error_widget().lens(Ctx::data()),
+        error_widget,
     )
     .lens(
         Ctx::make(AppState::common_ctx, AppState::search.then(Search::results))
             .then(Ctx::in_promise()),
     )
+    .on_cmd_async(
+        LOAD_RESULTS,
+        |q| WebApi::global().search(&q),
+        |_, data, q| data.search.results.defer(q),
+        |_, data, r| data.search.results.update(r),
+    )
+    .on_cmd_async(
+        OPEN_LINK,
+        |l| WebApi::global().load_spotify_link(&l),
+        |_, data, l| data.search.results.defer(l.id()),
+        |ctx, data, (_, r)| match r {
+            Ok(nav) => {
+                data.search.results.clear();
+                ctx.submit_command(cmd::NAVIGATE.with(nav));
+            }
+            Err(err) => {
+                data.search.results.reject(err);
+            }
+        },
+    )
 }
 
-fn artist_results_widget() -> impl Widget<Ctx<Arc<CommonCtx>, SearchResults>> {
+fn artist_results_widget() -> impl Widget<WithCtx<SearchResults>> {
     List::new(artist_widget).lens(Ctx::data().then(SearchResults::artists))
 }
 
-fn album_results_widget() -> impl Widget<Ctx<Arc<CommonCtx>, SearchResults>> {
+fn album_results_widget() -> impl Widget<WithCtx<SearchResults>> {
     List::new(album_widget).lens(Ctx::map(SearchResults::albums))
 }
 
-fn track_results_widget() -> impl Widget<Ctx<Arc<CommonCtx>, SearchResults>> {
+fn track_results_widget() -> impl Widget<WithCtx<SearchResults>> {
     tracklist_widget(TrackDisplay {
         title: true,
         artist: true,
@@ -72,7 +96,7 @@ fn track_results_widget() -> impl Widget<Ctx<Arc<CommonCtx>, SearchResults>> {
     })
 }
 
-fn playlist_results_widget() -> impl Widget<Ctx<Arc<CommonCtx>, SearchResults>> {
+fn playlist_results_widget() -> impl Widget<WithCtx<SearchResults>> {
     List::new(playlist_widget).lens(Ctx::data().then(SearchResults::playlists))
 }
 

@@ -1,29 +1,28 @@
 use std::sync::Arc;
 
 use druid::{
-    im::{vector, Vector},
+    im::Vector,
     kurbo::Line,
     lens::Map,
     piet::StrokeStyle,
     widget::{
         Controller, ControllerHost, CrossAxisAlignment, Flex, Label, List, ListIter, Painter,
     },
-    Data, Env, Event, EventCtx, Lens, LensExt, LocalizedString, Menu, MenuItem, MouseButton,
-    RenderContext, TextAlignment, Widget, WidgetExt,
+    Data, Env, Event, EventCtx, Lens, LensExt, LocalizedString, Menu, MenuItem, RenderContext,
+    TextAlignment, Widget, WidgetExt,
 };
 
 use crate::{
     cmd,
     data::{
-        Album, AppState, ArtistLink, ArtistTracks, CommonCtx, Ctx, Nav, PlaybackOrigin,
-        PlaybackPayload, PlaylistTracks, Recommendations, RecommendationsRequest, SavedTracks,
-        SearchResults, Track,
+        Album, AppState, ArtistLink, ArtistTracks, CommonCtx, Nav, PlaybackOrigin, PlaybackPayload,
+        PlaylistTracks, Recommendations, RecommendationsRequest, SavedTracks, SearchResults, Track,
+        WithCtx,
     },
-    ui::theme,
     widget::MyWidgetExt,
 };
 
-use super::utils;
+use super::{library, theme, utils};
 
 #[derive(Copy, Clone)]
 pub struct TrackDisplay {
@@ -46,7 +45,7 @@ impl TrackDisplay {
     }
 }
 
-pub fn tracklist_widget<T>(display: TrackDisplay) -> impl Widget<Ctx<Arc<CommonCtx>, T>>
+pub fn tracklist_widget<T>(display: TrackDisplay) -> impl Widget<WithCtx<T>>
 where
     T: TrackIter + Data,
 {
@@ -90,7 +89,7 @@ impl TrackIter for SearchResults {
 
 impl TrackIter for Recommendations {
     fn origin(&self) -> PlaybackOrigin {
-        PlaybackOrigin::Recommendations
+        PlaybackOrigin::Recommendations(self.request.clone())
     }
 
     fn tracks(&self) -> &Vector<Arc<Track>> {
@@ -118,7 +117,7 @@ impl TrackIter for SavedTracks {
     }
 }
 
-impl<T> ListIter<TrackRow> for Ctx<Arc<CommonCtx>, T>
+impl<T> ListIter<TrackRow> for WithCtx<T>
 where
     T: TrackIter + Data,
 {
@@ -168,7 +167,7 @@ struct TrackRow {
 impl TrackRow {
     fn is_playing() -> impl Lens<TrackRow, bool> {
         Map::new(
-            |tr: &TrackRow| tr.ctx.is_track_playing(&tr.track),
+            |row: &TrackRow| row.ctx.is_track_playing(&row.track),
             |_, _| {
                 // Immutable.
             },
@@ -178,17 +177,17 @@ impl TrackRow {
 
 struct PlayController;
 
-impl<T, W> Controller<Ctx<Arc<CommonCtx>, T>, W> for PlayController
+impl<T, W> Controller<WithCtx<T>, W> for PlayController
 where
     T: TrackIter + Data,
-    W: Widget<Ctx<Arc<CommonCtx>, T>>,
+    W: Widget<WithCtx<T>>,
 {
     fn event(
         &mut self,
         child: &mut W,
         ctx: &mut EventCtx,
         event: &Event,
-        data: &mut Ctx<Arc<CommonCtx>, T>,
+        data: &mut WithCtx<T>,
         env: &Env,
     ) {
         match event {
@@ -213,7 +212,7 @@ fn track_widget(display: TrackDisplay) -> impl Widget<TrackRow> {
     let mut minor = Flex::row();
 
     if display.number {
-        let track_number = Label::dynamic(|track: &Arc<Track>, _| track.track_number.to_string())
+        let track_number = Label::<Arc<Track>>::dynamic(|track, _| track.track_number.to_string())
             .with_text_size(theme::TEXT_SIZE_SMALL)
             .with_text_color(theme::PLACEHOLDER_COLOR)
             .with_text_alignment(TextAlignment::Center)
@@ -275,7 +274,7 @@ fn track_widget(display: TrackDisplay) -> impl Widget<TrackRow> {
     major.add_flex_child(line_painter, 1.0);
 
     if display.popularity {
-        let track_popularity = Label::dynamic(|track: &Arc<Track>, _| {
+        let track_popularity = Label::<Arc<Track>>::dynamic(|track, _| {
             track.popularity.map(popularity_stars).unwrap_or_default()
         })
         .with_text_size(theme::TEXT_SIZE_SMALL)
@@ -286,7 +285,7 @@ fn track_widget(display: TrackDisplay) -> impl Widget<TrackRow> {
     }
 
     let track_duration =
-        Label::dynamic(|track: &Arc<Track>, _| utils::as_minutes_and_seconds(&track.duration))
+        Label::<Arc<Track>>::dynamic(|track, _| utils::as_minutes_and_seconds(&track.duration))
             .with_text_size(theme::TEXT_SIZE_SMALL)
             .with_text_color(theme::PLACEHOLDER_COLOR)
             .lens(TrackRow::track);
@@ -300,18 +299,12 @@ fn track_widget(display: TrackDisplay) -> impl Widget<TrackRow> {
         .with_child(minor)
         .padding(theme::grid(1.0))
         .link()
-        .active(|tr: &TrackRow, _| tr.ctx.is_track_playing(&tr.track))
+        .active(|row, _| row.ctx.is_track_playing(&row.track))
         .rounded(theme::BUTTON_BORDER_RADIUS)
-        .on_ex_click(|ctx, event, tr: &mut TrackRow, _| match event.button {
-            MouseButton::Left => {
-                ctx.submit_notification(cmd::PLAY_TRACK_AT.with(tr.position));
-            }
-            MouseButton::Right => {
-                ctx.show_context_menu(track_menu(tr), event.window_pos);
-                ctx.set_active(true);
-            }
-            _ => {}
+        .on_click(|ctx, row, _| {
+            ctx.submit_notification(cmd::PLAY_TRACK_AT.with(row.position));
         })
+        .context_menu(track_menu)
 }
 
 fn popularity_stars(popularity: u32) -> String {
@@ -331,11 +324,11 @@ fn popularity_stars(popularity: u32) -> String {
     stars
 }
 
-fn track_menu(tr: &TrackRow) -> Menu<AppState> {
+fn track_menu(row: &TrackRow) -> Menu<AppState> {
     let mut menu = Menu::empty();
 
-    for artist_link in &tr.track.artists {
-        let more_than_one_artist = tr.track.artists.len() > 1;
+    for artist_link in &row.track.artists {
+        let more_than_one_artist = row.track.artists.len() > 1;
         let title = if more_than_one_artist {
             LocalizedString::new("menu-item-show-artist-name")
                 .with_placeholder(format!("Go To Artist “{}”", artist_link.name))
@@ -348,7 +341,7 @@ fn track_menu(tr: &TrackRow) -> Menu<AppState> {
         );
     }
 
-    if let Some(album_link) = tr.track.album.as_ref() {
+    if let Some(album_link) = row.track.album.as_ref() {
         menu = menu.entry(
             MenuItem::new(
                 LocalizedString::new("menu-item-show-album").with_placeholder("Go To Album"),
@@ -362,28 +355,27 @@ fn track_menu(tr: &TrackRow) -> Menu<AppState> {
             LocalizedString::new("menu-item-show-recommended")
                 .with_placeholder("Show Similar Tracks"),
         )
-        .command(cmd::LOAD_RECOMMENDATIONS.with(RecommendationsRequest {
-            seed_tracks: vector![tr.track.id],
-            ..RecommendationsRequest::default()
-        })),
+        .command(cmd::NAVIGATE.with(Nav::Recommendations(Arc::new(
+            RecommendationsRequest::for_track(row.track.id),
+        )))),
     );
 
     menu = menu.entry(
         MenuItem::new(
             LocalizedString::new("menu-item-copy-link").with_placeholder("Copy Link to Track"),
         )
-        .command(cmd::COPY.with(tr.track.url())),
+        .command(cmd::COPY.with(row.track.url())),
     );
 
     menu = menu.separator();
 
-    if tr.ctx.is_track_saved(&tr.track) {
+    if row.ctx.is_track_saved(&row.track) {
         menu = menu.entry(
             MenuItem::new(
                 LocalizedString::new("menu-item-remove-from-library")
                     .with_placeholder("Remove Track from Library"),
             )
-            .command(cmd::UNSAVE_TRACK.with(tr.track.id)),
+            .command(library::UNSAVE_TRACK.with(row.track.id)),
         );
     } else {
         menu = menu.entry(
@@ -391,7 +383,7 @@ fn track_menu(tr: &TrackRow) -> Menu<AppState> {
                 LocalizedString::new("menu-item-save-to-library")
                     .with_placeholder("Save Track to Library"),
             )
-            .command(cmd::SAVE_TRACK.with(tr.track.clone())),
+            .command(library::SAVE_TRACK.with(row.track.clone())),
         );
     }
 

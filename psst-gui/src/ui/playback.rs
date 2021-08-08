@@ -15,11 +15,10 @@ use crate::{
         AppState, AudioAnalysis, NowPlaying, Playback, PlaybackOrigin, PlaybackState, Promise,
         QueueBehavior, Track,
     },
-    ui::theme,
     widget::{icons, icons::SvgIcon, Empty, Maybe, MyWidgetExt},
 };
 
-use super::utils;
+use super::{theme, utils};
 
 pub fn panel_widget() -> impl Widget<AppState> {
     let seek_bar = Maybe::or_empty(SeekBar::new).lens(Playback::now_playing);
@@ -73,16 +72,8 @@ fn playback_item_widget() -> impl Widget<NowPlaying> {
         .with_child(track_origin)
         .padding(theme::grid(2.0))
         .link()
-        .on_ex_click(|ctx, event, now_playing, _| {
-            match event.button {
-                MouseButton::Left => {
-                    ctx.submit_command(cmd::NAVIGATE.with(now_playing.origin.to_nav()));
-                }
-                MouseButton::Right => {
-                    // TODO: Show menu.
-                }
-                _ => {}
-            }
+        .on_click(|ctx, now_playing, _| {
+            ctx.submit_command(cmd::NAVIGATE.with(now_playing.origin.to_nav()));
         })
 }
 
@@ -93,7 +84,7 @@ fn playback_origin_icon(origin: &PlaybackOrigin) -> &'static SvgIcon {
         PlaybackOrigin::Artist { .. } => &icons::ARTIST,
         PlaybackOrigin::Playlist { .. } => &icons::PLAYLIST,
         PlaybackOrigin::Search { .. } => &icons::SEARCH,
-        PlaybackOrigin::Recommendations => &icons::SEARCH,
+        PlaybackOrigin::Recommendations { .. } => &icons::SEARCH,
     }
 }
 

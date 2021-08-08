@@ -2,6 +2,7 @@ mod album;
 mod artist;
 mod config;
 mod ctx;
+mod id;
 mod nav;
 mod playback;
 mod playlist;
@@ -97,8 +98,6 @@ impl Default for AppState {
                 results: Promise::Empty,
             },
             recommend: Recommend {
-                counter: 0,
-                request: None,
                 results: Promise::Empty,
             },
             album_detail: AlbumDetail {
@@ -310,6 +309,8 @@ impl CommonCtx {
         self.library.contains_album(album)
     }
 }
+
+pub type WithCtx<T> = Ctx<Arc<CommonCtx>, T>;
 
 #[derive(Clone, Data, Lens)]
 pub struct Personalized {

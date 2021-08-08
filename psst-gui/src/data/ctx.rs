@@ -131,21 +131,17 @@ where
     PD: Data,
     PE: Data,
 {
-    pub fn in_promise() -> impl Lens<Self, Promise<Ctx<C, PT>, Ctx<C, PD>, Ctx<C, PE>>> {
+    pub fn in_promise() -> impl Lens<Self, Promise<Ctx<C, PT>, PD, PE>> {
         Map::new(
             |c: &Self| match &c.data {
                 Promise::Empty => Promise::Empty,
                 Promise::Resolved(res) => {
                     Promise::Resolved(Ctx::new(c.ctx.to_owned(), res.to_owned()))
                 }
-                Promise::Deferred(def) => {
-                    Promise::Deferred(Ctx::new(c.ctx.to_owned(), def.to_owned()))
-                }
-                Promise::Rejected(err) => {
-                    Promise::Rejected(Ctx::new(c.ctx.to_owned(), err.to_owned()))
-                }
+                Promise::Deferred(def) => Promise::Deferred(def.to_owned()),
+                Promise::Rejected(err) => Promise::Rejected(err.to_owned()),
             },
-            |c: &mut Self, p: Promise<Ctx<C, PT>, Ctx<C, PD>, Ctx<C, PE>>| match p {
+            |c: &mut Self, p: Promise<Ctx<C, PT>, PD, PE>| match p {
                 Promise::Empty => {
                     c.data = Promise::Empty;
                 }
@@ -153,13 +149,11 @@ where
                     c.data = Promise::Resolved(pc.data);
                     c.ctx = pc.ctx;
                 }
-                Promise::Deferred(pc) => {
-                    c.data = Promise::Deferred(pc.data);
-                    c.ctx = pc.ctx;
+                Promise::Deferred(def) => {
+                    c.data = Promise::Deferred(def);
                 }
-                Promise::Rejected(pc) => {
-                    c.data = Promise::Rejected(pc.data);
-                    c.ctx = pc.ctx;
+                Promise::Rejected(err) => {
+                    c.data = Promise::Rejected(err);
                 }
             },
         )

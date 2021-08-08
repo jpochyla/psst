@@ -2,43 +2,43 @@ use std::sync::Arc;
 
 use druid::{
     widget::{CrossAxisAlignment, Flex, Label, LineBreaking, List},
-    LensExt, LocalizedString, Menu, MenuItem, MouseButton, Size, Widget, WidgetExt,
+    LensExt, LocalizedString, Menu, MenuItem, Selector, Size, Widget, WidgetExt,
 };
 
 use crate::{
     cmd,
-    data::{Album, AlbumDetail, AlbumLink, AppState, ArtistLink, Cached, CommonCtx, Ctx, Nav},
-    ui::{
-        theme,
-        track::{tracklist_widget, TrackDisplay},
-        utils::{error_widget, placeholder_widget, spinner_widget},
-    },
+    data::{Album, AlbumDetail, AlbumLink, AppState, ArtistLink, Cached, Ctx, Nav, WithCtx},
     webapi::WebApi,
-    widget::{Async, Clip, MyWidgetExt, RemoteImage},
+    widget::{Async, MyWidgetExt, RemoteImage},
 };
 
-use super::artist::artist_link_widget;
+use super::{
+    artist::artist_link_widget,
+    library, theme,
+    track::{tracklist_widget, TrackDisplay},
+    utils::{error_widget, placeholder_widget, spinner_widget},
+};
+
+pub const LOAD_DETAIL: Selector<AlbumLink> = Selector::new("app.album.load-detail");
 
 pub fn detail_widget() -> impl Widget<AppState> {
-    Async::new(spinner_widget, loaded_detail_widget, || {
-        error_widget().lens(Ctx::data())
-    })
-    .on_deferred(|c: &Ctx<Arc<CommonCtx>, AlbumLink>| {
-        WebApi::global()
-            .get_album(&c.data.id)
-            .map(|album| c.replace(album))
-            .map_err(|err| c.replace(err))
-    })
-    .lens(
-        Ctx::make(
-            AppState::common_ctx,
-            AppState::album_detail.then(AlbumDetail::album),
+    Async::new(spinner_widget, loaded_detail_widget, error_widget)
+        .lens(
+            Ctx::make(
+                AppState::common_ctx,
+                AppState::album_detail.then(AlbumDetail::album),
+            )
+            .then(Ctx::in_promise()),
         )
-        .then(Ctx::in_promise()),
-    )
+        .on_cmd_async(
+            LOAD_DETAIL,
+            |d| WebApi::global().get_album(&d.id),
+            |_, data, d| data.album_detail.album.defer(d),
+            |_, data, r| data.album_detail.album.update(r),
+        )
 }
 
-fn loaded_detail_widget() -> impl Widget<Ctx<Arc<CommonCtx>, Cached<Arc<Album>>>> {
+fn loaded_detail_widget() -> impl Widget<WithCtx<Cached<Arc<Album>>>> {
     let album_cover = rounded_cover_widget(theme::grid(10.0));
 
     let album_artists = List::new(artist_link_widget).lens(Album::artists.in_arc());
@@ -92,14 +92,10 @@ fn cover_widget(size: f64) -> impl Widget<Arc<Album>> {
 }
 
 fn rounded_cover_widget(size: f64) -> impl Widget<Arc<Album>> {
-    // TODO: Take the radius from theme.
-    Clip::new(
-        Size::new(size, size).to_rounded_rect(4.0),
-        cover_widget(size),
-    )
+    cover_widget(size).clip(Size::new(size, size).to_rounded_rect(4.0))
 }
 
-pub fn album_widget() -> impl Widget<Ctx<Arc<CommonCtx>, Arc<Album>>> {
+pub fn album_widget() -> impl Widget<WithCtx<Arc<Album>>> {
     let album_cover = cover_widget(theme::grid(7.0));
 
     let album_name = Label::raw()
@@ -117,7 +113,7 @@ pub fn album_widget() -> impl Widget<Ctx<Arc<CommonCtx>, Arc<Album>>> {
     .with_spacing(theme::grid(1.0))
     .lens(Album::artists.in_arc());
 
-    let album_date = Label::dynamic(|album: &Arc<Album>, _| album.release_year())
+    let album_date = Label::<Arc<Album>>::dynamic(|album, _| album.release_year())
         .with_text_size(theme::TEXT_SIZE_SMALL)
         .with_text_color(theme::PLACEHOLDER_COLOR);
 
@@ -135,20 +131,15 @@ pub fn album_widget() -> impl Widget<Ctx<Arc<CommonCtx>, Arc<Album>>> {
         .with_flex_child(album_info, 1.0)
         .lens(Ctx::data());
 
-    album.link().on_ex_click(
-        |ctx, event, album: &mut Ctx<Arc<CommonCtx>, Arc<Album>>, _| match event.button {
-            MouseButton::Left => {
-                ctx.submit_command(cmd::NAVIGATE.with(Nav::AlbumDetail(album.data.link())));
-            }
-            MouseButton::Right => {
-                ctx.show_context_menu(album_menu(album), event.window_pos);
-            }
-            _ => {}
-        },
-    )
+    album
+        .link()
+        .on_click(|ctx, album, _| {
+            ctx.submit_command(cmd::NAVIGATE.with(Nav::AlbumDetail(album.data.link())));
+        })
+        .context_menu(album_menu)
 }
 
-fn album_menu(album: &Ctx<Arc<CommonCtx>, Arc<Album>>) -> Menu<AppState> {
+fn album_menu(album: &WithCtx<Arc<Album>>) -> Menu<AppState> {
     let mut menu = Menu::empty();
 
     for artist_link in &album.data.artists {
@@ -180,7 +171,7 @@ fn album_menu(album: &Ctx<Arc<CommonCtx>, Arc<Album>>) -> Menu<AppState> {
                 LocalizedString::new("menu-item-remove-from-library")
                     .with_placeholder("Remove Album from Library"),
             )
-            .command(cmd::UNSAVE_ALBUM.with(album.data.link())),
+            .command(library::UNSAVE_ALBUM.with(album.data.link())),
         );
     } else {
         menu = menu.entry(
@@ -188,7 +179,7 @@ fn album_menu(album: &Ctx<Arc<CommonCtx>, Arc<Album>>) -> Menu<AppState> {
                 LocalizedString::new("menu-item-save-to-library")
                     .with_placeholder("Save Album to Library"),
             )
-            .command(cmd::SAVE_ALBUM.with(album.data.clone())),
+            .command(library::SAVE_ALBUM.with(album.data.clone())),
         );
     }
 

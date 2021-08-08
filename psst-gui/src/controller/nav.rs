@@ -2,7 +2,8 @@ use druid::widget::{prelude::*, Controller};
 
 use crate::{
     cmd,
-    data::{AppState, Nav},
+    data::{AppState, Nav, SpotifyUrl},
+    ui::{album, artist, library, playlist, recommend, search},
 };
 
 pub struct NavController;
@@ -12,36 +13,34 @@ impl NavController {
         match &data.route {
             Nav::Home => {}
             Nav::SavedTracks => {
-                if data.library.saved_tracks.is_empty() {
-                    data.library_mut().saved_tracks.defer_default();
+                if !data.library.saved_tracks.is_resolved() {
+                    ctx.submit_command(library::LOAD_TRACKS);
                 }
             }
             Nav::SavedAlbums => {
-                if data.library.saved_albums.is_empty() {
-                    data.library_mut().saved_albums.defer_default();
+                if !data.library.saved_albums.is_resolved() {
+                    ctx.submit_command(library::LOAD_ALBUMS);
                 }
             }
             Nav::SearchResults(query) => {
-                ctx.submit_command(cmd::LOAD_SEARCH_RESULTS.with(query.to_owned()));
+                if let Some(link) = SpotifyUrl::parse(query) {
+                    ctx.submit_command(search::OPEN_LINK.with(link));
+                } else {
+                    ctx.submit_command(search::LOAD_RESULTS.with(query.to_owned()));
+                }
             }
             Nav::AlbumDetail(link) => {
-                if !data.album_detail.album.is_deferred(link) {
-                    data.album_detail.album.defer(link.to_owned());
-                }
+                ctx.submit_command(album::LOAD_DETAIL.with(link.to_owned()));
             }
             Nav::ArtistDetail(link) => {
-                if !data.artist_detail.top_tracks.is_deferred(link) {
-                    data.artist_detail.top_tracks.defer(link.to_owned());
-                    data.artist_detail.albums.defer(link.to_owned());
-                    data.artist_detail.related_artists.defer(link.to_owned());
-                }
+                ctx.submit_command(artist::LOAD_DETAIL.with(link.to_owned()));
             }
             Nav::PlaylistDetail(link) => {
-                if !data.playlist_detail.tracks.is_deferred(link) {
-                    data.playlist_detail.tracks.defer(link.to_owned());
-                }
+                ctx.submit_command(playlist::LOAD_DETAIL.with(link.to_owned()));
             }
-            Nav::Recommendations => {}
+            Nav::Recommendations(request) => {
+                ctx.submit_command(recommend::LOAD_RESULTS.with(request.clone()));
+            }
         }
     }
 }
@@ -62,16 +61,16 @@ where
             Event::Command(cmd) if cmd.is(cmd::NAVIGATE) => {
                 let nav = cmd.get_unchecked(cmd::NAVIGATE);
                 data.navigate(nav);
-                self.load_route_data(ctx, data);
                 ctx.set_handled();
+                self.load_route_data(ctx, data);
             }
             Event::Command(cmd) if cmd.is(cmd::NAVIGATE_BACK) => {
                 let count = cmd.get_unchecked(cmd::NAVIGATE_BACK);
                 for _ in 0..*count {
                     data.navigate_back();
                 }
-                self.load_route_data(ctx, data);
                 ctx.set_handled();
+                self.load_route_data(ctx, data);
             }
             _ => {
                 child.event(ctx, event, data, env);

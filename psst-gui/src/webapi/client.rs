@@ -443,12 +443,12 @@ impl WebApi {
     // https://developer.spotify.com/documentation/web-api/reference/#endpoint-get-recommendations
     pub fn get_recommendations(
         &self,
-        data: RecommendationsRequest,
+        data: Arc<RecommendationsRequest>,
     ) -> Result<Recommendations, Error> {
-        let seed_artists = data.seed_artists.into_iter().map(|link| link.id).join(", ");
+        let seed_artists = data.seed_artists.iter().map(|link| &link.id).join(", ");
         let seed_tracks = data
             .seed_tracks
-            .into_iter()
+            .iter()
             .map(|track| track.to_base62())
             .join(", ");
 
@@ -460,7 +460,8 @@ impl WebApi {
             .query("seed_tracks", &seed_tracks);
         // TODO: insert the rest of `data` as query parameters.
 
-        let result = self.load(request)?;
+        let mut result: Recommendations = self.load(request)?;
+        result.request = data;
         Ok(result)
     }
 }

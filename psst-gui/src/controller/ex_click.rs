@@ -1,16 +1,20 @@
 use druid::{
-    widget::Controller, Data, Env, Event, EventCtx, LifeCycle, LifeCycleCtx, MouseEvent, Widget,
+    widget::Controller, Data, Env, Event, EventCtx, LifeCycle, LifeCycleCtx, MouseButton,
+    MouseEvent, Widget,
 };
 
 pub struct ExClick<T> {
-    /// A closure that will be invoked when the child widget is clicked.
+    button: Option<MouseButton>,
     action: Box<dyn Fn(&mut EventCtx, &MouseEvent, &mut T, &Env)>,
 }
 
 impl<T: Data> ExClick<T> {
-    /// Create a new clickable [`Controller`] widget.
-    pub fn new(action: impl Fn(&mut EventCtx, &MouseEvent, &mut T, &Env) + 'static) -> Self {
+    pub fn new(
+        button: Option<MouseButton>,
+        action: impl Fn(&mut EventCtx, &MouseEvent, &mut T, &Env) + 'static,
+    ) -> Self {
         ExClick {
+            button,
             action: Box::new(action),
         }
     }
@@ -19,12 +23,16 @@ impl<T: Data> ExClick<T> {
 impl<T: Data, W: Widget<T>> Controller<T, W> for ExClick<T> {
     fn event(&mut self, child: &mut W, ctx: &mut EventCtx, event: &Event, data: &mut T, env: &Env) {
         match event {
-            Event::MouseDown(_) => {
-                ctx.set_active(true);
-                ctx.request_paint();
+            Event::MouseDown(mouse_event) => {
+                if mouse_event.button == self.button.unwrap_or(mouse_event.button) {
+                    ctx.set_active(true);
+                    ctx.request_paint();
+                }
             }
             Event::MouseUp(mouse_event) => {
-                if ctx.is_active() {
+                if mouse_event.button == self.button.unwrap_or(mouse_event.button)
+                    && ctx.is_active()
+                {
                     ctx.set_active(false);
                     if ctx.is_hot() {
                         (self.action)(ctx, mouse_event, data, env);

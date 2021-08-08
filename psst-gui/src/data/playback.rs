@@ -6,6 +6,8 @@ use crate::data::{
     AlbumLink, ArtistLink, AudioAnalysis, Nav, PlaylistLink, Promise, Track, TrackId,
 };
 
+use super::RecommendationsRequest;
+
 #[derive(Clone, Debug, Data, Lens)]
 pub struct Playback {
     pub state: PlaybackState,
@@ -62,7 +64,7 @@ pub enum PlaybackOrigin {
     Artist(ArtistLink),
     Playlist(PlaylistLink),
     Search(Arc<str>),
-    Recommendations,
+    Recommendations(Arc<RecommendationsRequest>),
 }
 
 impl PlaybackOrigin {
@@ -73,7 +75,7 @@ impl PlaybackOrigin {
             PlaybackOrigin::Artist(link) => Nav::ArtistDetail(link.clone()),
             PlaybackOrigin::Playlist(link) => Nav::PlaylistDetail(link.clone()),
             PlaybackOrigin::Search(query) => Nav::SearchResults(query.clone()),
-            PlaybackOrigin::Recommendations => Nav::Recommendations,
+            PlaybackOrigin::Recommendations(request) => Nav::Recommendations(request.clone()),
         }
     }
 }
@@ -86,7 +88,7 @@ impl fmt::Display for PlaybackOrigin {
             PlaybackOrigin::Artist(link) => link.name.fmt(f),
             PlaybackOrigin::Playlist(link) => link.name.fmt(f),
             PlaybackOrigin::Search(query) => query.fmt(f),
-            PlaybackOrigin::Recommendations => f.write_str("Recommended"),
+            PlaybackOrigin::Recommendations(_) => f.write_str("Recommended"),
         }
     }
 }
