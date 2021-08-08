@@ -6,8 +6,8 @@ use crate::error::Error;
 pub enum Promise<T: Data, D: Data = (), E: Data = Error> {
     Empty,
     Deferred(D),
-    Resolved(T),
-    Rejected(E),
+    Resolved { def: D, val: T },
+    Rejected { def: D, err: E },
 }
 
 #[derive(Eq, PartialEq, Debug)]
@@ -22,29 +22,44 @@ impl<T: Data, D: Data, E: Data> Promise<T, D, E> {
     pub fn state(&self) -> PromiseState {
         match self {
             Self::Empty => PromiseState::Empty,
-            Self::Deferred(_) => PromiseState::Deferred,
-            Self::Resolved(_) => PromiseState::Resolved,
-            Self::Rejected(_) => PromiseState::Rejected,
+            Self::Deferred { .. } => PromiseState::Deferred,
+            Self::Resolved { .. } => PromiseState::Resolved,
+            Self::Rejected { .. } => PromiseState::Rejected,
         }
     }
 
-    pub fn is_empty(&self) -> bool {
-        matches!(self, Self::Empty)
-    }
-
-    pub fn is_resolved(&self) -> bool {
-        matches!(self, Self::Resolved(_))
-    }
-
-    pub fn is_rejected(&self) -> bool {
-        matches!(self, Self::Rejected(_))
-    }
-
-    pub fn is_deferred(&self, def: &D) -> bool
+    pub fn contains(&self, d: &D) -> bool
     where
         D: PartialEq,
     {
-        matches!(self, Self::Deferred(d) if d == def)
+        matches!(self, Self::Resolved { def, .. } if def == d)
+    }
+
+    pub fn is_resolved(&self) -> bool {
+        self.state() == PromiseState::Resolved
+    }
+
+    pub fn is_deferred(&self, d: &D) -> bool
+    where
+        D: PartialEq,
+    {
+        matches!(self, Self::Deferred(def) if def == d)
+    }
+
+    pub fn resolved(&self) -> Option<&T> {
+        if let Promise::Resolved { val, .. } = self {
+            Some(val)
+        } else {
+            None
+        }
+    }
+
+    pub fn resolved_mut(&mut self) -> Option<&mut T> {
+        if let Promise::Resolved { val, .. } = self {
+            Some(val)
+        } else {
+            None
+        }
     }
 
     pub fn clear(&mut self) {
@@ -55,18 +70,18 @@ impl<T: Data, D: Data, E: Data> Promise<T, D, E> {
         *self = Self::Deferred(def);
     }
 
-    pub fn resolve(&mut self, val: T) {
-        *self = Self::Resolved(val);
+    pub fn resolve(&mut self, def: D, val: T) {
+        *self = Self::Resolved { def, val };
     }
 
-    pub fn reject(&mut self, err: E) {
-        *self = Self::Rejected(err);
+    pub fn reject(&mut self, def: D, err: E) {
+        *self = Self::Rejected { def, err };
     }
 
-    pub fn resolve_or_reject(&mut self, res: Result<T, E>) {
+    pub fn resolve_or_reject(&mut self, def: D, res: Result<T, E>) {
         *self = match res {
-            Ok(ok) => Self::Resolved(ok),
-            Err(err) => Self::Rejected(err),
+            Ok(val) => Self::Resolved { def, val },
+            Err(err) => Self::Rejected { def, err },
         };
     }
 
@@ -75,7 +90,9 @@ impl<T: Data, D: Data, E: Data> Promise<T, D, E> {
         D: PartialEq,
     {
         if self.is_deferred(&def) {
-            self.resolve_or_reject(res);
+            self.resolve_or_reject(def, res);
+        } else {
+            // Ignore.
         }
     }
 }

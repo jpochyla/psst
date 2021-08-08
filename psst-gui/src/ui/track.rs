@@ -347,7 +347,7 @@ fn track_menu(row: &TrackRow) -> Menu<AppState> {
                 LocalizedString::new("menu-item-show-album").with_placeholder("Go To Album"),
             )
             .command(cmd::NAVIGATE.with(Nav::AlbumDetail(album_link.to_owned()))),
-        )
+        );
     }
 
     menu = menu.entry(

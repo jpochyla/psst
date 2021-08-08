@@ -41,13 +41,6 @@ where
     {
         CtxMap { map }
     }
-
-    pub fn replace<U: Data>(&self, data: U) -> Ctx<C, U> {
-        Ctx {
-            ctx: self.ctx.to_owned(),
-            data,
-        }
-    }
 }
 
 struct CtxMake<CL, TL> {
@@ -135,25 +128,29 @@ where
         Map::new(
             |c: &Self| match &c.data {
                 Promise::Empty => Promise::Empty,
-                Promise::Resolved(res) => {
-                    Promise::Resolved(Ctx::new(c.ctx.to_owned(), res.to_owned()))
-                }
                 Promise::Deferred(def) => Promise::Deferred(def.to_owned()),
-                Promise::Rejected(err) => Promise::Rejected(err.to_owned()),
+                Promise::Resolved { def, val } => Promise::Resolved {
+                    def: def.to_owned(),
+                    val: Ctx::new(c.ctx.to_owned(), val.to_owned()),
+                },
+                Promise::Rejected { def, err } => Promise::Rejected {
+                    def: def.to_owned(),
+                    err: err.to_owned(),
+                },
             },
             |c: &mut Self, p: Promise<Ctx<C, PT>, PD, PE>| match p {
                 Promise::Empty => {
                     c.data = Promise::Empty;
                 }
-                Promise::Resolved(pc) => {
-                    c.data = Promise::Resolved(pc.data);
-                    c.ctx = pc.ctx;
-                }
                 Promise::Deferred(def) => {
                     c.data = Promise::Deferred(def);
                 }
-                Promise::Rejected(err) => {
-                    c.data = Promise::Rejected(err);
+                Promise::Resolved { def, val } => {
+                    c.data = Promise::Resolved { def, val: val.data };
+                    c.ctx = val.ctx;
+                }
+                Promise::Rejected { def, err } => {
+                    c.data = Promise::Rejected { def, err };
                 }
             },
         )

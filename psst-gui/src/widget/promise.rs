@@ -87,11 +87,11 @@ where
                 if data.is_deferred(&deferred) {
                     match *result {
                         Ok(val) => {
-                            data.resolve(val);
+                            data.resolve(*deferred, val);
                         }
                         Err(err) => {
                             log::error!("async: {:?}", err);
-                            data.reject(err);
+                            data.reject(*deferred, err);
                         }
                     }
                 }
@@ -185,14 +185,14 @@ impl<D: Data, T: Data, E: Data> Widget<Promise<T, D, E>> for Async<T, D, E> {
         if data.state() == self.widget.state() {
             match data {
                 Promise::Empty => {}
-                Promise::Deferred(d) => {
-                    self.widget.with_deferred(|w| w.event(ctx, event, d, env));
+                Promise::Deferred(def) => {
+                    self.widget.with_deferred(|w| w.event(ctx, event, def, env));
                 }
-                Promise::Resolved(o) => {
-                    self.widget.with_resolved(|w| w.event(ctx, event, o, env));
+                Promise::Resolved { val, .. } => {
+                    self.widget.with_resolved(|w| w.event(ctx, event, val, env));
                 }
-                Promise::Rejected(e) => {
-                    self.widget.with_rejected(|w| w.event(ctx, event, e, env));
+                Promise::Rejected { err, .. } => {
+                    self.widget.with_rejected(|w| w.event(ctx, event, err, env));
                 }
             };
         }
@@ -213,17 +213,17 @@ impl<D: Data, T: Data, E: Data> Widget<Promise<T, D, E>> for Async<T, D, E> {
         assert_eq!(data.state(), self.widget.state(), "{:?}", event);
         match data {
             Promise::Empty => {}
-            Promise::Deferred(d) => {
+            Promise::Deferred(def) => {
                 self.widget
-                    .with_deferred(|w| w.lifecycle(ctx, event, d, env));
+                    .with_deferred(|w| w.lifecycle(ctx, event, def, env));
             }
-            Promise::Resolved(o) => {
+            Promise::Resolved { val, .. } => {
                 self.widget
-                    .with_resolved(|w| w.lifecycle(ctx, event, o, env));
+                    .with_resolved(|w| w.lifecycle(ctx, event, val, env));
             }
-            Promise::Rejected(e) => {
+            Promise::Rejected { err, .. } => {
                 self.widget
-                    .with_rejected(|w| w.lifecycle(ctx, event, e, env));
+                    .with_rejected(|w| w.lifecycle(ctx, event, err, env));
             }
         };
     }
@@ -241,14 +241,14 @@ impl<D: Data, T: Data, E: Data> Widget<Promise<T, D, E>> for Async<T, D, E> {
         } else {
             match data {
                 Promise::Empty => {}
-                Promise::Deferred(d) => {
-                    self.widget.with_deferred(|w| w.update(ctx, d, env));
+                Promise::Deferred(def) => {
+                    self.widget.with_deferred(|w| w.update(ctx, def, env));
                 }
-                Promise::Resolved(o) => {
-                    self.widget.with_resolved(|w| w.update(ctx, o, env));
+                Promise::Resolved { val, .. } => {
+                    self.widget.with_resolved(|w| w.update(ctx, val, env));
                 }
-                Promise::Rejected(e) => {
-                    self.widget.with_rejected(|w| w.update(ctx, e, env));
+                Promise::Rejected { err, .. } => {
+                    self.widget.with_rejected(|w| w.update(ctx, err, env));
                 }
             };
         }
@@ -263,19 +263,19 @@ impl<D: Data, T: Data, E: Data> Widget<Promise<T, D, E>> for Async<T, D, E> {
     ) -> Size {
         match data {
             Promise::Empty => None,
-            Promise::Deferred(d) => self.widget.with_deferred(|w| {
-                let size = w.layout(ctx, bc, d, env);
-                w.set_origin(ctx, d, env, Point::ORIGIN);
+            Promise::Deferred(def) => self.widget.with_deferred(|w| {
+                let size = w.layout(ctx, bc, def, env);
+                w.set_origin(ctx, def, env, Point::ORIGIN);
                 size
             }),
-            Promise::Resolved(o) => self.widget.with_resolved(|w| {
-                let size = w.layout(ctx, bc, o, env);
-                w.set_origin(ctx, o, env, Point::ORIGIN);
+            Promise::Resolved { val, .. } => self.widget.with_resolved(|w| {
+                let size = w.layout(ctx, bc, val, env);
+                w.set_origin(ctx, val, env, Point::ORIGIN);
                 size
             }),
-            Promise::Rejected(e) => self.widget.with_rejected(|w| {
-                let size = w.layout(ctx, bc, e, env);
-                w.set_origin(ctx, e, env, Point::ORIGIN);
+            Promise::Rejected { err, .. } => self.widget.with_rejected(|w| {
+                let size = w.layout(ctx, bc, err, env);
+                w.set_origin(ctx, err, env, Point::ORIGIN);
                 size
             }),
         }
@@ -285,14 +285,14 @@ impl<D: Data, T: Data, E: Data> Widget<Promise<T, D, E>> for Async<T, D, E> {
     fn paint(&mut self, ctx: &mut PaintCtx, data: &Promise<T, D, E>, env: &Env) {
         match data {
             Promise::Empty => {}
-            Promise::Deferred(d) => {
-                self.widget.with_deferred(|w| w.paint(ctx, d, env));
+            Promise::Deferred(def) => {
+                self.widget.with_deferred(|w| w.paint(ctx, def, env));
             }
-            Promise::Resolved(o) => {
-                self.widget.with_resolved(|w| w.paint(ctx, o, env));
+            Promise::Resolved { val, .. } => {
+                self.widget.with_resolved(|w| w.paint(ctx, val, env));
             }
-            Promise::Rejected(e) => {
-                self.widget.with_rejected(|w| w.paint(ctx, e, env));
+            Promise::Rejected { err, .. } => {
+                self.widget.with_rejected(|w| w.paint(ctx, err, env));
             }
         };
     }

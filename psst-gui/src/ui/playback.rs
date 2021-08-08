@@ -12,7 +12,7 @@ use itertools::Itertools;
 use crate::{
     cmd,
     data::{
-        AppState, AudioAnalysis, NowPlaying, Playback, PlaybackOrigin, PlaybackState, Promise,
+        AppState, AudioAnalysis, NowPlaying, Playback, PlaybackOrigin, PlaybackState,
         QueueBehavior, Track,
     },
     widget::{icons, icons::SvgIcon, Empty, Maybe, MyWidgetExt},
@@ -377,7 +377,7 @@ impl Widget<NowPlaying> for SeekBar {
 }
 
 fn _compute_loudness_path(bounds: &Size, data: &NowPlaying) -> BezPath {
-    if let Promise::Resolved(analysis) = &data.analysis {
+    if let Some(analysis) = data.analysis.resolved() {
         _compute_loudness_path_from_analysis(bounds, &data.item.duration, analysis)
     } else {
         BezPath::new()

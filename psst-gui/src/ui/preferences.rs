@@ -131,13 +131,13 @@ fn general_tab_widget() -> impl Widget<AppState> {
                         |auth: &Authentication, _| auth.result.to_owned(),
                         |result, _, _| match result {
                             Promise::Empty => Empty.boxed(),
-                            Promise::Deferred(_) => Label::new("Logging In...")
+                            Promise::Deferred { .. } => Label::new("Logging In...")
                                 .with_text_size(theme::TEXT_SIZE_SMALL)
                                 .boxed(),
-                            Promise::Resolved(_) => Label::new("Success.")
+                            Promise::Resolved { .. } => Label::new("Success.")
                                 .with_text_size(theme::TEXT_SIZE_SMALL)
                                 .boxed(),
-                            Promise::Rejected(message) => Label::new(message.to_owned())
+                            Promise::Rejected { err, .. } => Label::new(err.to_owned())
                                 .with_text_size(theme::TEXT_SIZE_SMALL)
                                 .with_text_color(theme::RED)
                                 .boxed(),
@@ -226,7 +226,7 @@ impl<W: Widget<AppState>> Controller<AppState, W> for Authenticate {
                 let result = result.to_owned().map(|credentials| {
                     data.config.store_credentials(credentials);
                 });
-                data.preferences.auth.result.resolve_or_reject(result);
+                data.preferences.auth.result.resolve_or_reject((), result);
                 self.thread.take();
                 ctx.set_handled();
             }
@@ -259,11 +259,11 @@ fn cache_tab_widget() -> impl Widget<AppState> {
         .with_spacer(theme::grid(2.0))
         .with_child(Label::dynamic(
             |preferences: &Preferences, _| match preferences.cache_size {
-                Promise::Empty | Promise::Rejected(_) => "Unknown".to_string(),
-                Promise::Deferred(_) => "Computing".to_string(),
-                Promise::Resolved(0) => "Empty".to_string(),
-                Promise::Resolved(b) => {
-                    format!("{:.2} MB", b as f64 / 1e6_f64)
+                Promise::Empty | Promise::Rejected { .. } => "Unknown".to_string(),
+                Promise::Deferred { .. } => "Computing".to_string(),
+                Promise::Resolved { val: 0, .. } => "Empty".to_string(),
+                Promise::Resolved { val, .. } => {
+                    format!("{:.2} MB", val as f64 / 1e6_f64)
                 }
             },
         ));
@@ -298,7 +298,7 @@ impl<W: Widget<Preferences>> Controller<Preferences, W> for MeasureCacheSize {
         match &event {
             Event::Command(cmd) if cmd.is(Self::RESULT) => {
                 let result = cmd.get_unchecked(Self::RESULT).to_owned();
-                data.cache_size.resolve_or_reject(result.ok_or(()));
+                data.cache_size.resolve_or_reject((), result.ok_or(()));
                 self.thread.take();
                 ctx.set_handled();
             }

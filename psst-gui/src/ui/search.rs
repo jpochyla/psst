@@ -67,13 +67,13 @@ pub fn results_widget() -> impl Widget<AppState> {
         OPEN_LINK,
         |l| WebApi::global().load_spotify_link(&l),
         |_, data, l| data.search.results.defer(l.id()),
-        |ctx, data, (_, r)| match r {
+        |ctx, data, (l, r)| match r {
             Ok(nav) => {
                 data.search.results.clear();
                 ctx.submit_command(cmd::NAVIGATE.with(nav));
             }
             Err(err) => {
-                data.search.results.reject(err);
+                data.search.results.reject(l.id(), err);
             }
         },
     )

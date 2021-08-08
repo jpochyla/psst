@@ -25,21 +25,29 @@ impl NavController {
             Nav::SearchResults(query) => {
                 if let Some(link) = SpotifyUrl::parse(query) {
                     ctx.submit_command(search::OPEN_LINK.with(link));
-                } else {
+                } else if !data.search.results.contains(query) {
                     ctx.submit_command(search::LOAD_RESULTS.with(query.to_owned()));
                 }
             }
             Nav::AlbumDetail(link) => {
-                ctx.submit_command(album::LOAD_DETAIL.with(link.to_owned()));
+                if !data.album_detail.album.contains(link) {
+                    ctx.submit_command(album::LOAD_DETAIL.with(link.to_owned()));
+                }
             }
             Nav::ArtistDetail(link) => {
-                ctx.submit_command(artist::LOAD_DETAIL.with(link.to_owned()));
+                if !data.artist_detail.top_tracks.contains(link) {
+                    ctx.submit_command(artist::LOAD_DETAIL.with(link.to_owned()));
+                }
             }
             Nav::PlaylistDetail(link) => {
-                ctx.submit_command(playlist::LOAD_DETAIL.with(link.to_owned()));
+                if !data.playlist_detail.playlist.contains(link) {
+                    ctx.submit_command(playlist::LOAD_DETAIL.with(link.to_owned()));
+                }
             }
             Nav::Recommendations(request) => {
-                ctx.submit_command(recommend::LOAD_RESULTS.with(request.clone()));
+                if !data.recommend.results.contains(request) {
+                    ctx.submit_command(recommend::LOAD_RESULTS.with(request.clone()));
+                }
             }
         }
     }

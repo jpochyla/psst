@@ -217,21 +217,21 @@ pub struct Library {
 
 impl Library {
     pub fn add_track(&mut self, track: Arc<Track>) {
-        if let Promise::Resolved(saved) = &mut self.saved_tracks {
+        if let Some(saved) = self.saved_tracks.resolved_mut() {
             saved.set.insert(track.id);
             saved.tracks.push_front(track);
         }
     }
 
     pub fn remove_track(&mut self, track_id: &TrackId) {
-        if let Promise::Resolved(saved) = &mut self.saved_tracks {
+        if let Some(saved) = self.saved_tracks.resolved_mut() {
             saved.set.remove(track_id);
             saved.tracks.retain(|t| &t.id != track_id);
         }
     }
 
     pub fn contains_track(&self, track: &Track) -> bool {
-        if let Promise::Resolved(saved) = &self.saved_tracks {
+        if let Some(saved) = self.saved_tracks.resolved() {
             saved.set.contains(&track.id)
         } else {
             false
@@ -239,21 +239,21 @@ impl Library {
     }
 
     pub fn add_album(&mut self, album: Arc<Album>) {
-        if let Promise::Resolved(saved) = &mut self.saved_albums {
+        if let Some(saved) = self.saved_albums.resolved_mut() {
             saved.set.insert(album.id.clone());
             saved.albums.push_front(album);
         }
     }
 
     pub fn remove_album(&mut self, album_id: &Arc<str>) {
-        if let Promise::Resolved(saved) = &mut self.saved_albums {
+        if let Some(saved) = self.saved_albums.resolved_mut() {
             saved.set.remove(album_id);
             saved.albums.retain(|a| &a.id != album_id);
         }
     }
 
     pub fn contains_album(&self, album: &Album) -> bool {
-        if let Promise::Resolved(saved) = &self.saved_albums {
+        if let Some(saved) = self.saved_albums.resolved() {
             saved.set.contains(&album.id)
         } else {
             false

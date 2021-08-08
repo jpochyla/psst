@@ -330,15 +330,6 @@ where
                 self.update_media_control_playback(&data.playback);
                 ctx.set_handled();
             }
-            Event::Command(cmd) if cmd.is(cmd::UPDATE_AUDIO_ANALYSIS) => {
-                let (track_id, result) = cmd.get_unchecked(cmd::UPDATE_AUDIO_ANALYSIS);
-                if let Some(now_playing) = &mut data.playback.now_playing {
-                    if now_playing.analysis.is_deferred(track_id) {
-                        now_playing.analysis.resolve_or_reject(result.to_owned());
-                    }
-                }
-                ctx.set_handled();
-            }
             //
             Event::Command(cmd) if cmd.is(cmd::PLAY_TRACKS) => {
                 let payload = cmd.get_unchecked(cmd::PLAY_TRACKS);
