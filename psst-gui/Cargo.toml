@@ -4,6 +4,7 @@ version = "0.1.0"
 authors = ["Jan Pochyla <jpochyla@gmail.com>"]
 edition = "2018"
 build = "build.rs"
+description = "Fast Spotify client with native GUI"
 
 [dependencies]
 psst-core = { path = "../psst-core" }
@@ -30,3 +31,8 @@ url = "2.2"
 
 [target.'cfg(windows)'.build-dependencies]
 winres = "0.1.11"
+
+[package.metadata.bundle]
+name = "Psst"
+identifier = "com.psst.psst-gui"
+icon = ["assets/logo.ico"]
