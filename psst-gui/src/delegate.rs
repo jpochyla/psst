@@ -128,8 +128,12 @@ impl Delegate {
                     .unwrap();
             } else {
                 self.spawn(move || {
+                    let image_format = match &location[location.rfind(".").unwrap_or(0)..] {
+                        ".png" => image::ImageFormat::Png,
+                        _ => image::ImageFormat::Jpeg
+                    };
                     let dyn_image = WebApi::global()
-                        .get_image(&location, image::ImageFormat::Jpeg)
+                        .get_image(&location, image_format)
                         .unwrap();
                     let image_buf = ImageBuf::from_dynamic_image(dyn_image);
                     let payload = remote_image::ImagePayload {
