@@ -8,30 +8,39 @@ Fast Spotify client with native GUI, without Electron, built in Rust. Very early
 
 ##### Linux
 
-Our user-interface library, Druid, has two possible backends to choose from on Linux: GTK and pure X11, with Wayland backend in the works. The default linux backend is GTK. Before building on Linux, make sure the required dependencies are installed, i.e. for Debian:
+Our user-interface library, Druid, has two possible backends to choose from on Linux: GTK and pure X11, with Wayland backend in the works. The default linux backend is GTK. Before building on Linux, make sure the required dependencies are installed. 
+
+Debian/Ubuntu:
+
+```shell
+sudo apt-get install libssl-dev libgtk-3-dev libcairo2-dev
 ```
-# apt-get install libssl-dev libgtk-3-dev libcairo2-dev
+
+RHEL/Fedora:
+
+```shell
+sudo dnf install openssl-devel gtk3-devel cairo-devel
 ```
 
 ##### Building
 
 Development build:
-```
-$ git submodule update --recursive --init
-$ cargo build
+```shell
+git submodule update --recursive --init
+cargo build
 ```
 
 Release build:
-```
-$ git submodule update --recursive --init
-$ cargo build --release
+```shell
+git submodule update --recursive --init
+cargo build --release
 ```
 
 ##### Running and configuration
 
-```
-$ cd psst-gui
-$ cargo run
+```shell
+cd psst-gui
+cargo run
 # Use cargo run --release for the release build.
 ```
 
