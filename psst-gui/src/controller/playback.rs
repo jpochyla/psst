@@ -17,9 +17,7 @@ use psst_core::{
     cdn::Cdn,
     session::SessionService,
 };
-#[cfg(target_os = "windows")]
-use raw_window_handle::{HasRawWindowHandle, RawWindowHandle};
-use souvlaki::{MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback, MediaPosition};
+use souvlaki::{MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback, MediaPosition, PlatformConfig};
 
 use crate::{
     cmd,
@@ -76,19 +74,26 @@ impl PlaybackController {
             output.start_playback(source).expect("Playback failed");
         });
 
-        #[cfg(target_os = "windows")]
-        let mut media_controls = match window.raw_window_handle() {
-            RawWindowHandle::Windows(windows_handle) => {
-                MediaControls::for_window(windows_handle).unwrap()
+        let hwnd = {
+            #[cfg(target_os = "windows")]
+            {
+                use raw_window_handle::{HasRawWindowHandle, RawWindowHandle};
+                let handle = match window.raw_window_handle() {
+                    RawWindowHandle::Windows(h) => h,
+                    _ => unreachable!(),
+                };
+                Some(handle.hwnd)
             }
-            _ => unreachable!(),
+            #[cfg(not(target_os = "windows"))]
+            None
         };
-        #[cfg(target_os = "linux")]
-        let mut media_controls = MediaControls::new_with_name("psst", "Psst");
 
-        #[cfg(all(not(target_os = "windows"), not(target_os = "linux")))]
-        let mut media_controls = MediaControls::new();
-
+        let config = PlatformConfig {
+            dbus_name: "psst",
+            display_name: "Psst",
+            hwnd,
+        };
+        let mut media_controls = MediaControls::new(config).unwrap();
         media_controls
             .attach({
                 let sender = sender.clone();
