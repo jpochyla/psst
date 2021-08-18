@@ -17,7 +17,9 @@ use psst_core::{
     cdn::Cdn,
     session::SessionService,
 };
-use souvlaki::{MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback, MediaPosition, PlatformConfig};
+use souvlaki::{
+    MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback, MediaPosition, PlatformConfig,
+};
 
 use crate::{
     cmd,

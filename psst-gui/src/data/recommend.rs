@@ -17,21 +17,21 @@ pub struct Recommend {
 pub struct RecommendationsRequest {
     pub seed_artists: Vector<ArtistLink>,
     pub seed_tracks: Vector<TrackId>,
-    // pub duration: Range<Duration>,
-    // pub popularity: Range<u32>,
-    // pub key: Range<u32>,
-    // pub mode: Range<u32>,
-    // pub tempo: Range<u32>,
-    // pub time_signature: Range<u32>,
+    /* pub duration: Range<Duration>,
+     * pub popularity: Range<u32>,
+     * pub key: Range<u32>,
+     * pub mode: Range<u32>,
+     * pub tempo: Range<u32>,
+     * pub time_signature: Range<u32>, */
 
-    // pub acousticness: Range<f64>,
-    // pub danceability: Range<f64>,
-    // pub energy: Range<f64>,
-    // pub instrumentalness: Range<f64>,
-    // pub liveness: Range<f64>,
-    // pub loudness: Range<f64>,
-    // pub speechiness: Range<f64>,
-    // pub valence: Range<f64>,
+    /* pub acousticness: Range<f64>,
+     * pub danceability: Range<f64>,
+     * pub energy: Range<f64>,
+     * pub instrumentalness: Range<f64>,
+     * pub liveness: Range<f64>,
+     * pub loudness: Range<f64>,
+     * pub speechiness: Range<f64>,
+     * pub valence: Range<f64>, */
 }
 
 impl RecommendationsRequest {
