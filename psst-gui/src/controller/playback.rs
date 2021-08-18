@@ -7,7 +7,7 @@ use crossbeam_channel::Sender;
 use druid::{
     im::Vector,
     widget::{prelude::*, Controller},
-    ExtEventSink, WindowHandle,
+    ExtEventSink, KbKey, WindowHandle,
 };
 use psst_core::{
     audio_normalize::NormalizationLevel,
@@ -243,6 +243,10 @@ impl PlaybackController {
         self.send(PlayerEvent::Command(PlayerCommand::Resume));
     }
 
+    fn pause_or_resume(&mut self) {
+        self.send(PlayerEvent::Command(PlayerCommand::PauseOrResume));
+    }
+
     fn previous(&mut self) {
         self.send(PlayerEvent::Command(PlayerCommand::Previous));
     }
@@ -288,6 +292,10 @@ where
         env: &Env,
     ) {
         match event {
+            Event::WindowConnected => {
+                ctx.request_focus();
+                log::debug!("Playback requested focus. Focus state: {}", ctx.has_focus());
+            }
             Event::Command(cmd) if cmd.is(cmd::PLAYBACK_LOADING) => {
                 let item = cmd.get_unchecked(cmd::PLAYBACK_LOADING);
 
@@ -385,6 +393,15 @@ where
                     self.seek(position);
                 }
                 ctx.set_handled();
+            }
+            Event::KeyDown(key) if key.key == KbKey::Character(" ".to_string()) => {
+                self.pause_or_resume();
+            }
+            Event::KeyDown(key) if key.key == KbKey::ArrowRight => {
+                self.next();
+            }
+            Event::KeyDown(key) if key.key == KbKey::ArrowLeft => {
+                self.previous();
             }
             //
             _ => child.event(ctx, event, data, env),
