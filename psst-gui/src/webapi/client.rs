@@ -381,6 +381,7 @@ impl WebApi {
     pub fn get_playlist_tracks(&self, id: &str) -> Result<Vector<Arc<Track>>, Error> {
         #[derive(Clone, Deserialize)]
         struct PlaylistItem {
+            is_local: bool,
             track: Option<Arc<Track>>,
         }
 
@@ -390,7 +391,10 @@ impl WebApi {
             .query("additional_types", "track");
         let result: Vector<PlaylistItem> = self.load_all_pages(request)?;
 
-        Ok(result.into_iter().filter_map(|item| item.track).collect())
+        Ok(result
+            .into_iter()
+            .filter_map(|item| if item.is_local { None } else { item.track })
+            .collect())
     }
 }
 
