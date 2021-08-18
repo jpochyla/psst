@@ -5,6 +5,7 @@ authors = ["Jan Pochyla <jpochyla@gmail.com>"]
 edition = "2018"
 build = "build.rs"
 description = "Fast Spotify client with native GUI"
+repository = "https://github.com/jpochyla/psst"
 
 [dependencies]
 psst-core = { path = "../psst-core" }
@@ -34,5 +35,13 @@ winres = "0.1.11"
 
 [package.metadata.bundle]
 name = "Psst"
-identifier = "com.psst.psst-gui"
+identifier = "com.jpochyla.psst"
 icon = ["assets/logo.ico"]
+version = "0.1.0"
+resources = []
+copyright = "Copyright (c) Jan Pochyla 2021. All rights reserved."
+category = "Music"
+short_description = "Fast Spotify client with native GUI"
+long_description = """
+Small and efficient graphical music player for Spotify network.
+"""
