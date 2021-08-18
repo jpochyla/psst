@@ -40,7 +40,6 @@ pub const PLAY_TRACKS: Selector<PlaybackPayload> = Selector::new("app.play-track
 pub const PLAY_PREVIOUS: Selector = Selector::new("app.play-previous");
 pub const PLAY_PAUSE: Selector = Selector::new("app.play-pause");
 pub const PLAY_RESUME: Selector = Selector::new("app.play-resume");
-pub const PLAY_PAUSEORRESUME: Selector = Selector::new("app.play-pause_or_resume");
 pub const PLAY_NEXT: Selector = Selector::new("app.play-next");
 pub const PLAY_STOP: Selector = Selector::new("app.play-stop");
 pub const PLAY_QUEUE_BEHAVIOR: Selector<QueueBehavior> = Selector::new("app.play-queue-behavior");
