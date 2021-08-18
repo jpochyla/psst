@@ -7,7 +7,7 @@ use crossbeam_channel::Sender;
 use druid::{
     im::Vector,
     widget::{prelude::*, Controller},
-    ExtEventSink, KbKey, WindowHandle,
+    Code, ExtEventSink, InternalLifeCycle, KbKey, WindowHandle,
 };
 use psst_core::{
     audio_normalize::NormalizationLevel,
@@ -264,7 +264,6 @@ impl PlaybackController {
     }
 
     fn set_volume(&mut self, volume: f64) {
-        log::debug!("Set volume to {}", volume);
         self.send(PlayerEvent::Command(PlayerCommand::SetVolume { volume }));
     }
 
@@ -293,9 +292,8 @@ where
         env: &Env,
     ) {
         match event {
-            Event::WindowConnected => {
+            Event::Command(cmd) if cmd.is(cmd::SET_FOCUS) => {
                 ctx.request_focus();
-                log::debug!("Playback requested focus. Focus state: {}", ctx.has_focus());
             }
             Event::Command(cmd) if cmd.is(cmd::PLAYBACK_LOADING) => {
                 let item = cmd.get_unchecked(cmd::PLAYBACK_LOADING);
@@ -395,32 +393,25 @@ where
                 }
                 ctx.set_handled();
             }
-            Event::KeyDown(key) if key.key == KbKey::Character(" ".to_string()) => {
+            //
+            Event::KeyDown(key) if key.code == Code::Space => {
                 self.pause_or_resume();
                 ctx.set_handled();
             }
-            Event::KeyDown(key) if key.key == KbKey::ArrowRight => {
+            Event::KeyDown(key) if key.code == Code::ArrowRight => {
                 self.next();
                 ctx.set_handled();
             }
-            Event::KeyDown(key) if key.key == KbKey::ArrowLeft => {
+            Event::KeyDown(key) if key.code == Code::ArrowLeft => {
                 self.previous();
                 ctx.set_handled();
             }
             Event::KeyDown(key) if key.key == KbKey::Character("+".to_string()) => {
-                data.playback.volume = if data.playback.volume >= 0.9 {
-                    1.0
-                } else {
-                    data.playback.volume + 0.1
-                };
+                data.playback.volume = (data.playback.volume + 0.1).min(1.0);
                 ctx.set_handled();
             }
             Event::KeyDown(key) if key.key == KbKey::Character("-".to_string()) => {
-                data.playback.volume = if data.playback.volume <= 0.1 {
-                    0.0
-                } else {
-                    data.playback.volume - 0.1
-                };
+                data.playback.volume = (data.playback.volume - 0.1).max(0.0);
                 ctx.set_handled();
             }
             //
@@ -436,15 +427,26 @@ where
         data: &AppState,
         env: &Env,
     ) {
-        if let LifeCycle::WidgetAdded = event {
-            self.open_audio_output_and_start_threads(
-                data.session.clone(),
-                data.config.playback(),
-                ctx.get_external_handle(),
-                ctx.widget_id(),
-                ctx.window(),
-            );
-            self.set_volume(data.playback.volume);
+        match event {
+            LifeCycle::WidgetAdded => {
+                self.open_audio_output_and_start_threads(
+                    data.session.clone(),
+                    data.config.playback(),
+                    ctx.get_external_handle(),
+                    ctx.widget_id(),
+                    ctx.window(),
+                );
+                self.set_volume(data.playback.volume);
+
+                // Request focus so we can receive keyboard events.
+                ctx.submit_command(cmd::SET_FOCUS.to(ctx.widget_id()));
+            }
+            LifeCycle::Internal(InternalLifeCycle::RouteFocusChanged { new: None, .. }) => {
+                // Druid doesn't have any "ambient focus" concept, so we catch the situation
+                // when the focus is being lost and sign up to get focused ourselves.
+                ctx.submit_command(cmd::SET_FOCUS.to(ctx.widget_id()));
+            }
+            _ => {}
         }
         child.lifecycle(ctx, event, data, env);
     }
