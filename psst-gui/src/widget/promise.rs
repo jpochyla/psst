@@ -41,7 +41,6 @@ where
     }
 
     fn spawn_action(&mut self, self_id: WidgetId, event_sink: ExtEventSink, deferred: D) {
-        dbg!(self_id);
         let old_handle = self.handle.replace(thread::spawn({
             let func = self.func.clone();
             move || {
