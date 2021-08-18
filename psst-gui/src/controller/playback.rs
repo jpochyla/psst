@@ -264,6 +264,7 @@ impl PlaybackController {
     }
 
     fn set_volume(&mut self, volume: f64) {
+        log::debug!("Set volume to {}", volume);
         self.send(PlayerEvent::Command(PlayerCommand::SetVolume { volume }));
     }
 
@@ -396,12 +397,31 @@ where
             }
             Event::KeyDown(key) if key.key == KbKey::Character(" ".to_string()) => {
                 self.pause_or_resume();
+                ctx.set_handled();
             }
             Event::KeyDown(key) if key.key == KbKey::ArrowRight => {
                 self.next();
+                ctx.set_handled();
             }
             Event::KeyDown(key) if key.key == KbKey::ArrowLeft => {
                 self.previous();
+                ctx.set_handled();
+            }
+            Event::KeyDown(key) if key.key == KbKey::Character("+".to_string()) => {
+                data.playback.volume = if data.playback.volume >= 0.9 {
+                    1.0
+                } else {
+                    data.playback.volume + 0.1
+                };
+                ctx.set_handled();
+            }
+            Event::KeyDown(key) if key.key == KbKey::Character("-".to_string()) => {
+                data.playback.volume = if data.playback.volume <= 0.1 {
+                    0.0
+                } else {
+                    data.playback.volume - 0.1
+                };
+                ctx.set_handled();
             }
             //
             _ => child.event(ctx, event, data, env),
