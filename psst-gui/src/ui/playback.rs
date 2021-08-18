@@ -11,6 +11,7 @@ use itertools::Itertools;
 
 use crate::{
     cmd,
+    controller::PlaybackController,
     data::{
         AppState, AudioAnalysis, NowPlaying, Playback, PlaybackOrigin, PlaybackState,
         QueueBehavior, Track,
@@ -32,6 +33,7 @@ pub fn panel_widget() -> impl Widget<AppState> {
         .with_child(seek_bar)
         .with_child(BarLayout::new(item_info, controls))
         .lens(AppState::playback)
+        .controller(PlaybackController::new())
 }
 
 fn playback_item_widget() -> impl Widget<NowPlaying> {

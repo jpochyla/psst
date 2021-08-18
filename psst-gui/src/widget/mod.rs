@@ -1,3 +1,4 @@
+mod checkbox;
 mod dispatcher;
 mod empty;
 pub mod icons;
@@ -8,12 +9,14 @@ pub mod remote_image;
 mod theme;
 mod utils;
 
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use druid::{
-    widget::ControllerHost, Data, Env, EventCtx, Menu, MouseButton, MouseEvent, Selector, Widget,
+    widget::{ControllerHost, Padding},
+    Data, Env, EventCtx, Insets, Menu, MouseButton, MouseEvent, Selector, Widget,
 };
 
+pub use checkbox::Checkbox;
 pub use dispatcher::ViewDispatcher;
 pub use empty::Empty;
 pub use icons::Icon;
@@ -25,17 +28,41 @@ pub use theme::ThemeScope;
 pub use utils::{Border, Clip, Logger};
 
 use crate::{
-    controller::{ExClick, OnCmdAsync},
+    controller::{Debounce, ExClick, OnCmd, OnCmdAsync},
     data::AppState,
 };
 
 pub trait MyWidgetExt<T: Data>: Widget<T> + Sized + 'static {
+    fn log(self, label: &'static str) -> Logger<Self> {
+        Logger::new(self).with_label(label)
+    }
+
     fn link(self) -> Link<T> {
         Link::new(self)
     }
 
     fn clip<S>(self, shape: S) -> Clip<S, Self> {
         Clip::new(shape, self)
+    }
+
+    fn padding_left(self, p: f64) -> Padding<T, Self> {
+        Padding::new(Insets::new(p, 0.0, 0.0, 0.0), self)
+    }
+
+    fn padding_right(self, p: f64) -> Padding<T, Self> {
+        Padding::new(Insets::new(0.0, 0.0, p, 0.0), self)
+    }
+
+    fn padding_horizontal(self, p: f64) -> Padding<T, Self> {
+        Padding::new(Insets::new(p, 0.0, p, 0.0), self)
+    }
+
+    fn debounce(
+        self,
+        duration: Duration,
+        handler: impl Fn(&mut EventCtx, &mut T, &Env) + 'static,
+    ) -> ControllerHost<Self, Debounce<T>> {
+        ControllerHost::new(self, Debounce::trailing(duration, handler))
     }
 
     fn on_right_click(
@@ -45,7 +72,15 @@ pub trait MyWidgetExt<T: Data>: Widget<T> + Sized + 'static {
         ControllerHost::new(self, ExClick::new(Some(MouseButton::Right), func))
     }
 
-    fn on_cmd_async<U: Data + Send, V: Data + Send>(
+    fn on_command<U, F>(self, selector: Selector<U>, func: F) -> ControllerHost<Self, OnCmd<U, F>>
+    where
+        U: 'static,
+        F: Fn(&mut EventCtx, &U, &mut T),
+    {
+        ControllerHost::new(self, OnCmd::new(selector, func))
+    }
+
+    fn on_command_async<U: Data + Send, V: Data + Send>(
         self,
         selector: Selector<U>,
         request: impl Fn(U) -> V + Sync + Send + 'static,

@@ -33,11 +33,14 @@ pub use crate::data::{
     },
     playlist::{Playlist, PlaylistDetail, PlaylistLink, PlaylistTracks},
     promise::{Promise, PromiseState},
-    recommend::{Recommend, Recommendations, RecommendationsRequest},
+    recommend::{
+        Range, Recommend, Recommendations, RecommendationsKnobs, RecommendationsParams,
+        RecommendationsRequest, Toggled,
+    },
     search::{Search, SearchResults},
     track::{AudioAnalysis, AudioSegment, TimeInterval, Track, TrackId},
     user::UserProfile,
-    utils::{Cached, Image, Page},
+    utils::{Cached, Float64, Image, Page},
 };
 
 #[derive(Clone, Data, Lens)]
@@ -98,6 +101,7 @@ impl Default for AppState {
                 results: Promise::Empty,
             },
             recommend: Recommend {
+                knobs: Default::default(),
                 results: Promise::Empty,
             },
             album_detail: AlbumDetail {

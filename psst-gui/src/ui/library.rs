@@ -43,24 +43,33 @@ pub fn saved_tracks_widget() -> impl Widget<AppState> {
         )
         .then(Ctx::in_promise()),
     )
-    .on_cmd_async(
+    .on_command_async(
         LOAD_TRACKS,
         |_| WebApi::global().get_saved_tracks().map(SavedTracks::new),
         |_, data, _| data.library_mut().saved_tracks.defer_default(),
-        |_, data, r| data.library_mut().saved_tracks.update(r),
+        |_, data, r| {
+            data.library_mut().saved_tracks.update(r);
+            data.update_common_ctx();
+        },
     )
-    .on_cmd_async(
+    .on_command_async(
         SAVE_TRACK,
         |t| WebApi::global().save_track(&t.id.to_base62()),
-        |_, data, t| data.library_mut().add_track(t),
+        |_, data, t| {
+            data.library_mut().add_track(t);
+            data.update_common_ctx();
+        },
         |_, _, _| {
             // TODO: Handle failure.
         },
     )
-    .on_cmd_async(
+    .on_command_async(
         UNSAVE_TRACK,
         |i| WebApi::global().unsave_track(&i.to_base62()),
-        |_, data, i| data.library_mut().remove_track(&i),
+        |_, data, i| {
+            data.library_mut().remove_track(&i);
+            data.update_common_ctx();
+        },
         |_, _, _| {
             // TODO: Handle failure.
         },
@@ -80,24 +89,33 @@ pub fn saved_albums_widget() -> impl Widget<AppState> {
         )
         .then(Ctx::in_promise()),
     )
-    .on_cmd_async(
+    .on_command_async(
         LOAD_ALBUMS,
         |_| WebApi::global().get_saved_albums().map(SavedAlbums::new),
         |_, data, _| data.library_mut().saved_albums.defer_default(),
-        |_, data, r| data.library_mut().saved_albums.update(r),
+        |_, data, r| {
+            data.library_mut().saved_albums.update(r);
+            data.update_common_ctx();
+        },
     )
-    .on_cmd_async(
+    .on_command_async(
         SAVE_ALBUM,
         |a| WebApi::global().save_album(&a.id),
-        |_, data, a| data.library_mut().add_album(a),
+        |_, data, a| {
+            data.library_mut().add_album(a);
+            data.update_common_ctx();
+        },
         |_, _, _| {
             // TODO: Handle failure.
         },
     )
-    .on_cmd_async(
+    .on_command_async(
         UNSAVE_ALBUM,
         |l| WebApi::global().unsave_album(&l.id),
-        |_, data, l| data.library_mut().remove_album(&l.id),
+        |_, data, l| {
+            data.library_mut().remove_album(&l.id);
+            data.update_common_ctx();
+        },
         |_, _, _| {
             // TODO: Handle failure.
         },

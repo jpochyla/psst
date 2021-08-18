@@ -40,7 +40,7 @@ fn async_top_tracks_widget() -> impl Widget<AppState> {
             )
             .then(Ctx::in_promise()),
         )
-        .on_cmd_async(
+        .on_command_async(
             LOAD_DETAIL,
             |d| WebApi::global().get_artist_top_tracks(&d.id),
             |_, data, d| data.artist_detail.top_tracks.defer(d),
@@ -64,7 +64,7 @@ fn async_albums_widget() -> impl Widget<AppState> {
             )
             .then(Ctx::in_promise()),
         )
-        .on_cmd_async(
+        .on_command_async(
             LOAD_DETAIL,
             |d| WebApi::global().get_artist_albums(&d.id),
             |_, data, d| data.artist_detail.albums.defer(d),
@@ -75,7 +75,7 @@ fn async_albums_widget() -> impl Widget<AppState> {
 fn async_related_widget() -> impl Widget<AppState> {
     Async::new(spinner_widget, related_widget, error_widget)
         .lens(AppState::artist_detail.then(ArtistDetail::related_artists))
-        .on_cmd_async(
+        .on_command_async(
             LOAD_DETAIL,
             |d| WebApi::global().get_related_artists(&d.id),
             |_, data, d| data.artist_detail.related_artists.defer(d),

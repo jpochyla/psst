@@ -57,13 +57,13 @@ pub fn results_widget() -> impl Widget<AppState> {
         Ctx::make(AppState::common_ctx, AppState::search.then(Search::results))
             .then(Ctx::in_promise()),
     )
-    .on_cmd_async(
+    .on_command_async(
         LOAD_RESULTS,
         |q| WebApi::global().search(&q),
         |_, data, q| data.search.results.defer(q),
         |_, data, r| data.search.results.update(r),
     )
-    .on_cmd_async(
+    .on_command_async(
         OPEN_LINK,
         |l| WebApi::global().load_spotify_link(&l),
         |_, data, l| data.search.results.defer(l.id()),

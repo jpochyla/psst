@@ -7,40 +7,7 @@ use crate::data::{AlbumLink, ArtistLink, PlaylistLink};
 
 use super::RecommendationsRequest;
 
-#[derive(Clone, Debug, Data, Eq, PartialEq, Hash)]
-pub enum SpotifyUrl {
-    Playlist(Arc<str>),
-    Artist(Arc<str>),
-    Album(Arc<str>),
-    Track(Arc<str>),
-}
-
-impl SpotifyUrl {
-    pub fn parse(url: &str) -> Option<Self> {
-        let url = Url::parse(url).ok()?;
-        let mut segments = url.path_segments()?;
-        let entity = segments.next()?;
-        let id = segments.next()?;
-        match entity {
-            "playlist" => Some(Self::Playlist(id.into())),
-            "artist" => Some(Self::Artist(id.into())),
-            "album" => Some(Self::Album(id.into())),
-            "track" => Some(Self::Track(id.into())),
-            _ => None,
-        }
-    }
-
-    pub fn id(&self) -> Arc<str> {
-        match self {
-            SpotifyUrl::Playlist(id) => id.clone(),
-            SpotifyUrl::Artist(id) => id.clone(),
-            SpotifyUrl::Album(id) => id.clone(),
-            SpotifyUrl::Track(id) => id.clone(),
-        }
-    }
-}
-
-#[derive(Clone, Debug, Data, Eq, PartialEq, Hash)]
+#[derive(Clone, Debug, Data, PartialEq, Eq, Hash)]
 pub enum Nav {
     Home,
     SavedTracks,
@@ -76,6 +43,39 @@ impl Nav {
             Nav::ArtistDetail(link) => format!("Artist “{}”", link.name),
             Nav::PlaylistDetail(link) => format!("Playlist “{}”", link.name),
             Nav::Recommendations(_) => "Recommended".to_string(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Data, Eq, PartialEq, Hash)]
+pub enum SpotifyUrl {
+    Playlist(Arc<str>),
+    Artist(Arc<str>),
+    Album(Arc<str>),
+    Track(Arc<str>),
+}
+
+impl SpotifyUrl {
+    pub fn parse(url: &str) -> Option<Self> {
+        let url = Url::parse(url).ok()?;
+        let mut segments = url.path_segments()?;
+        let entity = segments.next()?;
+        let id = segments.next()?;
+        match entity {
+            "playlist" => Some(Self::Playlist(id.into())),
+            "artist" => Some(Self::Artist(id.into())),
+            "album" => Some(Self::Album(id.into())),
+            "track" => Some(Self::Track(id.into())),
+            _ => None,
+        }
+    }
+
+    pub fn id(&self) -> Arc<str> {
+        match self {
+            SpotifyUrl::Playlist(id) => id.clone(),
+            SpotifyUrl::Artist(id) => id.clone(),
+            SpotifyUrl::Album(id) => id.clone(),
+            SpotifyUrl::Track(id) => id.clone(),
         }
     }
 }

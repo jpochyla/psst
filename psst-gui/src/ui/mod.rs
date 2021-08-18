@@ -7,7 +7,7 @@ use druid::{
 
 use crate::{
     cmd,
-    controller::{CommonCtxController, NavController, PlaybackController, SessionController},
+    controller::{NavController, SessionController},
     data::{AppState, Nav, Playback},
     widget::{icons, icons::SvgIcon, Border, Empty, MyWidgetExt, ThemeScope, ViewDispatcher},
 };
@@ -110,9 +110,7 @@ fn root_widget() -> impl Widget<AppState> {
         .solid_bar(true);
 
     ThemeScope::new(split)
-        .controller(PlaybackController::new())
         .controller(SessionController::new())
-        .controller(CommonCtxController)
         .controller(NavController)
     // .debug_invalidation()
     // .debug_widget_id()

@@ -46,6 +46,15 @@ impl<T: Data, D: Data, E: Data> Promise<T, D, E> {
         matches!(self, Self::Resolved { def, .. } if def == d)
     }
 
+    pub fn deferred(&self) -> Option<&D> {
+        match self {
+            Promise::Deferred { def }
+            | Promise::Resolved { def, .. }
+            | Promise::Rejected { def, .. } => Some(def),
+            Promise::Empty => None,
+        }
+    }
+
     pub fn resolved(&self) -> Option<&T> {
         if let Promise::Resolved { val, .. } = self {
             Some(val)

@@ -1,6 +1,6 @@
 use crate::{
     data::{
-        Album, AlbumType, Artist, ArtistAlbums, AudioAnalysis, Cached, Nav, Page, Playlist,
+        Album, AlbumType, Artist, ArtistAlbums, AudioAnalysis, Cached, Nav, Page, Playlist, Range,
         Recommendations, RecommendationsRequest, SearchResults, SpotifyUrl, Track, UserProfile,
     },
     error::Error,
@@ -456,13 +456,39 @@ impl WebApi {
             .map(|track| track.to_base62())
             .join(", ");
 
-        let request = self
+        let mut request = self
             .get("v1/recommendations")?
             .query("marker", "from_token")
             .query("limit", "100")
             .query("seed_artists", &seed_artists)
             .query("seed_tracks", &seed_tracks);
-        // TODO: insert the rest of `data` as query parameters.
+
+        fn add_range_param(mut req: Request, r: Range<impl ToString>, s: &str) -> Request {
+            if let Some(v) = r.min {
+                req = req.query(&format!("min_{}", s), &v.to_string());
+            }
+            if let Some(v) = r.max {
+                req = req.query(&format!("max_{}", s), &v.to_string());
+            }
+            if let Some(v) = r.target {
+                req = req.query(&format!("target_{}", s), &v.to_string());
+            }
+            req
+        }
+        request = add_range_param(request, data.params.duration_ms, "duration_ms");
+        request = add_range_param(request, data.params.popularity, "popularity");
+        request = add_range_param(request, data.params.key, "key");
+        request = add_range_param(request, data.params.mode, "mode");
+        request = add_range_param(request, data.params.tempo, "tempo");
+        request = add_range_param(request, data.params.time_signature, "time_signature");
+        request = add_range_param(request, data.params.acousticness, "acousticness");
+        request = add_range_param(request, data.params.danceability, "danceability");
+        request = add_range_param(request, data.params.energy, "energy");
+        request = add_range_param(request, data.params.instrumentalness, "instrumentalness");
+        request = add_range_param(request, data.params.liveness, "liveness");
+        request = add_range_param(request, data.params.loudness, "loudness");
+        request = add_range_param(request, data.params.speechiness, "speechiness");
+        request = add_range_param(request, data.params.valence, "valence");
 
         let mut result: Recommendations = self.load(request)?;
         result.request = data;

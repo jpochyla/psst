@@ -30,7 +30,7 @@ pub fn detail_widget() -> impl Widget<AppState> {
             )
             .then(Ctx::in_promise()),
         )
-        .on_cmd_async(
+        .on_command_async(
             LOAD_DETAIL,
             |d| WebApi::global().get_album(&d.id),
             |_, data, d| data.album_detail.album.defer(d),

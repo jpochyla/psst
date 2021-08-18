@@ -1,4 +1,5 @@
 use std::{
+    fmt, hash,
     sync::Arc,
     time::{Duration, SystemTime},
 };
@@ -77,6 +78,41 @@ impl Image {
 
 pub fn default_str() -> Arc<str> {
     "".into()
+}
+
+#[derive(Copy, Clone, Default, Debug, Data, Deserialize)]
+pub struct Float64(pub f64);
+
+impl PartialEq for Float64 {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.to_bits() == other.0.to_bits()
+    }
+}
+
+impl Eq for Float64 {}
+
+impl hash::Hash for Float64 {
+    fn hash<H: hash::Hasher>(&self, state: &mut H) {
+        self.0.to_bits().hash(state)
+    }
+}
+
+impl fmt::Display for Float64 {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl From<f64> for Float64 {
+    fn from(f: f64) -> Self {
+        Self(f)
+    }
+}
+
+impl From<Float64> for f64 {
+    fn from(f: Float64) -> Self {
+        f.0
+    }
 }
 
 pub fn deserialize_secs<'de, D>(deserializer: D) -> Result<Duration, D::Error>
