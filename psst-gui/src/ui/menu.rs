@@ -27,6 +27,11 @@ fn mac_app_menu() -> Menu<AppState> {
                 .command(commands::QUIT_APP)
                 .hotkey(SysMods::Cmd, "q"),
         )
+        .entry(
+            MenuItem::new(LocalizedString::new("macos-menu-hide").with_placeholder("Hide Psst"))
+                .command(commands::HIDE_APPLICATION)
+                .hotkey(SysMods::Cmd, "h"),
+        )
 }
 
 fn edit_menu() -> Menu<AppState> {
