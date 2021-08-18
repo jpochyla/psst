@@ -27,7 +27,7 @@ raw-window-handle = "0.3"
 serde = { version = "1.0", features = ["derive", "rc"] }
 serde_json = "1.0"
 souvlaki = "0.4"
-ureq = { version = "2.1", features = ["json"] }
+ureq = { version = "2.1", features = ["json", "socks-proxy"] }
 url = "2.2"
 
 [target.'cfg(windows)'.build-dependencies]
