@@ -1,8 +1,10 @@
+use std::time::Duration;
+
 use druid::{
     im::Vector,
     lens::Unit,
     widget::{CrossAxisAlignment, Either, Flex, Label, Scroll, Slider, Split, ViewSwitcher},
-    Env, Insets, LensExt, Menu, MenuItem, Widget, WidgetExt, WindowDesc,
+    Env, Insets, LensExt, Menu, MenuItem, Selector, Widget, WidgetExt, WindowDesc,
 };
 
 use crate::{
@@ -117,26 +119,47 @@ fn root_widget() -> impl Widget<AppState> {
     // .debug_paint_layout()
 }
 
-fn volume_slider() -> impl Widget<AppState> {
-    Flex::column()
-        .with_child(
-            Label::dynamic(|&volume: &f64, _| format!("Volume: {}%", (volume * 100.0).floor()))
-                .with_text_color(theme::PLACEHOLDER_COLOR)
-                .with_text_size(theme::TEXT_SIZE_SMALL),
-        )
-        .with_default_spacer()
-        .with_child(
-            Slider::new()
-                .with_range(0.0, 1.0)
-                .expand_width()
-                .env_scope(|env, _| {
-                    env.set(theme::BASIC_WIDGET_HEIGHT, theme::grid(1.5));
-                    env.set(theme::FOREGROUND_LIGHT, env.get(theme::GREY_400));
-                    env.set(theme::FOREGROUND_DARK, env.get(theme::GREY_400));
-                }),
-        )
-        .padding((theme::grid(1.5), 0.0))
-        .lens(AppState::playback.then(Playback::volume))
+fn route_widget() -> impl Widget<AppState> {
+    ViewDispatcher::new(
+        |state: &AppState, _| state.route.clone(),
+        |route: &Nav, _, _| match route {
+            Nav::Home => Scroll::new(home::home_widget().padding(theme::grid(1.0)))
+                .vertical()
+                .boxed(),
+            Nav::SavedTracks => {
+                Scroll::new(library::saved_tracks_widget().padding(theme::grid(1.0)))
+                    .vertical()
+                    .boxed()
+            }
+            Nav::SavedAlbums => {
+                Scroll::new(library::saved_albums_widget().padding(theme::grid(1.0)))
+                    .vertical()
+                    .boxed()
+            }
+            Nav::SearchResults(_) => {
+                Scroll::new(search::results_widget().padding(theme::grid(1.0)))
+                    .vertical()
+                    .boxed()
+            }
+            Nav::AlbumDetail(_) => Scroll::new(album::detail_widget().padding(theme::grid(1.0)))
+                .vertical()
+                .boxed(),
+            Nav::ArtistDetail(_) => Scroll::new(artist::detail_widget().padding(theme::grid(1.0)))
+                .vertical()
+                .boxed(),
+            Nav::PlaylistDetail(_) => {
+                Scroll::new(playlist::detail_widget().padding(theme::grid(1.0)))
+                    .vertical()
+                    .boxed()
+            }
+            Nav::Recommendations(_) => {
+                Scroll::new(recommend::results_widget().padding(theme::grid(1.0)))
+                    .vertical()
+                    .boxed()
+            }
+        },
+    )
+    .expand()
 }
 
 fn sidebar_logo_widget() -> impl Widget<AppState> {
@@ -189,47 +212,34 @@ fn sidebar_link_widget(title: &str, nav: Nav) -> impl Widget<AppState> {
         .lens(AppState::route)
 }
 
-fn route_widget() -> impl Widget<AppState> {
-    ViewDispatcher::new(
-        |state: &AppState, _| state.route.clone(),
-        |route: &Nav, _, _| match route {
-            Nav::Home => Scroll::new(home::home_widget().padding(theme::grid(1.0)))
-                .vertical()
-                .boxed(),
-            Nav::SavedTracks => {
-                Scroll::new(library::saved_tracks_widget().padding(theme::grid(1.0)))
-                    .vertical()
-                    .boxed()
-            }
-            Nav::SavedAlbums => {
-                Scroll::new(library::saved_albums_widget().padding(theme::grid(1.0)))
-                    .vertical()
-                    .boxed()
-            }
-            Nav::SearchResults(_) => {
-                Scroll::new(search::results_widget().padding(theme::grid(1.0)))
-                    .vertical()
-                    .boxed()
-            }
-            Nav::AlbumDetail(_) => Scroll::new(album::detail_widget().padding(theme::grid(1.0)))
-                .vertical()
-                .boxed(),
-            Nav::ArtistDetail(_) => Scroll::new(artist::detail_widget().padding(theme::grid(1.0)))
-                .vertical()
-                .boxed(),
-            Nav::PlaylistDetail(_) => {
-                Scroll::new(playlist::detail_widget().padding(theme::grid(1.0)))
-                    .vertical()
-                    .boxed()
-            }
-            Nav::Recommendations(_) => {
-                Scroll::new(recommend::results_widget().padding(theme::grid(1.0)))
-                    .vertical()
-                    .boxed()
-            }
-        },
-    )
-    .expand()
+fn volume_slider() -> impl Widget<AppState> {
+    const SAVE_DELAY: Duration = Duration::from_millis(100);
+    const SAVE_TO_CONFIG: Selector = Selector::new("app.volume.save-to-config");
+
+    Flex::column()
+        .with_child(
+            Label::dynamic(|&volume: &f64, _| format!("Volume: {}%", (volume * 100.0).floor()))
+                .with_text_color(theme::PLACEHOLDER_COLOR)
+                .with_text_size(theme::TEXT_SIZE_SMALL),
+        )
+        .with_default_spacer()
+        .with_child(
+            Slider::new()
+                .with_range(0.0, 1.0)
+                .expand_width()
+                .env_scope(|env, _| {
+                    env.set(theme::BASIC_WIDGET_HEIGHT, theme::grid(1.5));
+                    env.set(theme::FOREGROUND_LIGHT, env.get(theme::GREY_400));
+                    env.set(theme::FOREGROUND_DARK, env.get(theme::GREY_400));
+                }),
+        )
+        .padding((theme::grid(1.5), 0.0))
+        .debounce(SAVE_DELAY, |ctx, _, _| ctx.submit_command(SAVE_TO_CONFIG))
+        .lens(AppState::playback.then(Playback::volume))
+        .on_command(SAVE_TO_CONFIG, |_, _, data| {
+            data.config.volume = data.playback.volume;
+            data.config.save();
+        })
 }
 
 fn topbar_back_button_widget() -> impl Widget<AppState> {

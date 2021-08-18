@@ -32,10 +32,8 @@ fn main() {
     )
     .init();
 
-    let state = AppState {
-        config: Config::load().unwrap_or_default(),
-        ..AppState::default()
-    };
+    let config = Config::load().unwrap_or_default();
+    let state = AppState::default_with_config(config);
 
     WebApi::new(
         state.session.clone(),

@@ -64,13 +64,25 @@ const APP_NAME: &str = "Psst";
 const CONFIG_FILENAME: &str = "config.json";
 const PROXY_ENV_VAR: &str = "SOCKS_PROXY";
 
-#[derive(Clone, Debug, Default, Data, Lens, Serialize, Deserialize)]
+#[derive(Clone, Debug, Data, Lens, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Config {
     #[data(ignore)]
     credentials: Option<Credentials>,
     pub audio_quality: AudioQuality,
     pub theme: Theme,
+    pub volume: f64,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            credentials: Default::default(),
+            audio_quality: Default::default(),
+            theme: Default::default(),
+            volume: 1.0,
+        }
+    }
 }
 
 impl Config {
@@ -106,8 +118,9 @@ impl Config {
         let dir = Self::config_dir().expect("Failed to get config dir");
         let path = Self::config_path().expect("Failed to get config path");
         mkdir_if_not_exists(&dir).expect("Failed to create config dir");
-        let file = File::create(path).expect("Failed to create config");
+        let file = File::create(&path).expect("Failed to create config");
         serde_json::to_writer_pretty(file, self).expect("Failed to write config");
+        log::info!("saved config: {:?}", &path);
     }
 
     pub fn has_credentials(&self) -> bool {

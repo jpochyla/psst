@@ -64,8 +64,8 @@ pub struct AppState {
     pub personalized: Personalized,
 }
 
-impl Default for AppState {
-    fn default() -> Self {
+impl AppState {
+    pub fn default_with_config(config: Config) -> Self {
         let library = Arc::new(Library {
             saved_albums: Promise::Empty,
             saved_tracks: Promise::Empty,
@@ -75,11 +75,18 @@ impl Default for AppState {
             playback_item: None,
             library: Arc::clone(&library),
         });
+        let playback = Playback {
+            state: PlaybackState::Stopped,
+            now_playing: None,
+            queue_behavior: QueueBehavior::Sequential,
+            queue: Vector::new(),
+            volume: config.volume,
+        };
         Self {
             session: SessionService::empty(),
             route: Nav::Home,
             history: Vector::new(),
-            config: Config::default(),
+            config,
             preferences: Preferences {
                 active: PreferencesTab::General,
                 auth: Authentication {
@@ -89,13 +96,7 @@ impl Default for AppState {
                 },
                 cache_size: Promise::Empty,
             },
-            playback: Playback {
-                state: PlaybackState::Stopped,
-                now_playing: None,
-                queue_behavior: QueueBehavior::Sequential,
-                queue: Vector::new(),
-                volume: 1.0, // 100% volume.
-            },
+            playback,
             search: Search {
                 input: "".into(),
                 results: Promise::Empty,

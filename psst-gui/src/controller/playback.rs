@@ -407,6 +407,7 @@ where
                 ctx.widget_id(),
                 ctx.window(),
             );
+            self.set_volume(data.playback.volume);
         }
         child.lifecycle(ctx, event, data, env);
     }
