@@ -1,8 +1,8 @@
 use std::{sync::Arc, thread};
 
 use druid::{
-    commands, image, AppDelegate, Application, Command, DelegateCtx, Env, Handled, ImageBuf,
-    Target, WindowId,
+    commands, AppDelegate, Application, Command, DelegateCtx, Env, Handled, ImageBuf, Target,
+    WindowId,
 };
 use lru_cache::LruCache;
 
@@ -128,9 +128,7 @@ impl Delegate {
                     .unwrap();
             } else {
                 self.spawn(move || {
-                    let dyn_image = WebApi::global()
-                        .get_image(&location, image::ImageFormat::Jpeg)
-                        .unwrap();
+                    let dyn_image = WebApi::global().get_image(&location).unwrap();
                     let image_buf = ImageBuf::from_dynamic_image(dyn_image);
                     let payload = remote_image::ImagePayload {
                         location,

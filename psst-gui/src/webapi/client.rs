@@ -5,7 +5,11 @@ use crate::{
     },
     error::Error,
 };
-use druid::{im::Vector, image, Data};
+use druid::{
+    im::Vector,
+    image::{self, ImageFormat},
+    Data,
+};
 use itertools::Itertools;
 use once_cell::sync::OnceCell;
 use psst_core::{
@@ -478,18 +482,20 @@ impl WebApi {
 
 /// Image endpoints.
 impl WebApi {
-    pub fn get_image(
-        &self,
-        uri: &str,
-        format: image::ImageFormat,
-    ) -> Result<image::DynamicImage, Error> {
-        let mut image_bytes = Vec::new();
-        self.agent
-            .get(uri)
-            .call()?
-            .into_reader()
-            .read_to_end(&mut image_bytes)?;
-        let image = image::load_from_memory_with_format(&image_bytes, format)?;
+    pub fn get_image(&self, uri: &str) -> Result<image::DynamicImage, Error> {
+        let response = self.agent.get(uri).call()?;
+        let format = match response.content_type() {
+            "image/jpeg" => Some(ImageFormat::Jpeg),
+            "image/png" => Some(ImageFormat::Png),
+            _ => None,
+        };
+        let mut body = Vec::new();
+        response.into_reader().read_to_end(&mut body)?;
+        let image = if let Some(format) = format {
+            image::load_from_memory_with_format(&body, format)?
+        } else {
+            image::load_from_memory(&body)?
+        };
         Ok(image)
     }
 }
