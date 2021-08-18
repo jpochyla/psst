@@ -28,6 +28,8 @@ sudo dnf install openssl-devel gtk3-devel cairo-devel
 
 ##### Building
 
+On all platforms, the **latest Rust stable** is neeed.
+
 Development build:
 ```shell
 git submodule update --recursive --init
