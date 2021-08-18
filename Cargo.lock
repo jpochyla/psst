@@ -2452,6 +2452,7 @@ dependencies = [
  "rustls",
  "serde",
  "serde_json",
+ "socks",
  "url",
  "webpki",
  "webpki-roots",
