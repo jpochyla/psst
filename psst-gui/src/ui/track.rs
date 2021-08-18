@@ -3,7 +3,6 @@ use std::sync::Arc;
 use druid::{
     im::Vector,
     kurbo::Line,
-    lens::Map,
     piet::StrokeStyle,
     widget::{
         Controller, ControllerHost, CrossAxisAlignment, Flex, Label, List, ListIter, Painter,
@@ -130,6 +129,7 @@ where
                 origin: origin.to_owned(),
                 track: track.to_owned(),
                 position: index,
+                is_playing: self.ctx.is_track_playing(track),
             };
             cb(&d, index);
         });
@@ -144,6 +144,7 @@ where
                 origin: origin.to_owned(),
                 track: track.to_owned(),
                 position: index,
+                is_playing: self.ctx.is_track_playing(track),
             };
             cb(&mut d, index);
 
@@ -162,17 +163,7 @@ struct TrackRow {
     track: Arc<Track>,
     origin: PlaybackOrigin,
     position: usize,
-}
-
-impl TrackRow {
-    fn is_playing() -> impl Lens<TrackRow, bool> {
-        Map::new(
-            |row: &TrackRow| row.ctx.is_track_playing(&row.track),
-            |_, _| {
-                // Immutable.
-            },
-        )
-    }
+    is_playing: bool,
 }
 
 struct PlayController;
@@ -241,7 +232,7 @@ fn track_widget(display: TrackDisplay) -> impl Widget<TrackRow> {
                 .lens(ArtistLink::name)
         })
         .horizontal()
-        .with_spacing(theme::grid(1.0))
+        .with_spacing(theme::grid(0.5))
         .lens(TrackRow::track.then(Track::artists.in_arc()));
         minor.add_child(track_artists);
     }
@@ -268,7 +259,7 @@ fn track_widget(display: TrackDisplay) -> impl Widget<TrackRow> {
         };
         ctx.stroke_styled(line, &color, 1.0, &STYLE);
     })
-    .lens(TrackRow::is_playing())
+    .lens(TrackRow::is_playing)
     .fix_height(1.0);
     major.add_default_spacer();
     major.add_flex_child(line_painter, 1.0);
@@ -299,7 +290,7 @@ fn track_widget(display: TrackDisplay) -> impl Widget<TrackRow> {
         .with_child(minor)
         .padding(theme::grid(1.0))
         .link()
-        .active(|row, _| row.ctx.is_track_playing(&row.track))
+        .active(|row, _| row.is_playing)
         .rounded(theme::BUTTON_BORDER_RADIUS)
         .on_click(|ctx, row, _| {
             ctx.submit_notification(cmd::PLAY_TRACK_AT.with(row.position));
