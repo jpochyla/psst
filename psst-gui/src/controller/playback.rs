@@ -243,10 +243,6 @@ impl PlaybackController {
         self.send(PlayerEvent::Command(PlayerCommand::Resume));
     }
 
-    fn pause_or_resume(&mut self) {
-        self.send(PlayerEvent::Command(PlayerCommand::PauseOrResume))
-    }
-
     fn previous(&mut self) {
         self.send(PlayerEvent::Command(PlayerCommand::Previous));
     }
@@ -361,10 +357,6 @@ where
             }
             Event::Command(cmd) if cmd.is(cmd::PLAY_RESUME) => {
                 self.resume();
-                ctx.set_handled();
-            }
-            Event::Command(cmd) if cmd.is(cmd::PLAY_PAUSEORRESUME) => {
-                self.pause_or_resume();
                 ctx.set_handled();
             }
             Event::Command(cmd) if cmd.is(cmd::PLAY_PREVIOUS) => {

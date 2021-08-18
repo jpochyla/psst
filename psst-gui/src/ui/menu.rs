@@ -1,6 +1,4 @@
-use druid::{
-    commands, platform_menus, Env, LocalizedString, Menu, MenuItem, RawMods, SysMods, WindowId,
-};
+use druid::{commands, platform_menus, Env, LocalizedString, Menu, MenuItem, SysMods, WindowId};
 
 use crate::{
     cmd,
@@ -41,13 +39,6 @@ fn edit_menu() -> Menu<AppState> {
         .entry(platform_menus::common::cut())
         .entry(platform_menus::common::copy())
         .entry(platform_menus::common::paste())
-        .entry(
-            MenuItem::new(
-                LocalizedString::new("macos-menu-pauseorresume").with_placeholder("Pause/Resume"),
-            )
-            .command(cmd::PLAY_PAUSEORRESUME)
-            .hotkey(RawMods::Ctrl, " "),
-        )
 }
 
 fn view_menu() -> Menu<AppState> {
