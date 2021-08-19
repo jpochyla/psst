@@ -31,6 +31,7 @@ pub fn preferences_widget() -> impl Widget<AppState> {
         |active: &PreferencesTab, _, _| match active {
             PreferencesTab::General => general_tab_widget().boxed(),
             PreferencesTab::Cache => cache_tab_widget().boxed(),
+            PreferencesTab::Account => account_tab_widget().boxed(),
         },
     )
     .padding(theme::grid(4.0))
@@ -75,7 +76,17 @@ fn tabs_widget() -> impl Widget<AppState> {
             PreferencesTab::General,
         ))
         .with_default_spacer()
-        .with_child(tab_widget("Cache", &icons::STORAGE, PreferencesTab::Cache))
+        .with_child(tab_widget(
+            "Account",
+            &icons::ACCOUNT,
+            PreferencesTab::Account,
+        ))
+        .with_default_spacer()
+        .with_child(tab_widget(
+            "Cache",
+            &icons::STORAGE,
+            PreferencesTab::Cache
+        ))
 }
 
 fn general_tab_widget() -> impl Widget<AppState> {
@@ -88,63 +99,6 @@ fn general_tab_widget() -> impl Widget<AppState> {
         .with_child(
             RadioGroup::new(vec![("Light", Theme::Light), ("Dark", Theme::Dark)])
                 .lens(AppState::config.then(Config::theme)),
-        );
-
-    col = col.with_spacer(theme::grid(3.0));
-
-    // Authentication
-    col = col
-        .with_child(Label::new("Credentials").with_font(theme::UI_FONT_MEDIUM))
-        .with_spacer(theme::grid(2.0))
-        .with_child(
-            TextBox::new()
-                .with_placeholder("Username")
-                .controller(InputController::new())
-                .env_scope(|env, _| env.set(theme::WIDE_WIDGET_WIDTH, theme::grid(16.0)))
-                .lens(
-                    AppState::preferences
-                        .then(Preferences::auth)
-                        .then(Authentication::username),
-                ),
-        )
-        .with_spacer(theme::grid(1.0))
-        .with_child(
-            TextBox::new()
-                .with_placeholder("Password")
-                .controller(InputController::new())
-                .env_scope(|env, _| env.set(theme::WIDE_WIDGET_WIDTH, theme::grid(16.0)))
-                .lens(
-                    AppState::preferences
-                        .then(Preferences::auth)
-                        .then(Authentication::password),
-                ),
-        )
-        .with_spacer(theme::grid(1.0))
-        .with_child(
-            Flex::row()
-                .with_child(Button::new("Log In").on_click(|ctx, _, _| {
-                    ctx.submit_command(Authenticate::REQUEST);
-                }))
-                .with_spacer(theme::grid(1.0))
-                .with_child(
-                    ViewSwitcher::new(
-                        |auth: &Authentication, _| auth.result.to_owned(),
-                        |result, _, _| match result {
-                            Promise::Empty => Empty.boxed(),
-                            Promise::Deferred { .. } => Label::new("Logging In...")
-                                .with_text_size(theme::TEXT_SIZE_SMALL)
-                                .boxed(),
-                            Promise::Resolved { .. } => Label::new("Success.")
-                                .with_text_size(theme::TEXT_SIZE_SMALL)
-                                .boxed(),
-                            Promise::Rejected { err, .. } => Label::new(err.to_owned())
-                                .with_text_size(theme::TEXT_SIZE_SMALL)
-                                .with_text_color(theme::RED)
-                                .boxed(),
-                        },
-                    )
-                    .lens(AppState::preferences.then(Preferences::auth)),
-                ),
         );
 
     col = col.with_spacer(theme::grid(3.0));
@@ -178,6 +132,69 @@ fn general_tab_widget() -> impl Widget<AppState> {
             .align_right()
             .lens(AppState::config),
     );
+
+    col.controller(Authenticate::new())
+}
+
+fn account_tab_widget() -> impl Widget<AppState> {
+    let mut col = Flex::column().cross_axis_alignment(CrossAxisAlignment::Start);
+
+    // Authentication
+    col = col
+        .with_child(Label::new("Credentials").with_font(theme::UI_FONT_MEDIUM))
+        .with_spacer(theme::grid(2.0))
+        .with_child(
+            TextBox::new()
+                .with_placeholder("📚 Username")
+                .controller(InputController::new())
+                .env_scope(|env, _| env.set(theme::WIDE_WIDGET_WIDTH, theme::grid(16.0)))
+                .lens(
+                    AppState::preferences
+                        .then(Preferences::auth)
+                        .then(Authentication::username),
+                ),
+        )
+        .with_spacer(theme::grid(1.0))
+        .with_child(
+            TextBox::new()
+                .with_placeholder("🔐 Password")
+                .controller(InputController::new())
+                .env_scope(|env, _| env.set(theme::WIDE_WIDGET_WIDTH, theme::grid(16.0)))
+                .lens(
+                    AppState::preferences
+                        .then(Preferences::auth)
+                        .then(Authentication::password),
+                ),
+        )
+        .with_spacer(theme::grid(1.0))
+        .with_child(
+            Flex::row()
+                .with_child(Button::new("Log In").on_click(|ctx, _, _| {
+                    ctx.submit_command(Authenticate::REQUEST);
+                }))
+                .with_spacer(theme::grid(1.0))
+                .with_child(
+                    ViewSwitcher::new(
+                        |auth: &Authentication, _| auth.result.to_owned(),
+                        |result, _, _| match result {
+                            Promise::Empty => Empty.boxed(),
+                            Promise::Deferred { .. } => Label::new("Logging In...")
+                                .with_text_size(theme::TEXT_SIZE_SMALL)
+                                .boxed(),
+                            Promise::Resolved { .. } => Label::new("Success.")
+                                .with_text_size(theme::TEXT_SIZE_SMALL)
+                                .boxed(),
+                            Promise::Rejected { err, .. } => Label::new(err.to_owned())
+                                .with_text_size(theme::TEXT_SIZE_SMALL)
+                                .with_text_color(theme::RED)
+                                .boxed(),
+                        },
+                    )
+                        .lens(AppState::preferences.then(Preferences::auth)),
+                ),
+        );
+
+    col = col.with_spacer(theme::grid(3.0));
 
     col.controller(Authenticate::new())
 }

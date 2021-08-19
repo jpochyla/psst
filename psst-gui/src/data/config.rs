@@ -34,6 +34,7 @@ impl Preferences {
 pub enum PreferencesTab {
     General,
     Cache,
+    Account,
 }
 
 #[derive(Clone, Debug, Data, Lens)]
