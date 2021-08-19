@@ -10,7 +10,7 @@ psst-protocol = { path = "../psst-protocol" }
 aes = { version = "0.7", features = ["ctr"] }
 byteorder = "1.4"
 crossbeam-channel = "0.5"
-hmac = "0.11.0"
+hmac = "0.11"
 iset = "0.0.5"
 log = "0.4"
 miniaudio = { git = "https://github.com/jpochyla/miniaudio-rs", default-features = false, features = ["ma-log-level-error", "ma-no-flac", "ma-no-mp3", "ma-no-wav"] }
