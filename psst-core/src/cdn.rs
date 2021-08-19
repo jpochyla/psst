@@ -140,13 +140,13 @@ fn parse_total_content_length(response: &ureq::Response) -> u64 {
 }
 
 /// Parses an expiration of an audio file URL.
-/// Expiration is stored at the beginning of the first query parameter, i.e.:
+/// Expiration is stored as `exp` field after `__token__`:
 ///
-/// .../59db919e18d6336461a0c71da051842ceef1b5af?1602319025_wu-SPeHxn...
-///                                              ^========^
+/// .../...a35817ca410?__token__=exp=1629466995~hmac=df348...
+///                                  ^========^
 fn parse_expiration(url: &str) -> Option<Duration> {
-    let first_param = url.split('?').nth(1)?;
-    let expires_millis = first_param.split('_').next()?;
+    let token_exp = url.split("__token__=exp=").nth(1)?;
+    let expires_millis = token_exp.split('~').next()?;
     let expires_millis = expires_millis.parse().ok()?;
     let expires = Duration::from_millis(expires_millis);
     Some(expires)
