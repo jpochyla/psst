@@ -146,9 +146,7 @@ where
         .ok_or_else(|| serde::de::Error::custom("Invalid date"))
 }
 
-pub(crate) fn deserialize_date_option<'de, D>(
-    deserializer: D,
-) -> Result<Option<NaiveDate>, D::Error>
+pub fn deserialize_date_option<'de, D>(deserializer: D) -> Result<Option<NaiveDate>, D::Error>
 where
     D: Deserializer<'de>,
 {
@@ -166,4 +164,12 @@ where
 {
     let page = Page::<T>::deserialize(deserializer)?;
     Ok(page.items)
+}
+
+pub fn deserialize_null_arc_str<'de, D>(deserializer: D) -> Result<Arc<str>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let opt = Option::deserialize(deserializer)?;
+    Ok(opt.unwrap_or_else(default_str))
 }

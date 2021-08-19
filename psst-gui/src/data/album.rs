@@ -23,6 +23,7 @@ pub struct Album {
     #[serde(default)]
     pub copyrights: Vector<Copyright>,
     #[serde(default = "super::utils::default_str")]
+    #[serde(deserialize_with = "super::utils::deserialize_null_arc_str")]
     pub label: Arc<str>,
     #[serde(default)]
     #[serde(deserialize_with = "super::utils::deserialize_first_page")]
