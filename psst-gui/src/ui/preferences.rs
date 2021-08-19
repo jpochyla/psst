@@ -145,7 +145,7 @@ fn account_tab_widget() -> impl Widget<AppState> {
         .with_spacer(theme::grid(2.0))
         .with_child(
             TextBox::new()
-                .with_placeholder("📚 Username")
+                .with_placeholder("Username")
                 .controller(InputController::new())
                 .env_scope(|env, _| env.set(theme::WIDE_WIDGET_WIDTH, theme::grid(16.0)))
                 .lens(
@@ -157,7 +157,7 @@ fn account_tab_widget() -> impl Widget<AppState> {
         .with_spacer(theme::grid(1.0))
         .with_child(
             TextBox::new()
-                .with_placeholder("🔐 Password")
+                .with_placeholder("Password")
                 .controller(InputController::new())
                 .env_scope(|env, _| env.set(theme::WIDE_WIDGET_WIDTH, theme::grid(16.0)))
                 .lens(
