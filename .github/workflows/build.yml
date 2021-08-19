@@ -51,6 +51,7 @@ jobs:
       run: |
         cargo install cargo-bundle
         cargo bundle --release
+      working-directory: psst-gui
       if: ${{ runner.os == 'macOS' }}
   
     - name: Create .dmg File
