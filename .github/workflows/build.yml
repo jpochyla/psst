@@ -17,37 +17,70 @@ jobs:
         os: [ubuntu-latest, macOS-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
+
     - uses: actions/checkout@v2
       with:
         submodules: recursive 
+
     - uses: actions-rs/toolchain@v1
       with:
         profile: minimal
         toolchain: stable
+
     - uses: Swatinem/rust-cache@v1
 
-    - name: Update Ubuntu repositories
+    - name: Update Linux Repositories
       run: sudo apt-get update
       if: ${{ runner.os == 'Linux' }}
-    - name: Install Dependencies
+
+    - name: Install Linux Dependencies
       run: sudo apt-get install -y libgtk-3-dev libssl-dev
       if: ${{ runner.os == 'Linux' }}
-    - name: Run tests
-      continue-on-error: true
-      run: cargo test
-    - name: Build
-      run: cargo build --release
-    - name: Format
+
+    - name: Check Formatting
       run: cargo fmt --all -- --check
-    - name: Make it executable
+
+    - name: Run Tests
+      run: cargo test
+      continue-on-error: true
+
+    - name: Build Release
+      run: cargo build --release
+
+    - name: Bundle macOS Release
+      run: |
+        cargo install cargo-bundle
+        cargo bundle --release
+      working-directory: psst-gui
+      if: ${{ runner.os == 'macOS' }}
+  
+    - name: Create .dmg File
+      run: |
+        hdiutil create Psst-uncompressed.dmg -volname "Psst" -srcfolder target/release/bundle/osx
+        hdiutil convert Psst-uncompressed.dmg -format UDZO -o Psst-x64.dmg
+      if: ${{ runner.os == 'macOS' }}
+
+    - name: Make Linux Binary Executable
       run: chmod +x target/release/psst-gui
-      if: ${{ runner.os != 'Windows' }}
+      if: ${{ runner.os == 'Linux' }}
+
     - uses: actions/upload-artifact@v2
       with:
-        name: psst-gui-${{ runner.os }}
-        path: |
-          target/release/psst-gui
-          target/release/psst-gui.exe
+        name: psst-gui
+        path: target/release/psst-gui
+      if: ${{ runner.os == 'Linux' }}
+
+    - uses: actions/upload-artifact@v2
+      with:
+        name: Psst-x64.dmg
+        path: ./Psst-x64.dmg
+      if: ${{ runner.os == 'macOS' }}
+
+    - uses: actions/upload-artifact@v2
+      with:
+        name: Psst.exe
+        path: target/release/psst-gui.exe
+      if: ${{ runner.os == 'Windows' }}
 
   deb:
     runs-on: ubuntu-latest
@@ -58,7 +91,7 @@ jobs:
         fetch-depth: 0
     - uses: actions/download-artifact@v2
       with:
-        name: psst-gui-Linux
+        name: psst-gui
         path: ${{runner.workspace}}
     - name: Move executable
       run: mkdir -p ${{runner.workspace}}/pkg/usr/bin/; mv ${{runner.workspace}}/psst-gui $_
@@ -67,7 +100,7 @@ jobs:
     - name: Set permissions
       run: chmod 755 ${{runner.workspace}}/pkg/usr/bin/psst-gui
     - name: Move license
-      run: mkdir -p ${{runner.workspace}}/pkg/usr/share/doc/psst/; mv .pkg/copyright $_
+      run: mkdir -p ${{runner.workspace}}/pkg/usr/share/doc/psst-gui/; mv .pkg/copyright $_
     - name: Move package config
       run: mkdir -p ${{runner.workspace}}/pkg/; mv .pkg/DEBIAN $_/
     - name: Set version

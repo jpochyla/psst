@@ -372,7 +372,7 @@ impl WebApi {
 
     // https://developer.spotify.com/documentation/web-api/reference/#endpoint-get-playlist
     pub fn get_playlist(&self, id: &str) -> Result<Playlist, Error> {
-        let request = self.get(format!("v1/me/playlists/{}", id))?;
+        let request = self.get(format!("v1/playlists/{}", id))?;
         let result = self.load(request)?;
         Ok(result)
     }
@@ -382,7 +382,17 @@ impl WebApi {
         #[derive(Clone, Deserialize)]
         struct PlaylistItem {
             is_local: bool,
-            track: Option<Arc<Track>>,
+            track: OptionalTrack,
+        }
+
+        // Spotify API likes to return _really_ bogus data for local tracks. Much better would
+        // be to ignore parsing this completely if `is_local` is true, but this will do as
+        // well.
+        #[derive(Clone, Deserialize)]
+        #[serde(untagged)]
+        enum OptionalTrack {
+            Track(Arc<Track>),
+            Json(serde_json::Value),
         }
 
         let request = self
@@ -393,7 +403,13 @@ impl WebApi {
 
         Ok(result
             .into_iter()
-            .filter_map(|item| if item.is_local { None } else { item.track })
+            .filter_map(|item| match item {
+                PlaylistItem {
+                    is_local: false,
+                    track: OptionalTrack::Track(track),
+                } => Some(track),
+                _ => None,
+            })
             .collect())
     }
 }
