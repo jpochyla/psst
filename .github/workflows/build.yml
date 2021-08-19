@@ -66,7 +66,7 @@ jobs:
 
     - uses: actions/upload-artifact@v2
       with:
-        name: psst
+        name: psst-gui
         path: target/release/psst-gui
       if: ${{ runner.os == 'Linux' }}
 
@@ -91,16 +91,16 @@ jobs:
         fetch-depth: 0
     - uses: actions/download-artifact@v2
       with:
-        name: psst
+        name: psst-gui
         path: ${{runner.workspace}}
     - name: Move executable
-      run: mkdir -p ${{runner.workspace}}/pkg/usr/bin/; mv ${{runner.workspace}}/psst $_
+      run: mkdir -p ${{runner.workspace}}/pkg/usr/bin/; mv ${{runner.workspace}}/psst-gui $_
     - name: Move desktop
       run: mkdir -p ${{runner.workspace}}/pkg/usr/share/applications/; mv .pkg/psst.desktop $_
     - name: Set permissions
-      run: chmod 755 ${{runner.workspace}}/pkg/usr/bin/psst
+      run: chmod 755 ${{runner.workspace}}/pkg/usr/bin/psst-gui
     - name: Move license
-      run: mkdir -p ${{runner.workspace}}/pkg/usr/share/doc/psst/; mv .pkg/copyright $_
+      run: mkdir -p ${{runner.workspace}}/pkg/usr/share/doc/psst-gui/; mv .pkg/copyright $_
     - name: Move package config
       run: mkdir -p ${{runner.workspace}}/pkg/; mv .pkg/DEBIAN $_/
     - name: Set version
