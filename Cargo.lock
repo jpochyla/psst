@@ -489,7 +489,7 @@ checksum = "bd0c93bb4b0c6d9b77f4435b0ae98c24d17f1c45b2ff844c6151a07256ca923b"
 [[package]]
 name = "druid"
 version = "0.7.0"
-source = "git+https://github.com/jpochyla/druid?branch=psst#30aa0baab6f9801aba16db48793d97a23839856a"
+source = "git+https://github.com/JuliDi/druid?branch=psst#a31679cdc6e0d4bebb96f5c50970ff9afa254851"
 dependencies = [
  "console_error_panic_hook",
  "druid-derive",
@@ -511,7 +511,7 @@ dependencies = [
 [[package]]
 name = "druid-derive"
 version = "0.4.0"
-source = "git+https://github.com/jpochyla/druid?branch=psst#30aa0baab6f9801aba16db48793d97a23839856a"
+source = "git+https://github.com/JuliDi/druid?branch=psst#a31679cdc6e0d4bebb96f5c50970ff9afa254851"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -521,7 +521,7 @@ dependencies = [
 [[package]]
 name = "druid-shell"
 version = "0.7.0"
-source = "git+https://github.com/jpochyla/druid?branch=psst#30aa0baab6f9801aba16db48793d97a23839856a"
+source = "git+https://github.com/JuliDi/druid?branch=psst#a31679cdc6e0d4bebb96f5c50970ff9afa254851"
 dependencies = [
  "anyhow",
  "bitflags",
@@ -542,7 +542,7 @@ dependencies = [
  "image",
  "instant",
  "js-sys",
- "keyboard-types",
+ "keyboard-types 0.5.0",
  "kurbo",
  "lazy_static",
  "objc",
@@ -1148,6 +1148,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a989afac88279b0482f402d234b5fbd405bf1ad051308595b58de4e6de22346b"
 dependencies = [
  "bitflags",
+ "serde",
+ "unicode-segmentation",
+]
+
+[[package]]
+name = "keyboard-types"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5168b1079eb8dc457c80f263c1f521578e458c1b21ae42328f65117738d31396"
+dependencies = [
+ "bitflags",
+ "serde",
+ "unicode-segmentation",
 ]
 
 [[package]]
@@ -1221,9 +1234,9 @@ checksum = "a3e378b66a060d48947b590737b30a1be76706c8dd7b8ba0f2fe3989c68a853f"
 
 [[package]]
 name = "memchr"
-version = "2.4.0"
+version = "2.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b16bd47d9e329435e309c58469fe0791c2d0d1ba96ec0954152a5ae2b04387dc"
+checksum = "308cc39be01b73d0d18f82a0e7b2a3df85245f84af96fdddc5d202d27e47b86a"
 
 [[package]]
 name = "miniaudio"
@@ -1668,6 +1681,7 @@ dependencies = [
  "env_logger",
  "fs_extra",
  "itertools 0.10.1",
+ "keyboard-types 0.6.1",
  "log",
  "lru-cache",
  "once_cell",
@@ -2003,8 +2017,7 @@ dependencies = [
 [[package]]
 name = "souvlaki"
 version = "0.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5834fb7421062570b409e49ecebee68d303866c8ba1c3f81138a82e8eba64081"
+source = "git+https://github.com/Sinono3/souvlaki#ab184816861bf2d691a1cf30db834cad383f70d6"
 dependencies = [
  "block",
  "cocoa",
@@ -2292,18 +2305,18 @@ dependencies = [
 
 [[package]]
 name = "tracing-core"
-version = "0.1.18"
+version = "0.1.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a9ff14f98b1a4b289c6248a023c1c2fa1491062964e9fed67ab29c4e4da4a052"
+checksum = "2ca517f43f0fb96e0c3072ed5c275fe5eece87e8cb52f4a77b69226d3b1c9df8"
 dependencies = [
  "lazy_static",
 ]
 
 [[package]]
 name = "tracing-subscriber"
-version = "0.2.19"
+version = "0.2.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ab69019741fca4d98be3c62d2b75254528b5432233fd8a4d2739fec20278de48"
+checksum = "b9cbe87a2fa7e35900ce5de20220a582a9483a7063811defce79d7cbd59d4cfe"
 dependencies = [
  "ansi_term",
  "sharded-slab",

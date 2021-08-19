@@ -11,6 +11,7 @@ use psst_core::{
 use serde::{Deserialize, Serialize};
 
 use super::Promise;
+use crate::data::{KbShortcut, ToKbShortcut};
 
 #[derive(Clone, Debug, Data, Lens)]
 pub struct Preferences {
@@ -72,6 +73,7 @@ pub struct Config {
     pub audio_quality: AudioQuality,
     pub theme: Theme,
     pub volume: f64,
+    pub shortcuts: KbShortcuts,
 }
 
 impl Default for Config {
@@ -81,6 +83,7 @@ impl Default for Config {
             audio_quality: Default::default(),
             theme: Default::default(),
             volume: 1.0,
+            shortcuts: KbShortcuts::default(),
         }
     }
 }
@@ -191,5 +194,26 @@ pub enum Theme {
 impl Default for Theme {
     fn default() -> Self {
         Self::Light
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Data, Serialize, Deserialize)]
+pub struct KbShortcuts {
+    pub play_resume: KbShortcut,
+    pub volume_increase: KbShortcut,
+    pub volume_decrease: KbShortcut,
+    pub next_song: KbShortcut,
+    pub previous_song: KbShortcut,
+}
+
+impl Default for KbShortcuts {
+    fn default() -> Self {
+        Self {
+            play_resume: " ".to_string().to_kbshortcut().unwrap(),
+            volume_increase: "+".to_string().to_kbshortcut().unwrap(),
+            volume_decrease: "-".to_string().to_kbshortcut().unwrap(),
+            next_song: "ArrowRight".to_string().to_kbshortcut().unwrap(),
+            previous_song: "ArrowLeft".to_string().to_kbshortcut().unwrap(),
+        }
     }
 }

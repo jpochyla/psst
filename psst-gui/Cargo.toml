@@ -12,8 +12,9 @@ psst-core = { path = "../psst-core" }
 
 chrono = { version = "0.4", features = ["serde"] }
 crossbeam-channel = "0.5"
-druid-shell = { git = "https://github.com/jpochyla/druid", branch = "psst", features = ["raw-win-handle"] }
-druid = { git = "https://github.com/jpochyla/druid", branch = "psst", features = ["im", "image", "jpeg", "png", "serde"] }
+druid-shell = { git = "https://github.com/JuliDi/druid", branch = "psst", features = ["raw-win-handle"] }
+druid = { git = "https://github.com/JuliDi/druid", branch = "psst", features = ["im", "image", "jpeg", "png", "serde"] }
+keyboard-types = { version = "0.6.1", features = ["serde"] }
 env_logger = "0.8"
 fs_extra = "1.2"
 itertools = "0.10"
@@ -26,7 +27,7 @@ rand = "0.8"
 raw-window-handle = "0.3"
 serde = { version = "1.0", features = ["derive", "rc"] }
 serde_json = "1.0"
-souvlaki = "0.4"
+souvlaki = { git = "https://github.com/Sinono3/souvlaki" }
 ureq = { version = "2.1", features = ["json", "socks-proxy"] }
 url = "2.2"
 

@@ -24,8 +24,8 @@ use souvlaki::{
 use crate::{
     cmd,
     data::{
-        AppState, Config, Playback, PlaybackOrigin, PlaybackState, QueueBehavior, QueuedTrack,
-        TrackId,
+        AppState, Config, KbShortcut, Playback, PlaybackOrigin, PlaybackState, QueueBehavior,
+        QueuedTrack, TrackId,
     },
 };
 
@@ -406,11 +406,11 @@ where
                 self.previous();
                 ctx.set_handled();
             }
-            Event::KeyDown(key) if key.key == KbKey::Character("+".to_string()) => {
+            Event::KeyDown(key) if data.config.shortcuts.volume_increase.matches(key) => {
                 data.playback.volume = (data.playback.volume + 0.1).min(1.0);
                 ctx.set_handled();
             }
-            Event::KeyDown(key) if key.key == KbKey::Character("-".to_string()) => {
+            Event::KeyDown(key) if data.config.shortcuts.volume_decrease.matches(key) => {
                 data.playback.volume = (data.playback.volume - 0.1).max(0.0);
                 ctx.set_handled();
             }

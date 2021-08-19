@@ -3,6 +3,7 @@ mod artist;
 mod config;
 mod ctx;
 mod id;
+mod kbshortcut;
 mod nav;
 mod playback;
 mod playlist;
@@ -26,6 +27,7 @@ pub use crate::data::{
     artist::{Artist, ArtistAlbums, ArtistDetail, ArtistLink, ArtistTracks},
     config::{AudioQuality, Authentication, Config, Preferences, PreferencesTab, Theme},
     ctx::Ctx,
+    kbshortcut::{KbShortcut, ToKbShortcut},
     nav::{Nav, SpotifyUrl},
     playback::{
         NowPlaying, Playback, PlaybackOrigin, PlaybackPayload, PlaybackState, QueueBehavior,
