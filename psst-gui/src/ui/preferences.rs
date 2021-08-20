@@ -21,7 +21,10 @@ use crate::{
 };
 
 use super::{icons::SvgIcon, theme};
+use crate::controller::ShortcutFormatter;
 use crate::data::KbShortcut;
+use druid::text::ParseFormatter;
+use druid::widget::{ValueTextBox, WidgetWrapper};
 
 pub fn preferences_widget() -> impl Widget<AppState> {
     let tabs = tabs_widget()
@@ -30,10 +33,10 @@ pub fn preferences_widget() -> impl Widget<AppState> {
 
     let active = ViewSwitcher::new(
         |state: &AppState, _| state.preferences.active,
-        |active: &PreferencesTab, _, _| match active {
+        |active: &PreferencesTab, data, _| match active {
             PreferencesTab::General => general_tab_widget().boxed(),
             PreferencesTab::Cache => cache_tab_widget().boxed(),
-            PreferencesTab::Shortcuts => shortcuts_tab_widget().boxed(),
+            PreferencesTab::Shortcuts => shortcuts_tab_widget(&data.config.shortcuts).boxed(),
         },
     )
     .padding(theme::grid(4.0))
@@ -342,29 +345,34 @@ impl<W: Widget<Preferences>> Controller<Preferences, W> for MeasureCacheSize {
     }
 }
 
-fn shortcuts_tab_widget() -> impl Widget<AppState> {
+fn shortcuts_tab_widget(shortcuts: &KbShortcuts) -> impl Widget<AppState> {
     let mut col = Flex::column().cross_axis_alignment(CrossAxisAlignment::Start);
 
-    // Authentication
     col = col
         .with_child(Label::new("Playback").with_font(theme::UI_FONT_MEDIUM))
-        .with_spacer(theme::grid(2.0))
-        .with_child(
-            TextBox::new()
-                .with_placeholder("Shortcut")
-                .controller(InputController::new())
-                .env_scope(|env, _| env.set(theme::WIDE_WIDGET_WIDTH, theme::grid(16.0)))
-                .lens(AppState::shortcuts.then(KbShortcuts::nextsong)),
-        );
+        .with_spacer(theme::grid(2.0));
 
-    // Save
+    for shortcut in shortcuts.to_desc_with_lens() {
+        let (lens, description) = shortcut;
+        let mut tb = TextBox::new()
+            .with_formatter(ShortcutFormatter)
+            .validate_while_editing(false)
+            .update_data_while_editing(true)
+            .controller(InputController::new())
+            .env_scope(|env, _| env.set(theme::WIDE_WIDGET_WIDTH, theme::grid(16.0)))
+            .lens(AppState::config.then(Config::shortcuts.then(lens)));
+
+        col = col
+            .with_child(Label::new(description).with_font(theme::UI_FONT))
+            .with_child(tb)
+            .with_spacer(theme::grid(2.0));
+    }
     col = col.with_child(
         Button::new("Save")
             .on_click(|ctx, config: &mut Config, _| {
+                ctx.request_focus();
                 config.save();
-                ctx.submit_command(cmd::SESSION_CONNECT);
-                ctx.submit_command(cmd::SHOW_MAIN);
-                ctx.submit_command(commands::CLOSE_WINDOW);
+                //ctx.submit_command(commands::CLOSE_WINDOW);
             })
             .fix_width(theme::grid(10.0))
             .align_right()

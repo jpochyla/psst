@@ -52,13 +52,8 @@ impl fmt::Display for KbShortcut {
 }
 
 #[derive(Debug, Clone)]
-struct ParseShortcutError;
+pub struct ParseShortcutError;
 
-// Generation of an error is completely separate from how it is displayed.
-// There's no need to be concerned about cluttering complex logic with the display style.
-//
-// Note that we don't store any extra info about the errors. This means we can't state
-// which string failed to parse without modifying our types to carry that information.
 impl fmt::Display for ParseShortcutError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "Error parsing shortcut!")
@@ -79,20 +74,13 @@ impl FromStr for KbShortcut {
     }
 }
 
-struct ShortcutLens;
-
-impl Lens<KbShortcut, String> for ShortcutLens {
-    fn with<V, F: FnOnce(&String) -> V>(&self, data: &KbShortcut, f: F) -> V {
-        f(&data.to_string())
+pub fn matches(key_event: &KeyEvent, str: &String) -> bool {
+    if let Ok(shortcut) = KbShortcut::from_str(&str) {
+        match shortcut {
+            KbShortcut::Key(str_key) => str_key == key_event.key,
+            KbShortcut::Code(str_code) => str_code == key_event.code,
+        }
+    } else {
+        false
     }
-
-    fn with_mut<V, F: FnOnce(&mut String) -> V>(&self, data: &mut KbShortcut, f: F) -> V {
-        let mut shortcut_as_string = &data.to_string();
-        f(&mut shortcut_as_string)
-    }
-}
-
-pub fn matches(key: KeyEvent, str: String) -> bool {
-    // Make KbShortcut from str, match key.code and key.key to the result and return if it matched
-    // on error return false?
 }

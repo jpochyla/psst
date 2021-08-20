@@ -29,7 +29,7 @@ pub use crate::data::{
         AudioQuality, Authentication, Config, KbShortcuts, Preferences, PreferencesTab, Theme,
     },
     ctx::Ctx,
-    kbshortcut::KbShortcut,
+    kbshortcut::{matches, KbShortcut},
     nav::{Nav, SpotifyUrl},
     playback::{
         NowPlaying, Playback, PlaybackOrigin, PlaybackPayload, PlaybackState, QueueBehavior,
@@ -55,7 +55,6 @@ pub struct AppState {
     pub route: Nav,
     pub history: Vector<Nav>,
     pub config: Config,
-    pub shortcuts: KbShortcuts,
     pub preferences: Preferences,
     pub playback: Playback,
     pub search: Search,
@@ -101,7 +100,6 @@ impl AppState {
                 },
                 cache_size: Promise::Empty,
             },
-            shortcuts: KbShortcuts::default(),
             playback,
             search: Search {
                 input: "".into(),
