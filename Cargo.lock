@@ -2003,7 +2003,8 @@ dependencies = [
 [[package]]
 name = "souvlaki"
 version = "0.4.1"
-source = "git+https://github.com/Sinono3/souvlaki#ab184816861bf2d691a1cf30db834cad383f70d6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5834fb7421062570b409e49ecebee68d303866c8ba1c3f81138a82e8eba64081"
 dependencies = [
  "block",
  "cocoa",
