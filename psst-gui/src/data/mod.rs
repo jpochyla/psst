@@ -25,9 +25,11 @@ use psst_core::session::SessionService;
 pub use crate::data::{
     album::{Album, AlbumDetail, AlbumLink, AlbumType, Copyright, CopyrightType},
     artist::{Artist, ArtistAlbums, ArtistDetail, ArtistLink, ArtistTracks},
-    config::{AudioQuality, Authentication, Config, Preferences, PreferencesTab, Theme},
+    config::{
+        AudioQuality, Authentication, Config, KbShortcuts, Preferences, PreferencesTab, Theme,
+    },
     ctx::Ctx,
-    kbshortcut::{KbShortcut, ToKbShortcut},
+    kbshortcut::KbShortcut,
     nav::{Nav, SpotifyUrl},
     playback::{
         NowPlaying, Playback, PlaybackOrigin, PlaybackPayload, PlaybackState, QueueBehavior,
@@ -53,6 +55,7 @@ pub struct AppState {
     pub route: Nav,
     pub history: Vector<Nav>,
     pub config: Config,
+    pub shortcuts: KbShortcuts,
     pub preferences: Preferences,
     pub playback: Playback,
     pub search: Search,
@@ -98,6 +101,7 @@ impl AppState {
                 },
                 cache_size: Promise::Empty,
             },
+            shortcuts: KbShortcuts::default(),
             playback,
             search: Search {
                 input: "".into(),

@@ -11,7 +11,8 @@ use psst_core::{
 use serde::{Deserialize, Serialize};
 
 use super::Promise;
-use crate::data::{KbShortcut, ToKbShortcut};
+use crate::data::KbShortcut;
+use std::str::FromStr;
 
 #[derive(Clone, Debug, Data, Lens)]
 pub struct Preferences {
@@ -35,6 +36,7 @@ impl Preferences {
 pub enum PreferencesTab {
     General,
     Cache,
+    Shortcuts,
 }
 
 #[derive(Clone, Debug, Data, Lens)]
@@ -73,7 +75,6 @@ pub struct Config {
     pub audio_quality: AudioQuality,
     pub theme: Theme,
     pub volume: f64,
-    pub shortcuts: KbShortcuts,
 }
 
 impl Default for Config {
@@ -83,7 +84,6 @@ impl Default for Config {
             audio_quality: Default::default(),
             theme: Default::default(),
             volume: 1.0,
-            shortcuts: KbShortcuts::default(),
         }
     }
 }
@@ -197,23 +197,23 @@ impl Default for Theme {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Data, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Data, Lens, Serialize, Deserialize)]
 pub struct KbShortcuts {
-    pub play_resume: KbShortcut,
-    pub volume_increase: KbShortcut,
-    pub volume_decrease: KbShortcut,
-    pub next_song: KbShortcut,
-    pub previous_song: KbShortcut,
+    pub play_resume: String,
+    pub volume_increase: String,
+    pub volume_decrease: String,
+    pub nextsong: String,
+    pub previous_song: String,
 }
 
 impl Default for KbShortcuts {
     fn default() -> Self {
         Self {
-            play_resume: " ".to_string().to_kbshortcut().unwrap(),
-            volume_increase: "+".to_string().to_kbshortcut().unwrap(),
-            volume_decrease: "-".to_string().to_kbshortcut().unwrap(),
-            next_song: "ArrowRight".to_string().to_kbshortcut().unwrap(),
-            previous_song: "ArrowLeft".to_string().to_kbshortcut().unwrap(),
+            play_resume: " ".to_string(),
+            volume_increase: "+".to_string(),
+            volume_decrease: "-".to_string(),
+            nextsong: "ArrowRight".to_string(),
+            previous_song: "ArrowLeft".to_string(),
         }
     }
 }

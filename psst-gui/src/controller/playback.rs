@@ -406,11 +406,11 @@ where
                 self.previous();
                 ctx.set_handled();
             }
-            Event::KeyDown(key) if data.config.shortcuts.volume_increase.matches(key) => {
+            Event::KeyDown(key) if matches(key, data.shortcuts.volume_increase) => {
                 data.playback.volume = (data.playback.volume + 0.1).min(1.0);
                 ctx.set_handled();
             }
-            Event::KeyDown(key) if data.config.shortcuts.volume_decrease.matches(key) => {
+            Event::KeyDown(key) if data.shortcuts.volume_decrease().matches(key) => {
                 data.playback.volume = (data.playback.volume - 0.1).max(0.0);
                 ctx.set_handled();
             }

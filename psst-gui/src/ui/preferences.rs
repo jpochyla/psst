@@ -14,12 +14,14 @@ use crate::{
     cmd,
     controller::InputController,
     data::{
-        AppState, AudioQuality, Authentication, Config, Preferences, PreferencesTab, Promise, Theme,
+        AppState, AudioQuality, Authentication, Config, KbShortcuts, Preferences, PreferencesTab,
+        Promise, Theme,
     },
     widget::{icons, Border, Empty, MyWidgetExt},
 };
 
 use super::{icons::SvgIcon, theme};
+use crate::data::KbShortcut;
 
 pub fn preferences_widget() -> impl Widget<AppState> {
     let tabs = tabs_widget()
@@ -31,6 +33,7 @@ pub fn preferences_widget() -> impl Widget<AppState> {
         |active: &PreferencesTab, _, _| match active {
             PreferencesTab::General => general_tab_widget().boxed(),
             PreferencesTab::Cache => cache_tab_widget().boxed(),
+            PreferencesTab::Shortcuts => shortcuts_tab_widget().boxed(),
         },
     )
     .padding(theme::grid(4.0))
@@ -76,6 +79,12 @@ fn tabs_widget() -> impl Widget<AppState> {
         ))
         .with_default_spacer()
         .with_child(tab_widget("Cache", &icons::STORAGE, PreferencesTab::Cache))
+        // TODO: Add new icon
+        .with_child(tab_widget(
+            "Shortcuts",
+            &icons::PLAYLIST,
+            PreferencesTab::Shortcuts,
+        ))
 }
 
 fn general_tab_widget() -> impl Widget<AppState> {
@@ -331,4 +340,36 @@ impl<W: Widget<Preferences>> Controller<Preferences, W> for MeasureCacheSize {
         }
         child.lifecycle(ctx, event, data, env);
     }
+}
+
+fn shortcuts_tab_widget() -> impl Widget<AppState> {
+    let mut col = Flex::column().cross_axis_alignment(CrossAxisAlignment::Start);
+
+    // Authentication
+    col = col
+        .with_child(Label::new("Playback").with_font(theme::UI_FONT_MEDIUM))
+        .with_spacer(theme::grid(2.0))
+        .with_child(
+            TextBox::new()
+                .with_placeholder("Shortcut")
+                .controller(InputController::new())
+                .env_scope(|env, _| env.set(theme::WIDE_WIDGET_WIDTH, theme::grid(16.0)))
+                .lens(AppState::shortcuts.then(KbShortcuts::nextsong)),
+        );
+
+    // Save
+    col = col.with_child(
+        Button::new("Save")
+            .on_click(|ctx, config: &mut Config, _| {
+                config.save();
+                ctx.submit_command(cmd::SESSION_CONNECT);
+                ctx.submit_command(cmd::SHOW_MAIN);
+                ctx.submit_command(commands::CLOSE_WINDOW);
+            })
+            .fix_width(theme::grid(10.0))
+            .align_right()
+            .lens(AppState::config),
+    );
+
+    col.controller(Authenticate::new())
 }
