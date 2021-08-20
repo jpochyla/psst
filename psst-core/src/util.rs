@@ -11,9 +11,9 @@ use quick_protobuf::{BytesReader, MessageRead, MessageWrite, Writer};
 
 use crate::error::Error;
 
-pub const NET_CONNECT_TIMEOUT: Duration = Duration::from_millis(4 * 1000);
+pub const NET_CONNECT_TIMEOUT: Duration = Duration::from_millis(8 * 1000);
 
-pub const NET_IO_TIMEOUT: Duration = Duration::from_millis(4 * 1000);
+pub const NET_IO_TIMEOUT: Duration = Duration::from_millis(8 * 1000);
 
 pub fn default_ureq_agent_builder(proxy_url: Option<&str>) -> Result<ureq::AgentBuilder, Error> {
     let builder = ureq::AgentBuilder::new()
