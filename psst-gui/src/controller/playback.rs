@@ -7,7 +7,7 @@ use crossbeam_channel::Sender;
 use druid::{
     im::Vector,
     widget::{prelude::*, Controller},
-    Code, ExtEventSink, InternalLifeCycle, KbKey, WindowHandle,
+    ExtEventSink, InternalLifeCycle, WindowHandle,
 };
 use psst_core::{
     audio_normalize::NormalizationLevel,
@@ -25,8 +25,8 @@ use crate::data::matches;
 use crate::{
     cmd,
     data::{
-        AppState, Config, KbShortcut, Playback, PlaybackOrigin, PlaybackState, QueueBehavior,
-        QueuedTrack, TrackId,
+        AppState, Config, Playback, PlaybackOrigin, PlaybackState, QueueBehavior, QueuedTrack,
+        TrackId,
     },
 };
 

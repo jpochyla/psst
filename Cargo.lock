@@ -489,7 +489,7 @@ checksum = "bd0c93bb4b0c6d9b77f4435b0ae98c24d17f1c45b2ff844c6151a07256ca923b"
 [[package]]
 name = "druid"
 version = "0.7.0"
-source = "git+https://github.com/JuliDi/druid?branch=psst#a31679cdc6e0d4bebb96f5c50970ff9afa254851"
+source = "git+https://github.com/jpochyla/druid?branch=psst#30aa0baab6f9801aba16db48793d97a23839856a"
 dependencies = [
  "console_error_panic_hook",
  "druid-derive",
@@ -511,7 +511,7 @@ dependencies = [
 [[package]]
 name = "druid-derive"
 version = "0.4.0"
-source = "git+https://github.com/JuliDi/druid?branch=psst#a31679cdc6e0d4bebb96f5c50970ff9afa254851"
+source = "git+https://github.com/jpochyla/druid?branch=psst#30aa0baab6f9801aba16db48793d97a23839856a"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -521,7 +521,7 @@ dependencies = [
 [[package]]
 name = "druid-shell"
 version = "0.7.0"
-source = "git+https://github.com/JuliDi/druid?branch=psst#a31679cdc6e0d4bebb96f5c50970ff9afa254851"
+source = "git+https://github.com/jpochyla/druid?branch=psst#30aa0baab6f9801aba16db48793d97a23839856a"
 dependencies = [
  "anyhow",
  "bitflags",
@@ -542,7 +542,7 @@ dependencies = [
  "image",
  "instant",
  "js-sys",
- "keyboard-types 0.5.0",
+ "keyboard-types",
  "kurbo",
  "lazy_static",
  "objc",
@@ -1148,19 +1148,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a989afac88279b0482f402d234b5fbd405bf1ad051308595b58de4e6de22346b"
 dependencies = [
  "bitflags",
- "serde",
- "unicode-segmentation",
-]
-
-[[package]]
-name = "keyboard-types"
-version = "0.6.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5168b1079eb8dc457c80f263c1f521578e458c1b21ae42328f65117738d31396"
-dependencies = [
- "bitflags",
- "serde",
- "unicode-segmentation",
 ]
 
 [[package]]
@@ -1681,7 +1668,6 @@ dependencies = [
  "env_logger",
  "fs_extra",
  "itertools 0.10.1",
- "keyboard-types 0.6.1",
  "log",
  "lru-cache",
  "once_cell",

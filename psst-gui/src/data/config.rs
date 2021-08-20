@@ -11,9 +11,7 @@ use psst_core::{
 use serde::{Deserialize, Serialize};
 
 use super::Promise;
-use crate::data::KbShortcut;
 use druid::lens::Field;
-use std::str::FromStr;
 
 #[derive(Clone, Debug, Data, Lens)]
 pub struct Preferences {
@@ -244,7 +242,7 @@ impl KbShortcuts {
 impl Default for KbShortcuts {
     fn default() -> Self {
         Self {
-            play_resume: " ".to_string(),
+            play_resume: "Space".to_string(),
             volume_increase: "+".to_string(),
             volume_decrease: "-".to_string(),
             next_song: "ArrowRight".to_string(),

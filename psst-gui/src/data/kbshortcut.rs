@@ -1,10 +1,10 @@
-use druid::{Data, Lens};
+use druid::Data;
 use druid_shell::{Code, KbKey, KeyEvent};
-use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::str::FromStr;
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, PartialEq)]
+/// Keyboard Shortcut comprised of either a [`KbKey`] or a [`Code`]
 pub enum KbShortcut {
     Key(KbKey),
     Code(Code),
@@ -17,6 +17,7 @@ impl Data for KbShortcut {
 }
 
 impl KbShortcut {
+    /// Return whether a given [`KeyEvent`] matches this shortcut
     pub fn matches(&self, event: &KeyEvent) -> bool {
         match self {
             KbShortcut::Key(key) => &event.key == key,
@@ -25,15 +26,21 @@ impl KbShortcut {
     }
 }
 
+/// Given a [`&str`], return the corresponding [`Code`] or an `Err` if there is no corresponding
+/// code.
+/// TODO: Add more String-to-Code mappings
 fn kb_code_from_str(s: &str) -> Result<Code, ()> {
     match s {
         "NumpadAdd" => Ok(Code::NumpadAdd),
         "Minus" => Ok(Code::Minus),
-        " " | "Space" => Ok(Code::Space),
+        "Space" => Ok(Code::Space),
         "ArrowRight" => Ok(Code::ArrowRight),
         "ArrowLeft" => Ok(Code::ArrowLeft),
         "ArrowUp" => Ok(Code::ArrowUp),
         "ArrowDown" => Ok(Code::ArrowDown),
+        "Backspace" => Ok(Code::Backspace),
+        "Enter" => Ok(Code::Enter),
+        "Tab" => Ok(Code::Tab),
         _ => Err(()),
     }
 }
@@ -74,13 +81,10 @@ impl FromStr for KbShortcut {
     }
 }
 
+/// Return whether a given [`KeyEvent`] matches the code or character given in `str`
 pub fn matches(key_event: &KeyEvent, str: &String) -> bool {
     if let Ok(shortcut) = KbShortcut::from_str(&str) {
-        match shortcut {
-            KbShortcut::Key(str_key) => str_key == key_event.key,
-            KbShortcut::Code(str_code) => str_code == key_event.code,
-        }
-    } else {
-        false
+        return shortcut.matches(key_event);
     }
+    false
 }

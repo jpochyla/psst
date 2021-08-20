@@ -6,7 +6,6 @@ use druid::{
 
 use crate::cmd;
 use druid::widget::ValueTextBox;
-use std::ops::DerefMut;
 
 pub struct InputController {
     on_submit: Option<Box<dyn Fn(&mut EventCtx, &mut String, &Env)>>,

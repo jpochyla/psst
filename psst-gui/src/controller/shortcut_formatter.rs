@@ -1,7 +1,5 @@
 use crate::data::KbShortcut;
 use druid::text::{Formatter, Selection, Validation, ValidationError};
-use druid::widget::{TextBoxEvent, ValidationDelegate};
-use druid::EventCtx;
 use std::str::FromStr;
 
 pub struct ShortcutFormatter;
@@ -11,10 +9,10 @@ impl Formatter<String> for ShortcutFormatter {
         value.to_string()
     }
 
-    fn validate_partial_input(&self, input: &str, sel: &Selection) -> Validation {
+    fn validate_partial_input(&self, input: &str, _: &Selection) -> Validation {
         match KbShortcut::from_str(input) {
             Ok(_) => Validation::success(),
-            Err(e) => Validation::failure(std::io::Error::new(
+            Err(_) => Validation::failure(std::io::Error::new(
                 std::io::ErrorKind::InvalidInput,
                 "Invalid Shortcut",
             )),

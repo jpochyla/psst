@@ -12,7 +12,7 @@ use psst_core::connection::Credentials;
 
 use crate::{
     cmd,
-    controller::InputController,
+    controller::{InputController, ShortcutFormatter},
     data::{
         AppState, AudioQuality, Authentication, Config, KbShortcuts, Preferences, PreferencesTab,
         Promise, Theme,
@@ -21,10 +21,6 @@ use crate::{
 };
 
 use super::{icons::SvgIcon, theme};
-use crate::controller::ShortcutFormatter;
-use crate::data::KbShortcut;
-use druid::text::ParseFormatter;
-use druid::widget::{ValueTextBox, WidgetWrapper};
 
 pub fn preferences_widget() -> impl Widget<AppState> {
     let tabs = tabs_widget()
@@ -345,26 +341,35 @@ impl<W: Widget<Preferences>> Controller<Preferences, W> for MeasureCacheSize {
     }
 }
 
+/// Generate the shortcut tab widget
+/// Pass [`KbShortcuts`] that should be manipulated (e.g. from `data`)
 fn shortcuts_tab_widget(shortcuts: &KbShortcuts) -> impl Widget<AppState> {
     let mut col = Flex::column().cross_axis_alignment(CrossAxisAlignment::Start);
 
     col = col
-        .with_child(Label::new("Playback").with_font(theme::UI_FONT_MEDIUM))
+        .with_child(Label::new("Playback Shortcuts").with_font(theme::UI_FONT_MEDIUM))
+        .with_spacer(theme::grid(2.0))
+        .with_child(
+            Label::new("Enter a single character or a code as defined\nby crate keyboard-types")
+                .with_font(theme::UI_FONT),
+        )
         .with_spacer(theme::grid(2.0));
 
+    // TODO: Add option to record shortcuts
     for shortcut in shortcuts.to_desc_with_lens() {
         let (lens, description) = shortcut;
-        let mut tb = TextBox::new()
-            .with_formatter(ShortcutFormatter)
-            .validate_while_editing(false)
-            .update_data_while_editing(true)
-            .controller(InputController::new())
-            .env_scope(|env, _| env.set(theme::WIDE_WIDGET_WIDTH, theme::grid(16.0)))
-            .lens(AppState::config.then(Config::shortcuts.then(lens)));
 
         col = col
             .with_child(Label::new(description).with_font(theme::UI_FONT))
-            .with_child(tb)
+            .with_child(
+                TextBox::new()
+                    .with_formatter(ShortcutFormatter)
+                    .validate_while_editing(false)
+                    .update_data_while_editing(true)
+                    .controller(InputController::new())
+                    .env_scope(|env, _| env.set(theme::WIDE_WIDGET_WIDTH, theme::grid(16.0)))
+                    .lens(AppState::config.then(Config::shortcuts.then(lens))),
+            )
             .with_spacer(theme::grid(2.0));
     }
     col = col.with_child(

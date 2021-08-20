@@ -52,7 +52,7 @@ pub fn preferences_window() -> WindowDesc<AppState> {
     let win = WindowDesc::new(preferences_widget())
         .title("Preferences")
         .window_size(win_size)
-        .resizable(false)
+        .resizable(true)
         .show_title(false)
         .transparent_titlebar(true);
     if cfg!(target_os = "macos") {
