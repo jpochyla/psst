@@ -63,6 +63,7 @@ cargo run
     - Add / remove track
     - Reorder tracks
     - Rename playlist
+    - Playlist folders
 - [ ] Playback queue
 - [x] Audio volume control
 - [x] Audio loudness normalization
