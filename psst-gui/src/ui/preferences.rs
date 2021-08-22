@@ -12,9 +12,10 @@ use psst_core::connection::Credentials;
 
 use crate::{
     cmd,
-    controller::InputController,
+    controller::{InputController, ShortcutFormatter},
     data::{
-        AppState, AudioQuality, Authentication, Config, Preferences, PreferencesTab, Promise, Theme,
+        AppState, AudioQuality, Authentication, Config, KbShortcuts, Preferences, PreferencesTab,
+        Promise, Theme,
     },
     widget::{icons, Border, Empty, MyWidgetExt},
 };
@@ -28,9 +29,10 @@ pub fn preferences_widget() -> impl Widget<AppState> {
 
     let active = ViewSwitcher::new(
         |state: &AppState, _| state.preferences.active,
-        |active: &PreferencesTab, _, _| match active {
+        |active: &PreferencesTab, data, _| match active {
             PreferencesTab::General => general_tab_widget().boxed(),
             PreferencesTab::Cache => cache_tab_widget().boxed(),
+            PreferencesTab::Shortcuts => shortcuts_tab_widget(&data.config.shortcuts).boxed(),
         },
     )
     .padding(theme::grid(4.0))
@@ -76,6 +78,12 @@ fn tabs_widget() -> impl Widget<AppState> {
         ))
         .with_default_spacer()
         .with_child(tab_widget("Cache", &icons::STORAGE, PreferencesTab::Cache))
+        // TODO: Add new icon
+        .with_child(tab_widget(
+            "Shortcuts",
+            &icons::PLAYLIST,
+            PreferencesTab::Shortcuts,
+        ))
 }
 
 fn general_tab_widget() -> impl Widget<AppState> {
@@ -331,4 +339,50 @@ impl<W: Widget<Preferences>> Controller<Preferences, W> for MeasureCacheSize {
         }
         child.lifecycle(ctx, event, data, env);
     }
+}
+
+/// Generate the shortcut tab widget
+/// Pass [`KbShortcuts`] that should be manipulated (e.g. from `data`)
+fn shortcuts_tab_widget(shortcuts: &KbShortcuts) -> impl Widget<AppState> {
+    let mut col = Flex::column().cross_axis_alignment(CrossAxisAlignment::Start);
+
+    col = col
+        .with_child(Label::new("Playback Shortcuts").with_font(theme::UI_FONT_MEDIUM))
+        .with_spacer(theme::grid(2.0))
+        .with_child(
+            Label::new("Enter a single character or a code as defined\nby crate keyboard-types")
+                .with_font(theme::UI_FONT),
+        )
+        .with_spacer(theme::grid(2.0));
+
+    // TODO: Add option to record shortcuts
+    for shortcut in shortcuts.to_desc_with_lens() {
+        let (lens, description) = shortcut;
+
+        col = col
+            .with_child(Label::new(description).with_font(theme::UI_FONT))
+            .with_child(
+                TextBox::new()
+                    .with_formatter(ShortcutFormatter)
+                    .validate_while_editing(false)
+                    .update_data_while_editing(true)
+                    .controller(InputController::new())
+                    .env_scope(|env, _| env.set(theme::WIDE_WIDGET_WIDTH, theme::grid(16.0)))
+                    .lens(AppState::config.then(Config::shortcuts.then(lens))),
+            )
+            .with_spacer(theme::grid(2.0));
+    }
+    col = col.with_child(
+        Button::new("Save")
+            .on_click(|ctx, config: &mut Config, _| {
+                ctx.request_focus();
+                config.save();
+                //ctx.submit_command(commands::CLOSE_WINDOW);
+            })
+            .fix_width(theme::grid(10.0))
+            .align_right()
+            .lens(AppState::config),
+    );
+
+    col.controller(Authenticate::new())
 }

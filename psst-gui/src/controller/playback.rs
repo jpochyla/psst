@@ -7,7 +7,7 @@ use crossbeam_channel::Sender;
 use druid::{
     im::Vector,
     widget::{prelude::*, Controller},
-    Code, ExtEventSink, InternalLifeCycle, KbKey, WindowHandle,
+    ExtEventSink, InternalLifeCycle, WindowHandle,
 };
 use psst_core::{
     audio_normalize::NormalizationLevel,
@@ -21,6 +21,7 @@ use souvlaki::{
     MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback, MediaPosition, PlatformConfig,
 };
 
+use crate::data::matches;
 use crate::{
     cmd,
     data::{
@@ -394,23 +395,23 @@ where
                 ctx.set_handled();
             }
             //
-            Event::KeyDown(key) if key.code == Code::Space => {
+            Event::KeyDown(key) if matches(key, &data.config.shortcuts.play_resume) => {
                 self.pause_or_resume();
                 ctx.set_handled();
             }
-            Event::KeyDown(key) if key.code == Code::ArrowRight => {
+            Event::KeyDown(key) if matches(key, &data.config.shortcuts.next_song) => {
                 self.next();
                 ctx.set_handled();
             }
-            Event::KeyDown(key) if key.code == Code::ArrowLeft => {
+            Event::KeyDown(key) if matches(key, &data.config.shortcuts.previous_song) => {
                 self.previous();
                 ctx.set_handled();
             }
-            Event::KeyDown(key) if key.key == KbKey::Character("+".to_string()) => {
+            Event::KeyDown(key) if matches(key, &data.config.shortcuts.volume_increase) => {
                 data.playback.volume = (data.playback.volume + 0.1).min(1.0);
                 ctx.set_handled();
             }
-            Event::KeyDown(key) if key.key == KbKey::Character("-".to_string()) => {
+            Event::KeyDown(key) if matches(key, &data.config.shortcuts.volume_decrease) => {
                 data.playback.volume = (data.playback.volume - 0.1).max(0.0);
                 ctx.set_handled();
             }

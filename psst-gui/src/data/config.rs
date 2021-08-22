@@ -11,6 +11,7 @@ use psst_core::{
 use serde::{Deserialize, Serialize};
 
 use super::Promise;
+use druid::lens::Field;
 
 #[derive(Clone, Debug, Data, Lens)]
 pub struct Preferences {
@@ -34,6 +35,7 @@ impl Preferences {
 pub enum PreferencesTab {
     General,
     Cache,
+    Shortcuts,
 }
 
 #[derive(Clone, Debug, Data, Lens)]
@@ -72,6 +74,7 @@ pub struct Config {
     pub audio_quality: AudioQuality,
     pub theme: Theme,
     pub volume: f64,
+    pub shortcuts: KbShortcuts,
 }
 
 impl Default for Config {
@@ -81,6 +84,7 @@ impl Default for Config {
             audio_quality: Default::default(),
             theme: Default::default(),
             volume: 1.0,
+            shortcuts: Default::default(),
         }
     }
 }
@@ -191,5 +195,58 @@ pub enum Theme {
 impl Default for Theme {
     fn default() -> Self {
         Self::Light
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Data, Lens, Serialize, Deserialize)]
+pub struct KbShortcuts {
+    pub play_resume: String,
+    pub volume_increase: String,
+    pub volume_decrease: String,
+    pub next_song: String,
+    pub previous_song: String,
+}
+
+impl KbShortcuts {
+    pub fn to_desc_with_lens(
+        &self,
+    ) -> Vec<(
+        Field<fn(&KbShortcuts) -> &String, fn(&mut KbShortcuts) -> &mut String>,
+        String,
+    )> {
+        vec![
+            (
+                druid::lens!(KbShortcuts, play_resume),
+                "Play/Resume".to_string(),
+            ),
+            (
+                druid::lens!(KbShortcuts, volume_increase),
+                "Volume Increase".to_string(),
+            ),
+            (
+                druid::lens!(KbShortcuts, volume_decrease),
+                "Volume Decrease".to_string(),
+            ),
+            (
+                druid::lens!(KbShortcuts, next_song),
+                "Next Song".to_string(),
+            ),
+            (
+                druid::lens!(KbShortcuts, previous_song),
+                "Previous Song".to_string(),
+            ),
+        ]
+    }
+}
+
+impl Default for KbShortcuts {
+    fn default() -> Self {
+        Self {
+            play_resume: "Space".to_string(),
+            volume_increase: "+".to_string(),
+            volume_decrease: "-".to_string(),
+            next_song: "ArrowRight".to_string(),
+            previous_song: "ArrowLeft".to_string(),
+        }
     }
 }

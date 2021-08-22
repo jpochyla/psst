@@ -52,7 +52,7 @@ pub fn preferences_window() -> WindowDesc<AppState> {
     let win = WindowDesc::new(preferences_widget())
         .title("Preferences")
         .window_size(win_size)
-        .resizable(false)
+        .resizable(true)
         .show_title(false)
         .transparent_titlebar(true);
     if cfg!(target_os = "macos") {
@@ -80,6 +80,7 @@ fn root_widget() -> impl Widget<AppState> {
         .with_child(sidebar_menu_widget())
         .with_default_spacer()
         .with_flex_child(playlists, 1.0)
+        .with_default_spacer()
         .with_child(volume_slider())
         .with_default_spacer()
         .with_child(user::user_widget())

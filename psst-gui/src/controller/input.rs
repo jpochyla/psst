@@ -5,6 +5,7 @@ use druid::{
 };
 
 use crate::cmd;
+use druid::widget::ValueTextBox;
 
 pub struct InputController {
     on_submit: Option<Box<dyn Fn(&mut EventCtx, &mut String, &Env)>>,
@@ -28,6 +29,32 @@ impl Controller<String, TextBox<String>> for InputController {
     fn event(
         &mut self,
         child: &mut TextBox<String>,
+        ctx: &mut EventCtx,
+        event: &Event,
+        data: &mut String,
+        env: &Env,
+    ) {
+        self.match_event(child, ctx, event, data, env)
+    }
+}
+
+impl Controller<String, ValueTextBox<String>> for InputController {
+    fn event(
+        &mut self,
+        child: &mut ValueTextBox<String>,
+        ctx: &mut EventCtx,
+        event: &Event,
+        data: &mut String,
+        env: &Env,
+    ) {
+        self.match_event(child, ctx, event, data, env)
+    }
+}
+
+impl InputController {
+    fn match_event(
+        &mut self,
+        child: &mut impl Widget<String>,
         ctx: &mut EventCtx,
         event: &Event,
         data: &mut String,

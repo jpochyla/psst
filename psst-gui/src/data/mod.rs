@@ -3,6 +3,7 @@ mod artist;
 mod config;
 mod ctx;
 mod id;
+mod kbshortcut;
 mod nav;
 mod playback;
 mod playlist;
@@ -24,8 +25,11 @@ use psst_core::session::SessionService;
 pub use crate::data::{
     album::{Album, AlbumDetail, AlbumLink, AlbumType, Copyright, CopyrightType},
     artist::{Artist, ArtistAlbums, ArtistDetail, ArtistLink, ArtistTracks},
-    config::{AudioQuality, Authentication, Config, Preferences, PreferencesTab, Theme},
+    config::{
+        AudioQuality, Authentication, Config, KbShortcuts, Preferences, PreferencesTab, Theme,
+    },
     ctx::Ctx,
+    kbshortcut::{matches, KbShortcut},
     nav::{Nav, SpotifyUrl},
     playback::{
         NowPlaying, Playback, PlaybackOrigin, PlaybackPayload, PlaybackState, QueueBehavior,
