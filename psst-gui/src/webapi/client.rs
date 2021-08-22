@@ -33,15 +33,13 @@ pub struct WebApi {
     agent: Agent,
     cache: WebApiCache,
     token_provider: TokenProvider,
-    local: Option<LocalTrackManager>
 }
 
 impl WebApi {
     pub fn new(
         session: SessionService,
         proxy_url: Option<&str>,
-        cache_base: Option<PathBuf>,
-        username: Option<String>
+        cache_base: Option<PathBuf>
     ) -> Self {
         let agent = default_ureq_agent_builder(proxy_url).unwrap().build();
         Self {
@@ -49,10 +47,6 @@ impl WebApi {
             agent,
             cache: WebApiCache::new(cache_base),
             token_provider: TokenProvider::new(),
-            local: match username {
-                Some(u) => LocalTrackManager::new(u),
-                _ => None
-            }
         }
     }
 
@@ -407,6 +401,8 @@ impl WebApi {
             .query("additional_types", "track");
         let result: Vector<PlaylistItem> = self.load_all_pages(request)?;
 
+        let local_manager = LocalTrackManager::global().lock();
+
         Ok(result
             .into_iter()
             .filter_map(|item| match item {
@@ -417,8 +413,8 @@ impl WebApi {
                 PlaylistItem {
                     is_local: _,
                     track: OptionalTrack::Json(track),
-                } => match &self.local {
-                    Some(l) => l.find_local_track(track),
+                } => match &local_manager {
+                    Ok(l) => l.find_local_track(track),
                     _ => None
                 },
             })

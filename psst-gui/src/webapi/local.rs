@@ -1,18 +1,9 @@
-use std::{
-    collections::{HashMap, hash_map::Entry}, 
-    fs::File, 
-    io, 
-    io::SeekFrom, 
-    io::prelude::*, 
-    str, 
-    sync::Arc, 
-    time::Duration, 
-    vec::Vec
-};
+use std::{collections::{HashMap, hash_map::Entry}, fs::File, io, io::SeekFrom, io::prelude::*, str, sync::{Arc, Mutex}, time::Duration, vec::Vec};
 
 use crate::data::{AlbumLink, ArtistLink, Image, Track, TrackId, config::Config};
 
 use druid::im::Vector;
+use once_cell::sync::OnceCell;
 use serde::{Deserialize, de::Deserializer};
 use serde_json::Value;
 
@@ -135,11 +126,7 @@ impl LocalChunkedReader {
 
     pub fn read_string_with_len(&mut self, len: usize) -> io::Result<String> {
         let str_bytes = self.read_exact(len)?;
-        match str::from_utf8(&str_bytes) {
-            Ok(s) => Ok(s.to_string()),
-            // TODO: This can definitely be done better
-            Err(_) => Err(io::Error::from(io::ErrorKind::Other))
-        }
+        String::from_utf8(str_bytes).map_err(|_| io::Error::from(io::ErrorKind::Other))
     }
 
     pub fn read_string(&mut self) -> io::Result<String> {
@@ -232,7 +219,26 @@ where
     Ok(duration)
 }
 
+static GLOBAL_LOCALTM: OnceCell<Mutex<LocalTrackManager>> = OnceCell::new();
+
 impl LocalTrackManager {
+
+    pub fn install_as_global(self) {
+        GLOBAL_LOCALTM
+            .set(Mutex::new(self))
+            .map_err(|_| "Cannot install more than once")
+            .unwrap()
+    }
+
+    pub fn global() -> &'static Mutex<Self> {
+        GLOBAL_LOCALTM.get().unwrap()
+    }
+
+    pub fn new() -> Self {
+        LocalTrackManager {
+            tracks: HashMap::<String, Vec<LocalTrack>>::new()
+        }
+    }
 
     fn validate_file(f: &mut File) -> bool {
         let mut magic_buf = [0u8; 4];
@@ -255,42 +261,43 @@ impl LocalTrackManager {
         return true;
     }
 
-    pub fn new(username: String) -> Option<Self> {
+    pub fn read_new_user(&mut self, username: String) {
+        // Clear all previous tracks
+        self.tracks.clear();
+
         let file_path = match Config::spotify_local_files(username) {
             Some(p) => p,
-            _ => return None
+            _ => return
         };
 
         let mut local_file_raw = match File::open(&file_path) {
             Ok(f) => f,
-            _ => return None
+            _ => return
         };
 
         if !LocalTrackManager::validate_file(&mut local_file_raw) {
             log::warn!("Could not validate local file");
-            return None;
+            return;
         }
 
         let mut chunked_reader = match LocalChunkedReader::new(local_file_raw) {
             Ok(r) => r,
-            _ => return None
+            _ => return
         };
 
         let array_signature = chunked_reader.read_exact(1);
         if array_signature.is_err() || array_signature.unwrap()[0] != ARRAY_SIGNATURE {
-            return None
+            return
         }
 
         let num_tracks =  match chunked_reader.read_varint() {
             Ok(nt) => nt,
-            _ => return None
+            _ => return
         };
 
         if chunked_reader.advance(2).is_err() {
-            return None;
+            return;
         }
-
-        let mut tracks = HashMap::<String, Vec<LocalTrack>>::new();
 
         for x in 1..=num_tracks {
             let title = match chunked_reader.read_string() {
@@ -320,7 +327,7 @@ impl LocalTrackManager {
                 artist,
             };
 
-            match tracks.entry(track.title.clone()) {
+            match self.tracks.entry(track.title.clone()) {
                 Entry::Vacant(e) => {e.insert(vec!(track));},
                 Entry::Occupied(mut e) => {e.get_mut().push(track)}
             }
@@ -332,10 +339,6 @@ impl LocalTrackManager {
                 break;
             }
         }
-
-        Some(LocalTrackManager {
-            tracks
-        })
     }
 
     fn is_matching(t1: &LocalTrack, t2: &LocalTrackJSON) -> bool {
@@ -351,7 +354,10 @@ impl LocalTrackManager {
             Err(e) => {log::error!("Error parsing track {:?}", e); return None;}
         };
 
-        let known_track = &self.tracks[&*local_track.name];
+        let known_track = match self.tracks.get(&*local_track.name) {
+            Some(kt) => kt,
+            _ => return None
+        };
 
         for check_track in known_track {
             if LocalTrackManager::is_matching(check_track, &local_track) {
