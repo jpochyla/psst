@@ -171,10 +171,7 @@ impl Config {
     }
 
     pub fn get_username(&self) -> Option<String> {
-        match &self.credentials {
-            Some(c) => Some(c.get_username()),
-            _ => None
-        }
+        self.credentials.as_ref().map(|c| c.get_username())
     }
 }
 

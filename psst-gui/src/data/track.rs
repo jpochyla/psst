@@ -21,7 +21,7 @@ pub struct Track {
     pub explicit: bool,
     pub is_local: bool,
     #[serde(skip_deserializing)]
-    pub local_path: Option<Arc<String>>,
+    pub local_path: Option<Arc<str>>,
     pub is_playable: Option<bool>,
     pub popularity: Option<u32>,
 }
