@@ -32,12 +32,14 @@ fn main() {
     .init();
 
     let config = Config::load().unwrap_or_default();
+    let username = config.get_username();
     let state = AppState::default_with_config(config);
 
     WebApi::new(
         state.session.clone(),
         Config::proxy().as_deref(),
         Config::cache_dir(),
+        username
     )
     .install_as_global();
 

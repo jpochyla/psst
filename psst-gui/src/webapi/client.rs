@@ -27,13 +27,14 @@ use std::{
 };
 use ureq::{Agent, Request, Response};
 
-use super::cache::WebApiCache;
+use super::{cache::WebApiCache, local::LocalTrackManager};
 
 pub struct WebApi {
     session: SessionService,
     agent: Agent,
     cache: WebApiCache,
     token_provider: TokenProvider,
+    local: Option<LocalTrackManager>
 }
 
 impl WebApi {
@@ -41,6 +42,7 @@ impl WebApi {
         session: SessionService,
         proxy_url: Option<&str>,
         cache_base: Option<PathBuf>,
+        username: Option<String>
     ) -> Self {
         let agent = default_ureq_agent_builder(proxy_url).unwrap().build();
         Self {
@@ -48,6 +50,10 @@ impl WebApi {
             agent,
             cache: WebApiCache::new(cache_base),
             token_provider: TokenProvider::new(),
+            local: match username {
+                Some(u) => LocalTrackManager::new(u),
+                _ => None
+            }
         }
     }
 
@@ -377,7 +383,7 @@ impl WebApi {
 
     // https://developer.spotify.com/documentation/web-api/reference/#endpoint-get-playlist
     pub fn get_playlist(&self, id: &str) -> Result<Playlist, Error> {
-        let request = self.get(format!("v1/playlists/{}", id))?;
+        let request = self.get(format!("v1/me/playlists/{}", id))?;
         let result = self.load(request)?;
         Ok(result)
     }
@@ -410,10 +416,16 @@ impl WebApi {
             .into_iter()
             .filter_map(|item| match item {
                 PlaylistItem {
-                    is_local: false,
+                    is_local: _,
                     track: OptionalTrack::Track(track),
                 } => Some(track),
-                _ => None,
+                PlaylistItem {
+                    is_local: _,
+                    track: OptionalTrack::Json(track),
+                } => match &self.local {
+                    Some(l) => l.find_local_track(track),
+                    _ => None
+                },
             })
             .collect())
     }

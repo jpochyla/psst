@@ -1,6 +1,6 @@
 mod album;
 mod artist;
-mod config;
+pub mod config;
 mod ctx;
 mod find;
 mod id;
