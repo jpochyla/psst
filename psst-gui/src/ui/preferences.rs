@@ -28,7 +28,7 @@ pub fn preferences_widget() -> impl Widget<AppState> {
 
     let active = ViewSwitcher::new(
         |state: &AppState, _| state.preferences.active,
-        |active: &PreferencesTab, _, _| match active {
+        |active, _, _| match active {
             PreferencesTab::General => general_tab_widget().boxed(),
             PreferencesTab::Cache => cache_tab_widget().boxed(),
         },
@@ -52,15 +52,9 @@ fn tabs_widget() -> impl Widget<AppState> {
             .padding(theme::grid(1.0))
             .link()
             .rounded(theme::BUTTON_BORDER_RADIUS)
-            .env_scope({
-                move |env, state: &AppState| {
-                    if tab == state.preferences.active {
-                        env.set(theme::LINK_COLD_COLOR, env.get(theme::BACKGROUND_DARK));
-                        env.set(theme::TEXT_COLOR, env.get(theme::FOREGROUND_LIGHT));
-                    } else {
-                        env.set(theme::LINK_COLD_COLOR, env.get(theme::BACKGROUND_LIGHT));
-                    }
-                }
+            .active(move |state: &AppState, _| tab == state.preferences.active)
+            .env_scope(|env, _| {
+                env.set(theme::LINK_ACTIVE_COLOR, env.get(theme::BACKGROUND_DARK));
             })
             .on_click(move |_, state: &mut AppState, _| {
                 state.preferences.active = tab;
