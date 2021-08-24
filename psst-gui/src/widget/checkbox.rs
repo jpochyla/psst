@@ -1,7 +1,10 @@
-use druid::kurbo::{BezPath, Size};
-use druid::piet::{LineCap, LineJoin, LinearGradient, RenderContext, StrokeStyle, UnitPoint};
-use druid::widget::{prelude::*, Label, LabelText};
-use druid::{theme, Affine};
+use druid::{
+    kurbo::{BezPath, Size},
+    piet::{LineCap, LineJoin, LinearGradient, RenderContext, StrokeStyle, UnitPoint},
+    theme,
+    widget::{prelude::*, Label, LabelText},
+    Affine,
+};
 
 pub struct Checkbox {
     label: Label<bool>,

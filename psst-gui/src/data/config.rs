@@ -33,6 +33,7 @@ impl Preferences {
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Data)]
 pub enum PreferencesTab {
     General,
+    Account,
     Cache,
 }
 
