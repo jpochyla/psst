@@ -202,7 +202,6 @@ impl Default for Theme {
         use cocoa::foundation::{NSArray, NSAutoreleasePool};
         use objc::rc::autoreleasepool;
         use objc::{msg_send, sel, sel_impl};
-        use std::panic;
 
         #[link(name = "AppKit", kind = "framework")]
         extern "C" {
