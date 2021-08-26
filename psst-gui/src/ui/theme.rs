@@ -140,8 +140,8 @@ fn setup_light_theme(env: &mut Env) {
 
     env.set(RED, Color::rgba8(0xEB, 0x57, 0x57, 0xFF));
 
-    env.set(LINK_HOT_COLOR, Color::rgba(0.0, 0.0, 0.0, 0.05));
-    env.set(LINK_ACTIVE_COLOR, Color::rgba(0.0, 0.0, 0.0, 0.025));
+    env.set(LINK_HOT_COLOR, Color::rgba(0.0, 0.0, 0.0, 0.06));
+    env.set(LINK_ACTIVE_COLOR, Color::rgba(0.0, 0.0, 0.0, 0.04));
     env.set(LINK_COLD_COLOR, Color::rgba(0.0, 0.0, 0.0, 0.0));
 }
 
