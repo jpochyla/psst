@@ -2,7 +2,7 @@ use std::{convert::TryFrom, ops::Deref, str::FromStr, sync::Arc, time::Duration}
 
 use druid::{im::Vector, lens::Map, Data, Lens};
 use psst_core::item_id::{ItemId, ItemIdType};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::data::{AlbumLink, ArtistLink};
 
@@ -62,8 +62,9 @@ impl Track {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash, Deserialize)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash, Deserialize, Serialize)]
 #[serde(try_from = "String")]
+#[serde(into = "String")]
 pub struct TrackId(ItemId);
 
 impl TrackId {
@@ -113,6 +114,12 @@ impl TryFrom<String> for TrackId {
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
         Self::from_str(&value)
+    }
+}
+
+impl From<TrackId> for String {
+    fn from(id: TrackId) -> Self {
+        id.0.to_base62()
     }
 }
 

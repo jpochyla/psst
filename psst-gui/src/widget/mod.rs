@@ -28,7 +28,7 @@ pub use theme::ThemeScope;
 pub use utils::{Border, Clip, Logger};
 
 use crate::{
-    controller::{Debounce, ExClick, OnCommand, OnCommandAsync, OnUpdate},
+    controller::{ExClick, OnCommand, OnCommandAsync, OnDebounce, OnUpdate},
     data::AppState,
 };
 
@@ -57,12 +57,12 @@ pub trait MyWidgetExt<T: Data>: Widget<T> + Sized + 'static {
         Padding::new(Insets::new(p, 0.0, p, 0.0), self)
     }
 
-    fn debounce(
+    fn on_debounce(
         self,
         duration: Duration,
         handler: impl Fn(&mut EventCtx, &mut T, &Env) + 'static,
-    ) -> ControllerHost<Self, Debounce<T>> {
-        ControllerHost::new(self, Debounce::trailing(duration, handler))
+    ) -> ControllerHost<Self, OnDebounce<T>> {
+        ControllerHost::new(self, OnDebounce::trailing(duration, handler))
     }
 
     fn on_update<F>(self, handler: F) -> ControllerHost<Self, OnUpdate<F>>

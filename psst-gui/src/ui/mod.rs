@@ -139,7 +139,7 @@ fn root_widget() -> impl Widget<AppState> {
         .solid_bar(true);
 
     ThemeScope::new(split)
-        .controller(SessionController::new())
+        .controller(SessionController)
         .controller(NavController)
     // .debug_invalidation()
     // .debug_widget_id()
@@ -261,7 +261,7 @@ fn volume_slider() -> impl Widget<AppState> {
                 }),
         )
         .padding((theme::grid(1.5), 0.0))
-        .debounce(SAVE_DELAY, |ctx, _, _| ctx.submit_command(SAVE_TO_CONFIG))
+        .on_debounce(SAVE_DELAY, |ctx, _, _| ctx.submit_command(SAVE_TO_CONFIG))
         .lens(AppState::playback.then(Playback::volume))
         .on_command(SAVE_TO_CONFIG, |_, _, data| {
             data.config.volume = data.playback.volume;

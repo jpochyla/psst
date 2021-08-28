@@ -6,7 +6,7 @@ use std::{
 
 use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
 use druid::{im::Vector, Data, Lens};
-use serde::{Deserialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Clone, Data, Lens)]
 pub struct Cached<T: Data> {
@@ -51,7 +51,7 @@ pub struct Page<T: Clone> {
     pub total: usize,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Hash, Data, Deserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash, Data, Deserialize, Serialize)]
 pub struct Image {
     pub url: Arc<str>,
     pub width: Option<usize>,
