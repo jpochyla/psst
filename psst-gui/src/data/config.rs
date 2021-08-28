@@ -96,10 +96,9 @@ impl Config {
         AppDirs::new(Some(APP_NAME), USE_XDG_ON_MACOS)
     }
 
-    pub fn spotify_local_files(username: String) -> Option<PathBuf> {
+    pub fn spotify_local_files_file(username: &str) -> Option<PathBuf> {
         AppDirs::new(Some("spotify"), USE_XDG_ON_MACOS).map(|dir| {
-            let path = format!("Users/{username}-user/local-files.bnk", 
-                                        username=username);
+            let path = format!("Users/{username}-user/local-files.bnk", username = username);
             dir.config_dir.join(path)
         })
     }
@@ -143,6 +142,10 @@ impl Config {
         self.credentials.replace(credentials);
     }
 
+    pub fn username(&self) -> Option<&str> {
+        self.credentials.as_ref().map(|c| c.username.as_str())
+    }
+
     pub fn session(&self) -> SessionConfig {
         SessionConfig {
             login_creds: self.credentials.clone().expect("Missing credentials"),
@@ -168,10 +171,6 @@ impl Config {
             },
             Some,
         )
-    }
-
-    pub fn get_username(&self) -> Option<String> {
-        self.credentials.as_ref().map(|c| c.get_username())
     }
 }
 
