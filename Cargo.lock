@@ -117,12 +117,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "904dfeac50f3cdaba28fc6f57fdcddb75f49ed61346676a78c4ffe55877802fd"
 
 [[package]]
-name = "bit-vec"
-version = "0.6.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "349f9b6a179ed607305526ca489b34ad0a41aed5f7980fa90eb03160b69598fb"
-
-[[package]]
 name = "bitflags"
 version = "1.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1074,15 +1068,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "iset"
-version = "0.0.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c2c883c0936012b04f82e7ccf385e0925f1b62549e083bc71dc64fbaa02be287"
-dependencies = [
- "bit-vec",
-]
-
-[[package]]
 name = "itertools"
 version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1617,7 +1602,6 @@ dependencies = [
  "byteorder",
  "crossbeam-channel",
  "hmac",
- "iset",
  "log",
  "miniaudio",
  "minivorbis",
@@ -1626,6 +1610,7 @@ dependencies = [
  "psst-protocol",
  "quick-protobuf",
  "rand",
+ "rangemap",
  "serde",
  "serde_json",
  "sha-1",
@@ -1742,6 +1727,12 @@ checksum = "a9fcdd2e881d02f1d9390ae47ad8e5696a9e4be7b547a1da2afbc61973217004"
 dependencies = [
  "rand_core 0.5.1",
 ]
+
+[[package]]
+name = "rangemap"
+version = "0.1.13"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b6cb84161aa5e5eaa263fadf53172fee10b72fa7aad3a37e0a7aa1aefec2423e"
 
 [[package]]
 name = "raw-window-handle"

@@ -8,7 +8,7 @@ use std::{
 };
 
 use crossbeam_channel::{unbounded, Receiver, Sender};
-use iset::IntervalSet;
+use rangemap::RangeSet;
 use tempfile::NamedTempFile;
 
 pub enum StreamRequest {
@@ -50,8 +50,8 @@ impl StreamStorage {
             req_sender: data_req_sender,
             data_map: Arc::new(StreamDataMap {
                 total_size,
-                downloaded: Mutex::new(IntervalSet::new()),
-                requested: Mutex::new(IntervalSet::new()),
+                downloaded: Mutex::new(RangeSet::new()),
+                requested: Mutex::new(RangeSet::new()),
                 condvar: Condvar::new(),
             }),
         })
@@ -68,7 +68,7 @@ impl StreamStorage {
         // Because the file is complete, let's mark the full range of data as
         // downloaded.  We mark it as requested as well, because the downloaded set is
         // always ⊆ the requested set.
-        let mut downloaded_set = IntervalSet::new();
+        let mut downloaded_set = RangeSet::new();
         downloaded_set.insert(0..total_size);
         let requested_set = downloaded_set.clone();
 
@@ -219,10 +219,10 @@ struct StreamDataMap {
     total_size: u64,
     // Contains ranges of data requested from the server.  Downloaded ranges are not removed from
     // this set.
-    requested: Mutex<IntervalSet<u64>>,
+    requested: Mutex<RangeSet<u64>>,
     // Contains ranges of data sure to be present in the backing storage.  Always a subset of the
     // requested ranges.
-    downloaded: Mutex<IntervalSet<u64>>,
+    downloaded: Mutex<RangeSet<u64>>,
     condvar: Condvar,
 }
 
@@ -235,14 +235,14 @@ impl StreamDataMap {
     /// Return an iterator of sub-ranges of `offset..offset+length` that have
     /// not yet been requested from the backend.
     fn not_yet_requested(&self, offset: u64, length: u64) -> impl IntoIterator<Item = (u64, u64)> {
-        let requested = self
+        #[allow(clippy::needless_collect)]
+        let gaps: Vec<_> = self
             .requested
             .lock()
-            .expect("Failed to acquire data map lock");
-        let overlaps = requested.iter(offset..offset + length);
-        interval_difference(offset..offset + length, overlaps)
-            .into_iter()
-            .map(range_to_offset_and_length)
+            .unwrap()
+            .gaps(&(offset..offset + length))
+            .collect();
+        gaps.into_iter().map(|r| range_to_offset_and_length(&r))
     }
 
     /// Mark given range as requested from the backend, so we can avoid
@@ -250,21 +250,16 @@ impl StreamDataMap {
     fn mark_as_requested(&self, offset: u64, length: u64) {
         self.requested
             .lock()
-            .expect("Failed to acquire data map lock")
+            .unwrap()
             .insert(offset..offset + length);
     }
 
+    /// Remove range previously marked as requested.
     fn mark_as_not_requested(&self, offset: u64, length: u64) {
-        let mut requested = self
-            .requested
+        self.requested
             .lock()
-            .expect("Failed to acquire data map lock");
-        let unmarked_range = offset..offset + length;
-        let filtered_set = requested
-            .iter(0..self.total_size)
-            .filter(|range| range != &unmarked_range)
-            .collect();
-        *requested = filtered_set;
+            .unwrap()
+            .remove(offset..offset + length);
     }
 
     /// Mark the range as downloaded and notify the `self.condvar`, so tasks
@@ -272,7 +267,7 @@ impl StreamDataMap {
     fn mark_as_downloaded(&self, offset: u64, length: u64) {
         self.downloaded
             .lock()
-            .expect("Failed to acquire data map lock")
+            .unwrap()
             .insert(offset..offset + length);
         self.condvar.notify_all();
     }
@@ -283,15 +278,12 @@ impl StreamDataMap {
         let mut called_callback = false;
         let mut available_len = 0; // Resulting length.
 
-        let downloaded = self
-            .downloaded
-            .lock()
-            .expect("Failed to acquire data map lock");
+        let downloaded = self.downloaded.lock().unwrap();
 
         let _mutex_guard = self
             .condvar
             .wait_while(downloaded, |downloaded| {
-                if let Some(range) = downloaded.overlap(offset).next() {
+                if let Some(range) = downloaded.get(&offset) {
                     let (over_ofs, over_len) = range_to_offset_and_length(range);
                     let offset_from_overlapping = offset - over_ofs;
                     available_len = over_len - offset_from_overlapping;
@@ -307,41 +299,21 @@ impl StreamDataMap {
                     true
                 }
             })
-            .expect("Failed to acquire data map lock");
+            .unwrap();
         available_len
     }
 
     // Returns true if data is completely downloaded.
     fn is_complete(&self) -> bool {
-        let downloaded = self
-            .downloaded
+        self.downloaded
             .lock()
-            .expect("Failed to acquire data map lock");
-        let overlaps = downloaded.iter(0..self.total_size);
-        interval_difference(0..self.total_size, overlaps).is_empty()
+            .unwrap()
+            .gaps(&(0..self.total_size))
+            .next()
+            .is_none()
     }
 }
 
-fn range_to_offset_and_length(range: Range<u64>) -> (u64, u64) {
+fn range_to_offset_and_length(range: &Range<u64>) -> (u64, u64) {
     (range.start, range.end - range.start)
-}
-
-/// Return all sub-ranges of `range` that are not covered by any of the
-/// `sorted_intervals`.
-fn interval_difference(
-    range: Range<u64>,
-    sorted_intervals: impl IntoIterator<Item = Range<u64>>,
-) -> Vec<Range<u64>> {
-    let mut acc = Vec::new();
-    let mut end = range.start;
-    for i in sorted_intervals {
-        if !i.contains(&end) {
-            acc.push(end..i.start);
-        }
-        end = i.end;
-    }
-    if range.contains(&end) {
-        acc.push(end..range.end);
-    }
-    acc
 }
