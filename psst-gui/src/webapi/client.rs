@@ -20,7 +20,7 @@ use std::{
     fmt::Display,
     io::{self, Read},
     path::PathBuf,
-    sync::Arc,
+    sync::{Arc, Mutex},
     thread,
     time::Duration,
 };
@@ -33,13 +33,14 @@ pub struct WebApi {
     agent: Agent,
     cache: WebApiCache,
     token_provider: TokenProvider,
+    local_track_manager: Mutex<LocalTrackManager>,
 }
 
 impl WebApi {
     pub fn new(
         session: SessionService,
         proxy_url: Option<&str>,
-        cache_base: Option<PathBuf>
+        cache_base: Option<PathBuf>,
     ) -> Self {
         let agent = default_ureq_agent_builder(proxy_url).unwrap().build();
         Self {
@@ -47,6 +48,7 @@ impl WebApi {
             agent,
             cache: WebApiCache::new(cache_base),
             token_provider: TokenProvider::new(),
+            local_track_manager: Mutex::new(LocalTrackManager::new()),
         }
     }
 
@@ -168,6 +170,18 @@ impl WebApi {
             }
         }
         Ok(results)
+    }
+
+    /// Load local track files from the official client's database.
+    pub fn load_local_tracks(&self, username: &str) {
+        if let Err(err) = self
+            .local_track_manager
+            .lock()
+            .unwrap()
+            .load_tracks_for_user(username)
+        {
+            log::error!("failed to read local tracks: {}", err);
+        }
     }
 }
 
@@ -385,9 +399,9 @@ impl WebApi {
             track: OptionalTrack,
         }
 
-        // Spotify API likes to return _really_ bogus data for local tracks. Much better would
-        // be to ignore parsing this completely if `is_local` is true, but this will do as
-        // well.
+        // Spotify API likes to return _really_ bogus data for local tracks. Much better
+        // would be to ignore parsing this completely if `is_local` is true, but
+        // this will do as well.
         #[derive(Clone, Deserialize)]
         #[serde(untagged)]
         enum OptionalTrack {
@@ -401,22 +415,19 @@ impl WebApi {
             .query("additional_types", "track");
         let result: Vector<PlaylistItem> = self.load_all_pages(request)?;
 
-        let local_manager = LocalTrackManager::global().lock();
+        let local_track_manager = self.local_track_manager.lock().unwrap();
 
         Ok(result
             .into_iter()
             .filter_map(|item| match item {
                 PlaylistItem {
-                    is_local: _,
                     track: OptionalTrack::Track(track),
+                    ..
                 } => Some(track),
                 PlaylistItem {
-                    is_local: _,
                     track: OptionalTrack::Json(track),
-                } => match &local_manager {
-                    Ok(l) => l.find_local_track(track),
-                    _ => None
-                },
+                    ..
+                } => local_track_manager.find_local_track(track),
             })
             .collect())
     }

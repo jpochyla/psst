@@ -1,14 +1,62 @@
-use std::{collections::{HashMap, hash_map::Entry}, fs::File, io, io::SeekFrom, io::prelude::*, str, sync::{Arc, Mutex}, time::Duration, vec::Vec};
-
-use crate::data::{AlbumLink, ArtistLink, Image, Track, TrackId, config::Config};
+use std::{
+    collections::HashMap,
+    fs::File,
+    io::{self, Cursor, Read},
+    str,
+    sync::Arc,
+    time::Duration,
+    vec::Vec,
+};
 
 use druid::im::Vector;
-use once_cell::sync::OnceCell;
-use serde::{Deserialize, de::Deserializer};
+use serde::Deserialize;
 use serde_json::Value;
 
-const MAGIC_BYTES: &[u8] = "SPCO".as_bytes();
-const FILE_TYPE: &[u8] = "LocalFilesStorage".as_bytes();
+use crate::data::{config::Config, AlbumLink, ArtistLink, Image, Track, TrackId};
+
+/**
+ * All local files registered by the Spotify file can be found in the file
+ * located at: <Spotify config>/Users/<username>-user/local-files.bnk
+ *
+ * While this is not a complete reverse engineering of the way it is stored,
+ * it suffices for now. The file appears to be saved as a custom fork of
+ * Google's ProtoBuf format.
+ *
+ * The file starts with "SPCO" as the magic followed by 0x13, 0x00*4 --
+ * couldn't tell what these bytes do.
+ *
+ * After that there is 0x11 and "LocalFilesStorage". Note the 0x11
+ * corresponds to the strings length and I can only assume this is somehow
+ * used to load the correct proto definition.
+ *
+ * Interestingly enough, Spotify bnk files are chunked. After the above
+ * there is a little endian encoded value of the number of bytes in a chunk
+ * maxing out at 0x1FE3. After exactly this many bytes another chunk size
+ * will be present. This can even interrupt strings however it does not
+ * include the 0x00, 0x00 that ends every file (I think).
+ *
+ * Following the first chunk size is 0x60, which I think is used to signify
+ * an array in this ProtoBuf-like language. Doesn't matter too much. The
+ * number of elements in the array then follows encoded as a varint
+ * (https://developers.google.com/protocol-buffers/docs/encoding).
+ *
+ * The bytes 0x94 0x00 seem to be present in every file I have used, I don't
+ * know what they represent.
+ *
+ * Then a track entry is presented as: `Title -> Artist -> Album ->
+ * Local Path -> Trailer`. I have no clue what the trailer represents other
+ * than directly after the `Local Path` the bytes `0x08 -> <varint encoding
+ * of track length>`, not relevant so far. The title, artist, etc. are each
+ * encoded in the following format `0x09(string identifier) -> <varint
+ * string size> -> string`. If the varint size is zero this is a null
+ * string.
+ *
+ * The end of a trailer for a given track is signified by 0x78, 0x04 from
+ * what I can tell.
+ */
+
+const MAGIC_BYTES: &[u8] = b"SPCO";
+const FILE_TYPE: &[u8] = b"LocalFilesStorage";
 
 const ARRAY_SIGNATURE: u8 = 0x60;
 const STRING_SIGNATURE: u8 = 0x09;
@@ -16,164 +64,135 @@ const TRAILER_END: [u8; 2] = [0x78u8, 0x04u8];
 
 #[derive(Clone, Debug)]
 pub struct LocalTrack {
-    title: String,
-    path: String,
-    album: String,
-    artist: String
+    title: Arc<str>,
+    path: Arc<str>,
+    album: Arc<str>,
+    artist: Arc<str>,
 }
 
 pub struct LocalTrackManager {
-    tracks: HashMap<String, Vec<LocalTrack>>
+    tracks: HashMap<Arc<str>, Vec<LocalTrack>>,
 }
 
-/**
- * All local files registered by the Spotify file can be found in the file located at:
- *  <Spotify config>/Users/<username>-user/local-files.bnk
- * 
- * While this is not a complete reverse engineering of the way it is stored it suffices for
- * now. The file appears to be saved as a custom fork of Google's protobuf format
- * 
- * The file starts with "SPCO" as the magic followed by 0x13, 0x00*4 couldn't tell you
- * what these bytes do
- * 
- * After that there is 0x11 and "LocalFilesStorage". Note the 0x11 corresponds to the strings
- * length and I can only assume this is somehow used to load the correct proto definition
- * 
- * Interestingly enough spotify bnk files are chunked. After the above there is a little endian
- * encoded value of the number of bytes in a chunk maxing out at 0x1FE3. After exactly this many bytes
- * another chunk size will be present. This can even interrupt strings however it does not include the
- * 0x00, 0x00 that ends every file(I think)
- * 
- * Following the first chunk size is 0x60 which I think is used to signify an array in this protobuf language?
- * Doesn't matter too much. The number of elements in the array then follows encoded as a 
- * varint(https://developers.google.com/protocol-buffers/docs/encoding)
- * 
- * The bytes 0x94 0x00 seem to be present in every file I have used, I don't know what the
- * represent.
- * 
- * Then a track entry is presented as follows Title -> Artist -> Album -> Local Path -> Trailer.
- * I have no clue what the trailer represents other than directly after the Local path the bytes
- * 0x08 -> <varint encoding of track length>, not relevant so far. The title, artist, etc are each
- * encoded in the following format 0x09(string identifier) -> <varint string size> -> string
- * If the varint size is 0 this is a null string
- * 
- * The end of a trailer for a given track is signified by 0x78, 0x04 from what I can tell
- */
-
-struct LocalChunkedReader {
-    reader: File,
-    chunk: Vec<u8>,
-    read_in: usize
-}
-
-impl LocalChunkedReader {
-    fn read_next_chunk(&mut self) -> io::Result<()> {
-        let mut chunk_size_bytes = [0u8; 2];
-        self.reader.read_exact(&mut chunk_size_bytes)?;
-
-        let chunk_size = (chunk_size_bytes[1] as usize) << 8 | (chunk_size_bytes[0] as usize);
-        let mut next_chunk = vec![0; chunk_size];
-        self.reader.read_exact(&mut next_chunk)?;
-        self.read_in += chunk_size + 2;
-
-        self.chunk.append(&mut next_chunk);
-        
-        Ok(())
+impl LocalTrackManager {
+    pub fn new() -> Self {
+        Self {
+            tracks: HashMap::new(),
+        }
     }
 
-    pub fn new(f: File) -> io::Result<Self> {
-        let mut ret = LocalChunkedReader {
-            reader: f,
-            chunk: vec![0u8; 0],
-            read_in: 0x1B
-        };
+    pub fn load_tracks_for_user(&mut self, username: &str) -> io::Result<()> {
+        let file_path =
+            Config::spotify_local_files_file(username).ok_or(io::ErrorKind::NotFound)?;
+        let local_file = File::open(&file_path)?;
+        let mut reader = LocalTracksReader::new(local_file)?;
 
-        ret.read_next_chunk()?;
-        Ok(ret)
-    }
+        log::info!("parsing local tracks: {:?}", file_path);
 
-    pub fn get_pos(&mut self) -> usize {
-        self.read_in - self.chunk.len()
-    }
-
-    pub fn read_exact(&mut self, size: usize) -> io::Result<Vec<u8>> {
-        if size >= self.chunk.len() {
-            self.read_next_chunk()?;
+        // Start reading the track array.
+        let num_tracks = reader.read_array()?;
+        if num_tracks > 0 {
+            reader.advance(2)?; // Skip `0x94 0x00`.
         }
 
-        Ok(self.chunk.drain(0..size).collect())
-    }
+        self.tracks.clear();
 
-    pub fn read_varint(&mut self) -> io::Result<usize> {
-
-        let mut shift: usize = 0;
-        let mut ret : usize = 0;
-
-        loop {
-            let val = self.read_exact(1)?[0];
-            let has_msb: bool = (val & !0b01111111) != 0;
-            ret |= ((val & 0b01111111) as usize) << shift;
-
-            if has_msb {
-                shift += 7;
-            } else {
+        for n in 1..=num_tracks {
+            let title = reader.read_string()?;
+            let artist = reader.read_string()?;
+            let album = reader.read_string()?;
+            let path = reader.read_string()?;
+            let track = LocalTrack {
+                title: title.into(),
+                path: path.into(),
+                album: album.into(),
+                artist: artist.into(),
+            };
+            self.tracks
+                .entry(track.title.clone())
+                .or_default()
+                .push(track);
+            if reader.advance_until(&TRAILER_END).is_err() {
+                if n != num_tracks {
+                    log::warn!("found EOF but missing {} tracks", num_tracks - n);
+                }
                 break;
             }
         }
 
-        Ok(ret)
-    }
-
-    pub fn read_string_with_len(&mut self, len: usize) -> io::Result<String> {
-        let str_bytes = self.read_exact(len)?;
-        String::from_utf8(str_bytes).map_err(|_| io::Error::from(io::ErrorKind::Other))
-    }
-
-    pub fn read_string(&mut self) -> io::Result<String> {
-        let magic = self.read_exact(1)?;
-
-        if magic[0] != STRING_SIGNATURE {
-            return Err(io::Error::from(io::ErrorKind::Other));
-        }
-
-        let str_size = self.read_varint()?;
-        self.read_string_with_len(str_size)
-    }
-
-    pub fn advance(&mut self, size: usize) -> io::Result<()> {
-        if size > self.chunk.len() {
-            self.read_next_chunk()?;
-        }
-
-        let _drained = self.chunk.drain(0..size);
         Ok(())
     }
 
-    pub fn read_until(&mut self, bytes: Vec<u8>) -> io::Result<()> {
-        loop {
-            match self.chunk.windows(bytes.len()).position(|window| window == bytes) {
-                Some(pos) => {
-                    self.chunk.drain(0..pos+bytes.len());
-                    return Ok(());
-                },
-                _ => {
-                    self.chunk.clear();
-                    self.read_next_chunk()?;
-                }
+    pub fn find_local_track(&self, track_json: Value) -> Option<Arc<Track>> {
+        let local_track: LocalTrackJson = match serde_json::from_value(track_json) {
+            Ok(t) => t,
+            Err(e) => {
+                log::error!("error parsing track {:?}", e);
+                return None;
+            }
+        };
+
+        let matching_tracks = self.tracks.get(&local_track.name)?;
+
+        for parsed_track in matching_tracks {
+            if Self::is_matching_in_addition_to_title(parsed_track, &local_track) {
+                return Some(Arc::new(Track {
+                    id: TrackId::INVALID,
+                    name: local_track.name,
+                    album: local_track.album.map(|local_album| {
+                        AlbumLink {
+                            id: local_album.id.unwrap_or_else(|| "null".into()), // TODO: Invalid ID
+                            name: local_album.name,
+                            images: local_album.images,
+                        }
+                    }),
+                    artists: local_track
+                        .artists
+                        .into_iter()
+                        .map(|artist| ArtistLink {
+                            id: artist.id.unwrap_or_else(|| "null".into()), // TODO: Invalid ID
+                            name: artist.name,
+                        })
+                        .collect(),
+                    duration: local_track.duration,
+                    disc_number: local_track.disc_number,
+                    track_number: local_track.track_number,
+                    explicit: local_track.explicit,
+                    is_local: local_track.is_local,
+                    local_path: Some(parsed_track.path.clone()),
+                    // TODO: Change this to true once playback is supported.
+                    is_playable: Some(false),
+                    popularity: local_track.popularity,
+                }));
             }
         }
+
+        None
+    }
+
+    fn is_matching_in_addition_to_title(t1: &LocalTrack, t2: &LocalTrackJson) -> bool {
+        // TODO: More checks on if a local track may return multiple artists from
+        // Spotify's web facing API.
+        let artist_mismatch = t2
+            .artists
+            .iter()
+            .next()
+            .map_or(false, |t2_artist| t2_artist.name != t1.artist);
+        let album_mismatch = t2
+            .album
+            .as_ref()
+            .map_or(false, |t2_album| t2_album.name != t1.album);
+        !(artist_mismatch || album_mismatch)
     }
 }
 
-/**
- * Spotify can do some weird stuff with local track APIs so serializing with serde requires
- * a good amount of workarounds. Basically the Tracks structs from the data crate with Option 
- * modifications to allow for null values
- */
+// Spotify can do some weird stuff with local track APIs so serializing with
+// `serde` requires a good amount of workarounds.  The following structs reflect
+// the ones in the `data` module, with modifications to allow for null values.
+
 #[derive(Clone, Debug, Deserialize)]
-struct LocalAlbumLinkJSON {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(default)]   
+struct LocalAlbumLinkJson {
+    #[serde(default)]
     pub id: Option<Arc<str>>,
     pub name: Arc<str>,
     #[serde(default)]
@@ -181,26 +200,22 @@ struct LocalAlbumLinkJSON {
 }
 
 #[derive(Clone, Debug, Deserialize)]
-struct LocalArtistLinkJSON {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(default)]   
+struct LocalArtistLinkJson {
+    #[serde(default)]
     pub id: Option<Arc<str>>,
     pub name: Arc<str>,
 }
 
-
 #[derive(Clone, Debug, Deserialize)]
-struct LocalTrackJSON {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(default)]    
+struct LocalTrackJson {
+    #[serde(default)]
     pub id: Option<TrackId>,
     pub name: Arc<str>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(default)]
-    pub album: Option<LocalAlbumLinkJSON>,
-    pub artists: Vector<LocalArtistLinkJSON>,
+    pub album: Option<LocalAlbumLinkJson>,
+    pub artists: Vector<LocalArtistLinkJson>,
     #[serde(rename = "duration_ms")]
-    #[serde(deserialize_with = "deserialize_millis")]
+    #[serde(deserialize_with = "crate::data::utils::deserialize_millis")]
     pub duration: Duration,
     pub disc_number: usize,
     pub track_number: usize,
@@ -210,197 +225,172 @@ struct LocalTrackJSON {
     pub popularity: Option<u32>,
 }
 
-pub fn deserialize_millis<'de, D>(deserializer: D) -> Result<Duration, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let millis = u64::deserialize(deserializer)?;
-    let duration = Duration::from_millis(millis);
-    Ok(duration)
+struct LocalTracksReader {
+    chunked: ChunkedReader,
 }
 
-static GLOBAL_LOCALTM: OnceCell<Mutex<LocalTrackManager>> = OnceCell::new();
-
-impl LocalTrackManager {
-
-    pub fn install_as_global(self) {
-        GLOBAL_LOCALTM
-            .set(Mutex::new(self))
-            .map_err(|_| "Cannot install more than once")
-            .unwrap()
+impl LocalTracksReader {
+    fn new(file: File) -> io::Result<Self> {
+        Ok(Self {
+            chunked: Self::parse_file(file)?,
+        })
     }
 
-    pub fn global() -> &'static Mutex<Self> {
-        GLOBAL_LOCALTM.get().unwrap()
+    /// Checks if `file` is in correct format and prepares it for reading.
+    fn parse_file(mut file: File) -> io::Result<ChunkedReader> {
+        // Validate the magic.
+        let magic = read_bytes(&mut file, 4)?;
+        if magic != MAGIC_BYTES {
+            return Err(io::ErrorKind::InvalidData.into());
+        }
+        // Skip `0x13, 0x00*4`.
+        advance(&mut file, 5)?;
+        // Validate the file-type marker.
+        let file_type = read_bytes(&mut file, 18)?;
+        if file_type[0] != FILE_TYPE.len() as u8 || &file_type[1..] != FILE_TYPE {
+            return Err(io::ErrorKind::InvalidData.into());
+        }
+        Ok(ChunkedReader::new(file))
     }
 
-    pub fn new() -> Self {
-        LocalTrackManager {
-            tracks: HashMap::<String, Vec<LocalTrack>>::new()
+    fn advance(&mut self, len: usize) -> io::Result<()> {
+        advance(&mut self.chunked, len)
+    }
+
+    fn advance_until(&mut self, bytes: &[u8]) -> io::Result<()> {
+        advance_until(&mut self.chunked, bytes)
+    }
+
+    fn read_string(&mut self) -> io::Result<String> {
+        let signature = read_u8(&mut self.chunked)?;
+        if signature != STRING_SIGNATURE {
+            return Err(io::ErrorKind::InvalidData.into());
+        }
+        let str_size = read_uvarint(&mut self.chunked)?;
+        let str_buf = read_utf8(&mut self.chunked, str_size as usize)?;
+        Ok(str_buf)
+    }
+
+    fn read_array(&mut self) -> io::Result<usize> {
+        let signature = read_u8(&mut self.chunked)?;
+        if signature != ARRAY_SIGNATURE {
+            return Err(io::ErrorKind::InvalidData.into());
+        }
+        let num_entries = read_uvarint(&mut self.chunked)? as usize;
+        Ok(num_entries)
+    }
+}
+
+/// Implements a `Read` trait over the chunked file format described above.
+struct ChunkedReader {
+    inner: File,
+    chunk: Cursor<Vec<u8>>,
+}
+
+impl ChunkedReader {
+    fn new(inner: File) -> Self {
+        Self {
+            inner,
+            chunk: Cursor::default(),
         }
     }
 
-    fn validate_file(f: &mut File) -> bool {
-        let mut magic_buf = [0u8; 4];
-        f.read_exact(&mut magic_buf).unwrap();
-
-        if magic_buf != MAGIC_BYTES {
-            return false;
-        }
-
-        if f.seek(SeekFrom::Start(0x9)).is_err() {
-            return false;
-        }
-
-        let mut file_type: [u8; 0x12] = [0; 0x12];
-        if f.read_exact(&mut file_type).is_err() 
-                || file_type[0] != 0x11 || !file_type[1..].eq(FILE_TYPE) {
-            return false;
-        }
-
-        return true;
+    fn read_next_chunk(&mut self) -> io::Result<()> {
+        // Two LE bytes of chunk length.
+        let size = read_u16_le(&mut self.inner)?;
+        // Chunk content.
+        let buf = read_bytes(&mut self.inner, size as usize)?;
+        self.chunk = Cursor::new(buf);
+        Ok(())
     }
+}
 
-    pub fn read_new_user(&mut self, username: String) {
-        // Clear all previous tracks
-        self.tracks.clear();
-
-        let file_path = match Config::spotify_local_files(username) {
-            Some(p) => p,
-            _ => return
-        };
-
-        let mut local_file_raw = match File::open(&file_path) {
-            Ok(f) => f,
-            _ => return
-        };
-
-        if !LocalTrackManager::validate_file(&mut local_file_raw) {
-            log::warn!("Could not validate local file");
-            return;
-        }
-
-        let mut chunked_reader = match LocalChunkedReader::new(local_file_raw) {
-            Ok(r) => r,
-            _ => return
-        };
-
-        let array_signature = chunked_reader.read_exact(1);
-        if array_signature.is_err() || array_signature.unwrap()[0] != ARRAY_SIGNATURE {
-            return
-        }
-
-        let num_tracks =  match chunked_reader.read_varint() {
-            Ok(nt) => nt,
-            _ => return
-        };
-
-        if chunked_reader.advance(2).is_err() {
-            return;
-        }
-
-        for x in 1..=num_tracks {
-            let title = match chunked_reader.read_string() {
-                Ok(s) => s,
-                _ => break
-            };
-
-            let artist = match chunked_reader.read_string() {
-                Ok(s) => s,
-                _ => break
-            };
-
-            let album = match chunked_reader.read_string() {
-                Ok(s) => s,
-                _ => break
-            };
-
-            let path = match chunked_reader.read_string() {
-                Ok(s) => s,
-                _ => break
-            };
-
-            let track = LocalTrack{
-                title,
-                path,
-                album,
-                artist,
-            };
-
-            match self.tracks.entry(track.title.clone()) {
-                Entry::Vacant(e) => {e.insert(vec!(track));},
-                Entry::Occupied(mut e) => {e.get_mut().push(track)}
+impl Read for ChunkedReader {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        loop {
+            let n = self.chunk.read(buf)?;
+            if n > 0 {
+                break Ok(n);
+            } else {
+                // `self.chunk` is empty, read the next one.  Returns `Err` on EOF.
+                self.read_next_chunk()?;
             }
+        }
+    }
+}
 
-            if chunked_reader.read_until(TRAILER_END.to_vec()).is_err() {
-                if x != num_tracks {
-                    log::warn!("Found EOF but missing {missin} tracks...", missin=num_tracks-x);
-                }
+/// Helper, reads a byte from `f` or returns `Err`.
+fn read_u8(f: &mut impl io::Read) -> io::Result<u8> {
+    let mut buf = [0u8; 1];
+    f.read_exact(&mut buf)?;
+    Ok(buf[0])
+}
+
+/// Helper, reads little-endian `u16` or returns `Err`.
+fn read_u16_le(f: &mut impl io::Read) -> io::Result<u16> {
+    let mut buf = [0u8; 2];
+    f.read_exact(&mut buf)?;
+    Ok(u16::from_le_bytes(buf))
+}
+
+/// Helper, reads ProtoBuf-style unsigned varint from `f` or returns `Err`.
+fn read_uvarint(f: &mut impl io::Read) -> io::Result<u64> {
+    let mut shift: u64 = 0;
+    let mut ret: u64 = 0;
+
+    loop {
+        let byte = read_u8(f)?;
+        let has_msb: bool = (byte & !0b01111111) != 0;
+        ret |= ((byte & 0b01111111) as u64) << shift;
+
+        if has_msb {
+            shift += 7;
+        } else {
+            break;
+        }
+    }
+
+    Ok(ret)
+}
+
+/// Helper, reads a `Vec<u8>` of length `len` from `f` or returns `Err`.
+fn read_bytes(f: &mut impl io::Read, len: usize) -> io::Result<Vec<u8>> {
+    let mut buf = vec![0u8; len];
+    f.read_exact(&mut buf)?;
+    Ok(buf)
+}
+
+/// Helper, reads a UTF-8 string of length `len` from `f` or returns `Err`.
+fn read_utf8(f: &mut impl io::Read, len: usize) -> io::Result<String> {
+    let buf = read_bytes(f, len)?;
+    String::from_utf8(buf).map_err(|_| io::ErrorKind::InvalidData.into())
+}
+
+/// Helper, skips `len` bytes of `f` or returns `Err`.
+fn advance(f: &mut impl io::Read, len: usize) -> io::Result<()> {
+    for _ in 0..len {
+        read_u8(f)?;
+    }
+    Ok(())
+}
+
+/// Helper, skips bytes of `f` until an exact continuous `bytes` match is found,
+/// or returns `Err`.
+pub fn advance_until(f: &mut impl io::Read, bytes: &[u8]) -> io::Result<()> {
+    let mut i = 0;
+    while i < bytes.len() {
+        loop {
+            let r = read_u8(f)?;
+            if r == bytes[i] {
+                i += 1; // Match, continue with the next byte of `bytes`.
                 break;
+            } else {
+                i = 0; // Mismatch, start at the beginning again.
+                if r == bytes[i] {
+                    i += 1;
+                }
             }
         }
     }
-
-    fn is_matching(t1: &LocalTrack, t2: &LocalTrackJSON) -> bool {
-        // TODO: more checks on if a local track may return multiple artists from spotify's web facing API
-        // if (has_artists => first artists is equal to local track) && (has_album => album equality) 
-        !(!t2.artists.is_empty() && *t2.artists[0].name != t1.artist) 
-                && !(t2.album.as_ref().is_some() && *t2.album.as_ref().unwrap().name != t1.album)
-    }
-
-    pub fn find_local_track(&self, track: Value) -> Option<Arc<Track>> {
-        let local_track: LocalTrackJSON = match serde_json::from_value(track) {
-            Ok(t) => t,
-            Err(e) => {log::error!("Error parsing track {:?}", e); return None;}
-        };
-
-        let known_track = match self.tracks.get(&*local_track.name) {
-            Some(kt) => kt,
-            _ => return None
-        };
-
-        for check_track in known_track {
-            if LocalTrackManager::is_matching(check_track, &local_track) {
-                return Some(Arc::<Track>::new(Track {
-                    id: TrackId::INVALID,
-                    name: local_track.name,
-                    album: Some(AlbumLink {
-                        id: match local_track.album {
-                            Some(ref e) => match &e.id {
-                                Some(id) => id.clone(),
-                                _ => Arc::from(check_track.album.clone())
-                            },
-                            _ => Arc::from("<null>")
-                        },
-                        name: match local_track.album {
-                            Some(ref e) => e.name.clone(),
-                            None => Arc::from("<Unknown>"),
-                        },
-                        images: match local_track.album {
-                            Some(ref e) => e.images.clone(),
-                            _ => Vector::<Image>::new(),
-                        }
-                    }),
-                    artists: local_track.artists
-                                    .into_iter()
-                                    .map(|artist| ArtistLink {
-                                        id: artist.id.unwrap_or(Arc::from(check_track.artist.clone())),
-                                        name: artist.name
-                                    })
-                                    .collect(),
-                    duration: local_track.duration,
-                    disc_number: local_track.disc_number,
-                    track_number: local_track.track_number,
-                    explicit: local_track.explicit,
-                    is_local: local_track.is_local,
-                    local_path: Some(Arc::from(check_track.path.clone())),
-                    // TODO: Change this to true once playback is supported
-                    is_playable: Some(false),
-                    popularity: local_track.popularity,
-                }));
-            }
-        }
-
-        None
-    }
+    Ok(())
 }

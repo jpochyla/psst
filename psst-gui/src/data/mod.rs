@@ -11,7 +11,7 @@ mod recommend;
 mod search;
 mod track;
 mod user;
-mod utils;
+pub mod utils;
 
 use std::{mem, sync::Arc, time::Duration};
 

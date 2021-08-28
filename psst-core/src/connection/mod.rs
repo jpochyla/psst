@@ -41,9 +41,9 @@ const AP_FALLBACK: &str = "ap.spotify.com:443";
 #[serde(from = "SerializedCredentials")]
 #[serde(into = "SerializedCredentials")]
 pub struct Credentials {
-    username: String,
-    auth_data: Vec<u8>,
-    auth_type: AuthenticationType,
+    pub username: String,
+    pub auth_data: Vec<u8>,
+    pub auth_type: AuthenticationType,
 }
 
 impl Credentials {
@@ -53,10 +53,6 @@ impl Credentials {
             auth_type: AuthenticationType::AUTHENTICATION_USER_PASS,
             auth_data: password.into_bytes(),
         }
-    }
-
-    pub fn get_username(&self) -> String {
-        self.username.clone()
     }
 }
 
