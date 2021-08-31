@@ -1,6 +1,7 @@
 use druid::{Color, Env, FontDescriptor, FontFamily, FontWeight, Insets, Key, Size};
 #[cfg(any(target_os = "macos", target_os = "windows"))]
 use dark_light::{detect, Mode};
+use detect_desktop_environment::DesktopEnvironment;
 pub use druid::theme::*;
 
 use crate::data::{AppState, Theme};
@@ -70,6 +71,7 @@ pub fn setup(env: &mut Env, state: &AppState) {
             env.set(BUTTON_DARK, env.get(GREY_700));
         }
         Theme::Auto => {
+            #[cfg(any(target_os = "macos", target_os = "windows"))]
             match detect() {
                 Mode::Dark => {
                     env.set(BUTTON_LIGHT, env.get(GREY_600));
@@ -149,6 +151,30 @@ fn setup_auto_theme(env: &mut Env) {
         Mode::Light => {
             setup_light_theme(env)
         }
+    }
+    #[cfg(target_os = "linux")]
+    match DesktopEnvironment::detect() {
+        DesktopEnvironment::Unknown => {}
+        DesktopEnvironment::Cinnamon => {}
+        DesktopEnvironment::Enlightenment => {}
+        DesktopEnvironment::Gnome => {}
+        DesktopEnvironment::Kde => {
+            if let Ok(content) = std::fs::read_to_string("/home/eduardo/.config/kdeglobals") {
+                let theme = content.lines().filter(|line| line.contains("Name=")).collect::<String>();
+                if theme.to_lowercase().contains("dark") {
+                    setup_dark_theme(env)
+                } else {
+                    setup_light_theme(env)
+                }
+            }
+        }
+        DesktopEnvironment::Lxde => {}
+        DesktopEnvironment::Lxqt => {}
+        DesktopEnvironment::MacOs => {}
+        DesktopEnvironment::Mate => {}
+        DesktopEnvironment::Unity => {}
+        DesktopEnvironment::Windows => {}
+        DesktopEnvironment::Xfce => {}
     }
 }
 

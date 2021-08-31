@@ -453,6 +453,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "detect-desktop-environment"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "21d8ad60dd5b13a4ee6bd8fa2d5d88965c597c67bce32b5fc49c94f55cb50810"
+
+[[package]]
 name = "digest"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1637,6 +1643,7 @@ dependencies = [
  "chrono",
  "crossbeam-channel",
  "dark-light",
+ "detect-desktop-environment",
  "druid",
  "druid-shell",
  "env_logger 0.9.0",
