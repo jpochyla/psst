@@ -1,6 +1,6 @@
 use druid::{Color, Env, FontDescriptor, FontFamily, FontWeight, Insets, Key, Size};
-// #[cfg(any(target_os = "macos", target_os = "windows"))]
-// use dark_light::{detect, Mode};
+#[cfg(any(target_os = "macos", target_os = "windows"))]
+use dark_light::{detect, Mode};
 pub use druid::theme::*;
 
 use crate::data::{AppState, Theme};
@@ -45,18 +45,8 @@ pub fn setup(env: &mut Env, state: &AppState) {
     match state.config.theme {
         Theme::Light => setup_light_theme(env),
         Theme::Dark => setup_dark_theme(env),
+        Theme::Auto => setup_auto_theme(env),
     };
-
-    // #[cfg(any(target_os = "macos", target_os = "windows"))]
-    //     {
-    //         std::thread::spawn(|| {
-    //             match detect() {
-    //                 Mode::Dark => setup_light_theme(env),
-    //                 Mode::Light => setup_dark_theme(env)
-    //             }
-    //         });
-    //     }
-
 
     env.set(WINDOW_BACKGROUND_COLOR, env.get(GREY_700));
     env.set(TEXT_COLOR, env.get(GREY_100));
@@ -78,6 +68,18 @@ pub fn setup(env: &mut Env, state: &AppState) {
         Theme::Dark => {
             env.set(BUTTON_LIGHT, env.get(GREY_600));
             env.set(BUTTON_DARK, env.get(GREY_700));
+        }
+        Theme::Auto => {
+            match detect() {
+                Mode::Dark => {
+                    env.set(BUTTON_LIGHT, env.get(GREY_600));
+                    env.set(BUTTON_DARK, env.get(GREY_700));
+                },
+                Mode::Light => {
+                    env.set(BUTTON_LIGHT, env.get(GREY_700));
+                    env.set(BUTTON_DARK, env.get(GREY_600));
+                }
+            }
         }
     }
 
@@ -136,6 +138,18 @@ pub fn setup(env: &mut Env, state: &AppState) {
     env.set(MENU_BUTTON_BG_INACTIVE, env.get(GREY_600));
     env.set(MENU_BUTTON_FG_ACTIVE, env.get(GREY_000));
     env.set(MENU_BUTTON_FG_INACTIVE, env.get(GREY_100));
+}
+
+fn setup_auto_theme(env: &mut Env) {
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    match detect() {
+        Mode::Dark => {
+            setup_dark_theme(env)
+        },
+        Mode::Light => {
+            setup_light_theme(env)
+        }
+    }
 }
 
 fn setup_light_theme(env: &mut Env) {
