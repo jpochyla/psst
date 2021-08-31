@@ -1,5 +1,6 @@
 use druid::{Color, Env, FontDescriptor, FontFamily, FontWeight, Insets, Key, Size};
-
+// #[cfg(any(target_os = "macos", target_os = "windows"))]
+// use dark_light::{detect, Mode};
 pub use druid::theme::*;
 
 use crate::data::{AppState, Theme};
@@ -45,6 +46,17 @@ pub fn setup(env: &mut Env, state: &AppState) {
         Theme::Light => setup_light_theme(env),
         Theme::Dark => setup_dark_theme(env),
     };
+
+    // #[cfg(any(target_os = "macos", target_os = "windows"))]
+    //     {
+    //         std::thread::spawn(|| {
+    //             match detect() {
+    //                 Mode::Dark => setup_light_theme(env),
+    //                 Mode::Light => setup_dark_theme(env)
+    //             }
+    //         });
+    //     }
+
 
     env.set(WINDOW_BACKGROUND_COLOR, env.get(GREY_700));
     env.set(TEXT_COLOR, env.get(GREY_100));
