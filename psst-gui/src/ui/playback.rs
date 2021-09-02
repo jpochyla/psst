@@ -3,9 +3,9 @@ use std::time::Duration;
 use druid::{
     kurbo::{Affine, BezPath},
     widget::{CrossAxisAlignment, Either, Flex, Label, LineBreaking, Spinner, ViewSwitcher},
-    BoxConstraints, Data, Env, Event, EventCtx, LayoutCtx, LensExt, LifeCycle, LifeCycleCtx,
-    MouseButton, PaintCtx, Point, Rect, RenderContext, Size, UpdateCtx, Widget, WidgetExt,
-    WidgetPod,
+    BoxConstraints, Cursor, Data, Env, Event, EventCtx, LayoutCtx, LensExt, LifeCycle,
+    LifeCycleCtx, MouseButton, PaintCtx, Point, Rect, RenderContext, Size, UpdateCtx, Widget,
+    WidgetExt, WidgetPod,
 };
 use itertools::Itertools;
 
@@ -308,6 +308,9 @@ impl SeekBar {
 impl Widget<NowPlaying> for SeekBar {
     fn event(&mut self, ctx: &mut EventCtx, event: &Event, _data: &mut NowPlaying, _env: &Env) {
         match event {
+            Event::MouseMove(_) => {
+                ctx.set_cursor(&Cursor::Pointer);
+            }
             Event::MouseDown(mouse) => {
                 if mouse.button == MouseButton::Left {
                     ctx.set_active(true);

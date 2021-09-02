@@ -385,9 +385,9 @@ impl WebApi {
             track: OptionalTrack,
         }
 
-        // Spotify API likes to return _really_ bogus data for local tracks. Much better would
-        // be to ignore parsing this completely if `is_local` is true, but this will do as
-        // well.
+        // Spotify API likes to return _really_ bogus data for local tracks. Much better
+        // would be to ignore parsing this completely if `is_local` is true, but this
+        // will do as well.
         #[derive(Clone, Deserialize)]
         #[serde(untagged)]
         enum OptionalTrack {

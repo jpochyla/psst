@@ -12,7 +12,7 @@ type AsyncCmdPre<T, U> = Box<dyn Fn(&mut EventCtx, &mut T, U)>;
 type AsyncCmdReq<U, V> = Arc<dyn Fn(U) -> V + Sync + Send + 'static>;
 type AsyncCmdRes<T, U, V> = Box<dyn Fn(&mut EventCtx, &mut T, (U, V))>;
 
-pub struct OnCmdAsync<W, T, U, V> {
+pub struct OnCommandAsync<W, T, U, V> {
     child: WidgetPod<T, W>,
     selector: Selector<U>,
     preflight_fn: AsyncCmdPre<T, U>,
@@ -21,7 +21,7 @@ pub struct OnCmdAsync<W, T, U, V> {
     thread: Option<JoinHandle<()>>,
 }
 
-impl<W, T, U, V> OnCmdAsync<W, T, U, V>
+impl<W, T, U, V> OnCommandAsync<W, T, U, V>
 where
     W: Widget<T>,
 {
@@ -45,7 +45,7 @@ where
     }
 }
 
-impl<W, T, U, V> Widget<T> for OnCmdAsync<W, T, U, V>
+impl<W, T, U, V> Widget<T> for OnCommandAsync<W, T, U, V>
 where
     W: Widget<T>,
     T: Data,

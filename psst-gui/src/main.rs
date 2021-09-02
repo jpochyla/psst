@@ -50,8 +50,8 @@ fn main() {
         delegate = Delegate::with_main(window.id);
         launcher = AppLauncher::with_window(window).configure_env(ui::theme::setup);
     } else {
-        // No configured credentials, open the preferences.
-        let window = ui::preferences_window();
+        // No configured credentials, open the account setup.
+        let window = ui::account_setup_window();
         delegate = Delegate::with_preferences(window.id);
         launcher = AppLauncher::with_window(window).configure_env(ui::theme::setup);
     };

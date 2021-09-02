@@ -4,7 +4,7 @@ use druid::{
     im::{vector, Vector},
     Data, Lens,
 };
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use super::{ArtistLink, Float64, Promise, Track, TrackId};
 
@@ -14,10 +14,11 @@ pub struct Recommend {
     pub results: Promise<Recommendations, Arc<RecommendationsRequest>>,
 }
 
-#[derive(Clone, Debug, Default, Data, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, Default, Data, PartialEq, Eq, Hash, Deserialize, Serialize)]
 pub struct RecommendationsRequest {
     pub seed_artists: Vector<ArtistLink>,
     pub seed_tracks: Vector<TrackId>,
+    #[serde(skip)]
     pub params: RecommendationsParams,
 }
 

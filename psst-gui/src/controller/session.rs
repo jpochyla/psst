@@ -5,10 +5,6 @@ use crate::{cmd, data::AppState};
 pub struct SessionController;
 
 impl SessionController {
-    pub fn new() -> Self {
-        Self
-    }
-
     fn connect(&self, data: &mut AppState) {
         // Update the session configuration, any active session will get shut down.
         data.session.update_config(data.config.session());

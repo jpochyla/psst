@@ -67,17 +67,10 @@ impl ToAudioPath for Track {
 
 fn is_restricted_in_region(restriction: &Restriction, country: &str) -> bool {
     if let Some(allowed) = &restriction.countries_allowed {
-        if allowed.is_empty() {
-            return true;
-        }
-        if is_country_in_list(allowed.as_bytes(), country.as_bytes()) {
-            return false;
-        }
+        return !is_country_in_list(allowed.as_bytes(), country.as_bytes());
     }
     if let Some(forbidden) = &restriction.countries_forbidden {
-        if is_country_in_list(forbidden.as_bytes(), country.as_bytes()) {
-            return true;
-        }
+        return is_country_in_list(forbidden.as_bytes(), country.as_bytes());
     }
     false
 }

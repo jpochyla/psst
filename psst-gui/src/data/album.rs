@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use chrono::NaiveDate;
 use druid::{im::Vector, Data, Lens};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::data::{ArtistLink, Cached, Image, Promise, Track};
 
@@ -72,7 +72,7 @@ impl Album {
     }
 }
 
-#[derive(Clone, Debug, Data, Lens, Eq, PartialEq, Hash, Deserialize)]
+#[derive(Clone, Debug, Data, Lens, Eq, PartialEq, Hash, Deserialize, Serialize)]
 pub struct AlbumLink {
     pub id: Arc<str>,
     pub name: Arc<str>,
