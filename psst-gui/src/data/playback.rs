@@ -5,6 +5,7 @@ use druid::{im::Vector, Data, Lens};
 use crate::data::{
     AlbumLink, ArtistLink, AudioAnalysis, Nav, PlaylistLink, Promise, Track, TrackId,
 };
+use serde::{Deserialize, Serialize};
 
 use super::RecommendationsRequest;
 
@@ -23,12 +24,18 @@ pub struct QueuedTrack {
     pub origin: PlaybackOrigin,
 }
 
-#[derive(Copy, Clone, Debug, Data, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Data, Eq, PartialEq, Serialize, Deserialize)]
 pub enum QueueBehavior {
     Sequential,
     Random,
     LoopTrack,
     LoopAll,
+}
+
+impl Default for QueueBehavior {
+    fn default() -> Self {
+        QueueBehavior::Sequential
+    }
 }
 
 #[derive(Copy, Clone, Debug, Data, Eq, PartialEq)]

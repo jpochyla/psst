@@ -78,7 +78,7 @@ impl AppState {
         let playback = Playback {
             state: PlaybackState::Stopped,
             now_playing: None,
-            queue_behavior: QueueBehavior::Sequential,
+            queue_behavior: config.queue_behavior,
             queue: Vector::new(),
             volume: config.volume,
         };
@@ -200,6 +200,12 @@ impl AppState {
         self.playback.state = PlaybackState::Stopped;
         self.playback.now_playing.take();
         self.common_ctx_mut().playback_item.take();
+    }
+
+    pub fn set_queue_behavior(&mut self, queue_behavior: QueueBehavior) {
+        self.playback.queue_behavior = queue_behavior;
+        self.config.queue_behavior = queue_behavior;
+        self.config.save();
     }
 }
 

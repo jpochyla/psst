@@ -10,7 +10,7 @@ use psst_core::{
 };
 use serde::{Deserialize, Serialize};
 
-use super::{Nav, Promise};
+use super::{Nav, Promise, QueueBehavior};
 
 #[derive(Clone, Debug, Data, Lens)]
 pub struct Preferences {
@@ -74,6 +74,7 @@ pub struct Config {
     pub theme: Theme,
     pub volume: f64,
     pub last_route: Option<Nav>,
+    pub queue_behavior: QueueBehavior,
 }
 
 impl Default for Config {
@@ -84,6 +85,7 @@ impl Default for Config {
             theme: Default::default(),
             volume: 1.0,
             last_route: Default::default(),
+            queue_behavior: Default::default(),
         }
     }
 }
