@@ -16,7 +16,7 @@ use crate::{
         AppState, AudioAnalysis, NowPlaying, Playback, PlaybackOrigin, PlaybackState,
         QueueBehavior, Track,
     },
-    widget::{icons, icons::SvgIcon, Empty, Maybe, MyWidgetExt},
+    widget::{icons, icons::SvgIcon, Empty, Maybe, MyWidgetExt, RemoteImage},
 };
 
 use super::{theme, utils};
@@ -36,7 +36,20 @@ pub fn panel_widget() -> impl Widget<AppState> {
         .controller(PlaybackController::new())
 }
 
+pub fn cover_widget(size: f64) -> impl Widget<NowPlaying> {
+    RemoteImage::new(
+        utils::placeholder_widget(),
+        move |np: &NowPlaying, _| match &np.item.album {
+            Some(album) => album.image(size, size).map(|image| image.url.clone()),
+            None => None,
+        },
+    )
+    .fix_size(size, size)
+}
+
 fn playback_item_widget() -> impl Widget<NowPlaying> {
+    let cover_art = cover_widget(theme::grid(10.0));
+
     let track_name = Label::raw()
         .with_line_break_mode(LineBreaking::Clip)
         .with_font(theme::UI_FONT_MEDIUM)
@@ -65,14 +78,18 @@ fn playback_item_widget() -> impl Widget<NowPlaying> {
     )
     .lens(NowPlaying::origin);
 
-    Flex::column()
-        .cross_axis_alignment(CrossAxisAlignment::Start)
-        .with_child(track_name)
-        .with_spacer(2.0)
-        .with_child(track_artist)
-        .with_spacer(2.0)
-        .with_child(track_origin)
-        .padding(theme::grid(2.0))
+    Flex::row()
+        .with_child(Flex::column().with_child(cover_art))
+        .with_child(
+            Flex::column()
+                .cross_axis_alignment(CrossAxisAlignment::Start)
+                .with_child(track_name)
+                .with_spacer(2.0)
+                .with_child(track_artist)
+                .with_spacer(2.0)
+                .with_child(track_origin)
+                .padding(theme::grid(2.0)),
+        )
         .link()
         .on_click(|ctx, now_playing, _| {
             ctx.submit_command(cmd::NAVIGATE.with(now_playing.origin.to_nav()));
