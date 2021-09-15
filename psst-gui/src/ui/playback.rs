@@ -69,7 +69,7 @@ fn playback_item_widget() -> impl Widget<NowPlaying> {
 
     Flex::row()
         .with_child(Flex::column().with_child(cover_art))
-        .with_child(
+        .with_flex_child(
             Flex::column()
                 .cross_axis_alignment(CrossAxisAlignment::Start)
                 .with_child(track_name)
@@ -78,6 +78,7 @@ fn playback_item_widget() -> impl Widget<NowPlaying> {
                 .with_spacer(2.0)
                 .with_child(track_origin)
                 .padding(theme::grid(2.0)),
+            1.0,
         )
         .link()
         .on_click(|ctx, now_playing, _| {
