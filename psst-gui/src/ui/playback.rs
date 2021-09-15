@@ -36,17 +36,6 @@ pub fn panel_widget() -> impl Widget<AppState> {
         .controller(PlaybackController::new())
 }
 
-pub fn cover_widget(size: f64) -> impl Widget<NowPlaying> {
-    RemoteImage::new(
-        utils::placeholder_widget(),
-        move |np: &NowPlaying, _| match &np.item.album {
-            Some(album) => album.image(size, size).map(|image| image.url.clone()),
-            None => None,
-        },
-    )
-    .fix_size(size, size)
-}
-
 fn playback_item_widget() -> impl Widget<NowPlaying> {
     let cover_art = cover_widget(theme::grid(10.0));
 
@@ -94,6 +83,13 @@ fn playback_item_widget() -> impl Widget<NowPlaying> {
         .on_click(|ctx, now_playing, _| {
             ctx.submit_command(cmd::NAVIGATE.with(now_playing.origin.to_nav()));
         })
+}
+
+pub fn cover_widget(size: f64) -> impl Widget<NowPlaying> {
+    RemoteImage::new(utils::placeholder_widget(), move |np: &NowPlaying, _| {
+        np.cover_image_url(size, size).map(|url| url.into())
+    })
+    .fix_size(size, size)
 }
 
 fn playback_origin_icon(origin: &PlaybackOrigin) -> &'static SvgIcon {

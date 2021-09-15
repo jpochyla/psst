@@ -49,11 +49,16 @@ pub struct NowPlaying {
 
 impl NowPlaying {
     pub fn cover_image_url(&self, width: f64, height: f64) -> Option<&str> {
-        self.item
-            .album
-            .as_ref()
+        self.item_album()
             .and_then(|album| album.image(width, height))
             .map(|image| image.url.as_ref())
+    }
+
+    pub fn item_album(&self) -> Option<&AlbumLink> {
+        self.item.album.as_ref().or_else(|| match &self.origin {
+            PlaybackOrigin::Album(album) => Some(album),
+            _ => None,
+        })
     }
 }
 
