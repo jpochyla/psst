@@ -343,7 +343,7 @@ fn route_title_widget() -> impl Widget<Nav> {
 fn compute_main_window_title(data: &AppState, _env: &Env) -> String {
     if let Some(now_playing) = &data.playback.now_playing {
         format!(
-            "Psst - {} - {}",
+            "{} - {}",
             now_playing.item.artist_name(),
             now_playing.item.name
         )
