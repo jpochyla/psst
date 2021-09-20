@@ -19,7 +19,7 @@ use crate::{
     widget::{icons, icons::SvgIcon, Empty, Maybe, MyWidgetExt, RemoteImage},
 };
 
-use super::{theme, utils};
+use super::{theme, track, utils};
 
 pub fn panel_widget() -> impl Widget<AppState> {
     let seek_bar = Maybe::or_empty(SeekBar::new).lens(Playback::now_playing);
@@ -84,6 +84,7 @@ fn playback_item_widget() -> impl Widget<NowPlaying> {
         .on_click(|ctx, now_playing, _| {
             ctx.submit_command(cmd::NAVIGATE.with(now_playing.origin.to_nav()));
         })
+        .context_menu(|now_playing| track::track_menu(&now_playing.item, &now_playing.library))
 }
 
 pub fn cover_widget(size: f64) -> impl Widget<NowPlaying> {
@@ -368,9 +369,6 @@ impl Widget<NowPlaying> for SeekBar {
         data: &NowPlaying,
         _env: &Env,
     ) {
-        if !old_data.analysis.same(&data.analysis) || !old_data.item.same(&data.item) {
-            // self.loudness_path = compute_loudness_path(&ctx.size(), &data);
-        }
         if !old_data.same(data) {
             ctx.request_paint();
         }
@@ -392,14 +390,6 @@ impl Widget<NowPlaying> for SeekBar {
         } else {
             paint_audio_analysis(ctx, data, &self.loudness_path, env)
         }
-    }
-}
-
-fn _compute_loudness_path(bounds: &Size, data: &NowPlaying) -> BezPath {
-    if let Some(analysis) = data.analysis.resolved() {
-        _compute_loudness_path_from_analysis(bounds, &data.item.duration, analysis)
-    } else {
-        BezPath::new()
     }
 }
 

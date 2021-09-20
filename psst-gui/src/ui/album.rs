@@ -7,7 +7,9 @@ use druid::{
 
 use crate::{
     cmd,
-    data::{Album, AlbumDetail, AlbumLink, AppState, ArtistLink, Cached, Ctx, Nav, WithCtx},
+    data::{
+        Album, AlbumDetail, AlbumLink, AppState, ArtistLink, Cached, Ctx, Library, Nav, WithCtx,
+    },
     webapi::WebApi,
     widget::{Async, MyWidgetExt, RemoteImage},
 };
@@ -136,14 +138,18 @@ pub fn album_widget() -> impl Widget<WithCtx<Arc<Album>>> {
         .on_click(|ctx, album, _| {
             ctx.submit_command(cmd::NAVIGATE.with(Nav::AlbumDetail(album.data.link())));
         })
-        .context_menu(album_menu)
+        .context_menu(album_ctx_menu)
 }
 
-fn album_menu(album: &WithCtx<Arc<Album>>) -> Menu<AppState> {
+fn album_ctx_menu(album: &WithCtx<Arc<Album>>) -> Menu<AppState> {
+    album_menu(&album.data, &album.ctx.library)
+}
+
+fn album_menu(album: &Arc<Album>, library: &Arc<Library>) -> Menu<AppState> {
     let mut menu = Menu::empty();
 
-    for artist_link in &album.data.artists {
-        let more_than_one_artist = album.data.artists.len() > 1;
+    for artist_link in &album.artists {
+        let more_than_one_artist = album.artists.len() > 1;
         let title = if more_than_one_artist {
             LocalizedString::new("menu-item-show-artist-name")
                 .with_placeholder(format!("Go To Artist “{}”", artist_link.name))
@@ -160,18 +166,18 @@ fn album_menu(album: &WithCtx<Arc<Album>>) -> Menu<AppState> {
         MenuItem::new(
             LocalizedString::new("menu-item-copy-link").with_placeholder("Copy Link to Album"),
         )
-        .command(cmd::COPY.with(album.data.url())),
+        .command(cmd::COPY.with(album.url())),
     );
 
     menu = menu.separator();
 
-    if album.ctx.is_album_saved(&album.data) {
+    if library.contains_album(album) {
         menu = menu.entry(
             MenuItem::new(
                 LocalizedString::new("menu-item-remove-from-library")
                     .with_placeholder("Remove Album from Library"),
             )
-            .command(library::UNSAVE_ALBUM.with(album.data.link())),
+            .command(library::UNSAVE_ALBUM.with(album.link())),
         );
     } else {
         menu = menu.entry(
@@ -179,7 +185,7 @@ fn album_menu(album: &WithCtx<Arc<Album>>) -> Menu<AppState> {
                 LocalizedString::new("menu-item-save-to-library")
                     .with_placeholder("Save Album to Library"),
             )
-            .command(library::SAVE_ALBUM.with(album.data.clone())),
+            .command(library::SAVE_ALBUM.with(album.clone())),
         );
     }
 

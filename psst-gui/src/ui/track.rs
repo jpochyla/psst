@@ -14,9 +14,9 @@ use druid::{
 use crate::{
     cmd,
     data::{
-        Album, AppState, ArtistLink, ArtistTracks, CommonCtx, Nav, PlaybackOrigin, PlaybackPayload,
-        PlaylistTracks, Recommendations, RecommendationsRequest, SavedTracks, SearchResults, Track,
-        WithCtx,
+        Album, AppState, ArtistLink, ArtistTracks, CommonCtx, Library, Nav, PlaybackOrigin,
+        PlaybackPayload, PlaylistTracks, Recommendations, RecommendationsRequest, SavedTracks,
+        SearchResults, Track, WithCtx,
     },
     widget::MyWidgetExt,
 };
@@ -295,7 +295,7 @@ fn track_widget(display: TrackDisplay) -> impl Widget<TrackRow> {
         .on_click(|ctx, row, _| {
             ctx.submit_notification(cmd::PLAY_TRACK_AT.with(row.position));
         })
-        .context_menu(track_menu)
+        .context_menu(track_row_menu)
 }
 
 fn popularity_stars(popularity: u32) -> String {
@@ -315,11 +315,15 @@ fn popularity_stars(popularity: u32) -> String {
     stars
 }
 
-fn track_menu(row: &TrackRow) -> Menu<AppState> {
+fn track_row_menu(row: &TrackRow) -> Menu<AppState> {
+    track_menu(&row.track, &row.ctx.library)
+}
+
+pub fn track_menu(track: &Arc<Track>, library: &Arc<Library>) -> Menu<AppState> {
     let mut menu = Menu::empty();
 
-    for artist_link in &row.track.artists {
-        let more_than_one_artist = row.track.artists.len() > 1;
+    for artist_link in &track.artists {
+        let more_than_one_artist = track.artists.len() > 1;
         let title = if more_than_one_artist {
             LocalizedString::new("menu-item-show-artist-name")
                 .with_placeholder(format!("Go To Artist “{}”", artist_link.name))
@@ -332,7 +336,7 @@ fn track_menu(row: &TrackRow) -> Menu<AppState> {
         );
     }
 
-    if let Some(album_link) = row.track.album.as_ref() {
+    if let Some(album_link) = track.album.as_ref() {
         menu = menu.entry(
             MenuItem::new(
                 LocalizedString::new("menu-item-show-album").with_placeholder("Go To Album"),
@@ -347,7 +351,7 @@ fn track_menu(row: &TrackRow) -> Menu<AppState> {
                 .with_placeholder("Show Similar Tracks"),
         )
         .command(cmd::NAVIGATE.with(Nav::Recommendations(Arc::new(
-            RecommendationsRequest::for_track(row.track.id),
+            RecommendationsRequest::for_track(track.id),
         )))),
     );
 
@@ -355,18 +359,18 @@ fn track_menu(row: &TrackRow) -> Menu<AppState> {
         MenuItem::new(
             LocalizedString::new("menu-item-copy-link").with_placeholder("Copy Link to Track"),
         )
-        .command(cmd::COPY.with(row.track.url())),
+        .command(cmd::COPY.with(track.url())),
     );
 
     menu = menu.separator();
 
-    if row.ctx.is_track_saved(&row.track) {
+    if library.contains_track(track) {
         menu = menu.entry(
             MenuItem::new(
                 LocalizedString::new("menu-item-remove-from-library")
                     .with_placeholder("Remove Track from Library"),
             )
-            .command(library::UNSAVE_TRACK.with(row.track.id)),
+            .command(library::UNSAVE_TRACK.with(track.id)),
         );
     } else {
         menu = menu.entry(
@@ -374,7 +378,7 @@ fn track_menu(row: &TrackRow) -> Menu<AppState> {
                 LocalizedString::new("menu-item-save-to-library")
                     .with_placeholder("Save Track to Library"),
             )
-            .command(library::SAVE_TRACK.with(row.track.clone())),
+            .command(library::SAVE_TRACK.with(track.clone())),
         );
     }
 

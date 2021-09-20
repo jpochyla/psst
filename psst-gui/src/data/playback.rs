@@ -1,15 +1,11 @@
 use std::{fmt, sync::Arc, time::Duration};
 
 use druid::{im::Vector, Data, Lens};
-
-use crate::data::{
-    AlbumLink, ArtistLink, AudioAnalysis, Nav, PlaylistLink, Promise, Track, TrackId,
-};
 use serde::{Deserialize, Serialize};
 
-use super::RecommendationsRequest;
+use super::{AlbumLink, ArtistLink, Library, Nav, PlaylistLink, RecommendationsRequest, Track};
 
-#[derive(Clone, Debug, Data, Lens)]
+#[derive(Clone, Data, Lens)]
 pub struct Playback {
     pub state: PlaybackState,
     pub now_playing: Option<NowPlaying>,
@@ -46,12 +42,15 @@ pub enum PlaybackState {
     Stopped,
 }
 
-#[derive(Clone, Debug, Data, Lens)]
+#[derive(Clone, Data, Lens)]
 pub struct NowPlaying {
     pub item: Arc<Track>,
     pub origin: PlaybackOrigin,
     pub progress: Duration,
-    pub analysis: Promise<AudioAnalysis, TrackId>,
+
+    // Although keeping a ref to the `Library` here is a bit of a hack, it dramatically
+    // simplifies displaying the track context menu in the playback bar.
+    pub library: Arc<Library>,
 }
 
 impl NowPlaying {
