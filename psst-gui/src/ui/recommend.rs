@@ -52,7 +52,7 @@ pub fn results_widget() -> impl Widget<AppState> {
         });
 
     let param_knobs = params_widget()
-        .debounce(KNOBS_DEBOUNCE_DELAY, |ctx, knobs, _| {
+        .on_debounce(KNOBS_DEBOUNCE_DELAY, |ctx, knobs, _| {
             ctx.submit_command(UPDATE_PARAMS.with(knobs.as_params()));
         })
         .lens(AppState::recommend.then(Recommend::knobs));

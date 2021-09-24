@@ -52,8 +52,8 @@ fn main() {
         // Load user's local tracks for the WebApi.
         WebApi::global().load_local_tracks(state.config.username().unwrap());
     } else {
-        // No configured credentials, open the preferences.
-        let window = ui::preferences_window();
+        // No configured credentials, open the account setup.
+        let window = ui::account_setup_window();
         delegate = Delegate::with_preferences(window.id);
         launcher = AppLauncher::with_window(window).configure_env(ui::theme::setup);
     };

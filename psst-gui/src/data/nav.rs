@@ -1,13 +1,14 @@
 use std::sync::Arc;
 
 use druid::Data;
+use serde::{Deserialize, Serialize};
 use url::Url;
 
 use crate::data::{AlbumLink, ArtistLink, PlaylistLink};
 
 use super::RecommendationsRequest;
 
-#[derive(Clone, Debug, Data, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, Data, PartialEq, Eq, Hash, Deserialize, Serialize)]
 pub enum Nav {
     Home,
     SavedTracks,

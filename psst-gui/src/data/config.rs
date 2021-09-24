@@ -10,7 +10,7 @@ use psst_core::{
 };
 use serde::{Deserialize, Serialize};
 
-use super::Promise;
+use super::{Nav, Promise, QueueBehavior};
 
 #[derive(Clone, Debug, Data, Lens)]
 pub struct Preferences {
@@ -33,6 +33,7 @@ impl Preferences {
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Data)]
 pub enum PreferencesTab {
     General,
+    Account,
     Cache,
 }
 
@@ -73,6 +74,8 @@ pub struct Config {
     pub audio_quality: AudioQuality,
     pub theme: Theme,
     pub volume: f64,
+    pub last_route: Option<Nav>,
+    pub queue_behavior: QueueBehavior,
 }
 
 impl Default for Config {
@@ -82,6 +85,8 @@ impl Default for Config {
             audio_quality: Default::default(),
             theme: Default::default(),
             volume: 1.0,
+            last_route: Default::default(),
+            queue_behavior: Default::default(),
         }
     }
 }

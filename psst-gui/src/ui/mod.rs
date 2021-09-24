@@ -44,11 +44,16 @@ pub fn main_window() -> WindowDesc<AppState> {
 }
 
 pub fn preferences_window() -> WindowDesc<AppState> {
+    let win_size = (theme::grid(50.0), theme::grid(45.0));
+
+    // On Windows, the window size includes the titlebar.
     let win_size = if cfg!(target_os = "windows") {
-        (theme::grid(50.0), theme::grid(75.0))
+        const WINDOWS_TITLEBAR_OFFSET: f64 = 6.0;
+        (win_size.0, win_size.1 + WINDOWS_TITLEBAR_OFFSET)
     } else {
-        (theme::grid(50.0), theme::grid(69.0))
+        win_size
     };
+
     let win = WindowDesc::new(preferences_widget())
         .title("Preferences")
         .window_size(win_size)
@@ -62,9 +67,31 @@ pub fn preferences_window() -> WindowDesc<AppState> {
     }
 }
 
+pub fn account_setup_window() -> WindowDesc<AppState> {
+    let win = WindowDesc::new(account_setup_widget())
+        .title("Log In")
+        .window_size((theme::grid(50.0), theme::grid(45.0)))
+        .resizable(false)
+        .show_title(false)
+        .transparent_titlebar(true);
+    if cfg!(target_os = "macos") {
+        win.menu(menu::main_menu)
+    } else {
+        win
+    }
+}
+
 fn preferences_widget() -> impl Widget<AppState> {
     ThemeScope::new(
         preferences::preferences_widget()
+            .background(theme::BACKGROUND_DARK)
+            .expand(),
+    )
+}
+
+fn account_setup_widget() -> impl Widget<AppState> {
+    ThemeScope::new(
+        preferences::account_setup_widget()
             .background(theme::BACKGROUND_DARK)
             .expand(),
     )
@@ -112,7 +139,7 @@ fn root_widget() -> impl Widget<AppState> {
         .solid_bar(true);
 
     ThemeScope::new(split)
-        .controller(SessionController::new())
+        .controller(SessionController)
         .controller(NavController)
     // .debug_invalidation()
     // .debug_widget_id()
@@ -234,7 +261,7 @@ fn volume_slider() -> impl Widget<AppState> {
                 }),
         )
         .padding((theme::grid(1.5), 0.0))
-        .debounce(SAVE_DELAY, |ctx, _, _| ctx.submit_command(SAVE_TO_CONFIG))
+        .on_debounce(SAVE_DELAY, |ctx, _, _| ctx.submit_command(SAVE_TO_CONFIG))
         .lens(AppState::playback.then(Playback::volume))
         .on_command(SAVE_TO_CONFIG, |_, _, data| {
             data.config.volume = data.playback.volume;
@@ -316,7 +343,7 @@ fn route_title_widget() -> impl Widget<Nav> {
 fn compute_main_window_title(data: &AppState, _env: &Env) -> String {
     if let Some(now_playing) = &data.playback.now_playing {
         format!(
-            "Psst - {} - {}",
+            "{} - {}",
             now_playing.item.artist_name(),
             now_playing.item.name
         )

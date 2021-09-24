@@ -28,7 +28,7 @@ sudo dnf install openssl-devel gtk3-devel cairo-devel
 
 ##### Building
 
-On all platforms, the **latest Rust stable** (at least 1.54.0) is neeed.
+On all platforms, the **latest Rust stable** (at least 1.54.0) is needed.
 
 Development build:
 ```shell
@@ -63,6 +63,7 @@ cargo run
     - Add / remove track
     - Reorder tracks
     - Rename playlist
+    - Playlist folders
 - [ ] Playback queue
 - [x] Audio volume control
 - [x] Audio loudness normalization

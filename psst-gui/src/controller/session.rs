@@ -5,16 +5,14 @@ use crate::{cmd, data::AppState};
 pub struct SessionController;
 
 impl SessionController {
-    pub fn new() -> Self {
-        Self
-    }
-
     fn connect(&self, data: &mut AppState) {
         // Update the session configuration, any active session will get shut down.
         data.session.update_config(data.config.session());
 
         // Reload the global, usually visible data.
-        data.library_mut().playlists.defer_default();
+        data.with_library_mut(|library| {
+            library.playlists.defer_default();
+        });
         data.personalized.made_for_you.defer_default();
         data.user_profile.defer_default();
     }

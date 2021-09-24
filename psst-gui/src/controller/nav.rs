@@ -85,4 +85,20 @@ where
             }
         }
     }
+
+    fn lifecycle(
+        &mut self,
+        child: &mut W,
+        ctx: &mut LifeCycleCtx,
+        event: &LifeCycle,
+        data: &AppState,
+        env: &Env,
+    ) {
+        if let LifeCycle::WidgetAdded = event {
+            if let Some(route) = &data.config.last_route {
+                ctx.submit_command(cmd::NAVIGATE.with(route.to_owned()));
+            }
+        }
+        child.lifecycle(ctx, event, data, env)
+    }
 }

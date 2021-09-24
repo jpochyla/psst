@@ -380,7 +380,7 @@ where
             }
             Event::Command(cmd) if cmd.is(cmd::PLAY_QUEUE_BEHAVIOR) => {
                 let behavior = cmd.get_unchecked(cmd::PLAY_QUEUE_BEHAVIOR);
-                data.playback.queue_behavior = behavior.to_owned();
+                data.set_queue_behavior(behavior.to_owned());
                 self.set_queue_behavior(behavior.to_owned());
                 ctx.set_handled();
             }

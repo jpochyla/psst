@@ -2,13 +2,13 @@ use std::time::Duration;
 
 use druid::{widget::Controller, Data, Env, Event, EventCtx, TimerToken, UpdateCtx, Widget};
 
-pub struct Debounce<T> {
+pub struct OnDebounce<T> {
     duration: Duration,
     timer: TimerToken,
     handler: Box<dyn Fn(&mut EventCtx, &mut T, &Env)>,
 }
 
-impl<T> Debounce<T> {
+impl<T> OnDebounce<T> {
     pub fn trailing(
         duration: Duration,
         handler: impl Fn(&mut EventCtx, &mut T, &Env) + 'static,
@@ -21,7 +21,7 @@ impl<T> Debounce<T> {
     }
 }
 
-impl<T, W> Controller<T, W> for Debounce<T>
+impl<T, W> Controller<T, W> for OnDebounce<T>
 where
     T: Data,
     W: Widget<T>,

@@ -654,7 +654,7 @@ enum PreloadState {
 
 const OUTPUT_CHANNELS: u8 = 2;
 const OUTPUT_SAMPLE_RATE: u32 = 44100;
-const PROGRESS_PRECISION_SAMPLES: u64 = (OUTPUT_SAMPLE_RATE / 10) as u64;
+const PROGRESS_PRECISION_SAMPLES: u64 = OUTPUT_SAMPLE_RATE as u64 * OUTPUT_CHANNELS as u64; // 1 second.
 
 struct CurrentPlaybackItem {
     file: AudioFile,

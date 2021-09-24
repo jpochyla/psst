@@ -3,9 +3,9 @@ use std::time::Duration;
 use druid::{
     kurbo::{Affine, BezPath},
     widget::{CrossAxisAlignment, Either, Flex, Label, LineBreaking, Spinner, ViewSwitcher},
-    BoxConstraints, Data, Env, Event, EventCtx, LayoutCtx, LensExt, LifeCycle, LifeCycleCtx,
-    MouseButton, PaintCtx, Point, Rect, RenderContext, Size, UpdateCtx, Widget, WidgetExt,
-    WidgetPod,
+    BoxConstraints, Cursor, Data, Env, Event, EventCtx, LayoutCtx, LensExt, LifeCycle,
+    LifeCycleCtx, MouseButton, PaintCtx, Point, Rect, RenderContext, Size, UpdateCtx, Widget,
+    WidgetExt, WidgetPod,
 };
 use itertools::Itertools;
 
@@ -16,10 +16,10 @@ use crate::{
         AppState, AudioAnalysis, NowPlaying, Playback, PlaybackOrigin, PlaybackState,
         QueueBehavior, Track,
     },
-    widget::{icons, icons::SvgIcon, Empty, Maybe, MyWidgetExt},
+    widget::{icons, icons::SvgIcon, Empty, Maybe, MyWidgetExt, RemoteImage},
 };
 
-use super::{theme, utils};
+use super::{theme, track, utils};
 
 pub fn panel_widget() -> impl Widget<AppState> {
     let seek_bar = Maybe::or_empty(SeekBar::new).lens(Playback::now_playing);
@@ -37,6 +37,8 @@ pub fn panel_widget() -> impl Widget<AppState> {
 }
 
 fn playback_item_widget() -> impl Widget<NowPlaying> {
+    let cover_art = cover_widget(theme::grid(10.0));
+
     let track_name = Label::raw()
         .with_line_break_mode(LineBreaking::Clip)
         .with_font(theme::UI_FONT_MEDIUM)
@@ -65,18 +67,31 @@ fn playback_item_widget() -> impl Widget<NowPlaying> {
     )
     .lens(NowPlaying::origin);
 
-    Flex::column()
-        .cross_axis_alignment(CrossAxisAlignment::Start)
-        .with_child(track_name)
-        .with_spacer(2.0)
-        .with_child(track_artist)
-        .with_spacer(2.0)
-        .with_child(track_origin)
-        .padding(theme::grid(2.0))
+    Flex::row()
+        .with_child(Flex::column().with_child(cover_art))
+        .with_flex_child(
+            Flex::column()
+                .cross_axis_alignment(CrossAxisAlignment::Start)
+                .with_child(track_name)
+                .with_spacer(2.0)
+                .with_child(track_artist)
+                .with_spacer(2.0)
+                .with_child(track_origin)
+                .padding(theme::grid(2.0)),
+            1.0,
+        )
         .link()
         .on_click(|ctx, now_playing, _| {
             ctx.submit_command(cmd::NAVIGATE.with(now_playing.origin.to_nav()));
         })
+        .context_menu(|now_playing| track::track_menu(&now_playing.item, &now_playing.library))
+}
+
+pub fn cover_widget(size: f64) -> impl Widget<NowPlaying> {
+    RemoteImage::new(utils::placeholder_widget(), move |np: &NowPlaying, _| {
+        np.cover_image_url(size, size).map(|url| url.into())
+    })
+    .fix_size(size, size)
 }
 
 fn playback_origin_icon(origin: &PlaybackOrigin) -> &'static SvgIcon {
@@ -308,6 +323,9 @@ impl SeekBar {
 impl Widget<NowPlaying> for SeekBar {
     fn event(&mut self, ctx: &mut EventCtx, event: &Event, _data: &mut NowPlaying, _env: &Env) {
         match event {
+            Event::MouseMove(_) => {
+                ctx.set_cursor(&Cursor::Pointer);
+            }
             Event::MouseDown(mouse) => {
                 if mouse.button == MouseButton::Left {
                     ctx.set_active(true);
@@ -351,9 +369,6 @@ impl Widget<NowPlaying> for SeekBar {
         data: &NowPlaying,
         _env: &Env,
     ) {
-        if !old_data.analysis.same(&data.analysis) || !old_data.item.same(&data.item) {
-            // self.loudness_path = compute_loudness_path(&ctx.size(), &data);
-        }
         if !old_data.same(data) {
             ctx.request_paint();
         }
@@ -375,14 +390,6 @@ impl Widget<NowPlaying> for SeekBar {
         } else {
             paint_audio_analysis(ctx, data, &self.loudness_path, env)
         }
-    }
-}
-
-fn _compute_loudness_path(bounds: &Size, data: &NowPlaying) -> BezPath {
-    if let Some(analysis) = data.analysis.resolved() {
-        _compute_loudness_path_from_analysis(bounds, &data.item.duration, analysis)
-    } else {
-        BezPath::new()
     }
 }
 

@@ -38,14 +38,30 @@ impl Delegate {
         this
     }
 
-    fn spawn<F, T>(&self, f: F)
-    where
-        F: FnOnce() -> T,
-        F: Send + 'static,
-        T: Send + 'static,
-    {
-        // TODO: Use a thread pool.
-        thread::spawn(f);
+    fn show_main(&mut self, ctx: &mut DelegateCtx) {
+        match self.main_window {
+            Some(id) => {
+                ctx.submit_command(commands::SHOW_WINDOW.to(id));
+            }
+            None => {
+                let window = ui::main_window();
+                self.main_window.replace(window.id);
+                ctx.new_window(window);
+            }
+        }
+    }
+
+    fn show_preferences(&mut self, ctx: &mut DelegateCtx) {
+        match self.preferences_window {
+            Some(id) => {
+                ctx.submit_command(commands::SHOW_WINDOW.to(id));
+            }
+            None => {
+                let window = ui::preferences_window();
+                self.preferences_window.replace(window.id);
+                ctx.new_window(window);
+            }
+        }
     }
 }
 
@@ -59,28 +75,10 @@ impl AppDelegate<AppState> for Delegate {
         _env: &Env,
     ) -> Handled {
         if cmd.is(cmd::SHOW_MAIN) {
-            match self.main_window {
-                Some(id) => {
-                    ctx.submit_command(commands::SHOW_WINDOW.to(id));
-                }
-                None => {
-                    let window = ui::main_window();
-                    self.main_window.replace(window.id);
-                    ctx.new_window(window);
-                }
-            }
+            self.show_main(ctx);
             Handled::Yes
         } else if cmd.is(commands::SHOW_PREFERENCES) {
-            match self.preferences_window {
-                Some(id) => {
-                    ctx.submit_command(commands::SHOW_WINDOW.to(id));
-                }
-                None => {
-                    let window = ui::preferences_window();
-                    self.preferences_window.replace(window.id);
-                    ctx.new_window(window);
-                }
-            }
+            self.show_preferences(ctx);
             Handled::Yes
         } else if let Some(text) = cmd.get(cmd::COPY) {
             Application::global().clipboard().put_string(&text);
@@ -127,7 +125,7 @@ impl Delegate {
                 sink.submit_command(remote_image::PROVIDE_DATA, payload, target)
                     .unwrap();
             } else {
-                self.spawn(move || {
+                thread::spawn(move || {
                     let dyn_image = WebApi::global().get_image(&location).unwrap();
                     let image_buf = ImageBuf::from_dynamic_image(dyn_image);
                     let payload = remote_image::ImagePayload {

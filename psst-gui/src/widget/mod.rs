@@ -13,7 +13,7 @@ use std::{sync::Arc, time::Duration};
 
 use druid::{
     widget::{ControllerHost, Padding},
-    Data, Env, EventCtx, Insets, Menu, MouseButton, MouseEvent, Selector, Widget,
+    Data, Env, EventCtx, Insets, Menu, MouseButton, MouseEvent, Selector, UpdateCtx, Widget,
 };
 
 pub use checkbox::Checkbox;
@@ -28,7 +28,7 @@ pub use theme::ThemeScope;
 pub use utils::{Border, Clip, Logger};
 
 use crate::{
-    controller::{Debounce, ExClick, OnCmd, OnCmdAsync},
+    controller::{ExClick, OnCommand, OnCommandAsync, OnDebounce, OnUpdate},
     data::AppState,
 };
 
@@ -57,12 +57,19 @@ pub trait MyWidgetExt<T: Data>: Widget<T> + Sized + 'static {
         Padding::new(Insets::new(p, 0.0, p, 0.0), self)
     }
 
-    fn debounce(
+    fn on_debounce(
         self,
         duration: Duration,
         handler: impl Fn(&mut EventCtx, &mut T, &Env) + 'static,
-    ) -> ControllerHost<Self, Debounce<T>> {
-        ControllerHost::new(self, Debounce::trailing(duration, handler))
+    ) -> ControllerHost<Self, OnDebounce<T>> {
+        ControllerHost::new(self, OnDebounce::trailing(duration, handler))
+    }
+
+    fn on_update<F>(self, handler: F) -> ControllerHost<Self, OnUpdate<F>>
+    where
+        F: Fn(&mut UpdateCtx, &T, &T, &Env) + 'static,
+    {
+        ControllerHost::new(self, OnUpdate::new(handler))
     }
 
     fn on_right_click(
@@ -72,12 +79,16 @@ pub trait MyWidgetExt<T: Data>: Widget<T> + Sized + 'static {
         ControllerHost::new(self, ExClick::new(Some(MouseButton::Right), func))
     }
 
-    fn on_command<U, F>(self, selector: Selector<U>, func: F) -> ControllerHost<Self, OnCmd<U, F>>
+    fn on_command<U, F>(
+        self,
+        selector: Selector<U>,
+        func: F,
+    ) -> ControllerHost<Self, OnCommand<U, F>>
     where
         U: 'static,
         F: Fn(&mut EventCtx, &U, &mut T),
     {
-        ControllerHost::new(self, OnCmd::new(selector, func))
+        ControllerHost::new(self, OnCommand::new(selector, func))
     }
 
     fn on_command_async<U: Data + Send, V: Data + Send>(
@@ -86,8 +97,8 @@ pub trait MyWidgetExt<T: Data>: Widget<T> + Sized + 'static {
         request: impl Fn(U) -> V + Sync + Send + 'static,
         preflight: impl Fn(&mut EventCtx, &mut T, U) + 'static,
         response: impl Fn(&mut EventCtx, &mut T, (U, V)) + 'static,
-    ) -> OnCmdAsync<Self, T, U, V> {
-        OnCmdAsync::new(
+    ) -> OnCommandAsync<Self, T, U, V> {
+        OnCommandAsync::new(
             self,
             selector,
             Box::new(preflight),

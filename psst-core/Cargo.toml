@@ -11,7 +11,6 @@ aes = { version = "0.7", features = ["ctr"] }
 byteorder = "1.4"
 crossbeam-channel = "0.5"
 hmac = "0.11"
-iset = "0.0.5"
 log = "0.4"
 miniaudio = { git = "https://github.com/jpochyla/miniaudio-rs", default-features = false, features = ["ma-log-level-error", "ma-no-flac", "ma-no-mp3", "ma-no-wav"] }
 minivorbis = { path = "../minivorbis"}
@@ -19,6 +18,7 @@ num-bigint = { version = "0.4", features = ["rand"] }
 num-traits = "0.2"
 quick-protobuf = "0.8"
 rand = "0.8"
+rangemap = "0.1"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 sha-1 = "0.9"
