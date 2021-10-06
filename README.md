@@ -1,6 +1,6 @@
 # Psst
 
-Fast Spotify client with native GUI, without Electron, built in Rust. Very early in development, lacking in features, stability, and general user experience. It is being tested only on Mac so far, but aims for full Windows and Linux support. Contributions welcome!
+Fast Spotify client with native GUI, without Electron, built in Rust. Very early in development, lacking in features, stability, and general user experience. It is being tested only on Mac so far, but aims for full Windows, Linux and BSD support. Contributions welcome!
 
 **Note:** Spotify Premium account is required.
 
@@ -26,6 +26,18 @@ RHEL/Fedora:
 
 ```shell
 sudo dnf install openssl-devel gtk3-devel cairo-devel
+```
+
+##### BSD
+
+Similar to Linux, Druid defaults to GTK while providing an X11 backend as well.
+So far, only OpenBSD/amd64 has been tested, but other platforms should work as well.
+Furthermore, bindgen must be able to find LLVM through the expected environment variable.
+
+OpenBSD:
+```shell
+doas pkg_add gtk+3 cairo llvm
+export LIBCLANG_PATH=/usr/local/lib
 ```
 
 ##### Building
