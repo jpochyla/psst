@@ -31,7 +31,7 @@ pub use crate::data::{
         NowPlaying, Playback, PlaybackOrigin, PlaybackPayload, PlaybackState, QueueBehavior,
         QueuedTrack,
     },
-    playlist::{Playlist, PlaylistDetail, PlaylistLink, PlaylistTracks},
+    playlist::{Playlist, PlaylistDetail, PlaylistLink, PlaylistTracks, PlaylistTrackModification},
     promise::{Promise, PromiseState},
     recommend::{
         Range, Recommend, Recommendations, RecommendationsKnobs, RecommendationsParams,
@@ -276,6 +276,15 @@ impl Library {
             saved.set.contains(&album.id)
         } else {
             false
+        }
+    }
+    pub fn increment_playlist_track_count(&mut self, playlist_link: PlaylistLink){
+        if let Some(saved) = self.playlists.resolved_mut() {
+            for i in 0..saved.len(){
+                if saved[i].id == playlist_link.id{
+                    saved[i].track_count += 1
+                }
+            }
         }
     }
 }
