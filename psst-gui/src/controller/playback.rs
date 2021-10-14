@@ -55,8 +55,6 @@ impl PlaybackController {
         #[allow(unused_variables)] window: &WindowHandle,
     ) {
         let output = AudioOutput::open().unwrap();
-        let remote = output.remote();
-
         let cache_dir = Config::cache_dir().unwrap();
         let proxy_url = Config::proxy();
         let player = Player::new(
@@ -64,16 +62,15 @@ impl PlaybackController {
             Cdn::new(session, proxy_url.as_deref()).unwrap(),
             Cache::new(cache_dir).unwrap(),
             config,
-            remote,
+            &output,
         );
         let sender = player.event_sender();
-        let source = player.audio_source();
 
         let thread = thread::spawn(move || {
             Self::service_events(player, event_sink, widget_id);
         });
         let output_thread = thread::spawn(move || {
-            output.start_playback(source).expect("Playback failed");
+            output.play().expect("Playback failed");
         });
 
         let hwnd = {
@@ -121,9 +118,9 @@ impl PlaybackController {
                         .submit_command(cmd::PLAYBACK_LOADING, item, widget_id)
                         .unwrap();
                 }
-                PlayerEvent::Playing { path, duration } => {
+                PlayerEvent::Playing { path, position } => {
                     let item: TrackId = path.item_id.into();
-                    let progress = duration.to_owned();
+                    let progress = position.to_owned();
                     event_sink
                         .submit_command(cmd::PLAYBACK_PLAYING, (item, progress), widget_id)
                         .unwrap();
@@ -138,13 +135,13 @@ impl PlaybackController {
                         .submit_command(cmd::PLAYBACK_RESUMING, (), widget_id)
                         .unwrap();
                 }
-                PlayerEvent::Progress { duration, .. } => {
-                    let progress = duration.to_owned();
+                PlayerEvent::Position { position, .. } => {
+                    let progress = position.to_owned();
                     event_sink
                         .submit_command(cmd::PLAYBACK_PROGRESS, progress, widget_id)
                         .unwrap();
                 }
-                PlayerEvent::Blocked => {
+                PlayerEvent::Blocked { .. } => {
                     event_sink
                         .submit_command(cmd::PLAYBACK_BLOCKED, (), widget_id)
                         .unwrap();

@@ -1,106 +1,114 @@
-use std::{io, slice};
+use std::{io, time::Duration};
 
-use crate::error::Error;
+use symphonia::{
+    core::{
+        audio::{AudioBufferRef, Channels},
+        codecs::Decoder,
+        errors::Error as SymphoniaError,
+        formats::{FormatReader, SeekMode, SeekTo},
+        io::{MediaSource, MediaSourceStream},
+        units::TimeStamp,
+    },
+    default::{codecs::VorbisDecoder, formats::OggReader},
+};
 
-pub struct VorbisDecoder<R>
+use crate::{error::Error, util::FileWithConstSize};
+
+impl<T> MediaSource for FileWithConstSize<T>
 where
-    R: io::Read + io::Seek,
+    T: io::Read + io::Seek + Send,
 {
-    vorbis: minivorbis::Decoder<R>,
-    // Buffer with enough capacity for `minivorbis` packets.
-    packet: Vec<f32>,
-    // Offset into `packet`, currently pending sample.
-    pos: usize,
+    fn is_seekable(&self) -> bool {
+        true
+    }
+
+    fn byte_len(&self) -> Option<u64> {
+        Some(self.len())
+    }
 }
 
-impl<R> VorbisDecoder<R>
-where
-    R: io::Read + io::Seek,
-{
-    pub fn new(input: R) -> Result<Self, Error> {
-        let vorbis = minivorbis::Decoder::new(input)?;
+pub struct AudioDecoder {
+    track_id: u32, // Internal OGG track index.
+    decoder: Box<dyn Decoder>,
+    format: Box<dyn FormatReader>,
+    position: TimeStamp,
+}
+
+impl AudioDecoder {
+    pub fn new<T>(input: T) -> Result<Self, Error>
+    where
+        T: io::Read + io::Seek + Send + 'static,
+    {
+        let mss_opts = Default::default();
+        let mss = MediaSourceStream::new(Box::new(FileWithConstSize::new(input)), mss_opts);
+
+        let format_opts = Default::default();
+        let format = OggReader::try_new(mss, &format_opts)?;
+
+        let track = format.default_track().unwrap();
+        let decoder_opts = Default::default();
+        let decoder = VorbisDecoder::try_new(&track.codec_params, &decoder_opts)?;
 
         Ok(Self {
-            vorbis,
-            packet: Vec::with_capacity(minivorbis::TYPICAL_PACKET_CAP),
-            pos: 0, // Buffer is initially empty.
+            track_id: track.id,
+            decoder: Box::new(decoder),
+            format: Box::new(format),
+            position: 0,
         })
     }
 
-    pub fn seek(&mut self, pcm_frame: u64) {
-        self.vorbis
-            .seek_to_pcm(pcm_frame)
-            .expect("Failed to set current OGG stream position");
+    pub fn channels(&self) -> Option<Channels> {
+        self.decoder.codec_params().channels
     }
 
-    fn read_next_packet(&mut self) -> Result<usize, minivorbis::Error> {
-        loop {
-            let packet = unsafe {
-                slice::from_raw_parts_mut(self.packet.as_mut_ptr(), self.packet.capacity())
-            };
-            match self.vorbis.read_packet(packet) {
-                Err(minivorbis::Error::Hole) => {
-                    // Skip holes in decoding.
-                    continue;
-                }
-                Ok(len) => {
-                    unsafe {
-                        self.packet.set_len(len);
-                    }
-                    return Ok(len);
-                }
-                other_result => {
-                    return other_result;
-                }
+    pub fn sample_rate(&self) -> Option<u32> {
+        self.decoder.codec_params().sample_rate
+    }
+
+    pub fn max_frames_per_packet(&self) -> Option<u64> {
+        self.decoder.codec_params().max_frames_per_packet
+    }
+
+    pub fn seek(&mut self, time: Duration) -> Result<TimeStamp, Error> {
+        let seeked_to = self.format.seek(
+            SeekMode::Accurate,
+            SeekTo::Time {
+                time: time.as_secs_f64().into(),
+                track_id: Some(self.track_id),
+            },
+        )?;
+        self.position = seeked_to.actual_ts;
+        Ok(self.position)
+    }
+
+    pub fn next_packet(&mut self) -> Option<AudioBufferRef> {
+        let packet = match self.format.next_packet() {
+            Ok(packet) => packet,
+            Err(err) => {
+                log::error!("format error: {}", err);
+                return None;
+            }
+        };
+        match self.decoder.decode(&packet) {
+            Ok(packet) => {
+                self.position += packet.frames() as TimeStamp;
+                Some(packet)
+            }
+            // TODO: Handle non-fatal decoding errors and retry.
+            Err(err) => {
+                log::error!("fatal decode error: {}", err);
+                None
             }
         }
     }
 
-    fn channels(&self) -> u8 {
-        self.vorbis.channels
-    }
-
-    fn sample_rate(&self) -> u32 {
-        self.vorbis.sample_rate
+    pub fn current_frame(&self) -> TimeStamp {
+        self.position
     }
 }
 
-impl<R> Iterator for VorbisDecoder<R>
-where
-    R: io::Read + io::Seek,
-{
-    type Item = f32;
-
-    fn next(&mut self) -> Option<f32> {
-        if self.pos >= self.packet.len() {
-            // We have reached the end of the packet, try to read the next one.
-            match self.read_next_packet() {
-                Err(err) => {
-                    log::error!("error while decoding: {:?}", err);
-                    return None; // Signal an end of stream.
-                }
-                Ok(0) => {
-                    return None; // End of stream.
-                }
-                Ok(_) => {
-                    // We have read next packet, reset the cursor and continue.
-                    self.pos = 0;
-                }
-            }
-        }
-        // Sample is available in this packet, return it.
-        let sample = self.packet[self.pos];
-        self.pos += 1;
-        Some(sample)
-    }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        (self.packet.len() - self.pos, None)
-    }
-}
-
-impl From<minivorbis::Error> for Error {
-    fn from(err: minivorbis::Error) -> Error {
+impl From<SymphoniaError> for Error {
+    fn from(err: SymphoniaError) -> Error {
         Error::AudioDecodingError(Box::new(err))
     }
 }
