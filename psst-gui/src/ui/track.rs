@@ -11,15 +11,18 @@ use druid::{
     Selector, TextAlignment, Widget, WidgetExt,
 };
 
+use crate::data::FindQuery;
+use crate::webapi::WebApi;
 use crate::{
     cmd,
     data::{
-        Album, AppState, ArtistLink, ArtistTracks, CommonCtx, FindQuery, Library, MatchFindQuery,
-        Nav, PlaybackOrigin, PlaybackPayload, PlaylistTracks, Recommendations,
+        Album, AppState, ArtistLink, ArtistTracks, CommonCtx, Library, Nav, PlaybackOrigin,
+        PlaybackPayload, PlaylistTrackModification, PlaylistTracks, Recommendations,
         RecommendationsRequest, SavedTracks, SearchResults, Track, WithCtx,
     },
     widget::MyWidgetExt,
 };
+use crate::{data::MatchFindQuery, ui::playlist};
 
 use super::{
     find::{Find, Findable},
@@ -345,6 +348,9 @@ fn track_row_menu(row: &TrackRow) -> Menu<AppState> {
 pub fn track_menu(track: &Arc<Track>, library: &Arc<Library>) -> Menu<AppState> {
     let mut menu = Menu::empty();
 
+    // TODO: Get the current user without an API call
+    let current_user = WebApi::global().get_user_profile().unwrap();
+
     for artist_link in &track.artists {
         let more_than_one_artist = track.artists.len() > 1;
         let title = if more_than_one_artist {
@@ -404,6 +410,22 @@ pub fn track_menu(track: &Arc<Track>, library: &Arc<Library>) -> Menu<AppState> 
             .command(library::SAVE_TRACK.with(track.clone())),
         );
     }
+    let mut playlist_menu = Menu::new("Add to playlist");
+
+    let playlists = library.get_owned_playlists(current_user.id.clone());
+    for playlist in playlists {
+        playlist_menu = playlist_menu.entry(
+            MenuItem::new(
+                LocalizedString::new("menu-item-save-to-playlist")
+                    .with_placeholder(format!("{}", playlist.name)),
+            )
+            .command(playlist::ADD_TRACK.with(PlaylistTrackModification {
+                playlist_link: playlist.link(),
+                track_id: track.id,
+            })),
+        );
+    }
+    menu = menu.entry(playlist_menu);
 
     menu
 }
