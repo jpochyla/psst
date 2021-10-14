@@ -276,6 +276,13 @@ impl Library {
         }
     }
 
+    pub fn get_owned_playlists(&self, user_id: Arc<str>) -> Vec<&Playlist>{
+        if let Some(saved) = self.playlists.resolved() {
+            saved.iter().filter(|playlist| playlist.owner.id == user_id).collect()
+        } else {
+            Vec::new()
+        }
+    }
     pub fn contains_album(&self, album: &Album) -> bool {
         if let Some(saved) = self.saved_albums.resolved() {
             saved.set.contains(&album.id)
