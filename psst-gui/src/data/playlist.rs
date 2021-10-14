@@ -20,6 +20,7 @@ pub struct Playlist {
     #[serde(rename = "tracks")]
     #[serde(deserialize_with = "deserialize_track_count")]
     pub track_count: usize,
+    pub owner: PublicUser
 }
 
 impl Playlist {
