@@ -16,10 +16,15 @@ use crate::{
     data::{
         Album, AppState, ArtistLink, ArtistTracks, CommonCtx, Library, Nav, PlaybackOrigin,
         PlaybackPayload, PlaylistTracks, Recommendations, RecommendationsRequest, SavedTracks,
-        SearchResults, Track, WithCtx,
+        SearchResults, Track, WithCtx, PlaylistTrackModification
     },
-    widget::MyWidgetExt,
+    widget::{MyWidgetExt},
 };
+use crate::ui::playlist;
+use crate::ui::playlist::playlist_widget;
+use crate::ui::utils::{error_widget, spinner_widget};
+use crate::webapi::WebApi;
+use crate::widget::Async;
 
 use super::{library, theme, utils};
 
@@ -117,8 +122,8 @@ impl TrackIter for SavedTracks {
 }
 
 impl<T> ListIter<TrackRow> for WithCtx<T>
-where
-    T: TrackIter + Data,
+    where
+        T: TrackIter + Data,
 {
     fn for_each(&self, mut cb: impl FnMut(&TrackRow, usize)) {
         let origin = self.data.origin();
@@ -322,6 +327,9 @@ fn track_row_menu(row: &TrackRow) -> Menu<AppState> {
 pub fn track_menu(track: &Arc<Track>, library: &Arc<Library>) -> Menu<AppState> {
     let mut menu = Menu::empty();
 
+    // TODO: Get the current user without an API call
+    let current_user = WebApi::global().get_user_profile().unwrap();
+
     for artist_link in &track.artists {
         let more_than_one_artist = track.artists.len() > 1;
         let title = if more_than_one_artist {
@@ -381,6 +389,19 @@ pub fn track_menu(track: &Arc<Track>, library: &Arc<Library>) -> Menu<AppState> 
             .command(library::SAVE_TRACK.with(track.clone())),
         );
     }
+    let mut playlist_menu = Menu::new("Add to playlist");
+
+    let playlists = library.get_owned_playlists(current_user.id.clone());
+    for playlist in playlists {
+        playlist_menu = playlist_menu.entry(
+            MenuItem::new(
+                LocalizedString::new("menu-item-save-to-playlist")
+                    .with_placeholder(format!("{}", playlist.name)),
+            )
+                .command(playlist::ADD_TRACK.with(PlaylistTrackModification { playlist_link: playlist.link(), track_id: track.id }))
+        );
+    }
+    menu = menu.entry(playlist_menu);
 
     menu
 }
