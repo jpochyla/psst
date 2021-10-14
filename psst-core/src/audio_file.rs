@@ -1,6 +1,6 @@
 use std::{
     io,
-    io::{BufReader, Seek, SeekFrom},
+    io::{Seek, SeekFrom},
     path::PathBuf,
     sync::Arc,
     thread,
@@ -9,7 +9,7 @@ use std::{
 };
 
 use crate::{
-    audio_decode::VorbisDecoder,
+    audio_decode::AudioDecoder,
     audio_decrypt::AudioDecrypt,
     audio_key::AudioKey,
     audio_normalize::NormalizationData,
@@ -21,8 +21,6 @@ use crate::{
     stream_storage::{StreamReader, StreamRequest, StreamStorage, StreamWriter},
     util::OffsetFile,
 };
-
-pub type FileAudioSource = VorbisDecoder<OffsetFile<AudioDecrypt<BufReader<StreamReader>>>>;
 
 #[derive(Debug, Clone, Copy)]
 pub struct AudioPath {
@@ -93,19 +91,19 @@ impl AudioFile {
         }
     }
 
-    pub fn audio_source(
-        &self,
-        key: AudioKey,
-    ) -> Result<(FileAudioSource, NormalizationData), Error> {
-        let reader = match self {
-            Self::Streamed { streamed_file, .. } => streamed_file.storage.reader()?,
-            Self::Cached { cached_file, .. } => cached_file.storage.reader()?,
-        };
-        let buffered = BufReader::new(reader);
-        let mut decrypted = AudioDecrypt::new(key, buffered);
+    pub fn reader(&self) -> Result<StreamReader, Error> {
+        match self {
+            Self::Streamed { streamed_file, .. } => Ok(streamed_file.storage.reader()?),
+            Self::Cached { cached_file, .. } => Ok(cached_file.storage.reader()?),
+        }
+    }
+
+    pub fn audio_source(&self, key: AudioKey) -> Result<(AudioDecoder, NormalizationData), Error> {
+        let reader = self.reader()?;
+        let mut decrypted = AudioDecrypt::new(key, reader);
         let normalization = NormalizationData::parse(&mut decrypted)?;
         let encoded = OffsetFile::new(decrypted, self.header_length())?;
-        let decoded = VorbisDecoder::new(encoded)?;
+        let decoded = AudioDecoder::new(encoded)?;
         Ok((decoded, normalization))
     }
 

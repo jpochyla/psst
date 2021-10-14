@@ -4,10 +4,11 @@ use std::{
     io::{Read, Seek, SeekFrom, Write},
     ops::Range,
     path::{Path, PathBuf},
-    sync::{Arc, Condvar, Mutex},
+    sync::Arc,
 };
 
 use crossbeam_channel::{unbounded, Receiver, Sender};
+use parking_lot::{Condvar, Mutex};
 use rangemap::RangeSet;
 use tempfile::NamedTempFile;
 
@@ -232,82 +233,63 @@ impl StreamDataMap {
         self.total_size.saturating_sub(offset)
     }
 
-    /// Return an iterator of sub-ranges of `offset..offset+length` that have
-    /// not yet been requested from the backend.
-    fn not_yet_requested(&self, offset: u64, length: u64) -> impl IntoIterator<Item = (u64, u64)> {
-        #[allow(clippy::needless_collect)]
-        let gaps: Vec<_> = self
-            .requested
+    /// Return a vector of sub-ranges of `offset..offset+length` that have not
+    /// yet been requested from the backend.
+    fn not_yet_requested(&self, offset: u64, length: u64) -> Vec<(u64, u64)> {
+        self.requested
             .lock()
-            .unwrap()
             .gaps(&(offset..offset + length))
-            .collect();
-        gaps.into_iter().map(|r| range_to_offset_and_length(&r))
+            .into_iter()
+            .map(|r| range_to_offset_and_length(&r))
+            .collect()
     }
 
     /// Mark given range as requested from the backend, so we can avoid
     /// requesting it more than once.
     fn mark_as_requested(&self, offset: u64, length: u64) {
-        self.requested
-            .lock()
-            .unwrap()
-            .insert(offset..offset + length);
+        self.requested.lock().insert(offset..offset + length);
     }
 
     /// Remove range previously marked as requested.
     fn mark_as_not_requested(&self, offset: u64, length: u64) {
-        self.requested
-            .lock()
-            .unwrap()
-            .remove(offset..offset + length);
+        self.requested.lock().remove(offset..offset + length);
     }
 
     /// Mark the range as downloaded and notify the `self.condvar`, so tasks
     /// currently blocked in `self.wait_for` are woken up.
     fn mark_as_downloaded(&self, offset: u64, length: u64) {
-        self.downloaded
-            .lock()
-            .unwrap()
-            .insert(offset..offset + length);
+        self.downloaded.lock().insert(offset..offset + length);
         self.condvar.notify_all();
     }
 
     /// Block, waiting until at least some data at given offset is downloaded.
     /// Returns length that is available.  See `self.mark_as_downloaded`.
     fn wait_for(&self, offset: u64, blocking_callback: impl Fn(u64)) -> u64 {
+        let mut downloaded = self.downloaded.lock();
         let mut called_callback = false;
-        let mut available_len = 0; // Resulting length.
-
-        let downloaded = self.downloaded.lock().unwrap();
-
-        let _mutex_guard = self
-            .condvar
-            .wait_while(downloaded, |downloaded| {
-                if let Some(range) = downloaded.get(&offset) {
-                    let (over_ofs, over_len) = range_to_offset_and_length(range);
-                    let offset_from_overlapping = offset - over_ofs;
-                    available_len = over_len - offset_from_overlapping;
-                    // There is `available_len` bytes of data downloaded, stop waiting.
-                    false
-                } else {
-                    // Call the blocking callback, but only the first time we are waiting.
-                    if !called_callback {
-                        called_callback = true;
-                        blocking_callback(offset);
-                    }
-                    // There are no overlaps, wait.
-                    true
+        loop {
+            if let Some(range) = downloaded.get(&offset) {
+                let (over_ofs, over_len) = range_to_offset_and_length(range);
+                let offset_from_overlapping = offset - over_ofs;
+                let available_len = over_len - offset_from_overlapping;
+                // There is `available_len` bytes of data downloaded, stop waiting.
+                break available_len;
+            } else {
+                // Call the blocking callback, but only the first time we are waiting.
+                if !called_callback {
+                    called_callback = true;
+                    blocking_callback(offset);
                 }
-            })
-            .unwrap();
-        available_len
+                // There are no overlaps, wait.
+                self.condvar.wait(&mut downloaded);
+            }
+        }
     }
 
     // Returns true if data is completely downloaded.
     fn is_complete(&self) -> bool {
         self.downloaded
             .lock()
-            .unwrap()
             .gaps(&(0..self.total_size))
             .next()
             .is_none()

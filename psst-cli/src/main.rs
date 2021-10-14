@@ -55,15 +55,10 @@ fn play_item(
     let output_remote = output.remote();
     let config = PlaybackConfig::default();
 
-    let mut player = Player::new(session, cdn, cache, config, output.remote());
+    let mut player = Player::new(session, cdn, cache, config, &output);
 
-    let output_thread = thread::spawn({
-        let player_source = player.audio_source();
-        move || {
-            output
-                .start_playback(player_source)
-                .expect("Playback failed");
-        }
+    let output_thread = thread::spawn(move || {
+        output.play().expect("Playback failed");
     });
 
     let _ui_thread = thread::spawn({

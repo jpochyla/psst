@@ -1,18 +1,15 @@
-use std::{
-    mem,
-    sync::{Arc, Mutex},
-    thread,
-    thread::JoinHandle,
-    time::Duration,
-};
+use std::{mem, sync::Arc, thread, thread::JoinHandle, time::Duration};
 
 use crossbeam_channel::{unbounded, Receiver, Sender};
+use symphonia::core::audio::{SampleBuffer, SignalSpec};
 
 use crate::{
-    audio_file::{AudioFile, AudioPath, FileAudioSource},
+    actor::{Actor, ActorOp, Handle},
+    audio_decode::AudioDecoder,
+    audio_file::{AudioFile, AudioPath},
     audio_key::AudioKey,
     audio_normalize::NormalizationLevel,
-    audio_output::{AudioOutputRemote, AudioSample, AudioSource},
+    audio_output::{AudioOutput, AudioOutputRemote, AudioSink},
     audio_queue::{Queue, QueueBehavior},
     cache::CacheHandle,
     cdn::CdnHandle,
@@ -168,7 +165,7 @@ fn load_audio_key(
 
 pub struct LoadedPlaybackItem {
     file: AudioFile,
-    source: FileAudioSource,
+    source: AudioDecoder,
     norm_factor: f32,
 }
 
@@ -182,8 +179,8 @@ pub struct Player {
     queue: Queue,
     event_sender: Sender<PlayerEvent>,
     event_receiver: Receiver<PlayerEvent>,
-    audio_source: Arc<Mutex<PlayerAudioSource>>,
     audio_output_remote: AudioOutputRemote,
+    audio_output_sink: Arc<AudioSink<f32>>,
     consecutive_loading_failures: usize,
 }
 
@@ -193,13 +190,9 @@ impl Player {
         cdn: CdnHandle,
         cache: CacheHandle,
         config: PlaybackConfig,
-        audio_output_remote: AudioOutputRemote,
+        audio_output: &AudioOutput,
     ) -> Self {
         let (event_sender, event_receiver) = unbounded();
-        let audio_source = {
-            let event_sender = event_sender.clone();
-            Arc::new(Mutex::new(PlayerAudioSource::new(event_sender)))
-        };
         Self {
             session,
             cdn,
@@ -207,17 +200,13 @@ impl Player {
             config,
             event_sender,
             event_receiver,
-            audio_source,
-            audio_output_remote,
+            audio_output_remote: audio_output.remote(),
+            audio_output_sink: audio_output.sink(),
             state: PlayerState::Stopped,
             preload: PreloadState::None,
             queue: Queue::new(),
             consecutive_loading_failures: 0,
         }
-    }
-
-    pub fn audio_source(&self) -> Arc<Mutex<impl AudioSource>> {
-        self.audio_source.clone()
     }
 
     pub fn event_sender(&self) -> Sender<PlayerEvent> {
@@ -239,18 +228,18 @@ impl Player {
             PlayerEvent::Preloaded { item, result } => {
                 self.handle_preloaded(item, result);
             }
-            PlayerEvent::Progress { duration, path } => {
-                self.handle_progress(duration, path);
+            PlayerEvent::Position { position, path } => {
+                self.handle_position(position, path);
             }
-            PlayerEvent::Finished { .. } => {
-                self.handle_finished();
+            PlayerEvent::EndOfTrack { .. } => {
+                self.handle_end_of_track();
             }
             PlayerEvent::Loading { .. }
             | PlayerEvent::Playing { .. }
             | PlayerEvent::Pausing { .. }
             | PlayerEvent::Resuming { .. }
             | PlayerEvent::Stopped { .. }
-            | PlayerEvent::Blocked => {}
+            | PlayerEvent::Blocked { .. } => {}
         };
     }
 
@@ -320,25 +309,26 @@ impl Player {
         }
     }
 
-    fn handle_progress(&mut self, progress: Duration, path: AudioPath) {
+    fn handle_position(&mut self, new_position: Duration, path: AudioPath) {
         match &mut self.state {
-            PlayerState::Playing { duration, .. } | PlayerState::Paused { duration, .. } => {
-                *duration = progress;
+            PlayerState::Playing { position, .. } | PlayerState::Paused { position, .. } => {
+                *position = new_position;
             }
             _ => {
-                log::warn!("received unexpected progress report");
+                log::warn!("received unexpected position report");
             }
         }
         const PRELOAD_BEFORE_END_OF_TRACK: Duration = Duration::from_secs(30);
         if let Some(&item_to_preload) = self.queue.get_following() {
-            let time_until_end_of_track = path.duration.checked_sub(progress).unwrap_or_default();
+            let time_until_end_of_track =
+                path.duration.checked_sub(new_position).unwrap_or_default();
             if time_until_end_of_track <= PRELOAD_BEFORE_END_OF_TRACK {
                 self.preload(item_to_preload);
             }
         }
     }
 
-    fn handle_finished(&mut self) {
+    fn handle_end_of_track(&mut self) {
         self.queue.skip_to_following();
         if let Some(&item) = self.queue.get_current() {
             self.load_and_play(item);
@@ -387,8 +377,6 @@ impl Player {
                     .expect("Failed to send PlayerEvent::Loaded");
             }
         });
-        // Make sure the output is paused, so any currently playing item is stopped.
-        self.audio_output_remote.pause();
         self.event_sender
             .send(PlayerEvent::Loading { item })
             .expect("Failed to send PlayerEvent::Loading");
@@ -428,27 +416,47 @@ impl Player {
     fn play_loaded(&mut self, loaded_item: LoadedPlaybackItem) {
         log::info!("starting playback");
         let path = loaded_item.file.path();
-        let duration = Duration::default();
-        self.audio_source
-            .lock()
-            .expect("Failed to acquire audio source lock")
-            .play_now(loaded_item);
+        let position = Duration::default();
+        let worker = PlaybackWorker {
+            actor: Decoding::spawn_default({
+                let events = self.event_sender.clone();
+                let sink = self.audio_output_sink.clone();
+                move |this| Decoding::new(loaded_item, events, this, sink)
+            }),
+        };
+        worker.start();
+        self.state = PlayerState::Playing {
+            path,
+            position,
+            worker,
+        };
         self.event_sender
-            .send(PlayerEvent::Playing { path, duration })
+            .send(PlayerEvent::Playing { path, position })
             .expect("Failed to send PlayerEvent::Playing");
-        self.state = PlayerState::Playing { path, duration };
-        self.audio_output_remote.resume();
     }
 
     fn pause(&mut self) {
         match mem::replace(&mut self.state, PlayerState::Invalid) {
-            PlayerState::Playing { path, duration } | PlayerState::Paused { path, duration } => {
+            PlayerState::Playing {
+                path,
+                position,
+                worker,
+            }
+            | PlayerState::Paused {
+                path,
+                position,
+                worker,
+            } => {
                 log::info!("pausing playback");
+                worker.stop();
                 self.event_sender
-                    .send(PlayerEvent::Pausing { path, duration })
+                    .send(PlayerEvent::Pausing { path, position })
                     .expect("Failed to send PlayerEvent::Paused");
-                self.state = PlayerState::Paused { path, duration };
-                self.audio_output_remote.pause();
+                self.state = PlayerState::Paused {
+                    path,
+                    position,
+                    worker,
+                };
             }
             _ => {
                 log::warn!("invalid state transition");
@@ -458,13 +466,26 @@ impl Player {
 
     fn resume(&mut self) {
         match mem::replace(&mut self.state, PlayerState::Invalid) {
-            PlayerState::Playing { path, duration } | PlayerState::Paused { path, duration } => {
+            PlayerState::Playing {
+                path,
+                position,
+                worker,
+            }
+            | PlayerState::Paused {
+                path,
+                position,
+                worker,
+            } => {
                 log::info!("resuming playback");
+                worker.start();
                 self.event_sender
-                    .send(PlayerEvent::Resuming { path, duration })
+                    .send(PlayerEvent::Resuming { path, position })
                     .expect("Failed to send PlayerEvent::Resuming");
-                self.state = PlayerState::Playing { path, duration };
-                self.audio_output_remote.resume();
+                self.state = PlayerState::Playing {
+                    path,
+                    position,
+                    worker,
+                };
             }
             _ => {
                 log::warn!("invalid state transition");
@@ -509,16 +530,16 @@ impl Player {
             .send(PlayerEvent::Stopped)
             .expect("Failed to send PlayerEvent::Stopped");
         self.state = PlayerState::Stopped;
-        self.audio_output_remote.pause();
         self.queue.clear();
         self.consecutive_loading_failures = 0;
     }
 
     fn seek(&mut self, position: Duration) {
-        self.audio_source
-            .lock()
-            .expect("Failed to acquire audio source lock")
-            .seek(position);
+        if let PlayerState::Playing { worker, .. } | PlayerState::Paused { worker, .. } =
+            &mut self.state
+        {
+            worker.seek(position);
+        }
     }
 
     fn configure(&mut self, config: PlaybackConfig) {
@@ -527,8 +548,8 @@ impl Player {
 
     fn is_near_playback_start(&self) -> bool {
         match self.state {
-            PlayerState::Playing { duration, .. } | PlayerState::Paused { duration, .. } => {
-                duration < PREVIOUS_TRACK_THRESHOLD
+            PlayerState::Playing { position, .. } | PlayerState::Paused { position, .. } => {
+                position < PREVIOUS_TRACK_THRESHOLD
             }
             _ => false,
         }
@@ -593,32 +614,34 @@ pub enum PlayerEvent {
         item: PlaybackItem,
         result: Result<LoadedPlaybackItem, Error>,
     },
-    /// Player has started playing new track.  `Progress` events will follow.
+    /// Player has started playing new track.  `Position` events will follow.
     Playing {
         path: AudioPath,
-        duration: Duration,
+        position: Duration,
     },
     /// Player is in a paused state.  `Resuming` might follow.
     Pausing {
         path: AudioPath,
-        duration: Duration,
+        position: Duration,
     },
-    /// Player is resuming playback of a track.  `Progress` events will follow.
+    /// Player is resuming playback of a track.  `Position` events will follow.
     Resuming {
         path: AudioPath,
-        duration: Duration,
+        position: Duration,
     },
-    /// Player is either reacting to a seek event in a paused or playing state,
-    /// or track is naturally progressing during playback.
-    Progress {
+    /// Position of the playback head has changed.
+    Position {
         path: AudioPath,
-        duration: Duration,
+        position: Duration,
     },
     /// Player would like to continue playing, but is blocked, waiting for I/O.
-    Blocked,
+    Blocked {
+        path: AudioPath,
+        position: Duration,
+    },
     /// Player has finished playing a track.  `Loading` or `Playing` might
     /// follow if the queue is not empty, `Stopped` will follow if it is.
-    Finished,
+    EndOfTrack,
     /// The queue is empty.
     Stopped,
 }
@@ -630,11 +653,13 @@ enum PlayerState {
     },
     Playing {
         path: AudioPath,
-        duration: Duration,
+        position: Duration,
+        worker: PlaybackWorker,
     },
     Paused {
         path: AudioPath,
-        duration: Duration,
+        position: Duration,
+        worker: PlaybackWorker,
     },
     Stopped,
     Invalid,
@@ -652,116 +677,152 @@ enum PreloadState {
     None,
 }
 
-const OUTPUT_CHANNELS: u8 = 2;
-const OUTPUT_SAMPLE_RATE: u32 = 44100;
-const PROGRESS_PRECISION_SAMPLES: u64 = OUTPUT_SAMPLE_RATE as u64 * OUTPUT_CHANNELS as u64; // 1 second.
+struct PlaybackWorker {
+    actor: Handle<Decode>,
+}
 
-struct CurrentPlaybackItem {
+impl PlaybackWorker {
+    fn start(&self) {
+        self.actor.sender().send(Decode::Start).unwrap();
+    }
+
+    fn stop(&self) {
+        self.actor.sender().send(Decode::Stop).unwrap();
+    }
+
+    fn seek(&self, pos: Duration) {
+        self.actor.sender().send(Decode::Seek(pos)).unwrap();
+    }
+
+    fn quit(&self) {
+        let _ = self.actor.sender().send(Decode::Quit);
+    }
+}
+
+impl Drop for PlaybackWorker {
+    fn drop(&mut self) {
+        self.quit();
+    }
+}
+
+enum Decode {
+    Start,
+    Stop,
+    Seek(Duration),
+    ReadPacket,
+    FlushPacket,
+    Quit,
+}
+
+enum DecState {
+    Started,
+    Stopped,
+}
+
+struct Decoding {
     file: AudioFile,
-    source: FileAudioSource,
+    source: AudioDecoder,
     norm_factor: f32,
+    samples: SampleBuffer<f32>,
+    events: Sender<PlayerEvent>,
+    this: Sender<Decode>,
+    sink: Arc<AudioSink<f32>>,
+    state: DecState,
 }
 
-struct PlayerAudioSource {
-    current: Option<CurrentPlaybackItem>,
-    event_sender: Sender<PlayerEvent>,
-    samples: u64,
-}
-
-impl PlayerAudioSource {
-    fn new(event_sender: Sender<PlayerEvent>) -> Self {
+impl Decoding {
+    fn new(
+        loaded: LoadedPlaybackItem,
+        events: Sender<PlayerEvent>,
+        this: Sender<Decode>,
+        sink: Arc<AudioSink<f32>>,
+    ) -> Self {
+        let file = loaded.file;
+        let source = loaded.source;
+        let norm_factor = loaded.norm_factor;
+        let samples = {
+            let max_frames = source.max_frames_per_packet().unwrap_or(1024 * 8);
+            let channels = source.channels().unwrap();
+            let rate = source.sample_rate().unwrap();
+            SampleBuffer::new(max_frames, SignalSpec { rate, channels })
+        };
         Self {
-            event_sender,
-            current: None,
-            samples: 0,
+            file,
+            source,
+            norm_factor,
+            samples,
+            events,
+            this,
+            sink,
+            state: DecState::Stopped,
         }
     }
 
-    fn seek(&mut self, position: Duration) {
-        if let Some(current) = &mut self.current {
-            let seconds = position.as_secs_f64();
-            let frames = seconds * f64::from(OUTPUT_SAMPLE_RATE);
-            let samples = frames * f64::from(OUTPUT_CHANNELS);
-            current.source.seek(frames as u64);
-            self.samples = samples as u64;
-            self.report_audio_position();
-        }
-    }
-
-    fn play_now(&mut self, item: LoadedPlaybackItem) {
-        self.current.replace(CurrentPlaybackItem {
-            norm_factor: item.norm_factor,
-            source: item.source,
-            file: item.file,
-        });
-        self.samples = 0;
-    }
-
-    fn next_sample(&mut self) -> Option<AudioSample> {
-        if let Some(current) = &mut self.current {
-            let sample = current.source.next();
-            if sample.is_some() {
-                self.samples += 1;
-            } else {
-                self.samples = 0;
-            }
-            sample
-        } else {
-            None
-        }
-    }
-
-    fn report_audio_position(&self) {
-        if let Some(current) = &self.current {
-            let duration = Duration::from_secs_f64(
-                self.samples as f64 / f64::from(OUTPUT_SAMPLE_RATE) / f64::from(OUTPUT_CHANNELS),
-            );
-            let path = current.file.path();
-            self.event_sender
-                .send(PlayerEvent::Progress { duration, path })
-                .expect("Failed to send PlayerEvent::Progress");
-        }
-    }
-
-    fn report_audio_end(&self) {
-        self.event_sender
-            .send(PlayerEvent::Finished)
-            .expect("Failed to send PlayerEvent::Finished");
+    fn frames_to_duration(&self, frames: u64) -> Duration {
+        Duration::from_secs_f64(frames as f64 / self.source.sample_rate().unwrap() as f64)
     }
 }
 
-impl AudioSource for PlayerAudioSource {
-    fn channels(&self) -> u8 {
-        OUTPUT_CHANNELS
-    }
+impl Actor for Decoding {
+    type Message = Decode;
+    type Error = Error;
 
-    fn sample_rate(&self) -> u32 {
-        OUTPUT_SAMPLE_RATE
-    }
-
-    fn normalization_factor(&self) -> Option<f32> {
-        self.current.as_ref().map(|current| current.norm_factor)
-    }
-}
-
-impl Iterator for PlayerAudioSource {
-    type Item = AudioSample;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let sample = self.next_sample();
-        if sample.is_some() {
-            // Report audio progress.
-            if self.samples % PROGRESS_PRECISION_SAMPLES == 0 {
-                self.report_audio_position();
+    fn handle(&mut self, msg: Self::Message) -> Result<ActorOp, Self::Error> {
+        match msg {
+            Decode::Start => {
+                if let DecState::Stopped = self.state {
+                    self.state = DecState::Started;
+                    self.this.send(Decode::ReadPacket).unwrap();
+                }
             }
-        } else {
-            // We're at the end of track.  If we still have the source, drop it and report.
-            // Player will pause the audio output and we will stop getting polled
-            // eventually.
-            if self.current.take().is_some() {
-                self.report_audio_end();
+            Decode::Stop => {
+                self.state = DecState::Stopped;
+            }
+            Decode::Seek(pos) => match self.source.seek(pos) {
+                Ok(new_pos) => {
+                    self.events
+                        .send(PlayerEvent::Position {
+                            path: self.file.path(),
+                            position: self.frames_to_duration(new_pos),
+                        })
+                        .unwrap();
+                }
+                Err(err) => {
+                    log::error!("failed to seek: {}", err);
+                }
+            },
+            Decode::ReadPacket => {
+                if let DecState::Started = self.state {
+                    match self.source.next_packet() {
+                        Some(packet) => {
+                            // TODO: Apply `self.norm_factor`.
+                            // TODO: Apply global volume level.
+                            self.samples.copy_interleaved_ref(packet);
+                            self.this.send(Decode::FlushPacket).unwrap();
+                            self.events
+                                .send(PlayerEvent::Position {
+                                    path: self.file.path(),
+                                    position: self.frames_to_duration(self.source.current_frame()),
+                                })
+                                .unwrap();
+                        }
+                        None => {
+                            self.events.send(PlayerEvent::EndOfTrack).unwrap();
+                            return Ok(ActorOp::Shutdown);
+                        }
+                    }
+                }
+            }
+            Decode::FlushPacket => {
+                self.sink.write_blocking(&self.samples)?;
+                if let DecState::Started = self.state {
+                    self.this.send(Decode::ReadPacket).unwrap();
+                }
+            }
+            Decode::Quit => {
+                return Ok(ActorOp::Shutdown);
             }
         }
-        sample
+        Ok(ActorOp::Continue)
     }
 }

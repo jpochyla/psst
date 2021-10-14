@@ -4,9 +4,10 @@ members = [
     "psst-core",
     "psst-cli",
     "psst-gui",
-    "minivorbis-sys",
-    "minivorbis",
 ]
 
 [profile.dev]
 split-debuginfo = "unpacked"
+
+[profile.dev.package.symphonia]
+opt-level = 2

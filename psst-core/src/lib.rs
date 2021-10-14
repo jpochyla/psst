@@ -1,6 +1,7 @@
 #![allow(clippy::new_without_default)]
 
 pub mod access_token;
+pub mod actor;
 pub mod audio_decode;
 pub mod audio_decrypt;
 pub mod audio_file;
