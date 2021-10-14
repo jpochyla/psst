@@ -415,6 +415,14 @@ impl WebApi {
             })
             .collect())
     }
+
+    // https://developer.spotify.com/documentation/web-api/reference/#endpoint-add-tracks-to-playlist
+    pub fn add_track_to_playlist(&self, playlist_id: &str, track_uri: &str) -> Result<(), Error>{
+        let request = self.post(format!("v1/playlists/{}/tracks", playlist_id))?
+            .query("uris", track_uri);
+        let result = self.send_empty_json(request)?;
+        Ok(result)
+    }
 }
 
 /// Search endpoints.
