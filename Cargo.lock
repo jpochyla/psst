@@ -1344,6 +1344,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "libsamplerate"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bcbb68a750265482d1b1f70e3b4505da140c73960f8068726e2fd1ffb792c300"
+dependencies = [
+ "libc",
+]
+
+[[package]]
 name = "linked-hash-map"
 version = "0.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1971,6 +1980,7 @@ dependencies = [
  "cpal",
  "crossbeam-channel",
  "hmac",
+ "libsamplerate",
  "log",
  "num-bigint",
  "num-traits",

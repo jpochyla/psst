@@ -12,6 +12,7 @@ byteorder = "1.4"
 cpal = "0.13"
 crossbeam-channel = "0.5"
 hmac = "0.11"
+libsamplerate = "0.1"
 log = "0.4"
 num-bigint = { version = "0.4", features = ["rand"] }
 num-traits = "0.2"

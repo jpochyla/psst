@@ -57,10 +57,6 @@ fn play_item(
 
     let mut player = Player::new(session, cdn, cache, config, &output);
 
-    let output_thread = thread::spawn(move || {
-        output.play().expect("Playback failed");
-    });
-
     let _ui_thread = thread::spawn({
         let player_sender = player.event_sender();
 
@@ -109,7 +105,6 @@ fn play_item(
         player.handle(event);
     }
     output_remote.close();
-    output_thread.join().unwrap();
 
     Ok(())
 }
