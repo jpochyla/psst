@@ -33,12 +33,12 @@ pub trait Actor: Sized {
         }
     }
 
-    fn spawn<F>(cap: Capacity, factory: F) -> Handle<Self::Message>
+    fn spawn<F>(cap: Capacity, factory: F) -> ActorHandle<Self::Message>
     where
         F: FnOnce(Sender<Self::Message>) -> Self + Send + 'static,
     {
         let (send, recv) = cap.to_channel();
-        Handle {
+        ActorHandle {
             sender: send.clone(),
             thread: thread::spawn(move || {
                 factory(send).process(recv);
@@ -46,7 +46,7 @@ pub trait Actor: Sized {
         }
     }
 
-    fn spawn_default<F>(factory: F) -> Handle<Self::Message>
+    fn spawn_default<F>(factory: F) -> ActorHandle<Self::Message>
     where
         F: FnOnce(Sender<Self::Message>) -> Self + Send + 'static,
     {
@@ -54,12 +54,12 @@ pub trait Actor: Sized {
     }
 }
 
-pub struct Handle<M> {
+pub struct ActorHandle<M> {
     thread: JoinHandle<()>,
     sender: Sender<M>,
 }
 
-impl<M> Handle<M> {
+impl<M> ActorHandle<M> {
     pub fn sender(&self) -> Sender<M> {
         self.sender.clone()
     }

@@ -32,7 +32,7 @@ use crate::{
 pub struct PlaybackController {
     sender: Option<Sender<PlayerEvent>>,
     thread: Option<JoinHandle<()>>,
-    output_thread: Option<JoinHandle<()>>,
+    output: Option<AudioOutput>,
     media_controls: Option<MediaControls>,
 }
 
@@ -41,7 +41,7 @@ impl PlaybackController {
         Self {
             sender: None,
             thread: None,
-            output_thread: None,
+            output: None,
             media_controls: None,
         }
     }
@@ -68,9 +68,6 @@ impl PlaybackController {
 
         let thread = thread::spawn(move || {
             Self::service_events(player, event_sink, widget_id);
-        });
-        let output_thread = thread::spawn(move || {
-            output.play().expect("Playback failed");
         });
 
         let hwnd = {
@@ -104,7 +101,7 @@ impl PlaybackController {
 
         self.sender.replace(sender);
         self.thread.replace(thread);
-        self.output_thread.replace(output_thread);
+        self.output.replace(output);
         self.media_controls.replace(media_controls);
     }
 

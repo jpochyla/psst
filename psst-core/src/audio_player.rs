@@ -1,16 +1,17 @@
-use std::{mem, sync::Arc, thread, thread::JoinHandle, time::Duration};
+use std::{mem, thread, thread::JoinHandle, time::Duration};
 
 use crossbeam_channel::{unbounded, Receiver, Sender};
 use symphonia::core::audio::{SampleBuffer, SignalSpec};
 
 use crate::{
-    actor::{Actor, ActorOp, Handle},
+    actor::{Actor, ActorHandle, ActorOp},
     audio_decode::AudioDecoder,
     audio_file::{AudioFile, AudioPath},
     audio_key::AudioKey,
     audio_normalize::NormalizationLevel,
     audio_output::{AudioOutput, AudioOutputRemote, AudioSink},
     audio_queue::{Queue, QueueBehavior},
+    audio_resample::{AudioResampler, ResamplingAlgo, ResamplingSpec},
     cache::CacheHandle,
     cdn::CdnHandle,
     error::Error,
@@ -180,7 +181,7 @@ pub struct Player {
     event_sender: Sender<PlayerEvent>,
     event_receiver: Receiver<PlayerEvent>,
     audio_output_remote: AudioOutputRemote,
-    audio_output_sink: Arc<AudioSink<f32>>,
+    audio_output_sink: AudioSink<f32>,
     consecutive_loading_failures: usize,
 }
 
@@ -678,7 +679,7 @@ enum PreloadState {
 }
 
 struct PlaybackWorker {
-    actor: Handle<Decode>,
+    actor: ActorHandle<Decode>,
 }
 
 impl PlaybackWorker {
@@ -705,6 +706,8 @@ impl Drop for PlaybackWorker {
     }
 }
 
+const REPORT_POSITION_EACH: Duration = Duration::from_millis(1000);
+
 enum Decode {
     Start,
     Stop,
@@ -723,11 +726,13 @@ struct Decoding {
     file: AudioFile,
     source: AudioDecoder,
     norm_factor: f32,
+    resampler: AudioResampler,
     samples: SampleBuffer<f32>,
     events: Sender<PlayerEvent>,
     this: Sender<Decode>,
-    sink: Arc<AudioSink<f32>>,
+    sink: AudioSink<f32>,
     state: DecState,
+    last_reported_position: Duration,
 }
 
 impl Decoding {
@@ -735,11 +740,24 @@ impl Decoding {
         loaded: LoadedPlaybackItem,
         events: Sender<PlayerEvent>,
         this: Sender<Decode>,
-        sink: Arc<AudioSink<f32>>,
+        sink: AudioSink<f32>,
     ) -> Self {
-        let file = loaded.file;
-        let source = loaded.source;
-        let norm_factor = loaded.norm_factor;
+        let LoadedPlaybackItem {
+            file,
+            source,
+            norm_factor,
+        } = loaded;
+        let resampler = AudioResampler::new(
+            // TODO: Make the quality configurable.
+            ResamplingAlgo::SincMediumQuality,
+            ResamplingSpec {
+                channels: source.channels().unwrap().count(),
+                from_rate: source.sample_rate().unwrap() as usize,
+                to_rate: sink.sample_rate() as usize,
+            },
+            1024 * 8,
+        )
+        .unwrap();
         let samples = {
             let max_frames = source.max_frames_per_packet().unwrap_or(1024 * 8);
             let channels = source.channels().unwrap();
@@ -750,16 +768,44 @@ impl Decoding {
             file,
             source,
             norm_factor,
+            resampler,
             samples,
             events,
             this,
             sink,
             state: DecState::Stopped,
+            last_reported_position: Duration::ZERO,
         }
     }
 
     fn frames_to_duration(&self, frames: u64) -> Duration {
         Duration::from_secs_f64(frames as f64 / self.source.sample_rate().unwrap() as f64)
+    }
+
+    fn report_position(&mut self, position: Duration) {
+        self.events
+            .send(PlayerEvent::Position {
+                path: self.file.path(),
+                position,
+            })
+            .unwrap();
+        self.last_reported_position = position;
+    }
+
+    fn report_current_position(&mut self) {
+        let position = self.frames_to_duration(self.source.current_frame());
+        self.report_position(position);
+    }
+
+    fn report_current_position_if_neeeded(&mut self) {
+        let position = self.frames_to_duration(self.source.current_frame());
+        if position.saturating_sub(self.last_reported_position) > REPORT_POSITION_EACH {
+            self.report_position(position);
+        }
+    }
+
+    fn is_started(&self) -> bool {
+        matches!(self.state, DecState::Started)
     }
 }
 
@@ -769,59 +815,56 @@ impl Actor for Decoding {
 
     fn handle(&mut self, msg: Self::Message) -> Result<ActorOp, Self::Error> {
         match msg {
-            Decode::Start => {
-                if let DecState::Stopped = self.state {
-                    self.state = DecState::Started;
-                    self.this.send(Decode::ReadPacket).unwrap();
-                }
+            Decode::Start if !self.is_started() => {
+                self.this.send(Decode::ReadPacket)?;
+                self.state = DecState::Started;
+                Ok(ActorOp::Continue)
             }
-            Decode::Stop => {
+            Decode::Stop if self.is_started() => {
                 self.state = DecState::Stopped;
+                Ok(ActorOp::Continue)
             }
-            Decode::Seek(pos) => match self.source.seek(pos) {
-                Ok(new_pos) => {
-                    self.events
-                        .send(PlayerEvent::Position {
-                            path: self.file.path(),
-                            position: self.frames_to_duration(new_pos),
-                        })
-                        .unwrap();
-                }
-                Err(err) => {
-                    log::error!("failed to seek: {}", err);
-                }
-            },
-            Decode::ReadPacket => {
-                if let DecState::Started = self.state {
-                    match self.source.next_packet() {
-                        Some(packet) => {
-                            // TODO: Apply `self.norm_factor`.
-                            // TODO: Apply global volume level.
-                            self.samples.copy_interleaved_ref(packet);
-                            self.this.send(Decode::FlushPacket).unwrap();
-                            self.events
-                                .send(PlayerEvent::Position {
-                                    path: self.file.path(),
-                                    position: self.frames_to_duration(self.source.current_frame()),
-                                })
-                                .unwrap();
-                        }
-                        None => {
-                            self.events.send(PlayerEvent::EndOfTrack).unwrap();
-                            return Ok(ActorOp::Shutdown);
-                        }
-                    }
-                }
-            }
-            Decode::FlushPacket => {
-                self.sink.write_blocking(&self.samples)?;
-                if let DecState::Started = self.state {
-                    self.this.send(Decode::ReadPacket).unwrap();
-                }
-            }
-            Decode::Quit => {
+            Decode::Seek(pos) => self.handle_seek(pos),
+            Decode::ReadPacket => self.handle_read_packet(),
+            Decode::FlushPacket => self.handle_flush_packet(),
+            Decode::Quit => Ok(ActorOp::Shutdown),
+            _ => Ok(ActorOp::Continue),
+        }
+    }
+}
+
+impl Decoding {
+    fn handle_seek(&mut self, position: Duration) -> Result<ActorOp, Error> {
+        if let Err(err) = self.source.seek(position) {
+            log::error!("failed to seek: {}", err);
+        } else {
+            self.report_current_position();
+        }
+        Ok(ActorOp::Continue)
+    }
+
+    fn handle_read_packet(&mut self) -> Result<ActorOp, Error> {
+        if self.is_started() {
+            if let Some(packet) = self.source.next_packet() {
+                self.samples.copy_interleaved_ref(packet);
+                self.report_current_position_if_neeeded();
+                self.this.send(Decode::FlushPacket)?;
+            } else {
+                self.events.send(PlayerEvent::EndOfTrack)?;
                 return Ok(ActorOp::Shutdown);
             }
+        }
+        Ok(ActorOp::Continue)
+    }
+
+    fn handle_flush_packet(&mut self) -> Result<ActorOp, Error> {
+        let samples = self.samples.samples();
+        let resampled = self.resampler.resample(samples)?;
+        // TODO: Apply `self.norm_factor`.
+        // TODO: Apply global volume level.
+        self.sink.write_blocking(resampled)?;
+        if self.is_started() {
+            self.this.send(Decode::ReadPacket)?;
         }
         Ok(ActorOp::Continue)
     }

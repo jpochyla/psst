@@ -10,6 +10,7 @@ pub mod audio_normalize;
 pub mod audio_output;
 pub mod audio_player;
 pub mod audio_queue;
+pub mod audio_resample;
 pub mod cache;
 pub mod cdn;
 pub mod connection;

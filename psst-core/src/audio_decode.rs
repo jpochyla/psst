@@ -84,6 +84,9 @@ impl AudioDecoder {
     pub fn next_packet(&mut self) -> Option<AudioBufferRef> {
         let packet = match self.format.next_packet() {
             Ok(packet) => packet,
+            Err(SymphoniaError::IoError(io)) if io.kind() == io::ErrorKind::UnexpectedEof => {
+                return None;
+            }
             Err(err) => {
                 log::error!("format error: {}", err);
                 return None;
