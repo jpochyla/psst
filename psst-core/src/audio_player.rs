@@ -1,4 +1,13 @@
-use std::{mem, thread, thread::JoinHandle, time::Duration};
+use std::{
+    mem,
+    sync::{
+        atomic::{AtomicU32, Ordering},
+        Arc,
+    },
+    thread,
+    thread::JoinHandle,
+    time::Duration,
+};
 
 use crossbeam_channel::{unbounded, Receiver, Sender};
 use symphonia::core::audio::{SampleBuffer, SignalSpec};
@@ -9,7 +18,7 @@ use crate::{
     audio_file::{AudioFile, AudioPath},
     audio_key::AudioKey,
     audio_normalize::NormalizationLevel,
-    audio_output::{AudioOutput, AudioOutputRemote, AudioSink},
+    audio_output::{AudioOutput, AudioSink},
     audio_queue::{Queue, QueueBehavior},
     audio_resample::{AudioResampler, ResamplingAlgo, ResamplingSpec},
     cache::CacheHandle,
@@ -180,8 +189,8 @@ pub struct Player {
     queue: Queue,
     event_sender: Sender<PlayerEvent>,
     event_receiver: Receiver<PlayerEvent>,
-    audio_output_remote: AudioOutputRemote,
     audio_output_sink: AudioSink<f32>,
+    audio_volume: VolumeLevel,
     consecutive_loading_failures: usize,
 }
 
@@ -201,8 +210,8 @@ impl Player {
             config,
             event_sender,
             event_receiver,
-            audio_output_remote: audio_output.remote(),
             audio_output_sink: audio_output.sink(),
+            audio_volume: VolumeLevel::new(),
             state: PlayerState::Stopped,
             preload: PreloadState::None,
             queue: Queue::new(),
@@ -411,7 +420,7 @@ impl Player {
     }
 
     fn set_volume(&mut self, volume: f64) {
-        self.audio_output_remote.set_volume(volume);
+        self.audio_volume.set(volume as _);
     }
 
     fn play_loaded(&mut self, loaded_item: LoadedPlaybackItem) {
@@ -422,7 +431,8 @@ impl Player {
             actor: Decoding::spawn_default({
                 let events = self.event_sender.clone();
                 let sink = self.audio_output_sink.clone();
-                move |this| Decoding::new(loaded_item, events, this, sink)
+                let volume = self.audio_volume.clone();
+                move |this| Decoding::new(loaded_item, events, this, sink, volume)
             }),
         };
         worker.start();
@@ -731,6 +741,7 @@ struct Decoding {
     events: Sender<PlayerEvent>,
     this: Sender<Decode>,
     sink: AudioSink<f32>,
+    volume: VolumeLevel,
     state: DecState,
     last_reported_position: Duration,
 }
@@ -741,6 +752,7 @@ impl Decoding {
         events: Sender<PlayerEvent>,
         this: Sender<Decode>,
         sink: AudioSink<f32>,
+        volume: VolumeLevel,
     ) -> Self {
         let LoadedPlaybackItem {
             file,
@@ -773,6 +785,7 @@ impl Decoding {
             events,
             this,
             sink,
+            volume,
             state: DecState::Stopped,
             last_reported_position: Duration::ZERO,
         }
@@ -859,13 +872,43 @@ impl Decoding {
 
     fn handle_flush_packet(&mut self) -> Result<ActorOp, Error> {
         let samples = self.samples.samples();
+
+        // Resample the sample buffer into a rate that the audio output supports.
         let resampled = self.resampler.resample(samples)?;
-        // TODO: Apply `self.norm_factor`.
-        // TODO: Apply global volume level.
+
+        // Apply the global volume level and the normalization factor.
+        let factor = self.norm_factor * self.volume.get();
+        for sample in resampled.iter_mut() {
+            *sample *= factor;
+        }
+
+        // Write into the sink, block until all samples are committed to the ring buffer.
         self.sink.write_blocking(resampled)?;
+
         if self.is_started() {
             self.this.send(Decode::ReadPacket)?;
         }
         Ok(ActorOp::Continue)
+    }
+}
+
+#[derive(Clone)]
+struct VolumeLevel {
+    volume: Arc<AtomicU32>,
+}
+
+impl VolumeLevel {
+    fn new() -> Self {
+        Self {
+            volume: Arc::new(AtomicU32::new(0)),
+        }
+    }
+
+    fn set(&self, volume: f32) {
+        self.volume.store(volume.to_bits(), Ordering::Relaxed)
+    }
+
+    fn get(&self) -> f32 {
+        f32::from_bits(self.volume.load(Ordering::Relaxed))
     }
 }

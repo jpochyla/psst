@@ -52,7 +52,6 @@ fn play_item(
     item: PlaybackItem,
 ) -> Result<(), Error> {
     let output = AudioOutput::open()?;
-    let output_remote = output.remote();
     let config = PlaybackConfig::default();
 
     let mut player = Player::new(session, cdn, cache, config, &output);
@@ -104,7 +103,7 @@ fn play_item(
     for event in player.event_receiver() {
         player.handle(event);
     }
-    output_remote.close();
+    output.sink().close();
 
     Ok(())
 }
