@@ -10,11 +10,10 @@ use crate::{
     error::Error,
 };
 
-const RING_BUF_SIZE: usize = 1024 * 4;
+const RING_BUF_SIZE: usize = 1024 * 8;
 
 pub struct AudioOutput {
     sink: AudioSink<f32>,
-    remote: AudioOutputRemote,
     _handle: ActorHandle<OutputStreamMsg>,
     _ring_buf: rb::SpscRb<f32>,
 }
@@ -32,64 +31,28 @@ impl AudioOutput {
 
         // Open an output stream with a ring buffer that will get consumed in the audio
         // thread and get written to in the playback threads (through an `AudioSink`).
-        // TODO: Support additional sample formats.
         let ring_buf = rb::SpscRb::new(RING_BUF_SIZE);
         let handle = OutputStream::spawn_default({
             let config = supported.config();
             let consumer = ring_buf.consumer();
+            // TODO: Support additional sample formats.
             move |_| OutputStream::open::<f32>(device, config, consumer).unwrap()
         });
         let sink = AudioSink {
-            ring_buf_prod: Arc::new(ring_buf.producer()),
             sample_rate: supported.sample_rate(),
-        };
-        let remote = AudioOutputRemote {
-            sender: handle.sender(),
+            ring_buf_prod: Arc::new(ring_buf.producer()),
+            msg_sender: handle.sender(),
         };
 
         Ok(Self {
             _ring_buf: ring_buf,
             _handle: handle,
             sink,
-            remote,
         })
     }
 
     pub fn sink(&self) -> AudioSink<f32> {
         self.sink.clone()
-    }
-
-    pub fn remote(&self) -> AudioOutputRemote {
-        self.remote.clone()
-    }
-}
-
-#[derive(Clone)]
-pub struct AudioOutputRemote {
-    sender: Sender<OutputStreamMsg>,
-}
-
-impl AudioOutputRemote {
-    pub fn pause(&self) {
-        self.send(OutputStreamMsg::Pause);
-    }
-
-    pub fn resume(&self) {
-        self.send(OutputStreamMsg::Resume);
-    }
-
-    pub fn close(&self) {
-        self.send(OutputStreamMsg::Close);
-    }
-
-    pub fn set_volume(&self, _volume: f64) {
-        // TODO
-    }
-
-    fn send(&self, msg: OutputStreamMsg) {
-        if self.sender.send(msg).is_err() {
-            log::error!("output stream actor is dead");
-        }
     }
 }
 
@@ -101,8 +64,9 @@ impl OutputSample for f32 {}
 
 #[derive(Clone)]
 pub struct AudioSink<T: OutputSample> {
-    ring_buf_prod: Arc<rb::Producer<T>>,
     sample_rate: cpal::SampleRate,
+    ring_buf_prod: Arc<rb::Producer<T>>,
+    msg_sender: Sender<OutputStreamMsg>,
 }
 
 impl<T: OutputSample> AudioSink<T> {
@@ -127,6 +91,24 @@ impl<T: OutputSample> AudioSink<T> {
         }
 
         Ok(())
+    }
+
+    pub fn pause(&self) {
+        self.send(OutputStreamMsg::Pause);
+    }
+
+    pub fn resume(&self) {
+        self.send(OutputStreamMsg::Resume);
+    }
+
+    pub fn close(&self) {
+        self.send(OutputStreamMsg::Close);
+    }
+
+    fn send(&self, msg: OutputStreamMsg) {
+        if self.msg_sender.send(msg).is_err() {
+            log::error!("output stream actor is dead");
+        }
     }
 }
 
