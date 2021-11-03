@@ -10,11 +10,10 @@ use druid::{
     Code, ExtEventSink, InternalLifeCycle, KbKey, WindowHandle,
 };
 use psst_core::{
-    audio_normalize::NormalizationLevel,
-    audio_output::AudioOutput,
-    audio_player::{PlaybackConfig, PlaybackItem, Player, PlayerCommand, PlayerEvent},
+    audio::{normalize::NormalizationLevel, output::AudioOutput},
     cache::Cache,
     cdn::Cdn,
+    player::{item::PlaybackItem, PlaybackConfig, Player, PlayerCommand, PlayerEvent},
     session::SessionService,
 };
 use souvlaki::{
@@ -64,7 +63,7 @@ impl PlaybackController {
             config,
             &output,
         );
-        let sender = player.event_sender();
+        let sender = player.sender();
 
         let thread = thread::spawn(move || {
             Self::service_events(player, event_sink, widget_id);
@@ -106,7 +105,7 @@ impl PlaybackController {
     }
 
     fn service_events(mut player: Player, event_sink: ExtEventSink, widget_id: WidgetId) {
-        for event in player.event_receiver() {
+        for event in player.receiver() {
             // Forward events that affect the UI state to the UI thread.
             match &event {
                 PlayerEvent::Loading { item } => {
@@ -264,10 +263,10 @@ impl PlaybackController {
     fn set_queue_behavior(&mut self, behavior: QueueBehavior) {
         self.send(PlayerEvent::Command(PlayerCommand::SetQueueBehavior {
             behavior: match behavior {
-                QueueBehavior::Sequential => psst_core::audio_queue::QueueBehavior::Sequential,
-                QueueBehavior::Random => psst_core::audio_queue::QueueBehavior::Random,
-                QueueBehavior::LoopTrack => psst_core::audio_queue::QueueBehavior::LoopTrack,
-                QueueBehavior::LoopAll => psst_core::audio_queue::QueueBehavior::LoopAll,
+                QueueBehavior::Sequential => psst_core::player::queue::QueueBehavior::Sequential,
+                QueueBehavior::Random => psst_core::player::queue::QueueBehavior::Random,
+                QueueBehavior::LoopTrack => psst_core::player::queue::QueueBehavior::LoopTrack,
+                QueueBehavior::LoopAll => psst_core::player::queue::QueueBehavior::LoopAll,
             },
         }));
     }

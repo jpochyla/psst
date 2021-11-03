@@ -10,7 +10,7 @@ use crate::{
     error::Error,
 };
 
-const RING_BUF_SIZE: usize = 1024 * 8;
+const RING_BUF_SIZE: usize = 1024 * 16;
 
 pub struct AudioOutput {
     sink: AudioSink<f32>,
@@ -24,6 +24,10 @@ impl AudioOutput {
         let device = cpal::default_host()
             .default_output_device()
             .ok_or(cpal::DefaultStreamConfigError::DeviceNotAvailable)?;
+
+        if let Ok(name) = device.name() {
+            log::info!("using audio device: {:?}", name);
+        }
 
         // Get the default device config, so we know what sample format and sample rate
         // the device supports.
@@ -129,6 +133,8 @@ impl OutputStream {
         config: cpal::StreamConfig,
         ring_buf_cons: rb::Consumer<T>,
     ) -> Result<Self, Error> {
+        log::info!("opening output stream: {:?}", config);
+
         let stream = device.build_output_stream(
             &config,
             move |output: &mut [T], _| {

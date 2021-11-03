@@ -3,9 +3,9 @@ use std::time::Duration;
 use quick_protobuf::MessageRead;
 
 use crate::{
-    audio_file::{AudioFile, AudioPath},
     error::Error,
     item_id::{FileId, ItemId, ItemIdType},
+    player::file::{AudioFile, AudioPath},
     protocol::metadata::{Restriction, Track},
     session::SessionService,
 };

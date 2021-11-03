@@ -1,7 +1,7 @@
 use crate::error::Error;
 
 #[derive(Copy, Clone)]
-pub enum ResamplingAlgo {
+pub enum ResamplingQuality {
     SincBestQuality = libsamplerate::SRC_SINC_BEST_QUALITY as isize,
     SincMediumQuality = libsamplerate::SRC_SINC_MEDIUM_QUALITY as isize,
     SincFastest = libsamplerate::SRC_SINC_FASTEST as isize,
@@ -28,11 +28,15 @@ pub struct AudioResampler {
 }
 
 impl AudioResampler {
-    pub fn new(algo: ResamplingAlgo, spec: ResamplingSpec, capacity: usize) -> Result<Self, Error> {
+    pub fn new(
+        quality: ResamplingQuality,
+        spec: ResamplingSpec,
+        capacity: usize,
+    ) -> Result<Self, Error> {
         let mut error_int = 0i32;
         let state = unsafe {
             libsamplerate::src_new(
-                algo as i32,
+                quality as i32,
                 spec.channels as i32,
                 &mut error_int as *mut i32,
             )

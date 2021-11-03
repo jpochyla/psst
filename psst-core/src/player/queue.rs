@@ -1,6 +1,6 @@
 use rand::prelude::SliceRandom;
 
-use crate::audio_player::PlaybackItem;
+use super::PlaybackItem;
 
 #[derive(Debug)]
 pub enum QueueBehavior {

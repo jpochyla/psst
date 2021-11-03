@@ -9,18 +9,20 @@ use std::{
 };
 
 use crate::{
-    audio_decode::AudioDecoder,
-    audio_decrypt::AudioDecrypt,
-    audio_key::AudioKey,
-    audio_normalize::NormalizationData,
+    audio::{
+        decode::AudioDecoder,
+        decrypt::{AudioDecrypt, AudioKey},
+        normalize::NormalizationData,
+    },
     cache::CacheHandle,
     cdn::{CdnHandle, CdnUrl},
     error::Error,
     item_id::{FileId, ItemId},
     protocol::metadata::mod_AudioFile::Format,
-    stream_storage::{StreamReader, StreamRequest, StreamStorage, StreamWriter},
     util::OffsetFile,
 };
+
+use super::storage::{StreamReader, StreamRequest, StreamStorage, StreamWriter};
 
 #[derive(Debug, Clone, Copy)]
 pub struct AudioPath {
