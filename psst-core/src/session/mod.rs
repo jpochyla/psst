@@ -1,3 +1,7 @@
+pub mod access_token;
+pub mod audio_key;
+pub mod mercury;
+
 use std::{
     io,
     net::{Shutdown, TcpStream},
@@ -14,15 +18,19 @@ use quick_protobuf::MessageRead;
 use serde::de::DeserializeOwned;
 
 use crate::{
-    audio_key::{AudioKey, AudioKeyDispatcher},
+    audio::decrypt::AudioKey,
     connection::{
         shannon_codec::{ShannonDecoder, ShannonEncoder, ShannonMsg},
         Credentials, Transport,
     },
     error::Error,
     item_id::{FileId, ItemId},
-    mercury::{MercuryDispatcher, MercuryRequest, MercuryResponse},
     util::deserialize_protobuf,
+};
+
+use self::{
+    audio_key::AudioKeyDispatcher,
+    mercury::{MercuryDispatcher, MercuryRequest, MercuryResponse},
 };
 
 /// Configuration values needed to open the session connection.

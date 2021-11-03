@@ -7,7 +7,9 @@ use std::{
 use serde::Deserialize;
 
 use crate::{
-    access_token::TokenProvider, error::Error, item_id::FileId, session::SessionService,
+    error::Error,
+    item_id::FileId,
+    session::{access_token::TokenProvider, SessionService},
     util::default_ureq_agent_builder,
 };
 

@@ -3,7 +3,7 @@ use std::{
     thread::{self, JoinHandle},
 };
 
-use crossbeam_channel::{bounded, unbounded, Receiver, Sender};
+use crossbeam_channel::{bounded, unbounded, Receiver, SendError, Sender, TrySendError};
 
 pub enum ActorOp {
     Continue,
@@ -66,6 +66,14 @@ impl<M> ActorHandle<M> {
 
     pub fn join(self) {
         let _ = self.thread.join();
+    }
+
+    pub fn send(&self, msg: M) -> Result<(), SendError<M>> {
+        self.sender.send(msg)
+    }
+
+    pub fn try_send(&self, msg: M) -> Result<(), TrySendError<M>> {
+        self.sender.try_send(msg)
     }
 }
 

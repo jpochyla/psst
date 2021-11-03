@@ -13,7 +13,8 @@ use druid::{
 use itertools::Itertools;
 use once_cell::sync::OnceCell;
 use psst_core::{
-    access_token::TokenProvider, session::SessionService, util::default_ureq_agent_builder,
+    session::{access_token::TokenProvider, SessionService},
+    util::default_ureq_agent_builder,
 };
 use serde::{de::DeserializeOwned, Deserialize};
 use std::{

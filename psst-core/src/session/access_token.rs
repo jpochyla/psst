@@ -3,7 +3,9 @@ use std::time::{Duration, Instant};
 use parking_lot::Mutex;
 use serde::Deserialize;
 
-use crate::{error::Error, session::SessionService};
+use crate::error::Error;
+
+use super::SessionService;
 
 // Client ID of the official Web Spotify front-end.
 const CLIENT_ID: &str = "65b708073fc0480ea92a077233ca87bd";

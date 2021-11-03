@@ -3,9 +3,9 @@ use std::{env, env::VarError, fs::File, path::PathBuf};
 use druid::{Data, Lens};
 use platform_dirs::AppDirs;
 use psst_core::{
-    audio_player::PlaybackConfig,
     cache::mkdir_if_not_exists,
     connection::Credentials,
+    player::PlaybackConfig,
     session::{SessionConfig, SessionConnection},
 };
 use serde::{Deserialize, Serialize};
