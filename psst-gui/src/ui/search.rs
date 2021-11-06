@@ -29,6 +29,9 @@ pub fn input_widget() -> impl Widget<AppState> {
     TextBox::new()
         .with_placeholder("Search")
         .controller(InputController::new().on_submit(|ctx, query, _| {
+            if query.trim().is_empty() {
+                return
+            }
             ctx.submit_command(cmd::NAVIGATE.with(Nav::SearchResults(query.clone().into())));
         }))
         .with_id(cmd::WIDGET_SEARCH_INPUT)
