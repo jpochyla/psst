@@ -2,8 +2,8 @@ use std::{io, time::Duration};
 
 use symphonia::{
     core::{
-        audio::{AudioBufferRef, Channels},
-        codecs::Decoder,
+        audio::{AudioBufferRef, SignalSpec},
+        codecs::{CodecParameters, Decoder},
         errors::Error as SymphoniaError,
         formats::{FormatReader, SeekMode, SeekTo},
         io::{MediaSource, MediaSourceStream},
@@ -31,7 +31,6 @@ pub struct AudioDecoder {
     track_id: u32, // Internal OGG track index.
     decoder: Box<dyn Decoder>,
     format: Box<dyn FormatReader>,
-    position: TimeStamp,
 }
 
 impl AudioDecoder {
@@ -49,24 +48,31 @@ impl AudioDecoder {
         let decoder_opts = Default::default();
         let decoder = VorbisDecoder::try_new(&track.codec_params, &decoder_opts)?;
 
+        let p = &track.codec_params;
+        log::debug!(
+            "loaded vorbis: sample_rate={:?} n_frames={:?} start_ts={:?} channels={:?}",
+            p.sample_rate,
+            p.n_frames,
+            p.start_ts,
+            p.channels
+        );
+
         Ok(Self {
             track_id: track.id,
             decoder: Box::new(decoder),
             format: Box::new(format),
-            position: 0,
         })
     }
 
-    pub fn channels(&self) -> Option<Channels> {
-        self.decoder.codec_params().channels
+    pub fn codec_params(&self) -> &CodecParameters {
+        self.decoder.codec_params()
     }
 
-    pub fn sample_rate(&self) -> Option<u32> {
-        self.decoder.codec_params().sample_rate
-    }
-
-    pub fn max_frames_per_packet(&self) -> Option<u64> {
-        self.decoder.codec_params().max_frames_per_packet
+    pub fn signal_spec(&self) -> SignalSpec {
+        SignalSpec {
+            rate: self.codec_params().sample_rate.unwrap(),
+            channels: self.codec_params().channels.unwrap(),
+        }
     }
 
     pub fn seek(&mut self, time: Duration) -> Result<TimeStamp, Error> {
@@ -77,11 +83,10 @@ impl AudioDecoder {
                 track_id: Some(self.track_id),
             },
         )?;
-        self.position = seeked_to.actual_ts;
-        Ok(self.position)
+        Ok(seeked_to.actual_ts)
     }
 
-    pub fn next_packet(&mut self) -> Option<AudioBufferRef> {
+    pub fn next_packet(&mut self) -> Option<(TimeStamp, AudioBufferRef)> {
         let packet = match self.format.next_packet() {
             Ok(packet) => packet,
             Err(SymphoniaError::IoError(io)) if io.kind() == io::ErrorKind::UnexpectedEof => {
@@ -93,20 +98,13 @@ impl AudioDecoder {
             }
         };
         match self.decoder.decode(&packet) {
-            Ok(packet) => {
-                self.position += packet.frames() as TimeStamp;
-                Some(packet)
-            }
+            Ok(decoded) => Some((packet.pts(), decoded)),
             // TODO: Handle non-fatal decoding errors and retry.
             Err(err) => {
                 log::error!("fatal decode error: {}", err);
                 None
             }
         }
-    }
-
-    pub fn current_frame(&self) -> TimeStamp {
-        self.position
     }
 }
 

@@ -1,12 +1,19 @@
 use std::{
     fmt::Display,
     thread::{self, JoinHandle},
+    time::Duration,
 };
 
-use crossbeam_channel::{bounded, unbounded, Receiver, SendError, Sender, TrySendError};
+use crossbeam_channel::{
+    bounded, unbounded, Receiver, RecvTimeoutError, SendError, Sender, TrySendError,
+};
 
-pub enum ActorOp {
+pub enum Act<T: Actor> {
     Continue,
+    WaitOr {
+        timeout: Duration,
+        timeout_msg: T::Message,
+    },
     Shutdown,
 }
 
@@ -14,22 +21,39 @@ pub trait Actor: Sized {
     type Message: Send + 'static;
     type Error: Display;
 
-    fn handle(&mut self, msg: Self::Message) -> Result<ActorOp, Self::Error>;
+    fn handle(&mut self, msg: Self::Message) -> Result<Act<Self>, Self::Error>;
 
     fn process(mut self, recv: Receiver<Self::Message>) {
-        for msg in recv {
-            match self.handle(msg) {
-                Ok(ActorOp::Continue) => {
-                    continue;
-                }
-                Ok(ActorOp::Shutdown) => {
+        let mut act = Act::Continue;
+        loop {
+            let msg = match act {
+                Act::Continue => match recv.recv() {
+                    Ok(msg) => msg,
+                    Err(_) => {
+                        break;
+                    }
+                },
+                Act::WaitOr {
+                    timeout,
+                    timeout_msg,
+                } => match recv.recv_timeout(timeout) {
+                    Ok(msg) => msg,
+                    Err(RecvTimeoutError::Timeout) => timeout_msg,
+                    Err(RecvTimeoutError::Disconnected) => {
+                        break;
+                    }
+                },
+                Act::Shutdown => {
                     break;
                 }
+            };
+            act = match self.handle(msg) {
+                Ok(act) => act,
                 Err(err) => {
                     log::error!("error: {}", err);
                     break;
                 }
-            }
+            };
         }
     }
 

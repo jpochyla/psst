@@ -6,17 +6,17 @@ use crate::{
     cdn::CdnHandle,
     error::Error,
     item_id::{ItemId, ItemIdType},
-    metadata::{Fetch, ToAudioPath},
+    metadata::{Fetch, ToMediaPath},
     session::SessionService,
 };
 
 use super::{
-    file::{AudioFile, AudioPath},
+    file::{MediaFile, MediaPath},
     PlaybackConfig,
 };
 
 pub struct LoadedPlaybackItem {
-    pub file: AudioFile,
+    pub file: MediaFile,
     pub source: AudioDecoder,
     pub norm_factor: f32,
 }
@@ -37,7 +37,7 @@ impl PlaybackItem {
     ) -> Result<LoadedPlaybackItem, Error> {
         let path = load_audio_path(self.item_id, session, &cache, config)?;
         let key = load_audio_key(&path, session, &cache)?;
-        let file = AudioFile::open(path, cdn, cache)?;
+        let file = MediaFile::open(path, cdn, cache)?;
         let (source, norm_data) = file.audio_source(key)?;
         let norm_factor = norm_data.factor_for_level(self.norm_level, config.pregain);
         Ok(LoadedPlaybackItem {
@@ -53,7 +53,7 @@ fn load_audio_path(
     session: &SessionService,
     cache: &CacheHandle,
     config: &PlaybackConfig,
-) -> Result<AudioPath, Error> {
+) -> Result<MediaPath, Error> {
     match item_id.id_type {
         ItemIdType::Track => {
             load_audio_path_from_track_or_alternative(item_id, session, cache, config)
@@ -67,7 +67,7 @@ fn load_audio_path_from_track_or_alternative(
     session: &SessionService,
     cache: &CacheHandle,
     config: &PlaybackConfig,
-) -> Result<AudioPath, Error> {
+) -> Result<MediaPath, Error> {
     let track = load_track(item_id, session, cache)?;
     let country = get_country_code(session, cache);
     let path = match country {
@@ -76,15 +76,15 @@ fn load_audio_path_from_track_or_alternative(
             // alternative track.
             let alt_id = track
                 .find_allowed_alternative(&user_country)
-                .ok_or(Error::AudioFileNotFound)?;
+                .ok_or(Error::MediaFileNotFound)?;
             let alt_track = load_track(alt_id, session, cache)?;
             let alt_path = alt_track
-                .to_audio_path(config.bitrate)
-                .ok_or(Error::AudioFileNotFound)?;
+                .to_media_path(config.bitrate)
+                .ok_or(Error::MediaFileNotFound)?;
             // We've found an alternative track with a fitting audio file.  Let's cheat a
             // little and pretend we've obtained it from the requested track.
             // TODO: We should be honest and display the real track information.
-            AudioPath {
+            MediaPath {
                 item_id,
                 ..alt_path
             }
@@ -93,8 +93,8 @@ fn load_audio_path_from_track_or_alternative(
             // Either we do not have a country code loaded or the track is available, return
             // it.
             track
-                .to_audio_path(config.bitrate)
-                .ok_or(Error::AudioFileNotFound)?
+                .to_media_path(config.bitrate)
+                .ok_or(Error::MediaFileNotFound)?
         }
     };
     Ok(path)
@@ -129,7 +129,7 @@ fn load_track(
 }
 
 fn load_audio_key(
-    path: &AudioPath,
+    path: &MediaPath,
     session: &SessionService,
     cache: &CacheHandle,
 ) -> Result<AudioKey, Error> {

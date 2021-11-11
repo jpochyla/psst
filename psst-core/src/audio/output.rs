@@ -1,21 +1,17 @@
-use std::sync::Arc;
-
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use crossbeam_channel::Sender;
-use rb::{RbConsumer, RbProducer, RB};
-use symphonia::core::sample::Sample;
+use crossbeam_channel::{bounded, Receiver, Sender};
 
 use crate::{
-    actor::{Actor, ActorHandle, ActorOp},
+    actor::{Act, Actor, ActorHandle},
+    audio::source::Empty,
     error::Error,
 };
 
-const RING_BUF_SIZE: usize = 1024 * 16;
+use super::source::AudioSource;
 
 pub struct AudioOutput {
-    sink: AudioSink<f32>,
-    _handle: ActorHandle<OutputStreamMsg>,
-    _ring_buf: rb::SpscRb<f32>,
+    _handle: ActorHandle<StreamMsg>,
+    sink: AudioSink,
 }
 
 impl AudioOutput {
@@ -33,121 +29,111 @@ impl AudioOutput {
         // the device supports.
         let supported = device.default_output_config()?;
 
-        // Open an output stream with a ring buffer that will get consumed in the audio
-        // thread and get written to in the playback threads (through an `AudioSink`).
-        let ring_buf = rb::SpscRb::new(RING_BUF_SIZE);
-        let handle = OutputStream::spawn_default({
+        let (callback_send, callback_recv) = bounded(16);
+
+        let handle = Stream::spawn_default({
             let config = supported.config();
-            let consumer = ring_buf.consumer();
             // TODO: Support additional sample formats.
-            move |_| OutputStream::open::<f32>(device, config, consumer).unwrap()
+            move |this| Stream::open(device, config, callback_recv, this).unwrap()
         });
         let sink = AudioSink {
             sample_rate: supported.sample_rate(),
-            ring_buf_prod: Arc::new(ring_buf.producer()),
-            msg_sender: handle.sender(),
+            stream_send: handle.sender(),
+            callback_send,
         };
 
         Ok(Self {
-            _ring_buf: ring_buf,
             _handle: handle,
             sink,
         })
     }
 
-    pub fn sink(&self) -> AudioSink<f32> {
+    pub fn sink(&self) -> AudioSink {
         self.sink.clone()
     }
 }
 
-pub trait OutputSample: cpal::Sample + Sample + Default + Send + 'static {}
-
-impl OutputSample for i16 {}
-impl OutputSample for u16 {}
-impl OutputSample for f32 {}
-
 #[derive(Clone)]
-pub struct AudioSink<T: OutputSample> {
+pub struct AudioSink {
     sample_rate: cpal::SampleRate,
-    ring_buf_prod: Arc<rb::Producer<T>>,
-    msg_sender: Sender<OutputStreamMsg>,
+    callback_send: Sender<CallbackMsg>,
+    stream_send: Sender<StreamMsg>,
 }
 
-impl<T: OutputSample> AudioSink<T> {
+impl AudioSink {
     pub fn sample_rate(&self) -> u32 {
         self.sample_rate.0
     }
 
-    pub fn write_blocking(&self, samples: &[T]) -> Result<(), Error> {
-        // Write out all samples from the sample buffer to the ring buffer.
-        let mut i = 0;
-        while i < samples.len() {
-            let writeable_samples = &samples[i..];
+    pub fn set_volume(&self, volume: f32) {
+        self.send_to_callback(CallbackMsg::SetVolume(volume));
+    }
 
-            // Write as many samples as possible to the ring buffer. This blocks until some
-            // samples are written or the consumer has been destroyed (None is returned).
-            if let Some(written) = self.ring_buf_prod.write_blocking(writeable_samples) {
-                i += written;
-            } else {
-                // Consumer destroyed, return an error.
-                return Err(cpal::PlayStreamError::DeviceNotAvailable.into());
-            }
-        }
-
-        Ok(())
+    pub fn play(&self, source: impl AudioSource) {
+        self.send_to_callback(CallbackMsg::PlaySource(Box::new(source)));
     }
 
     pub fn pause(&self) {
-        self.send(OutputStreamMsg::Pause);
+        self.send_to_stream(StreamMsg::Pause);
     }
 
     pub fn resume(&self) {
-        self.send(OutputStreamMsg::Resume);
+        self.send_to_stream(StreamMsg::Resume);
     }
 
     pub fn close(&self) {
-        self.send(OutputStreamMsg::Close);
+        self.send_to_stream(StreamMsg::Close);
     }
 
-    fn send(&self, msg: OutputStreamMsg) {
-        if self.msg_sender.send(msg).is_err() {
+    fn send_to_callback(&self, msg: CallbackMsg) {
+        if self.callback_send.send(msg).is_err() {
+            log::error!("output stream actor is dead");
+        }
+    }
+
+    fn send_to_stream(&self, msg: StreamMsg) {
+        if self.stream_send.send(msg).is_err() {
             log::error!("output stream actor is dead");
         }
     }
 }
 
-enum OutputStreamMsg {
+enum StreamMsg {
     Pause,
     Resume,
     Close,
 }
 
-struct OutputStream {
-    _device: cpal::Device,
+struct Stream {
     stream: cpal::Stream,
+    _device: cpal::Device,
 }
 
-impl OutputStream {
-    fn open<T: OutputSample>(
+impl Stream {
+    fn open(
         device: cpal::Device,
         config: cpal::StreamConfig,
-        ring_buf_cons: rb::Consumer<T>,
+        callback_recv: Receiver<CallbackMsg>,
+        stream_send: Sender<StreamMsg>,
     ) -> Result<Self, Error> {
-        log::info!("opening output stream: {:?}", config);
+        let mut callback = StreamCallback {
+            callback_recv,
+            _stream_send: stream_send,
+            source: Box::new(Empty),
+            volume: 1.0, // We start with the full volume.
+        };
 
+        log::info!("opening output stream: {:?}", config);
         let stream = device.build_output_stream(
             &config,
-            move |output: &mut [T], _| {
-                // Write out as many samples as possible from the ring buffer to the audio
-                // output.
-                let written = ring_buf_cons.read(output).unwrap_or(0);
-                // Mute any remaining samples.
-                output[written..].iter_mut().for_each(|s| *s = T::MID);
+            move |output, _| {
+                callback.write_samples(output);
             },
             |err| {
                 log::error!("audio output error: {}", err);
             },
         )?;
+
         Ok(Self {
             _device: device,
             stream,
@@ -155,32 +141,70 @@ impl OutputStream {
     }
 }
 
-impl Actor for OutputStream {
-    type Message = OutputStreamMsg;
+impl Actor for Stream {
+    type Message = StreamMsg;
     type Error = Error;
 
-    fn handle(&mut self, msg: Self::Message) -> Result<ActorOp, Self::Error> {
+    fn handle(&mut self, msg: Self::Message) -> Result<Act<Self>, Self::Error> {
         match msg {
-            OutputStreamMsg::Pause => {
+            StreamMsg::Pause => {
                 log::debug!("pausing audio output stream");
                 if let Err(err) = self.stream.pause() {
                     log::error!("failed to stop stream: {}", err);
                 }
-                Ok(ActorOp::Continue)
+                Ok(Act::Continue)
             }
-            OutputStreamMsg::Resume => {
+            StreamMsg::Resume => {
                 log::debug!("resuming audio output stream");
                 if let Err(err) = self.stream.play() {
                     log::error!("failed to start stream: {}", err);
                 }
-                Ok(ActorOp::Continue)
+                Ok(Act::Continue)
             }
-            OutputStreamMsg::Close => {
+            StreamMsg::Close => {
                 log::debug!("closing audio output stream");
                 let _ = self.stream.pause();
-                Ok(ActorOp::Shutdown)
+                Ok(Act::Shutdown)
             }
         }
+    }
+}
+
+enum CallbackMsg {
+    PlaySource(Box<dyn AudioSource>),
+    SetVolume(f32),
+}
+
+struct StreamCallback {
+    callback_recv: Receiver<CallbackMsg>,
+    _stream_send: Sender<StreamMsg>,
+    source: Box<dyn AudioSource>,
+    volume: f32,
+}
+
+impl StreamCallback {
+    fn write_samples(&mut self, output: &mut [f32]) {
+        // Process any pending data messages.
+        while let Ok(msg) = self.callback_recv.try_recv() {
+            match msg {
+                CallbackMsg::PlaySource(src) => {
+                    self.source = src;
+                }
+                CallbackMsg::SetVolume(volume) => {
+                    self.volume = volume;
+                }
+            }
+        }
+
+        // Write out as many samples as possible from the audio source to the
+        // output buffer.
+        let written = self.source.write(output);
+
+        // Apply the global volume level.
+        output[..written].iter_mut().for_each(|s| *s *= self.volume);
+
+        // Mute any remaining samples.
+        output[written..].iter_mut().for_each(|s| *s = 0.0);
     }
 }
 
