@@ -28,5 +28,5 @@ shannon = "0.2"
 socks = "0.3"
 symphonia = { version = "0.4", default-features = false, features = ["ogg", "vorbis"]}
 tempfile = "3.2"
-ureq = { version = "2.1", features = ["json"] }
+ureq = { version = "2.2", features = ["json"] }
 url = "2.2"

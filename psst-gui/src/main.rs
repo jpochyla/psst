@@ -26,8 +26,7 @@ fn main() {
     // Setup logging from the env variables, with defaults.
     Builder::from_env(
         Env::new()
-            // `ureq` is a bit too noisy, log only warnings by default.
-            .filter_or(ENV_LOG, "info,ureq::unit=warn")
+            .filter_or(ENV_LOG, "info")
             .write_style(ENV_LOG_STYLE),
     )
     .init();
