@@ -10,7 +10,6 @@ repository = "https://github.com/jpochyla/psst"
 [dependencies]
 psst-core = { path = "../psst-core" }
 
-chrono = { version = "0.4", features = ["serde"] }
 crossbeam-channel = "0.5"
 druid-shell = { git = "https://github.com/jpochyla/druid", branch = "psst", features = ["raw-win-handle"] }
 druid = { git = "https://github.com/jpochyla/druid", branch = "psst", features = ["im", "image", "jpeg", "png", "serde"] }
@@ -27,6 +26,7 @@ raw-window-handle = "0.3"
 serde = { version = "1.0", features = ["derive", "rc"] }
 serde_json = "1.0"
 souvlaki = "0.4"
+time = { version = "0.3", features = ["macros", "formatting"] }
 ureq = { version = "2.1", features = ["json", "socks-proxy"] }
 url = "2.2"
 

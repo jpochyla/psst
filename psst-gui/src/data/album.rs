@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
-use chrono::NaiveDate;
 use druid::{im::Vector, Data, Lens};
 use serde::{Deserialize, Serialize};
+use time::{formatting::Formattable, macros::format_description, Date};
 
 use crate::data::{ArtistLink, Cached, Image, Promise, Track};
 
@@ -30,7 +30,7 @@ pub struct Album {
     pub tracks: Vector<Arc<Track>>,
     #[serde(deserialize_with = "super::utils::deserialize_date_option")]
     #[data(same_fn = "PartialEq::eq")]
-    pub release_date: Option<NaiveDate>,
+    pub release_date: Option<Date>,
     #[data(same_fn = "PartialEq::eq")]
     pub release_date_precision: Option<DatePrecision>,
 }
@@ -38,20 +38,20 @@ pub struct Album {
 impl Album {
     pub fn release(&self) -> String {
         self.release_with_format(match self.release_date_precision {
-            Some(DatePrecision::Year) | None => "%Y",
-            Some(DatePrecision::Month) => "%B %Y",
-            Some(DatePrecision::Day) => "%B %d, %Y",
+            Some(DatePrecision::Year) | None => format_description!("[year]"),
+            Some(DatePrecision::Month) => format_description!("[month repr:long] [year]"),
+            Some(DatePrecision::Day) => format_description!("[month repr:long] [day], [year]"),
         })
     }
 
     pub fn release_year(&self) -> String {
-        self.release_with_format("%Y")
+        self.release_with_format(format_description!("[year]"))
     }
 
-    fn release_with_format(&self, format: &str) -> String {
+    fn release_with_format(&self, format: &(impl Formattable + ?Sized)) -> String {
         self.release_date
             .as_ref()
-            .map(|date| date.format(format).to_string())
+            .map(|date| date.format(format).expect("invalid format"))
             .unwrap_or_else(|| '-'.to_string())
     }
 
