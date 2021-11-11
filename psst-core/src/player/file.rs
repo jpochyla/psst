@@ -22,17 +22,17 @@ use crate::{
     util::OffsetFile,
 };
 
-use super::storage::{StreamReader, StreamRequest, StreamStorage, StreamWriter};
+use super::storage::{StreamRequest, StreamStorage, StreamWriter};
 
 #[derive(Debug, Clone, Copy)]
-pub struct AudioPath {
+pub struct MediaPath {
     pub item_id: ItemId,
     pub file_id: FileId,
     pub file_format: Format,
     pub duration: Duration,
 }
 
-pub enum AudioFile {
+pub enum MediaFile {
     Streamed {
         streamed_file: Arc<StreamedFile>,
         servicing_handle: JoinHandle<()>,
@@ -42,7 +42,7 @@ pub enum AudioFile {
     },
 }
 
-impl AudioFile {
+impl MediaFile {
     pub fn compatible_audio_formats(preferred_bitrate: usize) -> &'static [Format] {
         match preferred_bitrate {
             96 => &[
@@ -64,7 +64,7 @@ impl AudioFile {
         }
     }
 
-    pub fn open(path: AudioPath, cdn: CdnHandle, cache: CacheHandle) -> Result<Self, Error> {
+    pub fn open(path: MediaPath, cdn: CdnHandle, cache: CacheHandle) -> Result<Self, Error> {
         let cached_path = cache.audio_file_path(path.file_id);
         if cached_path.exists() {
             let cached_file = CachedFile::open(path, cached_path)?;
@@ -86,22 +86,22 @@ impl AudioFile {
         }
     }
 
-    pub fn path(&self) -> AudioPath {
+    pub fn path(&self) -> MediaPath {
         match self {
             Self::Streamed { streamed_file, .. } => streamed_file.path,
             Self::Cached { cached_file, .. } => cached_file.path,
         }
     }
 
-    pub fn reader(&self) -> Result<StreamReader, Error> {
+    pub fn storage(&self) -> &StreamStorage {
         match self {
-            Self::Streamed { streamed_file, .. } => Ok(streamed_file.storage.reader()?),
-            Self::Cached { cached_file, .. } => Ok(cached_file.storage.reader()?),
+            Self::Streamed { streamed_file, .. } => &streamed_file.storage,
+            Self::Cached { cached_file, .. } => &cached_file.storage,
         }
     }
 
     pub fn audio_source(&self, key: AudioKey) -> Result<(AudioDecoder, NormalizationData), Error> {
-        let reader = self.reader()?;
+        let reader = self.storage().reader()?;
         let mut decrypted = AudioDecrypt::new(key, reader);
         let normalization = NormalizationData::parse(&mut decrypted)?;
         let encoded = OffsetFile::new(decrypted, self.header_length())?;
@@ -118,7 +118,7 @@ impl AudioFile {
 }
 
 pub struct StreamedFile {
-    path: AudioPath,
+    path: MediaPath,
     storage: StreamStorage,
     url: CdnUrl,
     cdn: CdnHandle,
@@ -126,7 +126,7 @@ pub struct StreamedFile {
 }
 
 impl StreamedFile {
-    fn open(path: AudioPath, cdn: CdnHandle, cache: CacheHandle) -> Result<StreamedFile, Error> {
+    fn open(path: MediaPath, cdn: CdnHandle, cache: CacheHandle) -> Result<StreamedFile, Error> {
         // First, we need to resolve URL of the file contents.
         let url = cdn.resolve_audio_file_url(path.file_id)?;
         log::debug!("resolved file URL: {:?}", url.url);
@@ -216,12 +216,12 @@ impl StreamedFile {
 }
 
 pub struct CachedFile {
-    path: AudioPath,
+    path: MediaPath,
     storage: StreamStorage,
 }
 
 impl CachedFile {
-    fn open(path: AudioPath, file_path: PathBuf) -> Result<Self, Error> {
+    fn open(path: MediaPath, file_path: PathBuf) -> Result<Self, Error> {
         Ok(Self {
             path,
             storage: StreamStorage::from_complete_file(file_path)?,

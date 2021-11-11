@@ -4,21 +4,11 @@ pub mod queue;
 mod storage;
 mod worker;
 
-use std::{
-    mem,
-    sync::{
-        atomic::{AtomicU32, Ordering},
-        Arc,
-    },
-    thread,
-    thread::JoinHandle,
-    time::Duration,
-};
+use std::{mem, thread, thread::JoinHandle, time::Duration};
 
 use crossbeam_channel::{unbounded, Receiver, Sender};
 
 use crate::{
-    actor::Actor,
     audio::output::{AudioOutput, AudioSink},
     cache::CacheHandle,
     cdn::CdnHandle,
@@ -27,10 +17,10 @@ use crate::{
 };
 
 use self::{
-    file::AudioPath,
+    file::MediaPath,
     item::{LoadedPlaybackItem, PlaybackItem},
     queue::{Queue, QueueBehavior},
-    worker::{Decode, Decoding, DecodingWorker},
+    worker::PlaybackManager,
 };
 
 const PREVIOUS_TRACK_THRESHOLD: Duration = Duration::from_secs(3);
@@ -61,8 +51,8 @@ pub struct Player {
     queue: Queue,
     sender: Sender<PlayerEvent>,
     receiver: Receiver<PlayerEvent>,
-    audio_output_sink: AudioSink<f32>,
-    audio_volume: VolumeLevel,
+    audio_output_sink: AudioSink,
+    playback_mgr: PlaybackManager,
     consecutive_loading_failures: usize,
 }
 
@@ -76,6 +66,7 @@ impl Player {
     ) -> Self {
         let (sender, receiver) = unbounded();
         Self {
+            playback_mgr: PlaybackManager::new(audio_output.sink(), sender.clone()),
             session,
             cdn,
             cache,
@@ -83,7 +74,6 @@ impl Player {
             sender,
             receiver,
             audio_output_sink: audio_output.sink(),
-            audio_volume: VolumeLevel::new(),
             state: PlayerState::Stopped,
             preload: PreloadState::None,
             queue: Queue::new(),
@@ -101,21 +91,11 @@ impl Player {
 
     pub fn handle(&mut self, event: PlayerEvent) {
         match event {
-            PlayerEvent::Command(cmd) => {
-                self.handle_command(cmd);
-            }
-            PlayerEvent::Loaded { item, result } => {
-                self.handle_loaded(item, result);
-            }
-            PlayerEvent::Preloaded { item, result } => {
-                self.handle_preloaded(item, result);
-            }
-            PlayerEvent::Position { position, path } => {
-                self.handle_position(position, path);
-            }
-            PlayerEvent::EndOfTrack { .. } => {
-                self.handle_end_of_track();
-            }
+            PlayerEvent::Command(cmd) => self.handle_command(cmd),
+            PlayerEvent::Loaded { item, result } => self.handle_loaded(item, result),
+            PlayerEvent::Preloaded { item, result } => self.handle_preloaded(item, result),
+            PlayerEvent::Position { position, path } => self.handle_position(position, path),
+            PlayerEvent::EndOfTrack { .. } => self.handle_end_of_track(),
             PlayerEvent::Loading { .. }
             | PlayerEvent::Playing { .. }
             | PlayerEvent::Pausing { .. }
@@ -187,17 +167,22 @@ impl Player {
             },
             _ => {
                 log::info!("stale preload result received, ignoring");
+
+                // We are not preloading this item, but because we sometimes extract the
+                // preloading thread and use it for loading, let's check if the item is not
+                // being loaded now.
+                self.handle_loaded(item, result);
             }
         }
     }
 
-    fn handle_position(&mut self, new_position: Duration, path: AudioPath) {
+    fn handle_position(&mut self, new_position: Duration, path: MediaPath) {
         match &mut self.state {
             PlayerState::Playing { position, .. } | PlayerState::Paused { position, .. } => {
                 *position = new_position;
             }
             _ => {
-                log::warn!("received ununwraped position report");
+                log::warn!("received unexpected position report");
             }
         }
         const PRELOAD_BEFORE_END_OF_TRACK: Duration = Duration::from_secs(30);
@@ -229,36 +214,42 @@ impl Player {
     }
 
     fn load_and_play(&mut self, item: PlaybackItem) {
-        // Check if the item is already preloaded, and if so, take it out of the
-        // preloader state, and start the playback.
-        match mem::replace(&mut self.preload, PreloadState::None) {
+        // Check if the item is already in the preloader state.
+        let loading_handle = match mem::replace(&mut self.preload, PreloadState::None) {
             PreloadState::Preloaded {
                 item: preloaded_item,
                 loaded_item,
             } if preloaded_item == item => {
+                // This item is already loaded in the preloader state.
                 self.play_loaded(loaded_item);
                 return;
             }
-            preloading_or_none => {
-                // Restore the preloader to the previous state.
-                // TODO: If the item is being preloaded, extract the loading handle.
-                self.preload = preloading_or_none;
+
+            PreloadState::Preloading {
+                item: preloaded_item,
+                loading_handle,
+            } if preloaded_item == item => {
+                // This item is being preloaded. Take it out of the preloader state.
+                loading_handle
             }
-        }
-        // Item is not preloaded yet, load it in a background thread.
-        let loading_handle = thread::spawn({
-            let event_sender = self.sender.clone();
-            let session = self.session.clone();
-            let cdn = self.cdn.clone();
-            let cache = self.cache.clone();
-            let config = self.config.clone();
-            move || {
-                let result = item.load(&session, cdn, cache, &config);
-                event_sender
-                    .send(PlayerEvent::Loaded { item, result })
-                    .unwrap();
+
+            preloading_other_file_or_none => {
+                self.preload = preloading_other_file_or_none;
+                // Item is not preloaded yet, load it in a background thread.
+                thread::spawn({
+                    let sender = self.sender.clone();
+                    let session = self.session.clone();
+                    let cdn = self.cdn.clone();
+                    let cache = self.cache.clone();
+                    let config = self.config.clone();
+                    move || {
+                        let result = item.load(&session, cdn, cache, &config);
+                        sender.send(PlayerEvent::Loaded { item, result }).unwrap();
+                    }
+                })
             }
-        });
+        };
+
         self.sender.send(PlayerEvent::Loading { item }).unwrap();
         self.state = PlayerState::Loading {
             item,
@@ -271,44 +262,34 @@ impl Player {
             return;
         }
         let loading_handle = thread::spawn({
-            let event_sender = self.sender.clone();
+            let sender = self.sender.clone();
             let session = self.session.clone();
             let cdn = self.cdn.clone();
             let cache = self.cache.clone();
             let config = self.config.clone();
             move || {
                 let result = item.load(&session, cdn, cache, &config);
-                event_sender
+                sender
                     .send(PlayerEvent::Preloaded { item, result })
                     .unwrap();
             }
         });
         self.preload = PreloadState::Preloading {
             item,
-            _loading_handle: loading_handle,
+            loading_handle,
         };
     }
 
     fn set_volume(&mut self, volume: f64) {
-        self.audio_volume.set(volume as _);
+        self.audio_output_sink.set_volume(volume as f32);
     }
 
     fn play_loaded(&mut self, loaded_item: LoadedPlaybackItem) {
         log::info!("starting playback");
         let path = loaded_item.file.path();
         let position = Duration::default();
-        let worker = Decoding::spawn_default({
-            let events = self.sender.clone();
-            let sink = self.audio_output_sink.clone();
-            let volume = self.audio_volume.clone();
-            move |this| Decoding::new(loaded_item, events, this, sink, volume)
-        });
-        worker.send(Decode::Start).unwrap();
-        self.state = PlayerState::Playing {
-            path,
-            position,
-            worker: DecodingWorker { actor: worker },
-        };
+        self.playback_mgr.play(loaded_item);
+        self.state = PlayerState::Playing { path, position };
         self.sender
             .send(PlayerEvent::Playing { path, position })
             .unwrap();
@@ -316,26 +297,13 @@ impl Player {
 
     fn pause(&mut self) {
         match mem::replace(&mut self.state, PlayerState::Invalid) {
-            PlayerState::Playing {
-                path,
-                position,
-                worker,
-            }
-            | PlayerState::Paused {
-                path,
-                position,
-                worker,
-            } => {
+            PlayerState::Playing { path, position } | PlayerState::Paused { path, position } => {
                 log::info!("pausing playback");
-                worker.actor.send(Decode::Stop).unwrap();
+                self.audio_output_sink.pause();
                 self.sender
                     .send(PlayerEvent::Pausing { path, position })
                     .unwrap();
-                self.state = PlayerState::Paused {
-                    path,
-                    position,
-                    worker,
-                };
+                self.state = PlayerState::Paused { path, position };
             }
             _ => {
                 log::warn!("invalid state transition");
@@ -345,26 +313,13 @@ impl Player {
 
     fn resume(&mut self) {
         match mem::replace(&mut self.state, PlayerState::Invalid) {
-            PlayerState::Playing {
-                path,
-                position,
-                worker,
-            }
-            | PlayerState::Paused {
-                path,
-                position,
-                worker,
-            } => {
+            PlayerState::Playing { path, position } | PlayerState::Paused { path, position } => {
                 log::info!("resuming playback");
-                worker.actor.send(Decode::Start).unwrap();
+                self.audio_output_sink.resume();
                 self.sender
                     .send(PlayerEvent::Resuming { path, position })
                     .unwrap();
-                self.state = PlayerState::Playing {
-                    path,
-                    position,
-                    worker,
-                };
+                self.state = PlayerState::Playing { path, position };
             }
             _ => {
                 log::warn!("invalid state transition");
@@ -412,11 +367,7 @@ impl Player {
     }
 
     fn seek(&mut self, position: Duration) {
-        if let PlayerState::Playing { worker, .. } | PlayerState::Paused { worker, .. } =
-            &mut self.state
-        {
-            worker.actor.send(Decode::Seek(position)).unwrap();
-        }
+        self.playback_mgr.seek(position);
     }
 
     fn configure(&mut self, config: PlaybackConfig) {
@@ -493,27 +444,27 @@ pub enum PlayerEvent {
     },
     /// Player has started playing new track.  `Position` events will follow.
     Playing {
-        path: AudioPath,
+        path: MediaPath,
         position: Duration,
     },
     /// Player is in a paused state.  `Resuming` might follow.
     Pausing {
-        path: AudioPath,
+        path: MediaPath,
         position: Duration,
     },
     /// Player is resuming playback of a track.  `Position` events will follow.
     Resuming {
-        path: AudioPath,
+        path: MediaPath,
         position: Duration,
     },
     /// Position of the playback head has changed.
     Position {
-        path: AudioPath,
+        path: MediaPath,
         position: Duration,
     },
     /// Player would like to continue playing, but is blocked, waiting for I/O.
     Blocked {
-        path: AudioPath,
+        path: MediaPath,
         position: Duration,
     },
     /// Player has finished playing a track.  `Loading` or `Playing` might
@@ -529,14 +480,12 @@ enum PlayerState {
         _loading_handle: JoinHandle<()>,
     },
     Playing {
-        path: AudioPath,
+        path: MediaPath,
         position: Duration,
-        worker: DecodingWorker,
     },
     Paused {
-        path: AudioPath,
+        path: MediaPath,
         position: Duration,
-        worker: DecodingWorker,
     },
     Stopped,
     Invalid,
@@ -545,32 +494,11 @@ enum PlayerState {
 enum PreloadState {
     Preloading {
         item: PlaybackItem,
-        _loading_handle: JoinHandle<()>,
+        loading_handle: JoinHandle<()>,
     },
     Preloaded {
         item: PlaybackItem,
         loaded_item: LoadedPlaybackItem,
     },
     None,
-}
-
-#[derive(Clone)]
-pub struct VolumeLevel {
-    volume: Arc<AtomicU32>,
-}
-
-impl VolumeLevel {
-    pub fn new() -> Self {
-        Self {
-            volume: Arc::new(AtomicU32::new(0)),
-        }
-    }
-
-    pub fn set(&self, volume: f32) {
-        self.volume.store(volume.to_bits(), Ordering::Relaxed)
-    }
-
-    pub fn get(&self) -> f32 {
-        f32::from_bits(self.volume.load(Ordering::Relaxed))
-    }
 }
