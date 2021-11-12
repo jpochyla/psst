@@ -9,6 +9,7 @@ pub enum ResamplingQuality {
     Linear = libsamplerate::SRC_LINEAR as isize,
 }
 
+#[derive(Copy, Clone)]
 pub struct ResamplingSpec {
     pub from_rate: usize,
     pub to_rate: usize,
@@ -16,7 +17,11 @@ pub struct ResamplingSpec {
 }
 
 impl ResamplingSpec {
-    fn ratio(&self) -> f64 {
+    pub fn max_output_size(&self, max_input_size: usize) -> usize {
+        (self.ratio() * max_input_size as f64 * 1.2) as usize
+    }
+
+    pub fn ratio(&self) -> f64 {
         self.to_rate as f64 / self.from_rate as f64
     }
 }
@@ -24,15 +29,10 @@ impl ResamplingSpec {
 pub struct AudioResampler {
     state: *mut libsamplerate::SRC_STATE,
     spec: ResamplingSpec,
-    output: Vec<f32>,
 }
 
 impl AudioResampler {
-    pub fn new(
-        quality: ResamplingQuality,
-        spec: ResamplingSpec,
-        capacity: usize,
-    ) -> Result<Self, Error> {
+    pub fn new(quality: ResamplingQuality, spec: ResamplingSpec) -> Result<Self, Error> {
         let mut error_int = 0i32;
         let state = unsafe {
             libsamplerate::src_new(
@@ -44,26 +44,22 @@ impl AudioResampler {
         if error_int != 0 {
             Err(Error::ResamplingError(error_int))
         } else {
-            Ok(Self {
-                state,
-                spec,
-                output: vec![0.0; capacity],
-            })
+            Ok(Self { state, spec })
         }
     }
 
-    pub fn resample(&mut self, inter_input: &[f32]) -> Result<&mut [f32], Error> {
+    pub fn resample(&mut self, input: &[f32], output: &mut [f32]) -> Result<usize, Error> {
         if self.spec.from_rate == self.spec.to_rate {
             // Bypass conversion completely in case the sample rates are equal.
-            let output = &mut self.output[..inter_input.len()];
-            output.copy_from_slice(inter_input);
-            return Ok(output);
+            let output = &mut output[..input.len()];
+            output.copy_from_slice(input);
+            return Ok(output.len());
         }
         let mut src = libsamplerate::SRC_DATA {
-            data_in: inter_input.as_ptr(),
-            data_out: self.output.as_mut_ptr(),
-            input_frames: (inter_input.len() / self.spec.channels) as _,
-            output_frames: (self.output.len() / self.spec.channels) as _,
+            data_in: input.as_ptr(),
+            data_out: output.as_mut_ptr(),
+            input_frames: (input.len() / self.spec.channels) as _,
+            output_frames: (output.len() / self.spec.channels) as _,
             src_ratio: self.spec.ratio(),
             end_of_input: 0, // TODO: Use this.
             input_frames_used: 0,
@@ -75,10 +71,10 @@ impl AudioResampler {
         } else {
             let output_len = src.output_frames_gen as usize * self.spec.channels;
             let processed_len = src.input_frames_used as usize * self.spec.channels;
-            if processed_len != inter_input.len() {
+            if processed_len != input.len() {
                 log::warn!("skipping frames while resampling");
             }
-            Ok(&mut self.output[..output_len])
+            Ok(output_len)
         }
     }
 }
