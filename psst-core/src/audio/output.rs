@@ -75,10 +75,12 @@ impl AudioSink {
 
     pub fn pause(&self) {
         self.send_to_stream(StreamMsg::Pause);
+        self.send_to_callback(CallbackMsg::Pause);
     }
 
     pub fn resume(&self) {
         self.send_to_stream(StreamMsg::Resume);
+        self.send_to_callback(CallbackMsg::Resume);
     }
 
     pub fn close(&self) {
@@ -121,6 +123,7 @@ impl Stream {
             _stream_send: stream_send,
             source: Box::new(Empty),
             volume: 1.0, // We start with the full volume.
+            state: CallbackState::Paused,
         };
 
         log::info!("opening output stream: {:?}", config);
@@ -173,12 +176,20 @@ impl Actor for Stream {
 enum CallbackMsg {
     PlaySource(Box<dyn AudioSource>),
     SetVolume(f32),
+    Pause,
+    Resume,
+}
+
+enum CallbackState {
+    Playing,
+    Paused,
 }
 
 struct StreamCallback {
-    callback_recv: Receiver<CallbackMsg>,
     _stream_send: Sender<StreamMsg>,
+    callback_recv: Receiver<CallbackMsg>,
     source: Box<dyn AudioSource>,
+    state: CallbackState,
     volume: f32,
 }
 
@@ -193,15 +204,27 @@ impl StreamCallback {
                 CallbackMsg::SetVolume(volume) => {
                     self.volume = volume;
                 }
+                CallbackMsg::Pause => {
+                    self.state = CallbackState::Paused;
+                }
+                CallbackMsg::Resume => {
+                    self.state = CallbackState::Playing;
+                }
             }
         }
 
-        // Write out as many samples as possible from the audio source to the
-        // output buffer.
-        let written = self.source.write(output);
+        let written = if matches!(self.state, CallbackState::Playing) {
+            // Write out as many samples as possible from the audio source to the
+            // output buffer.
+            let written = self.source.write(output);
 
-        // Apply the global volume level.
-        output[..written].iter_mut().for_each(|s| *s *= self.volume);
+            // Apply the global volume level.
+            output[..written].iter_mut().for_each(|s| *s *= self.volume);
+
+            written
+        } else {
+            0
+        };
 
         // Mute any remaining samples.
         output[written..].iter_mut().for_each(|s| *s = 0.0);
