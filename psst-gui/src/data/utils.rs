@@ -7,7 +7,7 @@ use std::{
 
 use druid::{im::Vector, Data, Lens};
 use serde::{Deserialize, Deserializer, Serialize};
-use time::{Date, Month, OffsetDateTime};
+use time::{Date, Month};
 
 #[derive(Clone, Data, Lens)]
 pub struct Cached<T: Data> {
