@@ -186,10 +186,9 @@ impl Player {
             }
         }
         const PRELOAD_BEFORE_END_OF_TRACK: Duration = Duration::from_secs(30);
-        if let Some(&item_to_preload) = self.queue.get_following() {
-            let time_until_end_of_track =
-                path.duration.checked_sub(new_position).unwrap_or_default();
-            if time_until_end_of_track <= PRELOAD_BEFORE_END_OF_TRACK {
+        let time_until_end_of_track = path.duration.checked_sub(new_position).unwrap_or_default();
+        if time_until_end_of_track <= PRELOAD_BEFORE_END_OF_TRACK {
+            if let Some(&item_to_preload) = self.queue.get_following() {
                 self.preload(item_to_preload);
             }
         }
