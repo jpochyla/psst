@@ -105,7 +105,7 @@ impl DecoderSource {
         let total_samples = cp.n_frames.unwrap() * chan_count as u64;
         let time_base = cp.time_base.unwrap();
         let precision =
-            REPORT_PRECISION.as_millis() as u64 / (signal_spec.rate as u64 * chan_count as u64);
+            (signal_spec.rate as f64 * chan_count as f64 * REPORT_PRECISION.as_secs_f64()) as u64;
 
         // Create a ring-buffer for the decoded samples.  Worker thread is producing,
         // we are consuming in the `AudioSource` impl.
