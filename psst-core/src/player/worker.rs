@@ -1,4 +1,5 @@
 use std::{
+    ops::Range,
     sync::{
         atomic::{AtomicU64, Ordering},
         Arc,
@@ -15,7 +16,12 @@ use symphonia::core::{
 
 use crate::{
     actor::{Act, Actor, ActorHandle},
-    audio::{decode::AudioDecoder, output::AudioSink, source::AudioSource},
+    audio::{
+        decode::AudioDecoder,
+        output::AudioSink,
+        resample::{AudioResampler, ResamplingQuality, ResamplingSpec},
+        source::AudioSource,
+    },
     error::Error,
 };
 
@@ -41,7 +47,7 @@ impl PlaybackManager {
 
     pub fn play(&mut self, loaded: LoadedPlaybackItem) {
         let path = loaded.file.path();
-        let source = DecoderSource::new(loaded, self.event_send.clone());
+        let source = DecoderSource::new(loaded, self.event_send.clone(), self.sink.sample_rate());
         self.current = Some((path, source.actor.sender()));
         self.sink.play(source);
         self.sink.resume();
@@ -78,7 +84,11 @@ pub struct DecoderSource {
 }
 
 impl DecoderSource {
-    pub fn new(loaded: LoadedPlaybackItem, event_send: Sender<PlayerEvent>) -> Self {
+    pub fn new(
+        loaded: LoadedPlaybackItem,
+        event_send: Sender<PlayerEvent>,
+        output_sample_rate: u32,
+    ) -> Self {
         let LoadedPlaybackItem {
             file,
             source,
@@ -90,11 +100,12 @@ impl DecoderSource {
         // Gather the source signal parameters and compute how often we should report
         // the play-head position.
         let signal_spec = source.signal_spec();
-        let total_samples =
-            source.codec_params().n_frames.unwrap() * signal_spec.channels.count() as u64;
-        let time_base = source.codec_params().time_base.unwrap();
-        let precision = REPORT_PRECISION.as_millis() as u64
-            / (signal_spec.rate as u64 * signal_spec.channels.count() as u64);
+        let chan_count = signal_spec.channels.count();
+        let cp = source.codec_params();
+        let total_samples = cp.n_frames.unwrap() * chan_count as u64;
+        let time_base = cp.time_base.unwrap();
+        let precision =
+            REPORT_PRECISION.as_millis() as u64 / (signal_spec.rate as u64 * chan_count as u64);
 
         // Create a ring-buffer for the decoded samples.  Worker thread is producing,
         // we are consuming in the `AudioSource` impl.
@@ -106,11 +117,19 @@ impl DecoderSource {
         // incrementing on reading from the ring-buffer.
         let position = Arc::new(AtomicU64::new(0));
 
+        // Some output streams have different sample rate than the source, so we need to
+        // resample before pushing to the sink.
+        let res_spec = ResamplingSpec {
+            from_rate: signal_spec.rate as usize,
+            to_rate: output_sample_rate as usize,
+            channels: chan_count,
+        };
+
         // Spawn the worker and kick-start the decoding.  The buffer will start filling
         // now.
         let actor = Worker::spawn_default({
             let position = Arc::clone(&position);
-            move |this| Worker::new(this, source, buffer, position)
+            move |this| Worker::new(this, source, buffer, position, res_spec)
         });
         let _ = actor.send(Msg::Read);
 
@@ -175,9 +194,9 @@ impl AudioSource for DecoderSource {
         }
 
         if position >= self.total_samples {
-            // After reading the number of samples from the `CodecParameters`, we stop.
-            // Signal to the upper layer this track is over and short-circuit all further
-            // reads from this source.
+            // After reading the total number of samples from the `CodecParameters`, we
+            // stop. Signal to the upper layer this track is over and short-circuit all
+            // further reads from this source.
             if self.event_send.try_send(PlayerEvent::EndOfTrack).is_ok() {
                 self.end_of_track = true;
             }
@@ -200,15 +219,27 @@ enum Msg {
 }
 
 struct Worker {
+    /// Decoder we are reading packets/samples from.
     decoder: AudioDecoder,
+    /// Audio properties of the decoded signal.
     spec: SignalSpec,
+    /// Sending part of our own actor channel.
     this: Sender<Msg>,
+    /// Ring-buffer for the output signal.
     output: SpscRb<f32>,
+    /// Producing part of the output ring-buffer.
     producer: Producer<f32>,
+    /// Sample buffer containing samples read in the last packet.
     packet: SampleBuffer<f32>,
+    /// Buffer containing signal resampled from `packet`.
+    resampled: Vec<f32>,
+    /// Resampling structure we use to resample the signal.
+    resampler: AudioResampler,
+    /// Shared atomic position.  Worker updates this on seek only.
     position: Arc<AtomicU64>,
-    samples_written: usize,
-    samples_to_flush: usize,
+    /// Range of samples in `resampled` that are awaiting flush into `output`.
+    samples_to_flush: Range<usize>,
+    /// Are we in the middle of automatic read loop?
     is_reading: bool,
 }
 
@@ -224,25 +255,31 @@ impl Worker {
         decoder: AudioDecoder,
         output: SpscRb<f32>,
         position: Arc<AtomicU64>,
+        res_spec: ResamplingSpec,
     ) -> Self {
         const DEFAULT_MAX_FRAMES: u64 = 1024 * 8;
 
+        let max_frames = decoder
+            .codec_params()
+            .max_frames_per_packet
+            .unwrap_or(DEFAULT_MAX_FRAMES);
+        let max_samples = max_frames as usize * res_spec.channels;
+        let max_output_size = res_spec.max_output_size(max_samples);
+        let resampled = vec![0.0; max_output_size];
+        let resampler =
+            AudioResampler::new(ResamplingQuality::SincMediumQuality, res_spec).unwrap();
+
         Self {
             producer: output.producer(),
-            packet: SampleBuffer::new(
-                decoder
-                    .codec_params()
-                    .max_frames_per_packet
-                    .unwrap_or(DEFAULT_MAX_FRAMES),
-                decoder.signal_spec(),
-            ),
+            packet: SampleBuffer::new(max_frames, decoder.signal_spec()),
             spec: decoder.signal_spec(),
+            resampled,
+            resampler,
             decoder,
             this,
             output,
             position,
-            samples_written: 0,
-            samples_to_flush: 0,
+            samples_to_flush: 0..0, // Arbitrary empty range.
             is_reading: false,
         }
     }
@@ -266,7 +303,7 @@ impl Worker {
         match self.decoder.seek(time) {
             Ok(timestamp) => {
                 if self.is_reading {
-                    self.samples_to_flush = 0;
+                    self.samples_to_flush = 0..0;
                 } else {
                     self.this.send(Msg::Read)?;
                 }
@@ -282,11 +319,10 @@ impl Worker {
     }
 
     fn on_read(&mut self) -> Result<Act<Self>, Error> {
-        if self.samples_to_flush > 0 {
-            let writable = last_n(self.packet.samples(), self.samples_to_flush);
+        if !self.samples_to_flush.is_empty() {
+            let writable = &self.resampled[self.samples_to_flush.clone()];
             if let Ok(written) = self.producer.write(writable) {
-                self.samples_written += written;
-                self.samples_to_flush -= written;
+                self.samples_to_flush.start += written;
                 self.is_reading = true;
                 self.this.send(Msg::Read)?;
                 Ok(Act::Continue)
@@ -304,7 +340,10 @@ impl Worker {
             match self.decoder.next_packet() {
                 Some((_, packet)) => {
                     self.packet.copy_interleaved_ref(packet);
-                    self.samples_to_flush = self.packet.samples().len();
+                    let to_flush = self
+                        .resampler
+                        .resample(self.packet.samples(), &mut self.resampled)?;
+                    self.samples_to_flush = 0..to_flush;
                     self.is_reading = true;
                     self.this.send(Msg::Read)?;
                 }
@@ -315,8 +354,4 @@ impl Worker {
             Ok(Act::Continue)
         }
     }
-}
-
-fn last_n<T>(slice: &[T], n: usize) -> &[T] {
-    &slice[slice.len() - n..]
 }
