@@ -34,7 +34,7 @@ jobs:
       if: ${{ runner.os == 'Linux' }}
 
     - name: Install Linux Dependencies
-      run: sudo apt-get install -y libgtk-3-dev libssl-dev
+      run: sudo apt-get install -y libgtk-3-dev libssl-dev libasound2-dev
       if: ${{ runner.os == 'Linux' }}
 
     - name: Check Formatting
