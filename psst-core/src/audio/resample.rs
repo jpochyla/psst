@@ -27,8 +27,8 @@ impl ResamplingSpec {
 }
 
 pub struct AudioResampler {
+    pub spec: ResamplingSpec,
     state: *mut libsamplerate::SRC_STATE,
-    spec: ResamplingSpec,
 }
 
 impl AudioResampler {

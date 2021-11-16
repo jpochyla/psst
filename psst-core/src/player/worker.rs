@@ -73,14 +73,14 @@ pub struct DecoderSource {
     actor: ActorHandle<Msg>,
     consumer: Consumer<f32>,
     event_send: Sender<PlayerEvent>,
+    total_samples: Arc<AtomicU64>,
     position: Arc<AtomicU64>,
     precision: u64,
     reported: u64,
-    total_samples: u64,
     end_of_track: bool,
     norm_factor: f32,
-    time_base: TimeBase,
-    signal_spec: SignalSpec,
+    input_spec: SignalSpec,
+    output_time_base: TimeBase,
 }
 
 impl DecoderSource {
@@ -99,13 +99,11 @@ impl DecoderSource {
 
         // Gather the source signal parameters and compute how often we should report
         // the play-head position.
-        let signal_spec = source.signal_spec();
-        let chan_count = signal_spec.channels.count();
-        let cp = source.codec_params();
-        let total_samples = cp.n_frames.unwrap() * chan_count as u64;
-        let time_base = cp.time_base.unwrap();
-        let precision =
-            (signal_spec.rate as f64 * chan_count as f64 * REPORT_PRECISION.as_secs_f64()) as u64;
+        let input_spec = source.signal_spec();
+        let output_time_base = TimeBase::new(1, output_sample_rate);
+        let precision = (output_sample_rate as f64
+            * input_spec.channels.count() as f64
+            * REPORT_PRECISION.as_secs_f64()) as u64;
 
         // Create a ring-buffer for the decoded samples.  Worker thread is producing,
         // we are consuming in the `AudioSource` impl.
@@ -117,19 +115,25 @@ impl DecoderSource {
         // incrementing on reading from the ring-buffer.
         let position = Arc::new(AtomicU64::new(0));
 
+        // Because the `n_frames` count that Symphonia gives us can be a bit unreliable,
+        // we track the total number of samples in this stream in this atomic, set when
+        // the underlying decoder returns EOF.
+        let total_samples = Arc::new(AtomicU64::new(u64::MAX));
+
         // Some output streams have different sample rate than the source, so we need to
         // resample before pushing to the sink.
         let res_spec = ResamplingSpec {
-            from_rate: signal_spec.rate as usize,
+            from_rate: input_spec.rate as usize,
             to_rate: output_sample_rate as usize,
-            channels: chan_count,
+            channels: input_spec.channels.count(),
         };
 
         // Spawn the worker and kick-start the decoding.  The buffer will start filling
         // now.
         let actor = Worker::spawn_default({
             let position = Arc::clone(&position);
-            move |this| Worker::new(this, source, buffer, position, res_spec)
+            let total_samples = Arc::clone(&total_samples);
+            move |this| Worker::new(this, source, buffer, position, total_samples, res_spec)
         });
         let _ = actor.send(Msg::Read);
 
@@ -139,8 +143,8 @@ impl DecoderSource {
             consumer,
             event_send,
             norm_factor,
-            time_base,
-            signal_spec,
+            input_spec,
+            output_time_base,
             total_samples,
             end_of_track: false,
             position,
@@ -158,8 +162,8 @@ impl DecoderSource {
     }
 
     fn samples_to_duration(&self, samples: u64) -> Duration {
-        let frames = samples / self.signal_spec.channels.count() as u64;
-        let time = self.time_base.calc_time(frames);
+        let frames = samples / self.input_spec.channels.count() as u64;
+        let time = self.output_time_base.calc_time(frames);
         Duration::from_secs(time.seconds) + Duration::from_secs_f64(time.frac)
     }
 }
@@ -193,13 +197,18 @@ impl AudioSource for DecoderSource {
             }
         }
 
-        if position >= self.total_samples {
-            // After reading the total number of samples from the `CodecParameters`, we
-            // stop. Signal to the upper layer this track is over and short-circuit all
-            // further reads from this source.
+        let total_samples = self.total_samples.load(Ordering::Relaxed);
+        if position >= total_samples {
+            // After reading the total number of samples, we stop. Signal to the upper layer
+            // this track is over and short-circuit all further reads from this source.
             if self.event_send.try_send(PlayerEvent::EndOfTrack).is_ok() {
                 self.end_of_track = true;
             }
+            log::debug!(
+                "end of track, position: {}, total: {}",
+                position,
+                total_samples
+            );
         }
 
         written
@@ -219,26 +228,30 @@ enum Msg {
 }
 
 struct Worker {
-    /// Decoder we are reading packets/samples from.
-    decoder: AudioDecoder,
-    /// Audio properties of the decoded signal.
-    spec: SignalSpec,
     /// Sending part of our own actor channel.
     this: Sender<Msg>,
+    /// Decoder we are reading packets/samples from.
+    input: AudioDecoder,
+    /// Audio properties of the decoded signal.
+    input_spec: SignalSpec,
+    /// Sample buffer containing samples read in the last packet.
+    input_packet: SampleBuffer<f32>,
+    /// Resampling structure we use to resample the signal.
+    resampler: AudioResampler,
+    /// Buffer containing signal resampled from `packet`.
+    resampled: Vec<f32>,
     /// Ring-buffer for the output signal.
     output: SpscRb<f32>,
     /// Producing part of the output ring-buffer.
-    producer: Producer<f32>,
-    /// Sample buffer containing samples read in the last packet.
-    packet: SampleBuffer<f32>,
-    /// Buffer containing signal resampled from `packet`.
-    resampled: Vec<f32>,
-    /// Resampling structure we use to resample the signal.
-    resampler: AudioResampler,
-    /// Shared atomic position.  Worker updates this on seek only.
-    position: Arc<AtomicU64>,
+    output_producer: Producer<f32>,
+    /// Shared atomic position.  We update this on seek only.
+    output_position: Arc<AtomicU64>,
+    /// Shared atomic for total number of samples.  We set this on EOF.
+    output_total_samples: Arc<AtomicU64>,
     /// Range of samples in `resampled` that are awaiting flush into `output`.
-    samples_to_flush: Range<usize>,
+    output_samples_to_write: Range<usize>,
+    /// Number of samples written into the output channel.
+    output_samples_written: u64,
     /// Are we in the middle of automatic read loop?
     is_reading: bool,
 }
@@ -252,34 +265,37 @@ impl Worker {
 
     fn new(
         this: Sender<Msg>,
-        decoder: AudioDecoder,
+        input: AudioDecoder,
         output: SpscRb<f32>,
         position: Arc<AtomicU64>,
+        total_samples: Arc<AtomicU64>,
         res_spec: ResamplingSpec,
     ) -> Self {
         const DEFAULT_MAX_FRAMES: u64 = 1024 * 8;
 
-        let max_frames = decoder
+        let max_input_frames = input
             .codec_params()
             .max_frames_per_packet
             .unwrap_or(DEFAULT_MAX_FRAMES);
-        let max_samples = max_frames as usize * res_spec.channels;
-        let max_output_size = res_spec.max_output_size(max_samples);
-        let resampled = vec![0.0; max_output_size];
+        let max_input_samples = max_input_frames as usize * res_spec.channels;
+        let max_output_samples = res_spec.max_output_size(max_input_samples);
+        let resampled = vec![0.0; max_output_samples];
         let resampler =
             AudioResampler::new(ResamplingQuality::SincMediumQuality, res_spec).unwrap();
 
         Self {
-            producer: output.producer(),
-            packet: SampleBuffer::new(max_frames, decoder.signal_spec()),
-            spec: decoder.signal_spec(),
+            output_producer: output.producer(),
+            input_packet: SampleBuffer::new(max_input_frames, input.signal_spec()),
+            input_spec: input.signal_spec(),
             resampled,
             resampler,
-            decoder,
+            input,
             this,
             output,
-            position,
-            samples_to_flush: 0..0, // Arbitrary empty range.
+            output_position: position,
+            output_total_samples: total_samples,
+            output_samples_written: 0,
+            output_samples_to_write: 0..0, // Arbitrary empty range.
             is_reading: false,
         }
     }
@@ -300,15 +316,17 @@ impl Actor for Worker {
 
 impl Worker {
     fn on_seek(&mut self, time: Duration) -> Result<Act<Self>, Error> {
-        match self.decoder.seek(time) {
-            Ok(timestamp) => {
+        match self.input.seek(time) {
+            Ok(input_ts) => {
                 if self.is_reading {
-                    self.samples_to_flush = 0..0;
+                    self.output_samples_to_write = 0..0;
                 } else {
                     self.this.send(Msg::Read)?;
                 }
-                let position = timestamp * self.spec.channels.count() as u64;
-                self.position.store(position, Ordering::Relaxed);
+                let output_ts = (input_ts as f64 * self.resampler.spec.ratio()) as u64;
+                let output_pos = output_ts * self.input_spec.channels.count() as u64;
+                self.output_samples_written = output_pos;
+                self.output_position.store(output_pos, Ordering::Relaxed);
                 self.output.clear();
             }
             Err(err) => {
@@ -319,10 +337,11 @@ impl Worker {
     }
 
     fn on_read(&mut self) -> Result<Act<Self>, Error> {
-        if !self.samples_to_flush.is_empty() {
-            let writable = &self.resampled[self.samples_to_flush.clone()];
-            if let Ok(written) = self.producer.write(writable) {
-                self.samples_to_flush.start += written;
+        if !self.output_samples_to_write.is_empty() {
+            let writable = &self.resampled[self.output_samples_to_write.clone()];
+            if let Ok(written) = self.output_producer.write(writable) {
+                self.output_samples_written += written as u64;
+                self.output_samples_to_write.start += written;
                 self.is_reading = true;
                 self.this.send(Msg::Read)?;
                 Ok(Act::Continue)
@@ -337,18 +356,20 @@ impl Worker {
                 })
             }
         } else {
-            match self.decoder.next_packet() {
+            match self.input.next_packet() {
                 Some((_, packet)) => {
-                    self.packet.copy_interleaved_ref(packet);
+                    self.input_packet.copy_interleaved_ref(packet);
                     let to_flush = self
                         .resampler
-                        .resample(self.packet.samples(), &mut self.resampled)?;
-                    self.samples_to_flush = 0..to_flush;
+                        .resample(self.input_packet.samples(), &mut self.resampled)?;
+                    self.output_samples_to_write = 0..to_flush;
                     self.is_reading = true;
                     self.this.send(Msg::Read)?;
                 }
                 None => {
                     self.is_reading = false;
+                    self.output_total_samples
+                        .store(self.output_samples_written, Ordering::Relaxed);
                 }
             }
             Ok(Act::Continue)
