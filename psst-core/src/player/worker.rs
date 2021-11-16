@@ -95,7 +95,7 @@ impl DecoderSource {
             norm_factor,
         } = loaded;
 
-        const REPORT_PRECISION: Duration = Duration::from_millis(1000);
+        const REPORT_PRECISION: Duration = Duration::from_millis(900);
 
         // Gather the source signal parameters and compute how often we should report
         // the play-head position.
@@ -258,7 +258,7 @@ struct Worker {
 
 impl Worker {
     fn default_buffer() -> SpscRb<f32> {
-        const DEFAULT_BUFFER_SIZE: usize = 64 * 1024;
+        const DEFAULT_BUFFER_SIZE: usize = 128 * 1024;
 
         SpscRb::new(DEFAULT_BUFFER_SIZE)
     }
