@@ -27,7 +27,7 @@ impl AudioOutput {
 
         // Get the default device config, so we know what sample format and sample rate
         // the device supports.
-        let supported = device.default_output_config()?;
+        let supported = Self::preferred_output_config(&device)?;
 
         let (callback_send, callback_recv) = bounded(16);
 
@@ -46,6 +46,24 @@ impl AudioOutput {
             _handle: handle,
             sink,
         })
+    }
+
+    fn preferred_output_config(
+        device: &cpal::Device,
+    ) -> Result<cpal::SupportedStreamConfig, Error> {
+        const PREFERRED_SAMPLE_RATE: cpal::SampleRate = cpal::SampleRate(44_100);
+
+        let mut configs: Vec<_> = device.supported_output_configs()?.collect();
+        configs.sort_by(|a, b| a.cmp_default_heuristics(b));
+
+        for range in configs {
+            let r = range.min_sample_rate()..=range.max_sample_rate();
+            if r.contains(&PREFERRED_SAMPLE_RATE) {
+                return Ok(range.with_sample_rate(PREFERRED_SAMPLE_RATE));
+            }
+        }
+
+        Ok(device.default_output_config()?)
     }
 
     pub fn sink(&self) -> AudioSink {
@@ -233,6 +251,12 @@ impl StreamCallback {
 
 impl From<cpal::DefaultStreamConfigError> for Error {
     fn from(err: cpal::DefaultStreamConfigError) -> Error {
+        Error::AudioOutputError(Box::new(err))
+    }
+}
+
+impl From<cpal::SupportedStreamConfigsError> for Error {
+    fn from(err: cpal::SupportedStreamConfigsError) -> Error {
         Error::AudioOutputError(Box::new(err))
     }
 }
