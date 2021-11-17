@@ -15,3 +15,5 @@ opt-level = 2
 piet = { git = "https://github.com/jpochyla/piet", branch = "ctfont-cache" }
 piet-common = { git = "https://github.com/jpochyla/piet", branch = "ctfont-cache" }
 piet-coregraphics = { git = "https://github.com/jpochyla/piet", branch = "ctfont-cache" }
+# (not merged yet) solve panic at startup: "Add support for OpenBSD platform via sndio host" https://github.com/RustAudio/cpal/pull/493
+cpal = { git = "https://github.com/conwayste/cpal", branch = "aaron/openbsd_sndio_host" }
