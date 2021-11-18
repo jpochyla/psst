@@ -37,7 +37,7 @@ pub fn panel_widget() -> impl Widget<AppState> {
 }
 
 fn playback_item_widget() -> impl Widget<NowPlaying> {
-    let cover_art = cover_widget(theme::grid(10.0));
+    let cover_art = cover_widget(theme::grid(8.0));
 
     let track_name = Label::raw()
         .with_line_break_mode(LineBreaking::Clip)
@@ -68,7 +68,8 @@ fn playback_item_widget() -> impl Widget<NowPlaying> {
     .lens(NowPlaying::origin);
 
     Flex::row()
-        .with_child(Flex::column().with_child(cover_art))
+        .with_child(cover_art)
+        .with_spacer(theme::grid(2.0))
         .with_flex_child(
             Flex::column()
                 .cross_axis_alignment(CrossAxisAlignment::Start)
@@ -76,10 +77,10 @@ fn playback_item_widget() -> impl Widget<NowPlaying> {
                 .with_spacer(2.0)
                 .with_child(track_artist)
                 .with_spacer(2.0)
-                .with_child(track_origin)
-                .padding(theme::grid(2.0)),
+                .with_child(track_origin),
             1.0,
         )
+        .padding(theme::grid(1.0))
         .link()
         .on_click(|ctx, now_playing, _| {
             ctx.submit_command(cmd::NAVIGATE.with(now_playing.origin.to_nav()));
@@ -87,11 +88,12 @@ fn playback_item_widget() -> impl Widget<NowPlaying> {
         .context_menu(|now_playing| track::track_menu(&now_playing.item, &now_playing.library))
 }
 
-pub fn cover_widget(size: f64) -> impl Widget<NowPlaying> {
+fn cover_widget(size: f64) -> impl Widget<NowPlaying> {
     RemoteImage::new(utils::placeholder_widget(), move |np: &NowPlaying, _| {
         np.cover_image_url(size, size).map(|url| url.into())
     })
     .fix_size(size, size)
+    .clip(Size::new(size, size).to_rounded_rect(4.0))
 }
 
 fn playback_origin_icon(origin: &PlaybackOrigin) -> &'static SvgIcon {
