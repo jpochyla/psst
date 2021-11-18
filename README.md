@@ -42,7 +42,7 @@ export LIBCLANG_PATH=/usr/local/lib
 
 ##### Building
 
-On all platforms, the **latest Rust stable** (at least 1.54.0) is needed.
+On all platforms, the **latest Rust stable** (at least 1.56.0) is needed.
 
 Development build:
 ```shell

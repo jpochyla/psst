@@ -1,0 +1,4 @@
+[env]
+# point bindgen at LLVM on OpenBSD
+# required to build at least clang-sys, sndio-sys and cpal
+LIBCLANG_PATH = { value = "/usr/local/lib" }
