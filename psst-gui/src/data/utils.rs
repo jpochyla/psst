@@ -17,22 +17,18 @@ pub struct Cached<T: Data> {
 }
 
 impl<T: Data> Cached<T> {
-    pub fn fresh(data: T) -> Self {
-        Self {
-            data,
-            cached_at: None,
-        }
-    }
-
-    pub fn cached(data: T, at: SystemTime) -> Self {
+    pub fn new(data: T, at: SystemTime) -> Self {
         Self {
             data,
             cached_at: Some(at),
         }
     }
 
-    pub fn is_cached(&self) -> bool {
-        self.cached_at.is_some()
+    pub fn fresh(data: T) -> Self {
+        Self {
+            data,
+            cached_at: None,
+        }
     }
 
     pub fn map<U: Data>(self, f: impl Fn(T) -> U) -> Cached<U> {

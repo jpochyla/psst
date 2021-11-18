@@ -124,7 +124,7 @@ impl WebApi {
         if let Some(file) = self.cache.get(bucket, key) {
             let cached_at = file.metadata()?.modified()?;
             let value = serde_json::from_reader(file)?;
-            Ok(Cached::cached(value, cached_at))
+            Ok(Cached::new(value, cached_at))
         } else {
             let response = Self::with_retry(|| Ok(request.clone().call()?))?;
             let body = {

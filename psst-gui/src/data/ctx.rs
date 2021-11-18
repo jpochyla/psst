@@ -27,10 +27,6 @@ where
         CtxMake { cl, tl }
     }
 
-    pub fn ctx() -> impl Lens<Self, C> {
-        Field::new(|c: &Self| &c.ctx, |c: &mut Self| &mut c.ctx)
-    }
-
     pub fn data() -> impl Lens<Self, T> {
         Field::new(|c: &Self| &c.data, |c: &mut Self| &mut c.data)
     }

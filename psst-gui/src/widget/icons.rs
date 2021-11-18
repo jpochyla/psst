@@ -121,7 +121,6 @@ pub static PLAYLIST: SvgIcon = SvgIcon {
 #[derive(Copy, Clone)]
 pub enum PaintOp {
     Fill,
-    Stroke { width: f64 },
 }
 
 #[derive(Clone)]
@@ -190,7 +189,6 @@ impl<T> Widget<T> for Icon {
             ctx.transform(self.scale);
             match self.op {
                 PaintOp::Fill => ctx.fill(&self.bez_path, &color),
-                PaintOp::Stroke { width } => ctx.stroke(&self.bez_path, &color, width),
             }
         });
     }
