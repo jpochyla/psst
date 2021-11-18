@@ -55,12 +55,7 @@ impl AudioOutput {
         const PREFERRED_SAMPLE_RATE: cpal::SampleRate = cpal::SampleRate(44_100);
         const PREFERRED_CHANNELS: cpal::ChannelCount = 2;
 
-        let mut supported: Vec<_> = device.supported_output_configs()?.collect();
-
-        // Sort by the default heuristics.  This should prioritize `f32` sample format.
-        supported.sort_by(|a, b| a.cmp_default_heuristics(b));
-
-        for s in supported {
+        for s in device.supported_output_configs()? {
             let rates = s.min_sample_rate()..=s.max_sample_rate();
             if s.channels() == PREFERRED_CHANNELS
                 && s.sample_format() == PREFERRED_SAMPLE_FORMAT
