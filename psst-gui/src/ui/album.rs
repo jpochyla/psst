@@ -41,7 +41,9 @@ pub fn detail_widget() -> impl Widget<AppState> {
 }
 
 fn loaded_detail_widget() -> impl Widget<WithCtx<Cached<Arc<Album>>>> {
-    let album_cover = rounded_cover_widget(theme::grid(10.0));
+    let album_cover = rounded_cover_widget(theme::grid(10.0))
+        .lens(Ctx::data())
+        .context_menu(album_ctx_menu);
 
     let album_artists = List::new(artist_link_widget).lens(Album::artists.in_arc());
 
@@ -63,6 +65,12 @@ fn loaded_detail_widget() -> impl Widget<WithCtx<Cached<Arc<Album>>>> {
         .with_child(album_label)
         .padding(theme::grid(1.0));
 
+    let album_top = Flex::row()
+        .with_spacer(theme::grid(4.2))
+        .with_child(album_cover)
+        .with_default_spacer()
+        .with_child(album_info.lens(Ctx::data()));
+
     let album_tracks = tracklist_widget(TrackDisplay {
         number: true,
         title: true,
@@ -73,14 +81,7 @@ fn loaded_detail_widget() -> impl Widget<WithCtx<Cached<Arc<Album>>>> {
     Flex::column()
         .cross_axis_alignment(CrossAxisAlignment::Start)
         .with_spacer(theme::grid(1.0))
-        .with_child(
-            Flex::row()
-                .with_spacer(theme::grid(4.2))
-                .with_child(album_cover)
-                .with_default_spacer()
-                .with_child(album_info)
-                .lens(Ctx::data()),
-        )
+        .with_child(album_top)
         .with_spacer(theme::grid(1.0))
         .with_child(album_tracks)
         .lens(Ctx::map(Cached::data))
