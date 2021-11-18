@@ -48,8 +48,8 @@ pub fn setup(env: &mut Env, state: &AppState) {
 
     env.set(WINDOW_BACKGROUND_COLOR, env.get(GREY_700));
     env.set(TEXT_COLOR, env.get(GREY_100));
-    env.set(ICON_COLOR, env.get(GREY_300));
-    env.set(PLACEHOLDER_COLOR, env.get(GREY_300));
+    env.set(ICON_COLOR, env.get(GREY_400));
+    env.set(PLACEHOLDER_COLOR, env.get(GREY_400));
     env.set(PRIMARY_LIGHT, env.get(BLUE_100));
     env.set(PRIMARY_DARK, env.get(BLUE_200));
 
