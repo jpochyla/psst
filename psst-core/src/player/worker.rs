@@ -20,7 +20,7 @@ use crate::{
         decode::AudioDecoder,
         output::AudioSink,
         resample::{AudioResampler, ResamplingQuality, ResamplingSpec},
-        source::AudioSource,
+        source::{AudioSource, StereoMapper},
     },
     error::Error,
 };
@@ -47,9 +47,14 @@ impl PlaybackManager {
 
     pub fn play(&mut self, loaded: LoadedPlaybackItem) {
         let path = loaded.file.path();
-        let source = DecoderSource::new(loaded, self.event_send.clone(), self.sink.sample_rate());
-        self.current = Some((path, source.actor.sender()));
-        self.sink.play(source);
+        let decoder = DecoderSource::new(loaded, self.event_send.clone(), self.sink.sample_rate());
+        self.current = Some((path, decoder.actor.sender()));
+        self.sink.play(StereoMapper::new(
+            decoder,
+            2,
+            self.sink.channel_count(),
+            8 * 1024,
+        ));
         self.sink.resume();
     }
 
