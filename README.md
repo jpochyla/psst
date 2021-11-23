@@ -17,7 +17,7 @@ Our user-interface library, Druid, has two possible backends to choose from on L
 Debian/Ubuntu:
 
 ```shell
-sudo apt-get install libssl-dev libgtk-3-dev libcairo2-dev
+sudo apt-get install libssl-dev libgtk-3-dev libcairo2-dev libasound2-dev
 ```
 
 RHEL/Fedora:
