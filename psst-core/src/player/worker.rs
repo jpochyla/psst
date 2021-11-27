@@ -49,12 +49,15 @@ impl PlaybackManager {
         let path = loaded.file.path();
         let decoder = DecoderSource::new(loaded, self.event_send.clone(), self.sink.sample_rate());
         self.current = Some((path, decoder.actor.sender()));
-        self.sink.play(StereoMapper::new(
-            decoder,
-            2,
-            self.sink.channel_count(),
-            8 * 1024,
-        ));
+        if decoder.channel_count() != self.sink.channel_count() {
+            self.sink.play(StereoMapper::new(
+                decoder.channel_count(),
+                self.sink.channel_count(),
+                decoder,
+            ));
+        } else {
+            self.sink.play(decoder);
+        }
         self.sink.resume();
     }
 
@@ -156,6 +159,10 @@ impl DecoderSource {
             precision,
             reported: u64::MAX, // Something sufficiently distinct from any position.
         }
+    }
+
+    pub fn channel_count(&self) -> usize {
+        self.input_spec.channels.count()
     }
 
     fn written_samples(&self, position: u64) -> u64 {

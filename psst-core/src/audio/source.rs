@@ -34,17 +34,14 @@ pub struct StereoMapper<S> {
 }
 
 impl<S> StereoMapper<S> {
-    pub fn new(
-        source: S,
-        input_channels: usize,
-        output_channels: usize,
-        max_input_size: usize,
-    ) -> Self {
+    pub fn new(input_channels: usize, output_channels: usize, source: S) -> Self {
+        const BUFFER_SIZE: usize = 8 * 1024;
+
         Self {
             source,
             input_channels,
             output_channels,
-            buffer: vec![0.0; (max_input_size / input_channels) * output_channels],
+            buffer: vec![0.0; BUFFER_SIZE],
         }
     }
 
@@ -66,6 +63,7 @@ where
         for (i, o) in input_frames.zip(output_frames) {
             o[0] = i[0];
             o[1] = i[1];
+            // Assume the rest is is implicitly silence.
         }
         output.len()
     }
