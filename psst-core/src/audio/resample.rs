@@ -11,18 +11,22 @@ pub enum ResamplingQuality {
 
 #[derive(Copy, Clone)]
 pub struct ResamplingSpec {
-    pub from_rate: usize,
-    pub to_rate: usize,
+    pub input_rate: u32,
+    pub output_rate: u32,
     pub channels: usize,
 }
 
 impl ResamplingSpec {
-    pub fn max_output_size(&self, max_input_size: usize) -> usize {
-        (self.ratio() * max_input_size as f64 * 1.2) as usize
+    pub fn output_size(&self, input_size: usize) -> usize {
+        (self.output_rate as f64 / self.input_rate as f64 * input_size as f64) as usize
+    }
+
+    pub fn input_size(&self, output_size: usize) -> usize {
+        (self.input_rate as f64 / self.output_rate as f64 * output_size as f64) as usize
     }
 
     pub fn ratio(&self) -> f64 {
-        self.to_rate as f64 / self.from_rate as f64
+        self.output_rate as f64 / self.input_rate as f64
     }
 }
 
@@ -48,12 +52,12 @@ impl AudioResampler {
         }
     }
 
-    pub fn resample(&mut self, input: &[f32], output: &mut [f32]) -> Result<usize, Error> {
-        if self.spec.from_rate == self.spec.to_rate {
+    pub fn process(&mut self, input: &[f32], output: &mut [f32]) -> Result<(usize, usize), Error> {
+        if self.spec.input_rate == self.spec.output_rate {
             // Bypass conversion completely in case the sample rates are equal.
             let output = &mut output[..input.len()];
             output.copy_from_slice(input);
-            return Ok(output.len());
+            return Ok((input.len(), output.len()));
         }
         let mut src = libsamplerate::SRC_DATA {
             data_in: input.as_ptr(),
@@ -69,12 +73,9 @@ impl AudioResampler {
         if error_int != 0 {
             Err(Error::ResamplingError(error_int))
         } else {
-            let output_len = src.output_frames_gen as usize * self.spec.channels;
             let processed_len = src.input_frames_used as usize * self.spec.channels;
-            if processed_len != input.len() {
-                log::warn!("skipping frames while resampling");
-            }
-            Ok(output_len)
+            let output_len = src.output_frames_gen as usize * self.spec.channels;
+            Ok((processed_len, output_len))
         }
     }
 }
@@ -84,3 +85,5 @@ impl Drop for AudioResampler {
         unsafe { libsamplerate::src_delete(self.state) };
     }
 }
+
+unsafe impl Send for AudioResampler {}
