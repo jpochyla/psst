@@ -12,7 +12,7 @@ use crate::{
 
 use super::{
     theme,
-    track::{tracklist_widget, TrackDisplay},
+    track::{findable_tracklist_widget, TrackDisplay},
     utils::{error_widget, placeholder_widget, spinner_widget},
 };
 
@@ -95,12 +95,15 @@ pub fn detail_widget() -> impl Widget<AppState> {
     Async::new(
         spinner_widget,
         || {
-            tracklist_widget(TrackDisplay {
-                title: true,
-                artist: true,
-                album: true,
-                ..TrackDisplay::empty()
-            })
+            findable_tracklist_widget(
+                TrackDisplay {
+                    title: true,
+                    artist: true,
+                    album: true,
+                    ..TrackDisplay::empty()
+                },
+                cmd::FIND_IN_PLAYLIST,
+            )
         },
         error_widget,
     )

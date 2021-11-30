@@ -2,6 +2,7 @@ mod album;
 mod artist;
 mod config;
 mod ctx;
+mod find;
 mod id;
 mod nav;
 mod playback;
@@ -26,7 +27,8 @@ pub use crate::data::{
     artist::{Artist, ArtistAlbums, ArtistDetail, ArtistLink, ArtistTracks},
     config::{AudioQuality, Authentication, Config, Preferences, PreferencesTab, Theme},
     ctx::Ctx,
-    nav::{Nav, SpotifyUrl},
+    find::{FindQuery, Finder, MatchFindQuery},
+    nav::{Nav, Route, SpotifyUrl},
     playback::{
         NowPlaying, Playback, PlaybackOrigin, PlaybackPayload, PlaybackState, QueueBehavior,
         QueuedTrack,
@@ -48,7 +50,7 @@ pub struct AppState {
     #[data(ignore)]
     pub session: SessionService,
 
-    pub route: Nav,
+    pub nav: Nav,
     pub history: Vector<Nav>,
     pub config: Config,
     pub preferences: Preferences,
@@ -84,7 +86,7 @@ impl AppState {
         };
         Self {
             session: SessionService::empty(),
-            route: Nav::Home,
+            nav: Nav::Home,
             history: Vector::new(),
             config,
             preferences: Preferences {
@@ -117,6 +119,7 @@ impl AppState {
             playlist_detail: PlaylistDetail {
                 playlist: Promise::Empty,
                 tracks: Promise::Empty,
+                finder: Default::default(),
             },
             library,
             common_ctx,
@@ -130,8 +133,8 @@ impl AppState {
 
 impl AppState {
     pub fn navigate(&mut self, nav: &Nav) {
-        if &self.route != nav {
-            let previous = mem::replace(&mut self.route, nav.to_owned());
+        if &self.nav != nav {
+            let previous = mem::replace(&mut self.nav, nav.to_owned());
             self.history.push_back(previous);
             self.config.last_route.replace(nav.to_owned());
             self.config.save();
@@ -142,7 +145,7 @@ impl AppState {
         if let Some(nav) = self.history.pop_back() {
             self.config.last_route.replace(nav.clone());
             self.config.save();
-            self.route = nav;
+            self.nav = nav;
         }
     }
 }

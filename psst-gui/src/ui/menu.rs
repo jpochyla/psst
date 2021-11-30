@@ -67,4 +67,9 @@ fn view_menu() -> Menu<AppState> {
                 .command(cmd::SET_FOCUS.to(cmd::WIDGET_SEARCH_INPUT))
                 .hotkey(SysMods::Cmd, "l"),
         )
+        .entry(
+            MenuItem::new(LocalizedString::new("menu-item-find").with_placeholder("Find..."))
+                .command(cmd::TOGGLE_FINDER)
+                .hotkey(SysMods::Cmd, "f"),
+        )
 }

@@ -10,7 +10,7 @@ pub struct NavController;
 
 impl NavController {
     fn load_route_data(&self, ctx: &mut EventCtx, data: &mut AppState) {
-        match &data.route {
+        match &data.nav {
             Nav::Home => {}
             Nav::SavedTracks => {
                 if !data.library.saved_tracks.is_resolved() {

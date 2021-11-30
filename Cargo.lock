@@ -1990,6 +1990,7 @@ dependencies = [
  "psst-core",
  "rand",
  "raw-window-handle",
+ "regex",
  "serde",
  "serde_json",
  "souvlaki",

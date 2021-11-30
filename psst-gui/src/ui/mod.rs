@@ -10,12 +10,13 @@ use druid::{
 use crate::{
     cmd,
     controller::{NavController, SessionController},
-    data::{AppState, Nav, Playback},
+    data::{AppState, Nav, Playback, PlaylistDetail, Route},
     widget::{icons, icons::SvgIcon, Border, Empty, MyWidgetExt, ThemeScope, ViewDispatcher},
 };
 
 pub mod album;
 pub mod artist;
+pub mod find;
 pub mod home;
 pub mod library;
 pub mod menu;
@@ -148,38 +149,41 @@ fn root_widget() -> impl Widget<AppState> {
 
 fn route_widget() -> impl Widget<AppState> {
     ViewDispatcher::new(
-        |state: &AppState, _| state.route.clone(),
-        |route: &Nav, _, _| match route {
-            Nav::Home => Scroll::new(home::home_widget().padding(theme::grid(1.0)))
+        |state: &AppState, _| state.nav.route(),
+        |route: &Route, _, _| match route {
+            Route::Home => Scroll::new(home::home_widget().padding(theme::grid(1.0)))
                 .vertical()
                 .boxed(),
-            Nav::SavedTracks => {
+            Route::SavedTracks => {
                 Scroll::new(library::saved_tracks_widget().padding(theme::grid(1.0)))
                     .vertical()
                     .boxed()
             }
-            Nav::SavedAlbums => {
+            Route::SavedAlbums => {
                 Scroll::new(library::saved_albums_widget().padding(theme::grid(1.0)))
                     .vertical()
                     .boxed()
             }
-            Nav::SearchResults(_) => {
-                Scroll::new(search::results_widget().padding(theme::grid(1.0)))
-                    .vertical()
-                    .boxed()
-            }
-            Nav::AlbumDetail(_) => Scroll::new(album::detail_widget().padding(theme::grid(1.0)))
+            Route::SearchResults => Scroll::new(search::results_widget().padding(theme::grid(1.0)))
                 .vertical()
                 .boxed(),
-            Nav::ArtistDetail(_) => Scroll::new(artist::detail_widget().padding(theme::grid(1.0)))
+            Route::AlbumDetail => Scroll::new(album::detail_widget().padding(theme::grid(1.0)))
                 .vertical()
                 .boxed(),
-            Nav::PlaylistDetail(_) => {
-                Scroll::new(playlist::detail_widget().padding(theme::grid(1.0)))
-                    .vertical()
-                    .boxed()
-            }
-            Nav::Recommendations(_) => {
+            Route::ArtistDetail => Scroll::new(artist::detail_widget().padding(theme::grid(1.0)))
+                .vertical()
+                .boxed(),
+            Route::PlaylistDetail => Flex::column()
+                .with_child(
+                    find::finder_widget(cmd::FIND_IN_PLAYLIST, "Find in Playlist...")
+                        .lens(AppState::playlist_detail.then(PlaylistDetail::finder)),
+                )
+                .with_flex_child(
+                    Scroll::new(playlist::detail_widget().padding(theme::grid(1.0))).vertical(),
+                    1.0,
+                )
+                .boxed(),
+            Route::Recommendations => {
                 Scroll::new(recommend::results_widget().padding(theme::grid(1.0)))
                     .vertical()
                     .boxed()
@@ -207,17 +211,17 @@ fn sidebar_menu_widget() -> impl Widget<AppState> {
         .with_child(search::input_widget().padding((theme::grid(1.0), theme::grid(1.0))))
 }
 
-fn sidebar_link_widget(title: &str, nav: Nav) -> impl Widget<AppState> {
+fn sidebar_link_widget(title: &str, link_nav: Nav) -> impl Widget<AppState> {
     Label::new(title)
         .padding((theme::grid(2.0), theme::grid(1.0)))
         .expand_width()
         .link()
         .env_scope({
-            let nav = nav.clone();
-            move |env, route: &Nav| {
+            let link_nav = link_nav.clone();
+            move |env, nav: &Nav| {
                 env.set(
                     theme::LINK_COLD_COLOR,
-                    if &nav == route {
+                    if &link_nav == nav {
                         env.get(theme::MENU_BUTTON_BG_ACTIVE)
                     } else {
                         env.get(theme::MENU_BUTTON_BG_INACTIVE)
@@ -225,7 +229,7 @@ fn sidebar_link_widget(title: &str, nav: Nav) -> impl Widget<AppState> {
                 );
                 env.set(
                     theme::TEXT_COLOR,
-                    if &nav == route {
+                    if &link_nav == nav {
                         env.get(theme::MENU_BUTTON_FG_ACTIVE)
                     } else {
                         env.get(theme::MENU_BUTTON_FG_INACTIVE)
@@ -234,9 +238,9 @@ fn sidebar_link_widget(title: &str, nav: Nav) -> impl Widget<AppState> {
             }
         })
         .on_click(move |ctx, _, _| {
-            ctx.submit_command(cmd::NAVIGATE.with(nav.clone()));
+            ctx.submit_command(cmd::NAVIGATE.with(link_nav.clone()));
         })
-        .lens(AppState::route)
+        .lens(AppState::nav)
 }
 
 fn volume_slider() -> impl Widget<AppState> {
@@ -312,15 +316,15 @@ fn topbar_title_widget() -> impl Widget<AppState> {
         .with_child(route_title_widget())
         .with_spacer(theme::grid(0.5))
         .with_child(route_icon_widget())
-        .lens(AppState::route)
+        .lens(AppState::nav)
 }
 
 fn route_icon_widget() -> impl Widget<Nav> {
     ViewSwitcher::new(
-        |route: &Nav, _| route.clone(),
-        |route: &Nav, _, _| {
+        |nav: &Nav, _| nav.clone(),
+        |nav: &Nav, _, _| {
             let icon = |icon: &SvgIcon| icon.scale(theme::ICON_SIZE_SMALL);
-            match &route {
+            match &nav {
                 Nav::Home => Empty.boxed(),
                 Nav::SavedTracks => Empty.boxed(),
                 Nav::SavedAlbums => Empty.boxed(),
@@ -335,7 +339,7 @@ fn route_icon_widget() -> impl Widget<Nav> {
 }
 
 fn route_title_widget() -> impl Widget<Nav> {
-    Label::dynamic(|route: &Nav, _| route.title())
+    Label::dynamic(|nav: &Nav, _| nav.title())
         .with_font(theme::UI_FONT_MEDIUM)
         .with_text_size(theme::TEXT_SIZE_LARGE)
 }
