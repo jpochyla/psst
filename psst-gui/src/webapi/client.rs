@@ -8,7 +8,7 @@ use crate::{
 use druid::{
     im::Vector,
     image::{self, ImageFormat},
-    Data,
+    Data, ImageBuf,
 };
 use itertools::Itertools;
 use once_cell::sync::OnceCell;
@@ -529,8 +529,12 @@ impl WebApi {
 
 /// Image endpoints.
 impl WebApi {
-    pub fn get_image(&self, uri: &str) -> Result<image::DynamicImage, Error> {
-        let response = self.agent.get(uri).call()?;
+    pub fn get_cached_image(&self, uri: &Arc<str>) -> Option<ImageBuf> {
+        self.cache.get_image(uri)
+    }
+
+    pub fn get_image(&self, uri: Arc<str>) -> Result<ImageBuf, Error> {
+        let response = self.agent.get(&uri).call()?;
         let format = match response.content_type() {
             "image/jpeg" => Some(ImageFormat::Jpeg),
             "image/png" => Some(ImageFormat::Png),
@@ -543,7 +547,9 @@ impl WebApi {
         } else {
             image::load_from_memory(&body)?
         };
-        Ok(image)
+        let image_buf = ImageBuf::from_dynamic_image(image);
+        self.cache.set_image(uri, image_buf.clone());
+        Ok(image_buf)
     }
 }
 

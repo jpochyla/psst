@@ -20,6 +20,7 @@ log = "0.4"
 lru-cache = "0.1"
 once_cell = "1.8"
 open = "2.0"
+parking_lot = "0.11"
 platform-dirs = "0.3"
 rand = "0.8"
 raw-window-handle = "0.3"
@@ -28,6 +29,7 @@ serde = { version = "1.0", features = ["derive", "rc"] }
 serde_json = "1.0"
 souvlaki = "=0.4.0"
 time = { version = "0.3", features = ["macros", "formatting"] }
+threadpool = "1.8"
 ureq = { version = "2.1", features = ["json", "socks-proxy"] }
 url = "2.2"
 

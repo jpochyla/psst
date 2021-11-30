@@ -1,17 +1,34 @@
 use std::{
     fs::{self, File},
     path::PathBuf,
+    sync::Arc,
 };
 
+use druid::ImageBuf;
+use lru_cache::LruCache;
+use parking_lot::Mutex;
 use psst_core::cache::mkdir_if_not_exists;
 
 pub struct WebApiCache {
     base: Option<PathBuf>,
+    images: Mutex<LruCache<Arc<str>, ImageBuf>>,
 }
 
 impl WebApiCache {
     pub fn new(base: Option<PathBuf>) -> Self {
-        Self { base }
+        const IMAGE_CACHE_SIZE: usize = 256;
+        Self {
+            base,
+            images: Mutex::new(LruCache::new(IMAGE_CACHE_SIZE)),
+        }
+    }
+
+    pub fn get_image(&self, uri: &Arc<str>) -> Option<ImageBuf> {
+        self.images.lock().get_mut(uri).cloned()
+    }
+
+    pub fn set_image(&self, uri: Arc<str>, image: ImageBuf) {
+        self.images.lock().insert(uri, image);
     }
 
     pub fn get(&self, bucket: &str, key: &str) -> Option<File> {
