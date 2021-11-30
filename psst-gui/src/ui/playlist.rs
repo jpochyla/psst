@@ -5,7 +5,10 @@ use druid::{
 
 use crate::{
     cmd,
-    data::{AppState, Ctx, Library, Nav, Playlist, PlaylistDetail, PlaylistLink, PlaylistTracks, TrackId, PlaylistTrackModification},
+    data::{
+        AppState, Ctx, Library, Nav, Playlist, PlaylistDetail, PlaylistLink,
+        PlaylistTrackModification, PlaylistTracks, TrackId,
+    },
     webapi::WebApi,
     widget::{Async, MyWidgetExt, RemoteImage},
 };
@@ -45,10 +48,15 @@ pub fn list_widget() -> impl Widget<AppState> {
     .lens(AppState::library.then(Library::playlists.in_arc()))
     .on_command_async(
         ADD_TRACK,
-        |d| WebApi::global().add_track_to_playlist(&d.playlist_link.id, &d.track_id.to_uri().unwrap()),
-        |_, data, d| data.with_library_mut(move |library| {
-            library.increment_playlist_track_count(d.playlist_link)
-        }),
+        |d| {
+            WebApi::global()
+                .add_track_to_playlist(&d.playlist_link.id, &d.track_id.to_uri().unwrap())
+        },
+        |_, data, d| {
+            data.with_library_mut(move |library| {
+                library.increment_playlist_track_count(d.playlist_link)
+            })
+        },
         |_, _, _| {
             //TODO: Handle a failed request.
         },

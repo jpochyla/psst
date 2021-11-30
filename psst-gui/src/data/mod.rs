@@ -33,7 +33,7 @@ pub use crate::data::{
         NowPlaying, Playback, PlaybackOrigin, PlaybackPayload, PlaybackState, QueueBehavior,
         QueuedTrack,
     },
-    playlist::{Playlist, PlaylistDetail, PlaylistLink, PlaylistTracks, PlaylistTrackModification},
+    playlist::{Playlist, PlaylistDetail, PlaylistLink, PlaylistTrackModification, PlaylistTracks},
     promise::{Promise, PromiseState},
     recommend::{
         Range, Recommend, Recommendations, RecommendationsKnobs, RecommendationsParams,
@@ -276,9 +276,12 @@ impl Library {
         }
     }
 
-    pub fn get_owned_playlists(&self, user_id: Arc<str>) -> Vec<&Playlist>{
+    pub fn get_owned_playlists(&self, user_id: Arc<str>) -> Vec<&Playlist> {
         if let Some(saved) = self.playlists.resolved() {
-            saved.iter().filter(|playlist| playlist.owner.id == user_id).collect()
+            saved
+                .iter()
+                .filter(|playlist| playlist.owner.id == user_id)
+                .collect()
         } else {
             Vec::new()
         }
@@ -290,10 +293,10 @@ impl Library {
             false
         }
     }
-    pub fn increment_playlist_track_count(&mut self, playlist_link: PlaylistLink){
+    pub fn increment_playlist_track_count(&mut self, playlist_link: PlaylistLink) {
         if let Some(saved) = self.playlists.resolved_mut() {
-            for i in 0..saved.len(){
-                if saved[i].id == playlist_link.id{
+            for i in 0..saved.len() {
+                if saved[i].id == playlist_link.id {
                     saved[i].track_count += 1
                 }
             }

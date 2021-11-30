@@ -11,18 +11,17 @@ use druid::{
     Selector, TextAlignment, Widget, WidgetExt,
 };
 
-use crate::data::FindQuery;
-use crate::webapi::WebApi;
 use crate::{
     cmd,
     data::{
-        Album, AppState, ArtistLink, ArtistTracks, CommonCtx, Library, Nav, PlaybackOrigin,
-        PlaybackPayload, PlaylistTrackModification, PlaylistTracks, Recommendations,
-        RecommendationsRequest, SavedTracks, SearchResults, Track, WithCtx,
+        Album, AppState, ArtistLink, ArtistTracks, CommonCtx, FindQuery, Library, MatchFindQuery,
+        Nav, PlaybackOrigin, PlaybackPayload, PlaylistTrackModification, PlaylistTracks,
+        Recommendations, RecommendationsRequest, SavedTracks, SearchResults, Track, WithCtx,
     },
+    ui::playlist,
+    webapi::WebApi,
     widget::MyWidgetExt,
 };
-use crate::{data::MatchFindQuery, ui::playlist};
 
 use super::{
     find::{Find, Findable},

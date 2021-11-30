@@ -3,8 +3,7 @@ use std::sync::Arc;
 use druid::{im::Vector, Data, Lens};
 use serde::{Deserialize, Deserializer, Serialize};
 
-use crate::data::{Image, Promise, Track, TrackId};
-use crate::data::user::PublicUser;
+use crate::data::{user::PublicUser, Image, Promise, Track, TrackId};
 
 use super::Finder;
 
@@ -30,7 +29,7 @@ pub struct Playlist {
     #[serde(rename = "tracks")]
     #[serde(deserialize_with = "deserialize_track_count")]
     pub track_count: usize,
-    pub owner: PublicUser
+    pub owner: PublicUser,
 }
 
 impl Playlist {
