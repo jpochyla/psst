@@ -1,20 +1,22 @@
 use druid::widget::{prelude::*, Controller};
 
-use crate::{cmd, data::AppState};
+use crate::{
+    cmd,
+    data::AppState,
+    ui::{home, playlist, user},
+};
 
 pub struct SessionController;
 
 impl SessionController {
-    fn connect(&self, data: &mut AppState) {
+    fn connect(&self, ctx: &mut EventCtx, data: &mut AppState) {
         // Update the session configuration, any active session will get shut down.
         data.session.update_config(data.config.session());
 
         // Reload the global, usually visible data.
-        data.with_library_mut(|library| {
-            library.playlists.defer_default();
-        });
-        data.personalized.made_for_you.defer_default();
-        data.user_profile.defer_default();
+        ctx.submit_command(playlist::LOAD_LIST);
+        ctx.submit_command(home::LOAD_MADE_FOR_YOU);
+        ctx.submit_command(user::LOAD_PROFILE);
     }
 }
 
@@ -33,7 +35,7 @@ where
         match event {
             Event::Command(cmd) if cmd.is(cmd::SESSION_CONNECT) => {
                 if data.config.has_credentials() {
-                    self.connect(data);
+                    self.connect(ctx, data);
                 }
                 ctx.set_handled();
             }

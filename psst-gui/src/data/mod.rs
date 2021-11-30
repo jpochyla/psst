@@ -33,7 +33,7 @@ pub use crate::data::{
         NowPlaying, Playback, PlaybackOrigin, PlaybackPayload, PlaybackState, QueueBehavior,
         QueuedTrack,
     },
-    playlist::{Playlist, PlaylistDetail, PlaylistLink, PlaylistTrackModification, PlaylistTracks},
+    playlist::{Playlist, PlaylistAddTrack, PlaylistDetail, PlaylistLink, PlaylistTracks},
     promise::{Promise, PromiseState},
     recommend::{
         Range, Recommend, Recommendations, RecommendationsKnobs, RecommendationsParams,
@@ -62,7 +62,6 @@ pub struct AppState {
     pub playlist_detail: PlaylistDetail,
     pub library: Arc<Library>,
     pub common_ctx: Arc<CommonCtx>,
-    pub user_profile: Promise<UserProfile>,
     pub personalized: Personalized,
     pub alert: Option<Alert>,
 }
@@ -70,6 +69,7 @@ pub struct AppState {
 impl AppState {
     pub fn default_with_config(config: Config) -> Self {
         let library = Arc::new(Library {
+            user_profile: Promise::Empty,
             saved_albums: Promise::Empty,
             saved_tracks: Promise::Empty,
             playlists: Promise::Empty,
@@ -124,7 +124,6 @@ impl AppState {
             },
             library,
             common_ctx,
-            user_profile: Promise::Empty,
             personalized: Personalized {
                 made_for_you: Promise::Empty,
             },
@@ -234,6 +233,7 @@ impl AppState {
 
 #[derive(Clone, Data, Lens)]
 pub struct Library {
+    pub user_profile: Promise<UserProfile>,
     pub playlists: Promise<Vector<Playlist>>,
     pub saved_albums: Promise<SavedAlbums>,
     pub saved_tracks: Promise<SavedTracks>,
@@ -269,23 +269,13 @@ impl Library {
         }
     }
 
-    pub fn remove_album(&mut self, album_id: &Arc<str>) {
+    pub fn remove_album(&mut self, album_id: &str) {
         if let Some(saved) = self.saved_albums.resolved_mut() {
             saved.set.remove(album_id);
-            saved.albums.retain(|a| &a.id != album_id);
+            saved.albums.retain(|a| a.id.as_ref() != album_id);
         }
     }
 
-    pub fn get_owned_playlists(&self, user_id: Arc<str>) -> Vec<&Playlist> {
-        if let Some(saved) = self.playlists.resolved() {
-            saved
-                .iter()
-                .filter(|playlist| playlist.owner.id == user_id)
-                .collect()
-        } else {
-            Vec::new()
-        }
-    }
     pub fn contains_album(&self, album: &Album) -> bool {
         if let Some(saved) = self.saved_albums.resolved() {
             saved.set.contains(&album.id)
@@ -293,11 +283,29 @@ impl Library {
             false
         }
     }
-    pub fn increment_playlist_track_count(&mut self, playlist_link: PlaylistLink) {
+
+    pub fn writable_playlists(&self) -> Vec<&Playlist> {
+        if let Some(saved) = self.playlists.resolved() {
+            saved
+                .iter()
+                .filter(|playlist| {
+                    self.user_profile
+                        .resolved()
+                        .map(|user| playlist.owner.id == user.id)
+                        .unwrap_or(false)
+                        || playlist.collaborative
+                })
+                .collect()
+        } else {
+            Vec::new()
+        }
+    }
+
+    pub fn increment_playlist_track_count(&mut self, link: &PlaylistLink) {
         if let Some(saved) = self.playlists.resolved_mut() {
-            for i in 0..saved.len() {
-                if saved[i].id == playlist_link.id {
-                    saved[i].track_count += 1
+            for playlist in saved.iter_mut() {
+                if playlist.id == link.id {
+                    playlist.track_count += 1;
                 }
             }
         }

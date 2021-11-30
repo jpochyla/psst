@@ -1,16 +1,18 @@
 use druid::{
     commands,
     widget::{Either, Flex, Label},
-    Widget, WidgetExt,
+    LensExt, Selector, Widget, WidgetExt,
 };
 
 use crate::{
-    data::{AppState, UserProfile},
+    data::{AppState, Library, UserProfile},
     webapi::WebApi,
     widget::{Async, Empty, MyWidgetExt},
 };
 
 use super::theme;
+
+pub const LOAD_PROFILE: Selector = Selector::new("app.user.load-profile");
 
 pub fn user_widget() -> impl Widget<AppState> {
     let is_connected = Either::new(
@@ -33,8 +35,13 @@ pub fn user_widget() -> impl Widget<AppState> {
         },
         || Empty,
     )
-    .on_deferred(|_| WebApi::global().get_user_profile())
-    .lens(AppState::user_profile);
+    .lens(AppState::library.then(Library::user_profile.in_arc()))
+    .on_command_async(
+        LOAD_PROFILE,
+        |_| WebApi::global().get_user_profile(),
+        |_, data, d| data.with_library_mut(|l| l.user_profile.defer(d)),
+        |_, data, r| data.with_library_mut(|l| l.user_profile.update(r)),
+    );
 
     Flex::column()
         .with_child(is_connected)

@@ -75,6 +75,7 @@ impl WebApi {
     fn put(&self, path: impl Display) -> Result<Request, Error> {
         self.request("PUT", path)
     }
+
     fn post(&self, path: impl Display) -> Result<Request, Error> {
         self.request("POST", path)
     }

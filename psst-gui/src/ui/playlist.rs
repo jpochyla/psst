@@ -6,9 +6,10 @@ use druid::{
 use crate::{
     cmd,
     data::{
-        AppState, Ctx, Library, Nav, Playlist, PlaylistDetail, PlaylistLink,
-        PlaylistTrackModification, PlaylistTracks, TrackId,
+        AppState, Ctx, Library, Nav, Playlist, PlaylistAddTrack, PlaylistDetail, PlaylistLink,
+        PlaylistTracks,
     },
+    error::Error,
     webapi::WebApi,
     widget::{Async, MyWidgetExt, RemoteImage},
 };
@@ -19,8 +20,9 @@ use super::{
     utils::{error_widget, placeholder_widget, spinner_widget},
 };
 
+pub const LOAD_LIST: Selector = Selector::new("app.playlist.load-list");
 pub const LOAD_DETAIL: Selector<PlaylistLink> = Selector::new("app.playlist.load-detail");
-pub const ADD_TRACK: Selector<PlaylistTrackModification> = Selector::new("app.playlist.add-track");
+pub const ADD_TRACK: Selector<PlaylistAddTrack> = Selector::new("app.playlist.add-track");
 
 pub fn list_widget() -> impl Widget<AppState> {
     Async::new(
@@ -44,21 +46,28 @@ pub fn list_widget() -> impl Widget<AppState> {
         },
         error_widget,
     )
-    .on_deferred(|_| WebApi::global().get_playlists())
     .lens(AppState::library.then(Library::playlists.in_arc()))
+    .on_command_async(
+        LOAD_LIST,
+        |_| WebApi::global().get_playlists(),
+        |_, data, d| data.with_library_mut(|l| l.playlists.defer(d)),
+        |_, data, r| data.with_library_mut(|l| l.playlists.update(r)),
+    )
     .on_command_async(
         ADD_TRACK,
         |d| {
-            WebApi::global()
-                .add_track_to_playlist(&d.playlist_link.id, &d.track_id.to_uri().unwrap())
+            WebApi::global().add_track_to_playlist(
+                &d.link.id,
+                &d.track_id
+                    .to_uri()
+                    .ok_or_else(|| Error::WebApiError("Item doesn't have URI".to_string()))?,
+            )
         },
         |_, data, d| {
-            data.with_library_mut(move |library| {
-                library.increment_playlist_track_count(d.playlist_link)
-            })
+            data.with_library_mut(|library| library.increment_playlist_track_count(&d.link))
         },
         |_, _, _| {
-            //TODO: Handle a failed request.
+            // TODO: Handle failed requests.
         },
     )
 }

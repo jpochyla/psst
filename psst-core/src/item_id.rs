@@ -1,5 +1,4 @@
 use std::{convert::TryInto, fmt, ops::Deref};
-use crate::error::Error;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ItemIdType {
@@ -57,13 +56,14 @@ impl ItemId {
             Self::from_base62(gid, ItemIdType::Unknown)
         }
     }
-    // Converts an id to an uri as described in: https://developer.spotify.com/documentation/web-api/#spotify-uris-and-ids
-    pub fn to_uri(&self) -> Option<String>{
+
+    /// Converts an ID to an URI as described in: https://developer.spotify.com/documentation/web-api/#spotify-uris-and-ids
+    pub fn to_uri(&self) -> Option<String> {
         let b64 = self.to_base62();
-        return match self.id_type{
+        match self.id_type {
             ItemIdType::Track => Some(format!("spotify:track:{}", b64)),
             ItemIdType::Podcast => Some(format!("spotify:podcast:{}", b64)),
-            ItemIdType::Unknown => None
+            ItemIdType::Unknown => None,
         }
     }
 

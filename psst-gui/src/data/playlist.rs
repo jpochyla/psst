@@ -15,8 +15,8 @@ pub struct PlaylistDetail {
 }
 
 #[derive(Clone, Debug, Data, Lens, Deserialize)]
-pub struct PlaylistTrackModification {
-    pub playlist_link: PlaylistLink,
+pub struct PlaylistAddTrack {
+    pub link: PlaylistLink,
     pub track_id: TrackId,
 }
 
@@ -30,6 +30,7 @@ pub struct Playlist {
     #[serde(deserialize_with = "deserialize_track_count")]
     pub track_count: usize,
     pub owner: PublicUser,
+    pub collaborative: bool,
 }
 
 impl Playlist {
