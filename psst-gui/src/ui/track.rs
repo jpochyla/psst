@@ -1,8 +1,15 @@
 use std::sync::Arc;
 
-use druid::{Data, Env, Event, EventCtx, Lens, LensExt, LocalizedString, Menu, MenuItem, RenderContext, Selector, TextAlignment, Widget, WidgetExt, im::Vector, kurbo::Line, piet::StrokeStyle, widget::{
+use druid::{
+    im::Vector,
+    kurbo::Line,
+    piet::StrokeStyle,
+    widget::{
         Controller, ControllerHost, CrossAxisAlignment, Flex, Label, List, ListIter, Painter,
-    }};
+    },
+    Data, Env, Event, EventCtx, Lens, LensExt, LocalizedString, Menu, MenuItem, RenderContext,
+    Selector, TextAlignment, Widget, WidgetExt,
+};
 
 use crate::{
     cmd,
@@ -14,7 +21,10 @@ use crate::{
     widget::MyWidgetExt,
 };
 
-use super::{find::{Find, Findable}, library, theme, utils};
+use super::{
+    find::{Find, Findable},
+    library, theme, utils,
+};
 
 #[derive(Copy, Clone)]
 pub struct TrackDisplay {
