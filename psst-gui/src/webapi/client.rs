@@ -147,7 +147,7 @@ impl WebApi {
     ) -> Result<Vector<T>, Error> {
         // TODO: Some result sets, like very long playlists and saved tracks/albums can
         // be very big.  Implement virtualized scrolling and lazy-loading of results.
-        const PAGED_ITEMS_LIMIT: usize = 200;
+        const PAGED_ITEMS_LIMIT: usize = 500;
 
         let mut results = Vector::new();
         let mut limit = 50;
