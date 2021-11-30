@@ -9,9 +9,12 @@ use druid::{
 
 use crate::{
     cmd,
-    controller::{NavController, SessionController},
-    data::{AppState, Nav, Playback, PlaylistDetail, Route},
-    widget::{icons, icons::SvgIcon, Border, Empty, MyWidgetExt, ThemeScope, ViewDispatcher},
+    controller::{AfterDelay, NavController, SessionController},
+    data::{Alert, AppState, Nav, Playback, PlaylistDetail, Route},
+    widget::{
+        icons, icons::SvgIcon, Border, Empty, Maybe, MyWidgetExt, Overlay, ThemeScope,
+        ViewDispatcher,
+    },
 };
 
 pub mod album;
@@ -128,7 +131,7 @@ fn root_widget() -> impl Widget<AppState> {
     let main = Flex::column()
         .cross_axis_alignment(CrossAxisAlignment::Start)
         .with_child(topbar)
-        .with_flex_child(route_widget(), 1.0)
+        .with_flex_child(Overlay::bottom(route_widget(), alert_widget()), 1.0)
         .with_child(playback::panel_widget())
         .background(theme::BACKGROUND_LIGHT);
 
@@ -145,6 +148,26 @@ fn root_widget() -> impl Widget<AppState> {
     // .debug_invalidation()
     // .debug_widget_id()
     // .debug_paint_layout()
+}
+
+fn alert_widget() -> impl Widget<AppState> {
+    const REMOVE_ALERT: Selector = Selector::new("app.remove-alert");
+    const ALERT_DURATION: Duration = Duration::from_secs(5);
+
+    Maybe::or_empty(|| {
+        Label::raw()
+            .padding(theme::grid(2.0))
+            .background(theme::RED)
+            .expand_width()
+            .lens(Alert::message)
+            .controller(AfterDelay::new(ALERT_DURATION, |ctx, _, _| {
+                ctx.submit_command(REMOVE_ALERT);
+            }))
+    })
+    .on_command(REMOVE_ALERT, |_, _, alert| {
+        alert.take();
+    })
+    .lens(AppState::alert)
 }
 
 fn route_widget() -> impl Widget<AppState> {

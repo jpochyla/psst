@@ -64,6 +64,7 @@ pub struct AppState {
     pub common_ctx: Arc<CommonCtx>,
     pub user_profile: Promise<UserProfile>,
     pub personalized: Personalized,
+    pub alert: Option<Alert>,
 }
 
 impl AppState {
@@ -127,6 +128,9 @@ impl AppState {
             personalized: Personalized {
                 made_for_you: Promise::Empty,
             },
+            alert: Some(Alert {
+                message: "Ahoj".into(),
+            }),
         }
     }
 }
@@ -329,4 +333,9 @@ pub type WithCtx<T> = Ctx<Arc<CommonCtx>, T>;
 #[derive(Clone, Data, Lens)]
 pub struct Personalized {
     pub made_for_you: Promise<Vector<Playlist>>,
+}
+
+#[derive(Clone, Data, Lens)]
+pub struct Alert {
+    message: Arc<str>,
 }
