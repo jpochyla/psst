@@ -3,6 +3,7 @@ use regex::{Regex, RegexBuilder};
 
 #[derive(Clone, Default, Debug, Data, Lens)]
 pub struct Finder {
+    pub focused_result: usize,
     pub results: usize,
     pub show: bool,
     pub query: String,
@@ -12,6 +13,7 @@ impl Finder {
     pub fn reset(&mut self) {
         self.query = String::new();
         self.results = 0;
+        self.focused_result = 0;
     }
 
     pub fn reset_matches(&mut self) {
@@ -21,6 +23,22 @@ impl Finder {
     pub fn report_match(&mut self) -> usize {
         self.results += 1;
         self.results
+    }
+
+    pub fn focus_previous(&mut self) {
+        self.focused_result = if self.focused_result > 0 {
+            self.focused_result - 1
+        } else {
+            self.results.saturating_sub(1)
+        };
+    }
+
+    pub fn focus_next(&mut self) {
+        self.focused_result = if self.focused_result < self.results - 1 {
+            self.focused_result + 1
+        } else {
+            0
+        }
     }
 }
 
@@ -32,7 +50,7 @@ pub struct FindQuery {
 impl FindQuery {
     pub fn new(query: &str) -> Self {
         Self {
-            regex: Self::build_regex(&query),
+            regex: Self::build_regex(query),
         }
     }
 

@@ -8,7 +8,7 @@ use crate::{
     controller::InputController,
     data::{FindQuery, Finder, MatchFindQuery},
     ui::theme,
-    widget::Empty,
+    widget::{Empty, MyWidgetExt},
 };
 
 #[derive(Clone)]
@@ -70,7 +70,6 @@ where
                     let report = Report {
                         sender: ctx.widget_id(),
                     };
-                    dbg!(report.sender);
                     ctx.submit_command(REPORT_MATCH.with(report).to(*sender));
                 }
             }
@@ -118,19 +117,43 @@ pub fn finder_widget(selector: Selector<Find>, label: &'static str) -> impl Widg
         .expand_width()
         .lens(Finder::query);
 
-    let results = Label::dynamic(|results, _| match results {
-        0 => "Not Found".to_string(),
-        1 => "1 match".to_string(),
-        n => format!("{} matches", n),
+    let not_found = Label::new("Not Found")
+        .with_text_size(theme::TEXT_SIZE_SMALL)
+        .with_text_color(theme::PLACEHOLDER_COLOR);
+
+    let results = Label::dynamic(|finder: &Finder, _| {
+        format!("{} / {}", finder.focused_result, finder.results)
     })
     .with_text_size(theme::TEXT_SIZE_SMALL)
-    .with_text_color(theme::PLACEHOLDER_COLOR)
-    .lens(Finder::results);
+    .with_text_color(theme::PLACEHOLDER_COLOR);
+
+    let previous = Label::new("‹")
+        .padding(theme::grid(0.5))
+        .link()
+        .rounded(theme::BUTTON_BORDER_RADIUS)
+        .on_click(|_, data: &mut Finder, _| data.focus_previous());
+
+    let next = Label::new("›")
+        .padding(theme::grid(0.5))
+        .link()
+        .rounded(theme::BUTTON_BORDER_RADIUS)
+        .on_click(|_, data: &mut Finder, _| data.focus_next());
+
+    let results_with_controls = Either::new(
+        |data, _| data.results > 0,
+        Flex::row()
+            .with_child(previous)
+            .with_spacer(theme::grid(0.5))
+            .with_child(results)
+            .with_spacer(theme::grid(0.5))
+            .with_child(next),
+        not_found,
+    );
 
     let finder = Flex::row()
         .with_flex_child(input, 1.0)
         .with_default_spacer()
-        .with_child(results)
+        .with_child(results_with_controls)
         .padding(theme::grid(1.0))
         .background(theme::GREY_600);
 
@@ -165,7 +188,7 @@ where
                 ctx.set_handled();
             }
             Event::Command(cmd) if cmd.is(REPORT_MATCH) => {
-                if data.report_match() == 1 {
+                if data.report_match() == data.focused_result {
                     ctx.submit_command(FOCUS_MATCH.to(cmd.get_unchecked(REPORT_MATCH).sender));
                 }
                 ctx.set_handled();
@@ -194,7 +217,8 @@ where
         data: &Finder,
         env: &Env,
     ) {
-        if !old_data.query.same(&data.query) {
+        if !old_data.query.same(&data.query) || !old_data.focused_result.same(&data.focused_result)
+        {
             ctx.submit_command(FIND.to(ctx.widget_id()));
         }
         child.update(ctx, old_data, data, env)
