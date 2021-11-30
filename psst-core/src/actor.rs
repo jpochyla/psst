@@ -57,24 +57,27 @@ pub trait Actor: Sized {
         }
     }
 
-    fn spawn<F>(cap: Capacity, factory: F) -> ActorHandle<Self::Message>
+    fn spawn<F>(cap: Capacity, name: &str, factory: F) -> ActorHandle<Self::Message>
     where
         F: FnOnce(Sender<Self::Message>) -> Self + Send + 'static,
     {
         let (send, recv) = cap.to_channel();
         ActorHandle {
             sender: send.clone(),
-            thread: thread::spawn(move || {
-                factory(send).process(recv);
-            }),
+            thread: thread::Builder::new()
+                .name(name.to_string())
+                .spawn(move || {
+                    factory(send).process(recv);
+                })
+                .unwrap(),
         }
     }
 
-    fn spawn_default<F>(factory: F) -> ActorHandle<Self::Message>
+    fn spawn_with_default_cap<F>(name: &str, factory: F) -> ActorHandle<Self::Message>
     where
         F: FnOnce(Sender<Self::Message>) -> Self + Send + 'static,
     {
-        Self::spawn(Capacity::Bounded(128), factory)
+        Self::spawn(Capacity::Bounded(128), name, factory)
     }
 }
 

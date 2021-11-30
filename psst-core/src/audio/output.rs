@@ -31,7 +31,7 @@ impl AudioOutput {
 
         let (callback_send, callback_recv) = bounded(16);
 
-        let handle = Stream::spawn_default({
+        let handle = Stream::spawn_with_default_cap("audio_output", {
             let config = supported.config();
             // TODO: Support additional sample formats.
             move |this| Stream::open(device, config, callback_recv, this).unwrap()

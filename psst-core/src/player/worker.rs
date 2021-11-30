@@ -132,7 +132,7 @@ impl DecoderSource {
 
         // Spawn the worker and kick-start the decoding.  The buffer will start filling
         // now.
-        let actor = Worker::spawn_default({
+        let actor = Worker::spawn_with_default_cap("audio_decoding", {
             let position = Arc::clone(&position);
             let total_samples = Arc::clone(&total_samples);
             move |this| Worker::new(this, decoder, buffer, position, total_samples)
