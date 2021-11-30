@@ -128,9 +128,7 @@ impl AppState {
             personalized: Personalized {
                 made_for_you: Promise::Empty,
             },
-            alert: Some(Alert {
-                message: "Ahoj".into(),
-            }),
+            alert: None,
         }
     }
 }
