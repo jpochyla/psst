@@ -67,7 +67,8 @@ where
         let output_frames = output.chunks_exact_mut(self.output_channels);
         for (i, o) in input_frames.zip(output_frames) {
             o[0] = i[0];
-            o[1] = i[1];
+            // XXX on OpenBSD, there is only one channel.
+            //o[1] = i[1];
             // Assume the rest is is implicitly silence.
         }
         output.len()
