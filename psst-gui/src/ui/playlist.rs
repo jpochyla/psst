@@ -66,8 +66,10 @@ pub fn list_widget() -> impl Widget<AppState> {
         |_, data, d| {
             data.with_library_mut(|library| library.increment_playlist_track_count(&d.link))
         },
-        |_, _, _| {
-            // TODO: Handle failed requests.
+        |_, data, (_, r)| {
+            if let Err(err) = r {
+                data.error_alert(err);
+            }
         },
     )
 }

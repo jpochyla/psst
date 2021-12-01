@@ -4,13 +4,13 @@ use druid::{
     im::Vector,
     lens::Unit,
     widget::{CrossAxisAlignment, Either, Flex, Label, Scroll, Slider, Split, ViewSwitcher},
-    Env, Insets, LensExt, Menu, MenuItem, Selector, Widget, WidgetExt, WindowDesc,
+    Color, Env, Insets, Key, LensExt, Menu, MenuItem, Selector, Widget, WidgetExt, WindowDesc,
 };
 
 use crate::{
     cmd,
     controller::{AfterDelay, NavController, SessionController},
-    data::{Alert, AppState, Nav, Playback, PlaylistDetail, Route},
+    data::{Alert, AlertStyle, AppState, Nav, Playback, PlaylistDetail, Route},
     widget::{
         icons, icons::SvgIcon, Border, Empty, Maybe, MyWidgetExt, Overlay, ThemeScope,
         ViewDispatcher,
@@ -151,20 +151,35 @@ fn root_widget() -> impl Widget<AppState> {
 }
 
 fn alert_widget() -> impl Widget<AppState> {
-    const REMOVE_ALERT: Selector = Selector::new("app.remove-alert");
+    const BG: Key<Color> = Key::new("app.alert.BG");
+    const DISMISS_ALERT: Selector = Selector::new("app.alert.dismiss");
     const ALERT_DURATION: Duration = Duration::from_secs(5);
 
     Maybe::or_empty(|| {
-        Label::raw()
+        Flex::row()
+            .with_child(
+                Label::dynamic(|alert: &Alert, _| match alert.style {
+                    AlertStyle::Error => "Error:".to_string(),
+                })
+                .with_font(theme::UI_FONT_MEDIUM),
+            )
+            .with_default_spacer()
+            .with_flex_child(Label::raw().lens(Alert::message), 1.0)
             .padding(theme::grid(2.0))
-            .background(theme::RED)
-            .expand_width()
-            .lens(Alert::message)
+            .background(BG)
+            .env_scope(|env, alert: &Alert| {
+                env.set(
+                    BG,
+                    match alert.style {
+                        AlertStyle::Error => env.get(theme::RED),
+                    },
+                )
+            })
             .controller(AfterDelay::new(ALERT_DURATION, |ctx, _, _| {
-                ctx.submit_command(REMOVE_ALERT);
+                ctx.submit_command(DISMISS_ALERT);
             }))
     })
-    .on_command(REMOVE_ALERT, |_, _, alert| {
+    .on_command(DISMISS_ALERT, |_, _, alert| {
         alert.take();
     })
     .lens(AppState::alert)

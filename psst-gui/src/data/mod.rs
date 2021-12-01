@@ -14,7 +14,7 @@ mod track;
 mod user;
 pub mod utils;
 
-use std::{mem, sync::Arc, time::Duration};
+use std::{fmt::Display, mem, sync::Arc, time::Duration};
 
 use druid::{
     im::{HashSet, Vector},
@@ -231,6 +231,15 @@ impl AppState {
     }
 }
 
+impl AppState {
+    pub fn error_alert(&mut self, message: impl Display) {
+        self.alert = Some(Alert {
+            style: AlertStyle::Error,
+            message: message.to_string().into(),
+        });
+    }
+}
+
 #[derive(Clone, Data, Lens)]
 pub struct Library {
     pub user_profile: Promise<UserProfile>,
@@ -362,5 +371,11 @@ pub struct Personalized {
 
 #[derive(Clone, Data, Lens)]
 pub struct Alert {
-    message: Arc<str>,
+    pub style: AlertStyle,
+    pub message: Arc<str>,
+}
+
+#[derive(Clone, Data, Eq, PartialEq)]
+pub enum AlertStyle {
+    Error,
 }

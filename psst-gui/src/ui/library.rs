@@ -65,8 +65,10 @@ pub fn saved_tracks_widget() -> impl Widget<AppState> {
                 library.add_track(t);
             });
         },
-        |_, _, _| {
-            // TODO: Handle failure.
+        |_, data, (_, r)| {
+            if let Err(err) = r {
+                data.error_alert(err);
+            }
         },
     )
     .on_command_async(
@@ -77,8 +79,10 @@ pub fn saved_tracks_widget() -> impl Widget<AppState> {
                 library.remove_track(&i);
             });
         },
-        |_, _, _| {
-            // TODO: Handle failure.
+        |_, data, (_, r)| {
+            if let Err(err) = r {
+                data.error_alert(err);
+            }
         },
     )
 }
@@ -118,8 +122,10 @@ pub fn saved_albums_widget() -> impl Widget<AppState> {
                 library.add_album(a);
             });
         },
-        |_, _, _| {
-            // TODO: Handle failure.
+        |_, data, (_, r)| {
+            if let Err(err) = r {
+                data.error_alert(err);
+            }
         },
     )
     .on_command_async(
@@ -130,8 +136,10 @@ pub fn saved_albums_widget() -> impl Widget<AppState> {
                 library.remove_album(&l.id);
             });
         },
-        |_, _, _| {
-            // TODO: Handle failure.
+        |_, data, (_, r)| {
+            if let Err(err) = r {
+                data.error_alert(err);
+            }
         },
     )
 }
