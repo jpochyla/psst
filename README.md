@@ -2,6 +2,8 @@
 
 Fast Spotify client with native GUI, without Electron, built in Rust. Very early in development, lacking in features, stability, and general user experience. It is being tested only on Mac so far, but aims for full Windows and Linux support. Contributions welcome!
 
+**Note:** Spotify Premium account is required.
+
 [![Build](https://github.com/jpochyla/psst/actions/workflows/build.yml/badge.svg)](https://github.com/jpochyla/psst/actions)
 
 ![Screenshot](./psst-gui/assets/screenshot.png)
