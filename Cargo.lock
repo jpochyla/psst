@@ -620,7 +620,7 @@ checksum = "bd0c93bb4b0c6d9b77f4435b0ae98c24d17f1c45b2ff844c6151a07256ca923b"
 [[package]]
 name = "druid"
 version = "0.7.0"
-source = "git+https://github.com/jpochyla/druid?branch=psst#faa66f1cd2c0e20581032b7bbcbdd3e8c9194c11"
+source = "git+https://github.com/jpochyla/druid?branch=psst#10be5170dc4d4a354d74eb940c28f8872390d73d"
 dependencies = [
  "console_error_panic_hook",
  "druid-derive",
@@ -642,7 +642,7 @@ dependencies = [
 [[package]]
 name = "druid-derive"
 version = "0.4.0"
-source = "git+https://github.com/jpochyla/druid?branch=psst#faa66f1cd2c0e20581032b7bbcbdd3e8c9194c11"
+source = "git+https://github.com/jpochyla/druid?branch=psst#10be5170dc4d4a354d74eb940c28f8872390d73d"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -652,7 +652,7 @@ dependencies = [
 [[package]]
 name = "druid-shell"
 version = "0.7.0"
-source = "git+https://github.com/jpochyla/druid?branch=psst#faa66f1cd2c0e20581032b7bbcbdd3e8c9194c11"
+source = "git+https://github.com/jpochyla/druid?branch=psst#10be5170dc4d4a354d74eb940c28f8872390d73d"
 dependencies = [
  "anyhow",
  "bitflags",
