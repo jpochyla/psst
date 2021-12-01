@@ -25,7 +25,8 @@ use ureq::{Agent, Request, Response};
 use crate::{
     data::{
         Album, AlbumType, Artist, ArtistAlbums, AudioAnalysis, Cached, Nav, Page, Playlist, Range,
-        Recommendations, RecommendationsRequest, SearchResults, SpotifyUrl, Track, UserProfile,
+        Recommendations, RecommendationsRequest, SearchResults, SearchTopic, SpotifyUrl, Track,
+        UserProfile,
     },
     error::Error,
 };
@@ -452,7 +453,7 @@ impl WebApi {
 /// Search endpoints.
 impl WebApi {
     // https://developer.spotify.com/documentation/web-api/reference/search/
-    pub fn search(&self, query: &str) -> Result<SearchResults, Error> {
+    pub fn search(&self, query: &str, topics: &[SearchTopic]) -> Result<SearchResults, Error> {
         #[derive(Deserialize)]
         struct ApiSearchResults {
             artists: Option<Page<Artist>>,
@@ -461,10 +462,11 @@ impl WebApi {
             playlists: Option<Page<Playlist>>,
         }
 
+        let topics = topics.iter().map(SearchTopic::as_str).join(",");
         let request = self
             .get("v1/search")?
             .query("q", query)
-            .query("type", "artist,album,track,playlist")
+            .query("type", &topics)
             .query("marker", "from_token");
         let result: ApiSearchResults = self.load(request)?;
 

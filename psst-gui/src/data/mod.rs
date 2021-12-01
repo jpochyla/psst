@@ -39,7 +39,7 @@ pub use crate::data::{
         Range, Recommend, Recommendations, RecommendationsKnobs, RecommendationsParams,
         RecommendationsRequest, Toggled,
     },
-    search::{Search, SearchResults},
+    search::{Search, SearchResults, SearchTopic},
     track::{AudioAnalysis, AudioSegment, TimeInterval, Track, TrackId},
     user::UserProfile,
     utils::{Cached, Float64, Image, Page},
