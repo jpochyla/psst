@@ -64,7 +64,6 @@ impl Authentication {
 const APP_NAME: &str = "Psst";
 const CONFIG_FILENAME: &str = "config.json";
 const PROXY_ENV_VAR: &str = "SOCKS_PROXY";
-const USE_XDG_ON_MACOS: bool = false;
 
 #[derive(Clone, Debug, Data, Lens, Serialize, Deserialize)]
 #[serde(default)]
@@ -93,12 +92,14 @@ impl Default for Config {
 
 impl Config {
     fn app_dirs() -> Option<AppDirs> {
+        const USE_XDG_ON_MACOS: bool = false;
+
         AppDirs::new(Some(APP_NAME), USE_XDG_ON_MACOS)
     }
 
     pub fn spotify_local_files_file(username: &str) -> Option<PathBuf> {
-        AppDirs::new(Some("spotify"), USE_XDG_ON_MACOS).map(|dir| {
-            let path = format!("Users/{username}-user/local-files.bnk", username = username);
+        AppDirs::new(Some("spotify"), false).map(|dir| {
+            let path = format!("Users/{}-user/local-files.bnk", username);
             dir.config_dir.join(path)
         })
     }

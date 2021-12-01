@@ -1,10 +1,12 @@
-use crate::{
-    data::{
-        Album, AlbumType, Artist, ArtistAlbums, AudioAnalysis, Cached, Nav, Page, Playlist, Range,
-        Recommendations, RecommendationsRequest, SearchResults, SpotifyUrl, Track, UserProfile,
-    },
-    error::Error,
+use std::{
+    fmt::Display,
+    io::{self, Read},
+    path::PathBuf,
+    sync::Arc,
+    thread,
+    time::Duration,
 };
+
 use druid::{
     im::Vector,
     image::{self, ImageFormat},
@@ -12,20 +14,21 @@ use druid::{
 };
 use itertools::Itertools;
 use once_cell::sync::OnceCell;
+use parking_lot::Mutex;
 use psst_core::{
     session::{access_token::TokenProvider, SessionService},
     util::default_ureq_agent_builder,
 };
 use serde::{de::DeserializeOwned, Deserialize};
-use std::{
-    fmt::Display,
-    io::{self, Read},
-    path::PathBuf,
-    sync::{Arc, Mutex},
-    thread,
-    time::Duration,
-};
 use ureq::{Agent, Request, Response};
+
+use crate::{
+    data::{
+        Album, AlbumType, Artist, ArtistAlbums, AudioAnalysis, Cached, Nav, Page, Playlist, Range,
+        Recommendations, RecommendationsRequest, SearchResults, SpotifyUrl, Track, UserProfile,
+    },
+    error::Error,
+};
 
 use super::{cache::WebApiCache, local::LocalTrackManager};
 
@@ -182,7 +185,6 @@ impl WebApi {
         if let Err(err) = self
             .local_track_manager
             .lock()
-            .unwrap()
             .load_tracks_for_user(username)
         {
             log::error!("failed to read local tracks: {}", err);
@@ -420,7 +422,7 @@ impl WebApi {
             .query("additional_types", "track");
         let result: Vector<PlaylistItem> = self.load_all_pages(request)?;
 
-        let local_track_manager = self.local_track_manager.lock().unwrap();
+        let local_track_manager = self.local_track_manager.lock();
 
         Ok(result
             .into_iter()
