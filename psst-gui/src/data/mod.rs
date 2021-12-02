@@ -14,7 +14,15 @@ mod track;
 mod user;
 pub mod utils;
 
-use std::{fmt::Display, mem, sync::Arc, time::Duration};
+use std::{
+    fmt::Display,
+    mem,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
+    time::Duration,
+};
 
 use druid::{
     im::{HashSet, Vector},
@@ -63,7 +71,7 @@ pub struct AppState {
     pub library: Arc<Library>,
     pub common_ctx: Arc<CommonCtx>,
     pub personalized: Personalized,
-    pub alert: Option<Alert>,
+    pub alerts: Vector<Alert>,
 }
 
 impl AppState {
@@ -127,7 +135,7 @@ impl AppState {
             personalized: Personalized {
                 made_for_you: Promise::Empty,
             },
-            alert: None,
+            alerts: Vector::new(),
         }
     }
 }
@@ -232,11 +240,24 @@ impl AppState {
 }
 
 impl AppState {
-    pub fn error_alert(&mut self, message: impl Display) {
-        self.alert = Some(Alert {
-            style: AlertStyle::Error,
+    pub fn info_alert(&mut self, message: impl Display) {
+        self.alerts.push_back(Alert {
             message: message.to_string().into(),
+            style: AlertStyle::Info,
+            id: Alert::fresh_id(),
         });
+    }
+
+    pub fn error_alert(&mut self, message: impl Display) {
+        self.alerts.push_back(Alert {
+            message: message.to_string().into(),
+            style: AlertStyle::Error,
+            id: Alert::fresh_id(),
+        });
+    }
+
+    pub fn dismiss_alert(&mut self, id: usize) {
+        self.alerts.retain(|a| a.id != id);
     }
 }
 
@@ -369,13 +390,23 @@ pub struct Personalized {
     pub made_for_you: Promise<Vector<Playlist>>,
 }
 
+static ALERT_ID: AtomicUsize = AtomicUsize::new(0);
+
 #[derive(Clone, Data, Lens)]
 pub struct Alert {
-    pub style: AlertStyle,
+    pub id: usize,
     pub message: Arc<str>,
+    pub style: AlertStyle,
+}
+
+impl Alert {
+    fn fresh_id() -> usize {
+        ALERT_ID.fetch_add(1, Ordering::SeqCst)
+    }
 }
 
 #[derive(Clone, Data, Eq, PartialEq)]
 pub enum AlertStyle {
     Error,
+    Info,
 }

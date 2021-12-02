@@ -69,6 +69,8 @@ pub fn list_widget() -> impl Widget<AppState> {
         |_, data, (_, r)| {
             if let Err(err) = r {
                 data.error_alert(err);
+            } else {
+                data.info_alert("Added to playlist.");
             }
         },
     )

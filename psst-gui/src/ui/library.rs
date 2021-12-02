@@ -68,6 +68,8 @@ pub fn saved_tracks_widget() -> impl Widget<AppState> {
         |_, data, (_, r)| {
             if let Err(err) = r {
                 data.error_alert(err);
+            } else {
+                data.info_alert("Track added to library.")
             }
         },
     )
@@ -82,6 +84,8 @@ pub fn saved_tracks_widget() -> impl Widget<AppState> {
         |_, data, (_, r)| {
             if let Err(err) = r {
                 data.error_alert(err);
+            } else {
+                data.info_alert("Track removed from library.")
             }
         },
     )
@@ -125,6 +129,8 @@ pub fn saved_albums_widget() -> impl Widget<AppState> {
         |_, data, (_, r)| {
             if let Err(err) = r {
                 data.error_alert(err);
+            } else {
+                data.info_alert("Album added to library.");
             }
         },
     )
@@ -139,6 +145,8 @@ pub fn saved_albums_widget() -> impl Widget<AppState> {
         |_, data, (_, r)| {
             if let Err(err) = r {
                 data.error_alert(err);
+            } else {
+                data.info_alert("Album removed from library.");
             }
         },
     )

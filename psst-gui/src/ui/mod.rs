@@ -3,7 +3,7 @@ use std::time::Duration;
 use druid::{
     im::Vector,
     lens::Unit,
-    widget::{CrossAxisAlignment, Either, Flex, Label, Scroll, Slider, Split, ViewSwitcher},
+    widget::{CrossAxisAlignment, Either, Flex, Label, List, Scroll, Slider, Split, ViewSwitcher},
     Color, Env, Insets, Key, LensExt, Menu, MenuItem, Selector, Widget, WidgetExt, WindowDesc,
 };
 
@@ -12,8 +12,7 @@ use crate::{
     controller::{AfterDelay, NavController, SessionController},
     data::{Alert, AlertStyle, AppState, Nav, Playback, PlaylistDetail, Route},
     widget::{
-        icons, icons::SvgIcon, Border, Empty, Maybe, MyWidgetExt, Overlay, ThemeScope,
-        ViewDispatcher,
+        icons, icons::SvgIcon, Border, Empty, MyWidgetExt, Overlay, ThemeScope, ViewDispatcher,
     },
 };
 
@@ -152,14 +151,15 @@ fn root_widget() -> impl Widget<AppState> {
 
 fn alert_widget() -> impl Widget<AppState> {
     const BG: Key<Color> = Key::new("app.alert.BG");
-    const DISMISS_ALERT: Selector = Selector::new("app.alert.dismiss");
+    const DISMISS_ALERT: Selector<usize> = Selector::new("app.alert.dismiss");
     const ALERT_DURATION: Duration = Duration::from_secs(5);
 
-    Maybe::or_empty(|| {
+    List::new(|| {
         Flex::row()
             .with_child(
                 Label::dynamic(|alert: &Alert, _| match alert.style {
                     AlertStyle::Error => "Error:".to_string(),
+                    AlertStyle::Info => String::new(),
                 })
                 .with_font(theme::UI_FONT_MEDIUM),
             )
@@ -172,17 +172,21 @@ fn alert_widget() -> impl Widget<AppState> {
                     BG,
                     match alert.style {
                         AlertStyle::Error => env.get(theme::RED),
+                        AlertStyle::Info => env.get(theme::GREY_600),
                     },
                 )
             })
-            .controller(AfterDelay::new(ALERT_DURATION, |ctx, _, _| {
-                ctx.submit_command(DISMISS_ALERT);
-            }))
+            .controller(AfterDelay::new(
+                ALERT_DURATION,
+                |ctx, alert: &mut Alert, _| {
+                    ctx.submit_command(DISMISS_ALERT.with(alert.id));
+                },
+            ))
     })
-    .on_command(DISMISS_ALERT, |_, _, alert| {
-        alert.take();
+    .lens(AppState::alerts)
+    .on_command(DISMISS_ALERT, |_, &id, state| {
+        state.dismiss_alert(id);
     })
-    .lens(AppState::alert)
 }
 
 fn route_widget() -> impl Widget<AppState> {
