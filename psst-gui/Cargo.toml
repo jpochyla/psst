@@ -39,7 +39,13 @@ winres = "0.1.11"
 [package.metadata.bundle]
 name = "Psst"
 identifier = "com.jpochyla.psst"
-icon = ["assets/logo.ico"]
+icon = [
+    "assets/logo_32.png",
+    "assets/logo_64.png",
+    "assets/logo_128.png",
+    "assets/logo_256.png",
+    "assets/logo_512.png",
+]
 version = "0.1.0"
 resources = []
 copyright = "Copyright (c) Jan Pochyla 2021. All rights reserved."
