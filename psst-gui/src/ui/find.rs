@@ -122,7 +122,7 @@ pub fn finder_widget(selector: Selector<Find>, label: &'static str) -> impl Widg
         .with_text_color(theme::PLACEHOLDER_COLOR);
 
     let results = Label::dynamic(|finder: &Finder, _| {
-        format!("{} / {}", finder.focused_result, finder.results)
+        format!("{} / {}", finder.focused_result + 1, finder.results)
     })
     .with_text_size(theme::TEXT_SIZE_SMALL)
     .with_text_color(theme::PLACEHOLDER_COLOR);
