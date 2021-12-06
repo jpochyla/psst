@@ -45,6 +45,7 @@ icon = [
     "assets/logo_128.png",
     "assets/logo_256.png",
     "assets/logo_512.png",
+    "assets/logo.ico",
 ]
 version = "0.1.0"
 resources = []
