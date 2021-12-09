@@ -26,14 +26,22 @@ jobs:
       with:
         profile: minimal
         toolchain: stable
-    - uses: jruipinto/ImageMagick-action@v1
-      with:
-        command: convert .\psst-gui\assets\logo_32.png -colors 256 logo_32_8bpp.png
-        command: convert .\psst-gui\assets\logo_32.png -colors 16 logo_32_4bpp.png
-        command: convert .\psst-gui\assets\logo_32.png -resize 16x16 -extent 16x16 -colors 256 logo_16_8bpp.png
-        command: convert .\psst-gui\assets\logo_32.png -resize 16x16 -extent 16x16 -colors 16 logo_16_4bpp.png
-        command: convert .\psst-gui\assets\logo_256.png .\psst-gui\assets\logo_128.png .\psst-gui\assets\logo_64.png .\psst-gui\assets\logo_32.png .\psst-gui\assets\logo_32_8bpp.png .\psst-gui\assets\logo_32_4bpp.png .\psst-gui\assets\logo_16.png .\psst-gui\assets\logo_16_8bpp.png .\psst-gui\assets\logo_4bpp.png .\psst-gui\assets\logo.ico
+
+    - name: Install ImageMagick on Windows
       if: ${{ runner.os == 'Windows' }}
+      run: |
+        choco install -y imagemagick.app --no-progress
+        Get-ChildItem -Path "${env:ProgramFiles}" | Where-Object {($_.Name -Like 'ImageMagick*')} | % { $_.FullName }
+        refreshenv
+
+    - name: Generate Icon for Windows
+      if: ${{ runner.os == 'Windows' }}
+      run: |
+        magick convert .\psst-gui\assets\logo_32.png -colors 256 logo_32_8bpp.png
+        magick convert .\psst-gui\assets\logo_32.png -colors 16 logo_32_4bpp.png
+        magick convert .\psst-gui\assets\logo_32.png -resize 16x16 -extent 16x16 -colors 256 logo_16_8bpp.png
+        magick convert .\psst-gui\assets\logo_32.png -resize 16x16 -extent 16x16 -colors 16 logo_16_4bpp.png
+        magick convert .\psst-gui\assets\logo_256.png .\psst-gui\assets\logo_128.png .\psst-gui\assets\logo_64.png .\psst-gui\assets\logo_32.png .\psst-gui\assets\logo_32_8bpp.png .\psst-gui\assets\logo_32_4bpp.png .\psst-gui\assets\logo_16.png .\psst-gui\assets\logo_16_8bpp.png .\psst-gui\assets\logo_4bpp.png .\psst-gui\assets\logo.ico
 
     - uses: Swatinem/rust-cache@v1
 
