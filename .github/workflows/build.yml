@@ -41,9 +41,10 @@ jobs:
       run: |
         magick convert .\logo_32.png -colors 256 logo_32_8bpp.png
         magick convert .\logo_32.png -colors 16 logo_32_4bpp.png
+        magick convert .\logo_32.png -resize 16x16 -extent 16x16 logo_16.png
         magick convert .\logo_32.png -resize 16x16 -extent 16x16 -colors 256 logo_16_8bpp.png
         magick convert .\logo_32.png -resize 16x16 -extent 16x16 -colors 16 logo_16_4bpp.png
-        magick convert .\logo_256.png .\logo_128.png .\logo_64.png .\logo_32.png .\logo_32_8bpp.png .\logo_32_4bpp.png .\logo_16.png .\logo_16_8bpp.png .\logo_4bpp.png .\logo.ico
+        magick convert .\logo_256.png .\logo_128.png .\logo_64.png .\logo_32.png .\logo_32_8bpp.png .\logo_32_4bpp.png .\logo_16.png .\logo_16_8bpp.png .\logo_16_4bpp.png .\logo.ico
       working-directory: psst-gui\assets
 
     - uses: Swatinem/rust-cache@v1
