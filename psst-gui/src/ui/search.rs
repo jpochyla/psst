@@ -114,6 +114,7 @@ fn track_results_widget() -> impl Widget<WithCtx<SearchResults>> {
                 title: true,
                 artist: true,
                 album: true,
+                cover: true,
                 ..TrackDisplay::empty()
             })),
     )

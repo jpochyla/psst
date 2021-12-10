@@ -132,6 +132,7 @@ pub fn detail_widget() -> impl Widget<AppState> {
                     title: true,
                     artist: true,
                     album: true,
+                    cover: true,
                     ..TrackDisplay::empty()
                 },
                 cmd::FIND_IN_PLAYLIST,
