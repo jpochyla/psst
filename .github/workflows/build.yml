@@ -31,7 +31,10 @@ jobs:
       if: ${{ runner.os == 'Windows' }}
       run: |
         choco install -y imagemagick.app --no-progress
-        Get-ChildItem -Path "${env:ProgramFiles}" | Where-Object {($_.Name -Like 'ImageMagick*')} | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+        $IMFolderName = Get-ChildItem -Path "${env:ProgramFiles}" | Where-Object {($_.Name -Like 'ImageMagick*')} | Convert-String -Example "Name=Name"
+        $IMAbsolutePath = Join-Path -Path "${env:ProgramFiles}" -ChildPath "${IMFolderName}"
+        $IMAbsolutePath | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+        echo $IMAbsolutePath
 
     - name: Generate Icon for Windows
       if: ${{ runner.os == 'Windows' }}
