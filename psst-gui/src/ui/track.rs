@@ -318,13 +318,14 @@ fn track_widget(display: TrackDisplay) -> impl Widget<TrackRow> {
     major.add_default_spacer();
     major.add_child(track_duration);
 
-    let main_columns = Flex::column()
-        .cross_axis_alignment(CrossAxisAlignment::Start)
-        .with_child(major)
-        .with_spacer(2.0)
-        .with_child(minor);
-
-    main_row.with_child(main_columns)
+    main_row.with_flex_child(
+            Flex::column()
+                .cross_axis_alignment(CrossAxisAlignment::Start)
+                .with_child(major)
+                .with_spacer(2.0)
+                .with_child(minor),
+            1.0
+        )
         .padding(theme::grid(1.0))
         .link()
         .active(|row, _| row.is_playing)
