@@ -287,7 +287,7 @@ fn client_hello(public_key: Vec<u8>, nonce: Vec<u8>) -> Vec<u8> {
     let hello = ClientHello {
         build_info: BuildInfo {
             platform: Platform::PLATFORM_LINUX_X86,
-            product: Product::PRODUCT_PARTNER,
+            product: Product::PRODUCT_CLIENT,
             product_flags: vec![],
             version: 109_800_078,
         },
