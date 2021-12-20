@@ -42,6 +42,7 @@ Release build:
 ```shell
 git submodule update --recursive --init
 cargo build --release
+# Use `cargo bundle --release` for building the installation bundle (i.e. macOS .app)
 ```
 
 ##### Running and configuration
@@ -49,7 +50,7 @@ cargo build --release
 ```shell
 cd psst-gui
 cargo run
-# Use cargo run --release for the release build.
+# Use `cargo run --release` for the release build.
 ```
 
 ##### Roadmap
