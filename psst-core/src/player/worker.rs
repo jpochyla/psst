@@ -213,11 +213,6 @@ impl AudioSource for DecoderSource {
             if self.event_send.try_send(PlayerEvent::EndOfTrack).is_ok() {
                 self.end_of_track = true;
             }
-            log::debug!(
-                "end of track, position: {}, total: {}",
-                position,
-                total_samples
-            );
         }
 
         written
@@ -289,6 +284,14 @@ impl Worker {
             .codec_params()
             .max_frames_per_packet
             .unwrap_or(DEFAULT_MAX_FRAMES);
+
+        // Promote the worker thread to audio priority to prevent buffer under-runs on
+        // high CPU usage.
+        if let Err(err) =
+            audio_thread_priority::promote_current_thread_to_real_time(0, input.signal_spec().rate)
+        {
+            log::warn!("failed to promote thread to audio priority: {}", err);
+        }
 
         Self {
             output_producer: output.producer(),

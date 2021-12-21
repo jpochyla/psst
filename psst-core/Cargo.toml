@@ -8,6 +8,7 @@ edition = "2018"
 psst-protocol = { path = "../psst-protocol" }
 
 aes = { version = "0.7", features = ["ctr"] }
+audio_thread_priority = "0.23"
 byteorder = "1.4"
 cpal = "0.13"
 crossbeam-channel = "0.5"
