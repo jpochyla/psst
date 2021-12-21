@@ -85,6 +85,7 @@ impl AppState {
         let common_ctx = Arc::new(CommonCtx {
             playback_item: None,
             library: Arc::clone(&library),
+            show_track_cover: config.show_track_cover,
         });
         let playback = Playback {
             state: PlaybackState::Stopped,
@@ -372,6 +373,7 @@ impl SavedAlbums {
 pub struct CommonCtx {
     pub playback_item: Option<Arc<Track>>,
     pub library: Arc<Library>,
+    pub show_track_cover: bool,
 }
 
 impl CommonCtx {

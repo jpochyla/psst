@@ -5,7 +5,8 @@ use druid::{
     kurbo::Line,
     piet::StrokeStyle,
     widget::{
-        Controller, ControllerHost, CrossAxisAlignment, Flex, Label, List, ListIter, Painter,
+        Controller, ControllerHost, CrossAxisAlignment, Either, Flex, Label, List, ListIter,
+        Painter,
     },
     Data, Env, Event, EventCtx, Lens, LensExt, LocalizedString, Menu, MenuItem, RenderContext,
     Selector, Size, TextAlignment, Widget, WidgetExt,
@@ -19,12 +20,13 @@ use crate::{
         RecommendationsRequest, SavedTracks, SearchResults, Track, WithCtx,
     },
     ui::playlist,
-    widget::{MyWidgetExt, RemoteImage},
+    widget::{Empty, MyWidgetExt, RemoteImage},
 };
 
 use super::{
     find::{Find, Findable},
-    library, theme, utils::{self, placeholder_widget},
+    library, theme,
+    utils::{self, placeholder_widget},
 };
 
 #[derive(Copy, Clone)]
@@ -245,13 +247,16 @@ fn track_widget(display: TrackDisplay) -> impl Widget<TrackRow> {
         minor.add_default_spacer();
     }
 
-	if display.cover {
-		let album_cover = rounded_cover_widget(theme::grid(4.0)) 
-			.lens(TrackRow::track);
-
-        main_row.add_child(album_cover);
-        main_row.add_default_spacer();
-	}
+    if display.cover {
+        let album_cover = rounded_cover_widget(theme::grid(4.0))
+            .padding_right(theme::grid(1.0)) // Instead of `add_default_spacer`.
+            .lens(TrackRow::track);
+        main_row.add_child(Either::new(
+            |row, _| row.ctx.show_track_cover,
+            album_cover,
+            Empty,
+        ));
+    }
 
     if display.title {
         let track_name = Label::raw()
@@ -318,13 +323,14 @@ fn track_widget(display: TrackDisplay) -> impl Widget<TrackRow> {
     major.add_default_spacer();
     major.add_child(track_duration);
 
-    main_row.with_flex_child(
+    main_row
+        .with_flex_child(
             Flex::column()
                 .cross_axis_alignment(CrossAxisAlignment::Start)
                 .with_child(major)
                 .with_spacer(2.0)
                 .with_child(minor),
-            1.0
+            1.0,
         )
         .padding(theme::grid(1.0))
         .link()
@@ -338,9 +344,10 @@ fn track_widget(display: TrackDisplay) -> impl Widget<TrackRow> {
 
 fn cover_widget(size: f64) -> impl Widget<Arc<Track>> {
     RemoteImage::new(placeholder_widget(), move |track: &Arc<Track>, _| {
-        track.album.as_ref().and_then(|al| 
-            al.image(size, size).map(|image| image.url.clone())
-        )
+        track
+            .album
+            .as_ref()
+            .and_then(|al| al.image(size, size).map(|image| image.url.clone()))
     })
     .fix_size(size, size)
 }
