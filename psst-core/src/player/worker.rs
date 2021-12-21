@@ -54,17 +54,24 @@ impl PlaybackManager {
             self.event_send.clone(),
         );
         self.current = Some((path, source.actor.sender()));
-        // Some output streams have different sample rate than the source, so we need to
-        // resample before pushing to the sink.
-        let source = ResampledSource::new(
-            source,
-            self.sink.sample_rate(),
-            ResamplingQuality::SincMediumQuality,
-        );
-        // Source output streams also have a different channel count. Map the stereo
-        // channels and silence the others.
-        let source = StereoMappedSource::new(source, self.sink.channel_count());
-        self.sink.play(source);
+        if source.sample_rate() == self.sink.sample_rate()
+            && source.channel_count() == self.sink.channel_count()
+        {
+            // We can start playing the source right away.
+            self.sink.play(source);
+        } else {
+            // Some output streams have different sample rate than the source, so we need to
+            // resample before pushing to the sink.
+            let source = ResampledSource::new(
+                source,
+                self.sink.sample_rate(),
+                ResamplingQuality::SincMediumQuality,
+            );
+            // Source output streams also have a different channel count. Map the stereo
+            // channels and silence the others.
+            let source = StereoMappedSource::new(source, self.sink.channel_count());
+            self.sink.play(source);
+        }
         self.sink.resume();
     }
 
