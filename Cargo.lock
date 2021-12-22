@@ -639,7 +639,7 @@ checksum = "bd0c93bb4b0c6d9b77f4435b0ae98c24d17f1c45b2ff844c6151a07256ca923b"
 [[package]]
 name = "druid"
 version = "0.7.0"
-source = "git+https://github.com/jpochyla/druid?branch=psst#10be5170dc4d4a354d74eb940c28f8872390d73d"
+source = "git+https://github.com/jpochyla/druid?branch=psst#625374b59c3772152045528c4914d3b3be0e54cf"
 dependencies = [
  "console_error_panic_hook",
  "druid-derive",
@@ -651,7 +651,7 @@ dependencies = [
  "im",
  "instant",
  "tracing",
- "tracing-subscriber 0.2.25",
+ "tracing-subscriber",
  "tracing-wasm",
  "unic-langid",
  "unicode-segmentation",
@@ -661,7 +661,7 @@ dependencies = [
 [[package]]
 name = "druid-derive"
 version = "0.4.0"
-source = "git+https://github.com/jpochyla/druid?branch=psst#10be5170dc4d4a354d74eb940c28f8872390d73d"
+source = "git+https://github.com/jpochyla/druid?branch=psst#625374b59c3772152045528c4914d3b3be0e54cf"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -671,7 +671,7 @@ dependencies = [
 [[package]]
 name = "druid-shell"
 version = "0.7.0"
-source = "git+https://github.com/jpochyla/druid?branch=psst#10be5170dc4d4a354d74eb940c28f8872390d73d"
+source = "git+https://github.com/jpochyla/druid?branch=psst#625374b59c3772152045528c4914d3b3be0e54cf"
 dependencies = [
  "anyhow",
  "bitflags",
@@ -1290,9 +1290,9 @@ dependencies = [
 
 [[package]]
 name = "keyboard-types"
-version = "0.5.0"
+version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a989afac88279b0482f402d234b5fbd405bf1ad051308595b58de4e6de22346b"
+checksum = "0b7668b7cff6a51fe61cdde64cd27c8a220786f399501b57ebe36f7d8112fd68"
 dependencies = [
  "bitflags",
 ]
@@ -2678,22 +2678,11 @@ dependencies = [
 
 [[package]]
 name = "tracing-subscriber"
-version = "0.2.25"
+version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0e0d2eaa99c3c2e41547cfa109e910a68ea03823cccad4a0525dcbc9b01e8c71"
+checksum = "245da694cc7fc4729f3f418b304cb57789f1bed2a78c575407ab8a23f53cb4d3"
 dependencies = [
  "ansi_term",
- "sharded-slab",
- "thread_local",
- "tracing-core",
-]
-
-[[package]]
-name = "tracing-subscriber"
-version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "80a4ddde70311d8da398062ecf6fc2c309337de6b0f77d6c27aff8d53f6fca52"
-dependencies = [
  "sharded-slab",
  "thread_local",
  "tracing-core",
@@ -2706,7 +2695,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4575c663a174420fa2d78f4108ff68f65bf2fbb7dd89f33749b6e826b3626e07"
 dependencies = [
  "tracing",
- "tracing-subscriber 0.3.1",
+ "tracing-subscriber",
  "wasm-bindgen",
 ]
 
