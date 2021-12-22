@@ -17,7 +17,7 @@ use crate::{
         AppState, AudioQuality, Authentication, Config, Preferences, PreferencesTab, Promise, Theme,
     },
     webapi::WebApi,
-    widget::{icons, Async, Border, MyWidgetExt},
+    widget::{icons, Async, Border, Checkbox, MyWidgetExt},
 };
 
 use super::{icons::SvgIcon, theme};
@@ -46,6 +46,8 @@ pub fn account_setup_widget() -> impl Widget<AppState> {
 }
 
 pub fn preferences_widget() -> impl Widget<AppState> {
+    const PROPAGATE_FLAGS: Selector = Selector::new("app.preferences.propagate-flags");
+
     Flex::column()
         .must_fill_main_axis(true)
         .cross_axis_alignment(CrossAxisAlignment::Fill)
@@ -68,11 +70,23 @@ pub fn preferences_widget() -> impl Widget<AppState> {
             .padding(theme::grid(4.0))
             .background(Border::Top.with_color(theme::GREY_500)),
         )
-        .on_update(|_, old_data, data, _| {
+        .on_update(|ctx, old_data, data, _| {
             // Immediately save any changes in the config.
             if !old_data.config.same(&data.config) {
                 data.config.save();
             }
+
+            // Propagate some flags further to the state.
+            if !old_data
+                .config
+                .show_track_cover
+                .same(&data.config.show_track_cover)
+            {
+                ctx.submit_command(PROPAGATE_FLAGS);
+            }
+        })
+        .on_command(PROPAGATE_FLAGS, |_, _, data| {
+            data.common_ctx_mut().show_track_cover = data.config.show_track_cover;
         })
 }
 
@@ -131,6 +145,14 @@ fn general_tab_widget() -> impl Widget<AppState> {
             RadioGroup::new(vec![("Light", Theme::Light), ("Dark", Theme::Dark)])
                 .lens(AppState::config.then(Config::theme)),
         );
+
+    col = col.with_spacer(theme::grid(1.5));
+
+    // Show track covers
+    col = col.with_child(
+        Checkbox::new("Show album covers for tracks")
+            .lens(AppState::config.then(Config::show_track_cover)),
+    );
 
     col = col.with_spacer(theme::grid(3.0));
 

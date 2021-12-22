@@ -75,6 +75,7 @@ pub struct Config {
     pub volume: f64,
     pub last_route: Option<Nav>,
     pub queue_behavior: QueueBehavior,
+    pub show_track_cover: bool,
 }
 
 impl Default for Config {
@@ -86,6 +87,7 @@ impl Default for Config {
             volume: 1.0,
             last_route: Default::default(),
             queue_behavior: Default::default(),
+            show_track_cover: Default::default(),
         }
     }
 }

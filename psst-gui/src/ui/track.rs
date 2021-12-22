@@ -5,10 +5,11 @@ use druid::{
     kurbo::Line,
     piet::StrokeStyle,
     widget::{
-        Controller, ControllerHost, CrossAxisAlignment, Flex, Label, List, ListIter, Painter,
+        Controller, ControllerHost, CrossAxisAlignment, Either, Flex, Label, List, ListIter,
+        Painter,
     },
     Data, Env, Event, EventCtx, Lens, LensExt, LocalizedString, Menu, MenuItem, RenderContext,
-    Selector, TextAlignment, Widget, WidgetExt,
+    Selector, Size, TextAlignment, Widget, WidgetExt,
 };
 
 use crate::{
@@ -19,12 +20,13 @@ use crate::{
         RecommendationsRequest, SavedTracks, SearchResults, Track, WithCtx,
     },
     ui::playlist,
-    widget::MyWidgetExt,
+    widget::{Empty, MyWidgetExt, RemoteImage},
 };
 
 use super::{
     find::{Find, Findable},
-    library, theme, utils,
+    library, theme,
+    utils::{self, placeholder_widget},
 };
 
 #[derive(Copy, Clone)]
@@ -33,6 +35,7 @@ pub struct TrackDisplay {
     pub title: bool,
     pub artist: bool,
     pub album: bool,
+    pub cover: bool,
     pub popularity: bool,
 }
 
@@ -43,6 +46,7 @@ impl TrackDisplay {
             title: false,
             artist: false,
             album: false,
+            cover: false,
             popularity: false,
         }
     }
@@ -223,6 +227,7 @@ where
 }
 
 fn track_widget(display: TrackDisplay) -> impl Widget<TrackRow> {
+    let mut main_row = Flex::row();
     let mut major = Flex::row();
     let mut minor = Flex::row();
 
@@ -240,6 +245,17 @@ fn track_widget(display: TrackDisplay) -> impl Widget<TrackRow> {
         // Align the bottom line content.
         minor.add_spacer(theme::grid(2.0));
         minor.add_default_spacer();
+    }
+
+    if display.cover {
+        let album_cover = rounded_cover_widget(theme::grid(4.0))
+            .padding_right(theme::grid(1.0)) // Instead of `add_default_spacer`.
+            .lens(TrackRow::track);
+        main_row.add_child(Either::new(
+            |row, _| row.ctx.show_track_cover,
+            album_cover,
+            Empty,
+        ));
     }
 
     if display.title {
@@ -307,11 +323,15 @@ fn track_widget(display: TrackDisplay) -> impl Widget<TrackRow> {
     major.add_default_spacer();
     major.add_child(track_duration);
 
-    Flex::column()
-        .cross_axis_alignment(CrossAxisAlignment::Start)
-        .with_child(major)
-        .with_spacer(2.0)
-        .with_child(minor)
+    main_row
+        .with_flex_child(
+            Flex::column()
+                .cross_axis_alignment(CrossAxisAlignment::Start)
+                .with_child(major)
+                .with_spacer(2.0)
+                .with_child(minor),
+            1.0,
+        )
         .padding(theme::grid(1.0))
         .link()
         .active(|row, _| row.is_playing)
@@ -320,6 +340,20 @@ fn track_widget(display: TrackDisplay) -> impl Widget<TrackRow> {
             ctx.submit_notification(cmd::PLAY_TRACK_AT.with(row.position));
         })
         .context_menu(track_row_menu)
+}
+
+fn cover_widget(size: f64) -> impl Widget<Arc<Track>> {
+    RemoteImage::new(placeholder_widget(), move |track: &Arc<Track>, _| {
+        track
+            .album
+            .as_ref()
+            .and_then(|al| al.image(size, size).map(|image| image.url.clone()))
+    })
+    .fix_size(size, size)
+}
+
+fn rounded_cover_widget(size: f64) -> impl Widget<Arc<Track>> {
+    cover_widget(size).clip(Size::new(size, size).to_rounded_rect(4.0))
 }
 
 fn popularity_stars(popularity: u32) -> String {
