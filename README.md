@@ -106,10 +106,14 @@ cargo run
 
 Contributions are very welcome! Project structure:
 
-- `/psst-cli` - Example CLI that plays a track.  Credentials need to be configured in the code.
 - `/psst-core` - Core library, takes care of Spotify TCP session, audio file retrieval, decoding, audio output, playback queue, etc.
 - `/psst-gui` - GUI application built with [Druid](https://github.com/linebender/druid)
+- `/psst-cli` - Example CLI that plays a track.  Credentials need to be configured in the code.
 - `/psst-protocol` - Internal Protobuf definitions used for Spotify communication.
+
+##### Privacy Policy
+
+Psst connects only to the official Spotify servers, does not call home. Cache of various things is stored locally, and can be deleted at any time. User credentials are not stored at all (re-usable authentication token from Spotify is used instead).
 
 ##### Thanks
 
