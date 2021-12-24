@@ -51,7 +51,7 @@ pub fn preferences_window() -> WindowDesc<AppState> {
 
     // On Windows, the window size includes the titlebar.
     let win_size = if cfg!(target_os = "windows") {
-        const WINDOWS_TITLEBAR_OFFSET: f64 = 6.0;
+        const WINDOWS_TITLEBAR_OFFSET: f64 = 32.0;
         (win_size.0, win_size.1 + WINDOWS_TITLEBAR_OFFSET)
     } else {
         win_size
