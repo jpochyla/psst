@@ -429,7 +429,10 @@ where
                     ctx.widget_id(),
                     ctx.window(),
                 );
+
+                // Initialize values loaded from the config.
                 self.set_volume(data.playback.volume);
+                self.set_queue_behavior(data.playback.queue_behavior);
 
                 // Request focus so we can receive keyboard events.
                 ctx.submit_command(cmd::SET_FOCUS.to(ctx.widget_id()));
