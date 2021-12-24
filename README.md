@@ -113,7 +113,7 @@ Contributions are very welcome! Project structure:
 
 ##### Privacy Policy
 
-Psst connects only to the official Spotify servers, does not call home. Cache of various things is stored locally, and can be deleted at any time. User credentials are not stored at all (re-usable authentication token from Spotify is used instead).
+Psst connects only to the official Spotify servers, and does not call home. Cache of various things is stored locally, and can be deleted at any time. User credentials are not stored at all (re-usable authentication token from Spotify is used instead).
 
 ##### Thanks
 
