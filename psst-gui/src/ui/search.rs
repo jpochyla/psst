@@ -44,41 +44,52 @@ pub fn input_widget() -> impl Widget<AppState> {
 }
 
 pub fn results_widget() -> impl Widget<AppState> {
-    Async::new(
-        spinner_widget,
-        || {
-            Flex::column()
-                .cross_axis_alignment(CrossAxisAlignment::Fill)
-                .with_child(artist_results_widget())
-                .with_child(album_results_widget())
-                .with_child(track_results_widget())
-                .with_child(playlist_results_widget())
+    Async::new(spinner_widget, loaded_results_widget, error_widget)
+        .lens(
+            Ctx::make(AppState::common_ctx, AppState::search.then(Search::results))
+                .then(Ctx::in_promise()),
+        )
+        .on_command_async(
+            LOAD_RESULTS,
+            |q| WebApi::global().search(&q, SearchTopic::all()),
+            |_, data, q| data.search.results.defer(q),
+            |_, data, r| data.search.results.update(r),
+        )
+        .on_command_async(
+            OPEN_LINK,
+            |l| WebApi::global().load_spotify_link(&l),
+            |_, data, l| data.search.results.defer(l.id()),
+            |ctx, data, (l, r)| match r {
+                Ok(nav) => {
+                    data.search.results.clear();
+                    ctx.submit_command(cmd::NAVIGATE.with(nav));
+                }
+                Err(err) => {
+                    data.search.results.reject(l.id(), err);
+                }
+            },
+        )
+}
+
+fn loaded_results_widget() -> impl Widget<WithCtx<SearchResults>> {
+    Either::new(
+        |results: &WithCtx<SearchResults>, _| {
+            results.data.artists.is_empty()
+                && results.data.albums.is_empty()
+                && results.data.tracks.is_empty()
+                && results.data.playlists.is_empty()
         },
-        error_widget,
-    )
-    .lens(
-        Ctx::make(AppState::common_ctx, AppState::search.then(Search::results))
-            .then(Ctx::in_promise()),
-    )
-    .on_command_async(
-        LOAD_RESULTS,
-        |q| WebApi::global().search(&q, SearchTopic::all()),
-        |_, data, q| data.search.results.defer(q),
-        |_, data, r| data.search.results.update(r),
-    )
-    .on_command_async(
-        OPEN_LINK,
-        |l| WebApi::global().load_spotify_link(&l),
-        |_, data, l| data.search.results.defer(l.id()),
-        |ctx, data, (l, r)| match r {
-            Ok(nav) => {
-                data.search.results.clear();
-                ctx.submit_command(cmd::NAVIGATE.with(nav));
-            }
-            Err(err) => {
-                data.search.results.reject(l.id(), err);
-            }
-        },
+        Label::new("No results")
+            .with_text_size(theme::TEXT_SIZE_LARGE)
+            .with_text_color(theme::PLACEHOLDER_COLOR)
+            .padding(theme::grid(6.0))
+            .center(),
+        Flex::column()
+            .cross_axis_alignment(CrossAxisAlignment::Fill)
+            .with_child(artist_results_widget())
+            .with_child(album_results_widget())
+            .with_child(track_results_widget())
+            .with_child(playlist_results_widget()),
     )
 }
 
