@@ -25,7 +25,7 @@ use ureq::{Agent, Request, Response};
 use crate::{
     data::{
         Album, AlbumType, Artist, ArtistAlbums, AudioAnalysis, Cached, Nav, Page, Playlist, Range,
-        Recommendations, RecommendationsRequest, SearchResults, SearchTopic, SpotifyUrl, Track,
+        Recommendations, RecommendationsRequest, SearchResults, SearchTopic, Show, SpotifyUrl, Track,
         UserProfile,
     },
     error::Error,
@@ -290,6 +290,19 @@ impl WebApi {
     }
 }
 
+
+/// Show endpoints. (Podcasts)
+impl WebApi {
+    // https://developer.spotify.com/documentation/web-api/reference/#/operations/get-a-show
+    pub fn get_show(&self, id: &str) -> Result<Cached<Arc<Show>>, Error> {
+        let request = self
+            .get(format!("v1/shows/{}", id))?
+            .query("market", "from_token");
+        let result = self.load_cached(request, "show", id)?;
+        Ok(result)
+    }
+}
+
 /// Track endpoints.
 impl WebApi {
     // https://developer.spotify.com/documentation/web-api/reference/#endpoint-get-track
@@ -347,6 +360,22 @@ impl WebApi {
             .load_all_pages(request)?
             .into_iter()
             .map(|item: SavedTrack| item.track)
+            .collect())
+    }
+
+    // https://developer.spotify.com/documentation/web-api/reference/#/operations/get-users-saved-shows
+    pub fn get_saved_shows(&self) -> Result<Vector<Arc<Show>>, Error> {
+        #[derive(Clone, Deserialize)]
+        struct SavedShow {
+            show: Arc<Show>,
+        }
+
+        let request = self.get("v1/me/shows")?.query("market", "from_token");
+
+        Ok(self
+            .load_all_pages(request)?
+            .into_iter()
+            .map(|item: SavedShow | item.show)
             .collect())
     }
 
@@ -488,6 +517,7 @@ impl WebApi {
             SpotifyUrl::Playlist(id) => Nav::PlaylistDetail(self.get_playlist(id)?.link()),
             SpotifyUrl::Artist(id) => Nav::ArtistDetail(self.get_artist(id)?.link()),
             SpotifyUrl::Album(id) => Nav::AlbumDetail(self.get_album(id)?.data.link()),
+            SpotifyUrl::Show(id) => Nav::AlbumDetail(self.get_album(id)?.data.link()),
             SpotifyUrl::Track(id) => Nav::AlbumDetail(
                 // TODO: We should highlight the exact track in the album.
                 self.get_track(id)?.album.clone().ok_or_else(|| {

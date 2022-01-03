@@ -10,6 +10,7 @@ mod playlist;
 mod promise;
 mod recommend;
 mod search;
+mod show;
 mod track;
 mod user;
 pub mod utils;
@@ -48,6 +49,7 @@ pub use crate::data::{
         RecommendationsRequest, Toggled,
     },
     search::{Search, SearchResults, SearchTopic},
+    show::{Show, ShowEpisodes, ShowLink},
     track::{AudioAnalysis, AudioSegment, TimeInterval, Track, TrackId},
     user::UserProfile,
     utils::{Cached, Float64, Image, Page},
@@ -80,6 +82,7 @@ impl AppState {
             user_profile: Promise::Empty,
             saved_albums: Promise::Empty,
             saved_tracks: Promise::Empty,
+            saved_shows: Promise::Empty,
             playlists: Promise::Empty,
         });
         let common_ctx = Arc::new(CommonCtx {
@@ -268,6 +271,7 @@ pub struct Library {
     pub playlists: Promise<Vector<Playlist>>,
     pub saved_albums: Promise<SavedAlbums>,
     pub saved_tracks: Promise<SavedTracks>,
+    pub saved_shows: Promise<SavedShows>,
 }
 
 impl Library {
@@ -366,6 +370,19 @@ impl SavedAlbums {
     pub fn new(albums: Vector<Arc<Album>>) -> Self {
         let set = albums.iter().map(|a| a.id.clone()).collect();
         Self { albums, set }
+    }
+}
+
+#[derive(Clone, Default, Data, Lens)]
+pub struct SavedShows {
+    pub shows: Vector<Arc<Show>>,
+    pub set: HashSet<Arc<str>>,
+}
+
+impl SavedShows {
+    pub fn new(shows: Vector<Arc<Show>>) -> Self {
+        let set = shows.iter().map(|a| a.id.clone()).collect();
+        Self { shows, set }
     }
 }
 

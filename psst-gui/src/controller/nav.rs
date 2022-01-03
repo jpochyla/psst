@@ -22,6 +22,11 @@ impl NavController {
                     ctx.submit_command(library::LOAD_ALBUMS);
                 }
             }
+            Nav::SavedShows => {
+                if !data.library.saved_shows.is_resolved() {
+                    ctx.submit_command(library::LOAD_SHOWS);
+                }
+            }
             Nav::SearchResults(query) => {
                 if let Some(link) = SpotifyUrl::parse(query) {
                     ctx.submit_command(search::OPEN_LINK.with(link));
@@ -43,6 +48,9 @@ impl NavController {
                 if !data.playlist_detail.playlist.contains(link) {
                     ctx.submit_command(playlist::LOAD_DETAIL.with(link.to_owned()));
                 }
+            }
+            Nav::ShowDetail(link) => {
+
             }
             Nav::Recommendations(request) => {
                 if !data.recommend.results.contains(request) {
