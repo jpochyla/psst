@@ -319,6 +319,28 @@ impl Library {
         }
     }
 
+    pub fn add_show(&mut self, show: Arc<Show>) {
+        if let Some(saved) = self.saved_shows.resolved_mut() {
+            saved.set.insert(show.id.clone());
+            saved.shows.push_front(show);
+        }
+    }
+
+    pub fn remove_show(&mut self, show_id: &str) {
+        if let Some(saved) = self.saved_shows.resolved_mut() {
+            saved.set.remove(show_id);
+            saved.shows.retain(|a| a.id.as_ref() != show_id);
+        }
+    }
+
+    pub fn contains_show(&self, show: &Show) -> bool {
+        if let Some(saved) = self.saved_shows.resolved() {
+            saved.set.contains(&show.id)
+        } else {
+            false
+        }
+    }
+
     pub fn writable_playlists(&self) -> Vec<&Playlist> {
         if let Some(saved) = self.playlists.resolved() {
             saved

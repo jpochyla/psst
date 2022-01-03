@@ -392,6 +392,20 @@ impl WebApi {
         self.send_empty_json(request)?;
         Ok(())
     }
+
+    // https://developer.spotify.com/documentation/web-api/reference/#/operations/save-shows-user
+    pub fn save_show(&self, id: &str) -> Result<(), Error> {
+        let request = self.put("v1/me/shows")?.query("ids", id);
+        self.send_empty_json(request)?;
+        Ok(())
+    }
+
+    // https://developer.spotify.com/documentation/web-api/reference/#/operations/remove-shows-user
+    pub fn unsave_show(&self, id: &str) -> Result<(), Error> {
+        let request = self.delete("v1/me/shows")?.query("ids", id);
+        self.send_empty_json(request)?;
+        Ok(())
+    }
 }
 
 /// View endpoints.

@@ -10,7 +10,7 @@ use druid::{
 use crate::{
     cmd,
     data::{
-        AppState, Show, Cached, Ctx, Nav,
+        AppState, Show, Cached, Ctx, Library, Nav,
         WithCtx, ShowLink
     },
     webapi::WebApi,
@@ -19,7 +19,7 @@ use crate::{
 
 use super::{
     album::album_widget,
-    theme,
+    library, theme,
     track::{tracklist_widget, TrackDisplay},
     utils::{error_widget, placeholder_widget, spinner_widget},
 };
@@ -118,7 +118,7 @@ pub fn show_widget() -> impl Widget<WithCtx<Arc<Show>>> {
         .on_click(|ctx, show, _| {
             ctx.submit_command(cmd::NAVIGATE.with(Nav::ShowDetail(show.data.link())));
         })
-        .context_menu(|show| artist_menu(&show.data.link()))
+        .context_menu(show_ctx_menu)
 }
 
 // pub fn artist_link_widget() -> impl Widget<ArtistLink> {
@@ -177,15 +177,39 @@ pub fn cover_widget(size: f64) -> impl Widget<Arc<Show>> {
 //         .padding(Insets::new(0.0, theme::grid(2.0), 0.0, theme::grid(1.0)))
 // }
 
-fn artist_menu(show: &ShowLink) -> Menu<AppState> {
+fn show_ctx_menu(show: &WithCtx<Arc<Show>>) -> Menu<AppState> {
+    show_menu(&show.data, &show.ctx.library)
+}
+
+fn show_menu(show: &Arc<Show>, library: &Arc<Library>) -> Menu<AppState> {
     let mut menu = Menu::empty();
 
     menu = menu.entry(
         MenuItem::new(
             LocalizedString::new("menu-item-copy-link").with_placeholder("Copy Link to Show"),
         )
-        .command(cmd::COPY.with(show.url())),
+        .command(cmd::COPY.with(show.link().url())),
     );
+
+    menu = menu.separator();
+
+    if library.contains_show(show) {
+        menu = menu.entry(
+            MenuItem::new(
+                LocalizedString::new("menu-item-remove-from-library")
+                    .with_placeholder("Unfollow"),
+            )
+            .command(library::UNSAVE_SHOW.with(show.link())),
+        );
+    } else {
+        menu = menu.entry(
+            MenuItem::new(
+                LocalizedString::new("menu-item-save-to-library")
+                    .with_placeholder("Follow"),
+            )
+            .command(library::SAVE_SHOW.with(show.clone())),
+        );
+    }
 
     menu
 }

@@ -3,7 +3,7 @@ use std::sync::Arc;
 use druid::{widget::List, LensExt, Selector, Widget, WidgetExt};
 
 use crate::{
-    data::{Album, AlbumLink, AppState, Ctx, Library, SavedAlbums, SavedTracks, SavedShows, Track, TrackId},
+    data::{Album, AlbumLink, AppState, Ctx, Library, SavedAlbums, SavedTracks, SavedShows, Show, ShowLink, Track, TrackId},
     webapi::WebApi,
     widget::{Async, MyWidgetExt},
 };
@@ -24,6 +24,9 @@ pub const UNSAVE_TRACK: Selector<TrackId> = Selector::new("app.library.unsave-tr
 
 pub const SAVE_ALBUM: Selector<Arc<Album>> = Selector::new("app.library.save-album");
 pub const UNSAVE_ALBUM: Selector<AlbumLink> = Selector::new("app.library.unsave-album");
+
+pub const SAVE_SHOW: Selector<Arc<Show>> = Selector::new("app.library.save-show");
+pub const UNSAVE_SHOW: Selector<ShowLink> = Selector::new("app.library.unsave-show");
 
 pub fn saved_tracks_widget() -> impl Widget<AppState> {
     Async::new(
@@ -181,36 +184,36 @@ pub fn saved_shows_widget() -> impl Widget<AppState> {
             });
         },
     )
-    // .on_command_async(
-    //     SAVE_ALBUM,
-    //     |a| WebApi::global().save_album(&a.id),
-    //     |_, data, a| {
-    //         data.with_library_mut(move |library| {
-    //             library.add_album(a);
-    //         });
-    //     },
-    //     |_, data, (_, r)| {
-    //         if let Err(err) = r {
-    //             data.error_alert(err);
-    //         } else {
-    //             data.info_alert("Album added to library.");
-    //         }
-    //     },
-    // )
-    // .on_command_async(
-    //     UNSAVE_ALBUM,
-    //     |l| WebApi::global().unsave_album(&l.id),
-    //     |_, data, l| {
-    //         data.with_library_mut(|library| {
-    //             library.remove_album(&l.id);
-    //         });
-    //     },
-    //     |_, data, (_, r)| {
-    //         if let Err(err) = r {
-    //             data.error_alert(err);
-    //         } else {
-    //             data.info_alert("Album removed from library.");
-    //         }
-    //     },
-    // )
+    .on_command_async(
+        SAVE_SHOW,
+        |a| WebApi::global().save_show(&a.id),
+        |_, data, s| {
+            data.with_library_mut(move |library| {
+                library.add_show(s);
+            });
+        },
+        |_, data, (_, r)| {
+            if let Err(err) = r {
+                data.error_alert(err);
+            } else {
+                data.info_alert("Show added to library.");
+            }
+        },
+    )
+    .on_command_async(
+        UNSAVE_SHOW,
+        |l| WebApi::global().unsave_show(&l.id),
+        |_, data, l| {
+            data.with_library_mut(|library| {
+                library.remove_show(&l.id);
+            });
+        },
+        |_, data, (_, r)| {
+            if let Err(err) = r {
+                data.error_alert(err);
+            } else {
+                data.info_alert("Show removed from library.");
+            }
+        },
+    )
 }
