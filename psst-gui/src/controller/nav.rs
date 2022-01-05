@@ -10,7 +10,7 @@ pub struct NavController;
 
 impl NavController {
     fn load_route_data(&self, ctx: &mut EventCtx, data: &mut AppState) {
-        match &data.route {
+        match &data.nav {
             Nav::Home => {}
             Nav::SavedTracks => {
                 if !data.library.saved_tracks.is_resolved() {
@@ -77,6 +77,11 @@ where
                 for _ in 0..*count {
                     data.navigate_back();
                 }
+                ctx.set_handled();
+                self.load_route_data(ctx, data);
+            }
+            Event::MouseDown(cmd) if cmd.button.is_x1() => {
+                data.navigate_back();
                 ctx.set_handled();
                 self.load_route_data(ctx, data);
             }

@@ -1,27 +1,36 @@
+pub mod access_token;
+pub mod audio_key;
+pub mod mercury;
+
 use std::{
     io,
     net::{Shutdown, TcpStream},
     sync::{
         atomic::{AtomicBool, Ordering},
-        Arc, Mutex,
+        Arc,
     },
     thread::{self, JoinHandle},
 };
 
 use crossbeam_channel::{unbounded, Receiver, Sender};
+use parking_lot::Mutex;
 use quick_protobuf::MessageRead;
 use serde::de::DeserializeOwned;
 
 use crate::{
-    audio_key::{AudioKey, AudioKeyDispatcher},
+    audio::decrypt::AudioKey,
     connection::{
         shannon_codec::{ShannonDecoder, ShannonEncoder, ShannonMsg},
         Credentials, Transport,
     },
     error::Error,
     item_id::{FileId, ItemId},
-    mercury::{MercuryDispatcher, MercuryRequest, MercuryResponse},
     util::deserialize_protobuf,
+};
+
+use self::{
+    audio_key::AudioKeyDispatcher,
+    mercury::{MercuryDispatcher, MercuryRequest, MercuryResponse},
 };
 
 /// Configuration values needed to open the session connection.
@@ -63,7 +72,7 @@ impl SessionService {
     /// Replace the active session config.  If a session is already connected,
     /// shut it down and wait until it's terminated.
     pub fn update_config(&self, config: SessionConfig) {
-        self.config.lock().unwrap().replace(config);
+        self.config.lock().replace(config);
         self.shutdown();
     }
 
@@ -71,7 +80,7 @@ impl SessionService {
     /// session.  We return false here after any case of I/O errors or an
     /// explicit session shutdown.
     pub fn is_connected(&self) -> bool {
-        matches!(self.connected.lock().unwrap().as_ref(), Some(worker) if !worker.has_terminated())
+        matches!(self.connected.lock().as_ref(), Some(worker) if !worker.has_terminated())
     }
 
     /// Return a handle for the connected session.  In case no connection is
@@ -80,14 +89,13 @@ impl SessionService {
     /// `SessionConnection::open` has an internal timeout, and should give up in
     /// a timely manner.
     pub fn connected(&self) -> Result<SessionHandle, Error> {
-        let mut connected = self.connected.lock().unwrap();
+        let mut connected = self.connected.lock();
         let is_connected_and_not_terminated =
             matches!(connected.as_ref(), Some(worker) if !worker.has_terminated());
         if !is_connected_and_not_terminated {
             let connection = SessionConnection::open(
                 self.config
                     .lock()
-                    .unwrap()
                     .as_ref()
                     .ok_or(Error::SessionDisconnected)?
                     .clone(),
@@ -103,7 +111,7 @@ impl SessionService {
 
     /// Signal a shutdown to the active worker and wait until it terminates.
     pub fn shutdown(&self) {
-        if let Some(worker) = self.connected.lock().unwrap().take() {
+        if let Some(worker) = self.connected.lock().take() {
             worker.handle().request_shutdown();
             worker.join();
         }
@@ -150,7 +158,7 @@ impl SessionWorker {
         let (disp_send, disp_recv) = unbounded();
         let (msg_send, msg_recv) = unbounded();
         let terminated = Arc::new(AtomicBool::new(false));
-        SessionWorker {
+        Self {
             decoding_thread: {
                 let decoder = transport.decoder;
                 let disp_send = disp_send.clone();

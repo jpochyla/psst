@@ -7,7 +7,7 @@ use std::{
 use psst_protocol::metadata::Track;
 
 use crate::{
-    audio_key::AudioKey,
+    audio::decrypt::AudioKey,
     error::Error,
     item_id::{FileId, ItemId},
     util::{deserialize_protobuf, serialize_protobuf},

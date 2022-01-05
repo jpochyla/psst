@@ -1,6 +1,5 @@
 use std::{
     collections::HashMap,
-    convert::TryInto,
     io::{Cursor, Read},
 };
 
@@ -8,20 +7,12 @@ use byteorder::{ReadBytesExt, BE};
 use crossbeam_channel::Sender;
 
 use crate::{
+    audio::decrypt::AudioKey,
     connection::shannon_codec::ShannonMsg,
     error::Error,
     item_id::{FileId, ItemId},
     util::Sequence,
 };
-
-#[derive(Debug, Hash, PartialEq, Eq, Copy, Clone)]
-pub struct AudioKey(pub [u8; 16]);
-
-impl AudioKey {
-    pub fn from_raw(data: &[u8]) -> Option<Self> {
-        Some(AudioKey(data.try_into().ok()?))
-    }
-}
 
 pub struct AudioKeyDispatcher {
     sequence: Sequence<u32>,

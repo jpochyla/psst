@@ -1,15 +1,22 @@
-use std::io;
+use std::{convert::TryInto, io};
 
 use aes::{
     cipher::{generic_array::GenericArray, NewCipher, StreamCipher, StreamCipherSeek},
     Aes128Ctr,
 };
 
-use crate::audio_key::AudioKey;
-
 const AUDIO_AESIV: [u8; 16] = [
     0x72, 0xe0, 0x67, 0xfb, 0xdd, 0xcb, 0xcf, 0x77, 0xeb, 0xe8, 0xbc, 0x64, 0x3f, 0x63, 0x0d, 0x93,
 ];
+
+#[derive(Debug, Hash, PartialEq, Eq, Copy, Clone)]
+pub struct AudioKey(pub [u8; 16]);
+
+impl AudioKey {
+    pub fn from_raw(data: &[u8]) -> Option<Self> {
+        Some(AudioKey(data.try_into().ok()?))
+    }
+}
 
 pub struct AudioDecrypt<T> {
     cipher: Aes128Ctr,

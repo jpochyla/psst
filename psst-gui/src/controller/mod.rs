@@ -1,3 +1,4 @@
+mod after_delay;
 mod ex_click;
 mod input;
 mod nav;
@@ -8,6 +9,7 @@ mod on_update;
 mod playback;
 mod session;
 
+pub use after_delay::AfterDelay;
 pub use ex_click::ExClick;
 pub use input::InputController;
 pub use nav::NavController;

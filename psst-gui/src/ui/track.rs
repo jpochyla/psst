@@ -5,23 +5,29 @@ use druid::{
     kurbo::Line,
     piet::StrokeStyle,
     widget::{
-        Controller, ControllerHost, CrossAxisAlignment, Flex, Label, List, ListIter, Painter,
+        Controller, ControllerHost, CrossAxisAlignment, Either, Flex, Label, List, ListIter,
+        Painter,
     },
     Data, Env, Event, EventCtx, Lens, LensExt, LocalizedString, Menu, MenuItem, RenderContext,
-    TextAlignment, Widget, WidgetExt,
+    Selector, Size, TextAlignment, Widget, WidgetExt,
 };
 
 use crate::{
     cmd,
     data::{
-        Album, AppState, ArtistLink, ArtistTracks, CommonCtx, Nav, PlaybackOrigin, PlaybackPayload,
-        PlaylistTracks, Recommendations, RecommendationsRequest, SavedTracks, SearchResults, Track,
-        WithCtx,
+        Album, AppState, ArtistLink, ArtistTracks, CommonCtx, FindQuery, Library, MatchFindQuery,
+        Nav, PlaybackOrigin, PlaybackPayload, PlaylistAddTrack, PlaylistTracks, Recommendations,
+        RecommendationsRequest, SavedTracks, SearchResults, Track, WithCtx,
     },
-    widget::MyWidgetExt,
+    ui::playlist,
+    widget::{Empty, MyWidgetExt, RemoteImage},
 };
 
-use super::{library, theme, utils};
+use super::{
+    find::{Find, Findable},
+    library, theme,
+    utils::{self, placeholder_widget},
+};
 
 #[derive(Copy, Clone)]
 pub struct TrackDisplay {
@@ -29,6 +35,7 @@ pub struct TrackDisplay {
     pub title: bool,
     pub artist: bool,
     pub album: bool,
+    pub cover: bool,
     pub popularity: bool,
 }
 
@@ -39,6 +46,7 @@ impl TrackDisplay {
             title: false,
             artist: false,
             album: false,
+            cover: false,
             popularity: false,
         }
     }
@@ -48,7 +56,19 @@ pub fn tracklist_widget<T>(display: TrackDisplay) -> impl Widget<WithCtx<T>>
 where
     T: TrackIter + Data,
 {
-    ControllerHost::new(List::new(move || track_widget(display)), PlayController)
+    let list = List::new(move || track_widget(display));
+    ControllerHost::new(list, PlayController)
+}
+
+pub fn findable_tracklist_widget<T>(
+    display: TrackDisplay,
+    selector: Selector<Find>,
+) -> impl Widget<WithCtx<T>>
+where
+    T: TrackIter + Data,
+{
+    let list = List::new(move || Findable::new(track_widget(display), selector));
+    ControllerHost::new(list, PlayController)
 }
 
 pub trait TrackIter {
@@ -166,6 +186,14 @@ struct TrackRow {
     is_playing: bool,
 }
 
+impl MatchFindQuery for TrackRow {
+    fn matches_query(&self, q: &FindQuery) -> bool {
+        q.matches_str(&self.track.name)
+            || self.track.album.iter().any(|a| q.matches_str(&a.name))
+            || self.track.artists.iter().any(|a| q.matches_str(&a.name))
+    }
+}
+
 struct PlayController;
 
 impl<T, W> Controller<WithCtx<T>, W> for PlayController
@@ -199,6 +227,7 @@ where
 }
 
 fn track_widget(display: TrackDisplay) -> impl Widget<TrackRow> {
+    let mut main_row = Flex::row();
     let mut major = Flex::row();
     let mut minor = Flex::row();
 
@@ -216,6 +245,17 @@ fn track_widget(display: TrackDisplay) -> impl Widget<TrackRow> {
         // Align the bottom line content.
         minor.add_spacer(theme::grid(2.0));
         minor.add_default_spacer();
+    }
+
+    if display.cover {
+        let album_cover = rounded_cover_widget(theme::grid(4.0))
+            .padding_right(theme::grid(1.0)) // Instead of `add_default_spacer`.
+            .lens(TrackRow::track);
+        main_row.add_child(Either::new(
+            |row, _| row.ctx.show_track_cover,
+            album_cover,
+            Empty,
+        ));
     }
 
     if display.title {
@@ -283,11 +323,15 @@ fn track_widget(display: TrackDisplay) -> impl Widget<TrackRow> {
     major.add_default_spacer();
     major.add_child(track_duration);
 
-    Flex::column()
-        .cross_axis_alignment(CrossAxisAlignment::Start)
-        .with_child(major)
-        .with_spacer(2.0)
-        .with_child(minor)
+    main_row
+        .with_flex_child(
+            Flex::column()
+                .cross_axis_alignment(CrossAxisAlignment::Start)
+                .with_child(major)
+                .with_spacer(2.0)
+                .with_child(minor),
+            1.0,
+        )
         .padding(theme::grid(1.0))
         .link()
         .active(|row, _| row.is_playing)
@@ -295,7 +339,21 @@ fn track_widget(display: TrackDisplay) -> impl Widget<TrackRow> {
         .on_click(|ctx, row, _| {
             ctx.submit_notification(cmd::PLAY_TRACK_AT.with(row.position));
         })
-        .context_menu(track_menu)
+        .context_menu(track_row_menu)
+}
+
+fn cover_widget(size: f64) -> impl Widget<Arc<Track>> {
+    RemoteImage::new(placeholder_widget(), move |track: &Arc<Track>, _| {
+        track
+            .album
+            .as_ref()
+            .and_then(|al| al.image(size, size).map(|image| image.url.clone()))
+    })
+    .fix_size(size, size)
+}
+
+fn rounded_cover_widget(size: f64) -> impl Widget<Arc<Track>> {
+    cover_widget(size).clip(Size::new(size, size).to_rounded_rect(4.0))
 }
 
 fn popularity_stars(popularity: u32) -> String {
@@ -315,11 +373,15 @@ fn popularity_stars(popularity: u32) -> String {
     stars
 }
 
-fn track_menu(row: &TrackRow) -> Menu<AppState> {
+fn track_row_menu(row: &TrackRow) -> Menu<AppState> {
+    track_menu(&row.track, &row.ctx.library)
+}
+
+pub fn track_menu(track: &Arc<Track>, library: &Arc<Library>) -> Menu<AppState> {
     let mut menu = Menu::empty();
 
-    for artist_link in &row.track.artists {
-        let more_than_one_artist = row.track.artists.len() > 1;
+    for artist_link in &track.artists {
+        let more_than_one_artist = track.artists.len() > 1;
         let title = if more_than_one_artist {
             LocalizedString::new("menu-item-show-artist-name")
                 .with_placeholder(format!("Go To Artist “{}”", artist_link.name))
@@ -332,7 +394,7 @@ fn track_menu(row: &TrackRow) -> Menu<AppState> {
         );
     }
 
-    if let Some(album_link) = row.track.album.as_ref() {
+    if let Some(album_link) = track.album.as_ref() {
         menu = menu.entry(
             MenuItem::new(
                 LocalizedString::new("menu-item-show-album").with_placeholder("Go To Album"),
@@ -347,7 +409,7 @@ fn track_menu(row: &TrackRow) -> Menu<AppState> {
                 .with_placeholder("Show Similar Tracks"),
         )
         .command(cmd::NAVIGATE.with(Nav::Recommendations(Arc::new(
-            RecommendationsRequest::for_track(row.track.id),
+            RecommendationsRequest::for_track(track.id),
         )))),
     );
 
@@ -355,18 +417,18 @@ fn track_menu(row: &TrackRow) -> Menu<AppState> {
         MenuItem::new(
             LocalizedString::new("menu-item-copy-link").with_placeholder("Copy Link to Track"),
         )
-        .command(cmd::COPY.with(row.track.url())),
+        .command(cmd::COPY.with(track.url())),
     );
 
     menu = menu.separator();
 
-    if row.ctx.is_track_saved(&row.track) {
+    if library.contains_track(track) {
         menu = menu.entry(
             MenuItem::new(
                 LocalizedString::new("menu-item-remove-from-library")
                     .with_placeholder("Remove Track from Library"),
             )
-            .command(library::UNSAVE_TRACK.with(row.track.id)),
+            .command(library::UNSAVE_TRACK.with(track.id)),
         );
     } else {
         menu = menu.entry(
@@ -374,9 +436,26 @@ fn track_menu(row: &TrackRow) -> Menu<AppState> {
                 LocalizedString::new("menu-item-save-to-library")
                     .with_placeholder("Save Track to Library"),
             )
-            .command(library::SAVE_TRACK.with(row.track.clone())),
+            .command(library::SAVE_TRACK.with(track.clone())),
         );
     }
+
+    let mut playlist_menu = Menu::new(
+        LocalizedString::new("menu-item-add-to-playlist").with_placeholder("Add to Playlist"),
+    );
+    for playlist in library.writable_playlists() {
+        playlist_menu = playlist_menu.entry(
+            MenuItem::new(
+                LocalizedString::new("menu-item-save-to-playlist")
+                    .with_placeholder(format!("{}", playlist.name)),
+            )
+            .command(playlist::ADD_TRACK.with(PlaylistAddTrack {
+                link: playlist.link(),
+                track_id: track.id,
+            })),
+        );
+    }
+    menu = menu.entry(playlist_menu);
 
     menu
 }

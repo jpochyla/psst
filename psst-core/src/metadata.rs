@@ -3,9 +3,9 @@ use std::time::Duration;
 use quick_protobuf::MessageRead;
 
 use crate::{
-    audio_file::{AudioFile, AudioPath},
     error::Error,
     item_id::{FileId, ItemId, ItemIdType},
+    player::file::{MediaFile, MediaPath},
     protocol::metadata::{Restriction, Track},
     session::SessionService,
 };
@@ -23,13 +23,13 @@ impl Fetch for Track {
     }
 }
 
-pub trait ToAudioPath {
+pub trait ToMediaPath {
     fn is_restricted_in_region(&self, country: &str) -> bool;
     fn find_allowed_alternative(&self, country: &str) -> Option<ItemId>;
-    fn to_audio_path(&self, preferred_bitrate: usize) -> Option<AudioPath>;
+    fn to_media_path(&self, preferred_bitrate: usize) -> Option<MediaPath>;
 }
 
-impl ToAudioPath for Track {
+impl ToMediaPath for Track {
     fn is_restricted_in_region(&self, country: &str) -> bool {
         self.restriction
             .iter()
@@ -44,8 +44,8 @@ impl ToAudioPath for Track {
         ItemId::from_raw(alt_track.gid.as_ref()?, ItemIdType::Track)
     }
 
-    fn to_audio_path(&self, preferred_bitrate: usize) -> Option<AudioPath> {
-        let file = AudioFile::compatible_audio_formats(preferred_bitrate)
+    fn to_media_path(&self, preferred_bitrate: usize) -> Option<MediaPath> {
+        let file = MediaFile::compatible_audio_formats(preferred_bitrate)
             .iter()
             .find_map(|&preferred_format| {
                 self.file
@@ -56,7 +56,7 @@ impl ToAudioPath for Track {
         let item_id = ItemId::from_raw(self.gid.as_ref()?, ItemIdType::Track)?;
         let file_id = FileId::from_raw(file.file_id.as_ref()?)?;
         let duration = Duration::from_millis(self.duration? as u64);
-        Some(AudioPath {
+        Some(MediaPath {
             item_id,
             file_id,
             file_format,

@@ -1,21 +1,3 @@
-use crate::{
-    data::{
-        Album, AlbumType, Artist, ArtistAlbums, AudioAnalysis, Cached, Nav, Page, Playlist, Range,
-        Recommendations, RecommendationsRequest, SearchResults, SpotifyUrl, Track, UserProfile,
-    },
-    error::Error,
-};
-use druid::{
-    im::Vector,
-    image::{self, ImageFormat},
-    Data,
-};
-use itertools::Itertools;
-use once_cell::sync::OnceCell;
-use psst_core::{
-    access_token::TokenProvider, session::SessionService, util::default_ureq_agent_builder,
-};
-use serde::{de::DeserializeOwned, Deserialize};
 use std::{
     fmt::Display,
     io::{self, Read},
@@ -24,15 +6,39 @@ use std::{
     thread,
     time::Duration,
 };
+
+use druid::{
+    im::Vector,
+    image::{self, ImageFormat},
+    Data, ImageBuf,
+};
+use itertools::Itertools;
+use once_cell::sync::OnceCell;
+use parking_lot::Mutex;
+use psst_core::{
+    session::{access_token::TokenProvider, SessionService},
+    util::default_ureq_agent_builder,
+};
+use serde::{de::DeserializeOwned, Deserialize};
 use ureq::{Agent, Request, Response};
 
-use super::cache::WebApiCache;
+use crate::{
+    data::{
+        Album, AlbumType, Artist, ArtistAlbums, AudioAnalysis, Cached, Nav, Page, Playlist, Range,
+        Recommendations, RecommendationsRequest, SearchResults, SearchTopic, SpotifyUrl, Track,
+        UserProfile,
+    },
+    error::Error,
+};
+
+use super::{cache::WebApiCache, local::LocalTrackManager};
 
 pub struct WebApi {
     session: SessionService,
     agent: Agent,
     cache: WebApiCache,
     token_provider: TokenProvider,
+    local_track_manager: Mutex<LocalTrackManager>,
 }
 
 impl WebApi {
@@ -47,6 +53,7 @@ impl WebApi {
             agent,
             cache: WebApiCache::new(cache_base),
             token_provider: TokenProvider::new(),
+            local_track_manager: Mutex::new(LocalTrackManager::new()),
         }
     }
 
@@ -73,6 +80,10 @@ impl WebApi {
 
     fn put(&self, path: impl Display) -> Result<Request, Error> {
         self.request("PUT", path)
+    }
+
+    fn post(&self, path: impl Display) -> Result<Request, Error> {
+        self.request("POST", path)
     }
 
     fn delete(&self, path: impl Display) -> Result<Request, Error> {
@@ -123,7 +134,7 @@ impl WebApi {
         if let Some(file) = self.cache.get(bucket, key) {
             let cached_at = file.metadata()?.modified()?;
             let value = serde_json::from_reader(file)?;
-            Ok(Cached::cached(value, cached_at))
+            Ok(Cached::new(value, cached_at))
         } else {
             let response = Self::with_retry(|| Ok(request.clone().call()?))?;
             let body = {
@@ -146,7 +157,7 @@ impl WebApi {
     ) -> Result<Vector<T>, Error> {
         // TODO: Some result sets, like very long playlists and saved tracks/albums can
         // be very big.  Implement virtualized scrolling and lazy-loading of results.
-        const PAGED_ITEMS_LIMIT: usize = 200;
+        const PAGED_ITEMS_LIMIT: usize = 500;
 
         let mut results = Vector::new();
         let mut limit = 50;
@@ -168,6 +179,17 @@ impl WebApi {
             }
         }
         Ok(results)
+    }
+
+    /// Load local track files from the official client's database.
+    pub fn load_local_tracks(&self, username: &str) {
+        if let Err(err) = self
+            .local_track_manager
+            .lock()
+            .load_tracks_for_user(username)
+        {
+            log::error!("failed to read local tracks: {}", err);
+        }
     }
 }
 
@@ -372,7 +394,7 @@ impl WebApi {
 
     // https://developer.spotify.com/documentation/web-api/reference/#endpoint-get-playlist
     pub fn get_playlist(&self, id: &str) -> Result<Playlist, Error> {
-        let request = self.get(format!("v1/playlists/{}", id))?;
+        let request = self.get(format!("v1/me/playlists/{}", id))?;
         let result = self.load(request)?;
         Ok(result)
     }
@@ -401,23 +423,37 @@ impl WebApi {
             .query("additional_types", "track");
         let result: Vector<PlaylistItem> = self.load_all_pages(request)?;
 
+        let local_track_manager = self.local_track_manager.lock();
+
         Ok(result
             .into_iter()
             .filter_map(|item| match item {
                 PlaylistItem {
-                    is_local: false,
                     track: OptionalTrack::Track(track),
+                    ..
                 } => Some(track),
-                _ => None,
+                PlaylistItem {
+                    track: OptionalTrack::Json(track),
+                    ..
+                } => local_track_manager.find_local_track(track),
             })
             .collect())
+    }
+
+    // https://developer.spotify.com/documentation/web-api/reference/#endpoint-add-tracks-to-playlist
+    pub fn add_track_to_playlist(&self, playlist_id: &str, track_uri: &str) -> Result<(), Error> {
+        let request = self
+            .post(format!("v1/playlists/{}/tracks", playlist_id))?
+            .query("uris", track_uri);
+        let result = self.send_empty_json(request)?;
+        Ok(result)
     }
 }
 
 /// Search endpoints.
 impl WebApi {
     // https://developer.spotify.com/documentation/web-api/reference/search/
-    pub fn search(&self, query: &str) -> Result<SearchResults, Error> {
+    pub fn search(&self, query: &str, topics: &[SearchTopic]) -> Result<SearchResults, Error> {
         #[derive(Deserialize)]
         struct ApiSearchResults {
             artists: Option<Page<Artist>>,
@@ -426,10 +462,11 @@ impl WebApi {
             playlists: Option<Page<Playlist>>,
         }
 
+        let topics = topics.iter().map(SearchTopic::as_str).join(",");
         let request = self
             .get("v1/search")?
             .query("q", query)
-            .query("type", "artist,album,track,playlist")
+            .query("type", &topics)
             .query("marker", "from_token");
         let result: ApiSearchResults = self.load(request)?;
 
@@ -528,8 +565,12 @@ impl WebApi {
 
 /// Image endpoints.
 impl WebApi {
-    pub fn get_image(&self, uri: &str) -> Result<image::DynamicImage, Error> {
-        let response = self.agent.get(uri).call()?;
+    pub fn get_cached_image(&self, uri: &Arc<str>) -> Option<ImageBuf> {
+        self.cache.get_image(uri)
+    }
+
+    pub fn get_image(&self, uri: Arc<str>) -> Result<ImageBuf, Error> {
+        let response = self.agent.get(&uri).call()?;
         let format = match response.content_type() {
             "image/jpeg" => Some(ImageFormat::Jpeg),
             "image/png" => Some(ImageFormat::Png),
@@ -542,7 +583,9 @@ impl WebApi {
         } else {
             image::load_from_memory(&body)?
         };
-        Ok(image)
+        let image_buf = ImageBuf::from_dynamic_image(image);
+        self.cache.set_image(uri, image_buf.clone());
+        Ok(image_buf)
     }
 }
 

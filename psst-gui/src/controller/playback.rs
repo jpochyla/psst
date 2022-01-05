@@ -10,11 +10,10 @@ use druid::{
     Code, ExtEventSink, InternalLifeCycle, KbKey, WindowHandle,
 };
 use psst_core::{
-    audio_normalize::NormalizationLevel,
-    audio_output::AudioOutput,
-    audio_player::{PlaybackConfig, PlaybackItem, Player, PlayerCommand, PlayerEvent},
+    audio::{normalize::NormalizationLevel, output::AudioOutput},
     cache::Cache,
     cdn::Cdn,
+    player::{item::PlaybackItem, PlaybackConfig, Player, PlayerCommand, PlayerEvent},
     session::SessionService,
 };
 use souvlaki::{
@@ -32,7 +31,7 @@ use crate::{
 pub struct PlaybackController {
     sender: Option<Sender<PlayerEvent>>,
     thread: Option<JoinHandle<()>>,
-    output_thread: Option<JoinHandle<()>>,
+    output: Option<AudioOutput>,
     media_controls: Option<MediaControls>,
 }
 
@@ -41,7 +40,7 @@ impl PlaybackController {
         Self {
             sender: None,
             thread: None,
-            output_thread: None,
+            output: None,
             media_controls: None,
         }
     }
@@ -55,8 +54,6 @@ impl PlaybackController {
         #[allow(unused_variables)] window: &WindowHandle,
     ) {
         let output = AudioOutput::open().unwrap();
-        let remote = output.remote();
-
         let cache_dir = Config::cache_dir().unwrap();
         let proxy_url = Config::proxy();
         let player = Player::new(
@@ -64,16 +61,12 @@ impl PlaybackController {
             Cdn::new(session, proxy_url.as_deref()).unwrap(),
             Cache::new(cache_dir).unwrap(),
             config,
-            remote,
+            &output,
         );
-        let sender = player.event_sender();
-        let source = player.audio_source();
+        let sender = player.sender();
 
         let thread = thread::spawn(move || {
             Self::service_events(player, event_sink, widget_id);
-        });
-        let output_thread = thread::spawn(move || {
-            output.start_playback(source).expect("Playback failed");
         });
 
         let hwnd = {
@@ -107,12 +100,12 @@ impl PlaybackController {
 
         self.sender.replace(sender);
         self.thread.replace(thread);
-        self.output_thread.replace(output_thread);
+        self.output.replace(output);
         self.media_controls.replace(media_controls);
     }
 
     fn service_events(mut player: Player, event_sink: ExtEventSink, widget_id: WidgetId) {
-        for event in player.event_receiver() {
+        for event in player.receiver() {
             // Forward events that affect the UI state to the UI thread.
             match &event {
                 PlayerEvent::Loading { item } => {
@@ -121,9 +114,9 @@ impl PlaybackController {
                         .submit_command(cmd::PLAYBACK_LOADING, item, widget_id)
                         .unwrap();
                 }
-                PlayerEvent::Playing { path, duration } => {
+                PlayerEvent::Playing { path, position } => {
                     let item: TrackId = path.item_id.into();
-                    let progress = duration.to_owned();
+                    let progress = position.to_owned();
                     event_sink
                         .submit_command(cmd::PLAYBACK_PLAYING, (item, progress), widget_id)
                         .unwrap();
@@ -138,13 +131,13 @@ impl PlaybackController {
                         .submit_command(cmd::PLAYBACK_RESUMING, (), widget_id)
                         .unwrap();
                 }
-                PlayerEvent::Progress { duration, .. } => {
-                    let progress = duration.to_owned();
+                PlayerEvent::Position { position, .. } => {
+                    let progress = position.to_owned();
                     event_sink
                         .submit_command(cmd::PLAYBACK_PROGRESS, progress, widget_id)
                         .unwrap();
                 }
-                PlayerEvent::Blocked => {
+                PlayerEvent::Blocked { .. } => {
                     event_sink
                         .submit_command(cmd::PLAYBACK_BLOCKED, (), widget_id)
                         .unwrap();
@@ -270,10 +263,10 @@ impl PlaybackController {
     fn set_queue_behavior(&mut self, behavior: QueueBehavior) {
         self.send(PlayerEvent::Command(PlayerCommand::SetQueueBehavior {
             behavior: match behavior {
-                QueueBehavior::Sequential => psst_core::audio_queue::QueueBehavior::Sequential,
-                QueueBehavior::Random => psst_core::audio_queue::QueueBehavior::Random,
-                QueueBehavior::LoopTrack => psst_core::audio_queue::QueueBehavior::LoopTrack,
-                QueueBehavior::LoopAll => psst_core::audio_queue::QueueBehavior::LoopAll,
+                QueueBehavior::Sequential => psst_core::player::queue::QueueBehavior::Sequential,
+                QueueBehavior::Random => psst_core::player::queue::QueueBehavior::Random,
+                QueueBehavior::LoopTrack => psst_core::player::queue::QueueBehavior::LoopTrack,
+                QueueBehavior::LoopAll => psst_core::player::queue::QueueBehavior::LoopAll,
             },
         }));
     }
@@ -380,7 +373,7 @@ where
             }
             Event::Command(cmd) if cmd.is(cmd::PLAY_QUEUE_BEHAVIOR) => {
                 let behavior = cmd.get_unchecked(cmd::PLAY_QUEUE_BEHAVIOR);
-                data.playback.queue_behavior = behavior.to_owned();
+                data.set_queue_behavior(behavior.to_owned());
                 self.set_queue_behavior(behavior.to_owned());
                 ctx.set_handled();
             }
@@ -436,7 +429,10 @@ where
                     ctx.widget_id(),
                     ctx.window(),
                 );
+
+                // Initialize values loaded from the config.
                 self.set_volume(data.playback.volume);
+                self.set_queue_behavior(data.playback.queue_behavior);
 
                 // Request focus so we can receive keyboard events.
                 ctx.submit_command(cmd::SET_FOCUS.to(ctx.widget_id()));

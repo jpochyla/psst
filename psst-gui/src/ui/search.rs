@@ -1,16 +1,20 @@
 use std::sync::Arc;
 
 use druid::{
-    widget::{CrossAxisAlignment, Flex, Label, LabelText, List, TextBox},
+    im::Vector,
+    widget::{CrossAxisAlignment, Either, Flex, Label, LabelText, List, TextBox},
     Data, LensExt, Selector, Widget, WidgetExt,
 };
 
 use crate::{
     cmd,
     controller::InputController,
-    data::{AppState, Ctx, Nav, Search, SearchResults, SpotifyUrl, WithCtx},
+    data::{
+        Album, AppState, Artist, Ctx, Nav, Playlist, Search, SearchResults, SearchTopic,
+        SpotifyUrl, WithCtx,
+    },
     webapi::WebApi,
-    widget::{Async, MyWidgetExt},
+    widget::{Async, Empty, MyWidgetExt},
 };
 
 use super::{
@@ -29,6 +33,9 @@ pub fn input_widget() -> impl Widget<AppState> {
     TextBox::new()
         .with_placeholder("Search")
         .controller(InputController::new().on_submit(|ctx, query, _| {
+            if query.trim().is_empty() {
+                return;
+            }
             ctx.submit_command(cmd::NAVIGATE.with(Nav::SearchResults(query.clone().into())));
         }))
         .with_id(cmd::WIDGET_SEARCH_INPUT)
@@ -37,67 +44,102 @@ pub fn input_widget() -> impl Widget<AppState> {
 }
 
 pub fn results_widget() -> impl Widget<AppState> {
-    Async::new(
-        spinner_widget,
-        || {
-            Flex::column()
-                .cross_axis_alignment(CrossAxisAlignment::Fill)
-                .with_child(header_widget("Artists"))
-                .with_child(artist_results_widget())
-                .with_child(header_widget("Albums"))
-                .with_child(album_results_widget())
-                .with_child(header_widget("Tracks"))
-                .with_child(track_results_widget())
-                .with_child(header_widget("Playlists"))
-                .with_child(playlist_results_widget())
+    Async::new(spinner_widget, loaded_results_widget, error_widget)
+        .lens(
+            Ctx::make(AppState::common_ctx, AppState::search.then(Search::results))
+                .then(Ctx::in_promise()),
+        )
+        .on_command_async(
+            LOAD_RESULTS,
+            |q| WebApi::global().search(&q, SearchTopic::all()),
+            |_, data, q| data.search.results.defer(q),
+            |_, data, r| data.search.results.update(r),
+        )
+        .on_command_async(
+            OPEN_LINK,
+            |l| WebApi::global().load_spotify_link(&l),
+            |_, data, l| data.search.results.defer(l.id()),
+            |ctx, data, (l, r)| match r {
+                Ok(nav) => {
+                    data.search.results.clear();
+                    ctx.submit_command(cmd::NAVIGATE.with(nav));
+                }
+                Err(err) => {
+                    data.search.results.reject(l.id(), err);
+                }
+            },
+        )
+}
+
+fn loaded_results_widget() -> impl Widget<WithCtx<SearchResults>> {
+    Either::new(
+        |results: &WithCtx<SearchResults>, _| {
+            results.data.artists.is_empty()
+                && results.data.albums.is_empty()
+                && results.data.tracks.is_empty()
+                && results.data.playlists.is_empty()
         },
-        error_widget,
-    )
-    .lens(
-        Ctx::make(AppState::common_ctx, AppState::search.then(Search::results))
-            .then(Ctx::in_promise()),
-    )
-    .on_command_async(
-        LOAD_RESULTS,
-        |q| WebApi::global().search(&q),
-        |_, data, q| data.search.results.defer(q),
-        |_, data, r| data.search.results.update(r),
-    )
-    .on_command_async(
-        OPEN_LINK,
-        |l| WebApi::global().load_spotify_link(&l),
-        |_, data, l| data.search.results.defer(l.id()),
-        |ctx, data, (l, r)| match r {
-            Ok(nav) => {
-                data.search.results.clear();
-                ctx.submit_command(cmd::NAVIGATE.with(nav));
-            }
-            Err(err) => {
-                data.search.results.reject(l.id(), err);
-            }
-        },
+        Label::new("No results")
+            .with_text_size(theme::TEXT_SIZE_LARGE)
+            .with_text_color(theme::PLACEHOLDER_COLOR)
+            .padding(theme::grid(6.0))
+            .center(),
+        Flex::column()
+            .cross_axis_alignment(CrossAxisAlignment::Fill)
+            .with_child(artist_results_widget())
+            .with_child(album_results_widget())
+            .with_child(track_results_widget())
+            .with_child(playlist_results_widget()),
     )
 }
 
 fn artist_results_widget() -> impl Widget<WithCtx<SearchResults>> {
-    List::new(artist_widget).lens(Ctx::data().then(SearchResults::artists))
+    Either::new(
+        |artists: &Vector<Artist>, _| artists.is_empty(),
+        Empty,
+        Flex::column()
+            .with_child(header_widget("Artists"))
+            .with_child(List::new(artist_widget)),
+    )
+    .lens(Ctx::data().then(SearchResults::artists))
 }
 
 fn album_results_widget() -> impl Widget<WithCtx<SearchResults>> {
-    List::new(album_widget).lens(Ctx::map(SearchResults::albums))
+    Either::new(
+        |albums: &WithCtx<Vector<Arc<Album>>>, _| albums.data.is_empty(),
+        Empty,
+        Flex::column()
+            .with_child(header_widget("Albums"))
+            .with_child(List::new(album_widget)),
+    )
+    .lens(Ctx::map(SearchResults::albums))
 }
 
 fn track_results_widget() -> impl Widget<WithCtx<SearchResults>> {
-    tracklist_widget(TrackDisplay {
-        title: true,
-        artist: true,
-        album: true,
-        ..TrackDisplay::empty()
-    })
+    Either::new(
+        |results: &WithCtx<SearchResults>, _| results.data.tracks.is_empty(),
+        Empty,
+        Flex::column()
+            .with_child(header_widget("Tracks"))
+            .with_child(tracklist_widget(TrackDisplay {
+                title: true,
+                artist: true,
+                album: true,
+                cover: true,
+                ..TrackDisplay::empty()
+            })),
+    )
 }
 
 fn playlist_results_widget() -> impl Widget<WithCtx<SearchResults>> {
-    List::new(playlist_widget).lens(Ctx::data().then(SearchResults::playlists))
+    Either::new(
+        |playlists: &Vector<Playlist>, _| playlists.is_empty(),
+        Empty,
+        Flex::column()
+            .with_child(header_widget("Playlists"))
+            .with_child(List::new(playlist_widget)),
+    )
+    .lens(Ctx::data().then(SearchResults::playlists))
 }
 
 fn header_widget<T: Data>(text: impl Into<LabelText<T>>) -> impl Widget<T> {

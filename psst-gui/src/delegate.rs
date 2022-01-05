@@ -1,28 +1,24 @@
-use std::{sync::Arc, thread};
-
 use druid::{
-    commands, AppDelegate, Application, Command, DelegateCtx, Env, Handled, ImageBuf, Target,
-    WindowId,
+    commands, AppDelegate, Application, Command, DelegateCtx, Env, Handled, Target, WindowId,
 };
-use lru_cache::LruCache;
+use threadpool::ThreadPool;
 
 use crate::{cmd, data::AppState, ui, webapi::WebApi, widget::remote_image};
 
 pub struct Delegate {
-    image_cache: LruCache<Arc<str>, ImageBuf>,
     main_window: Option<WindowId>,
     preferences_window: Option<WindowId>,
+    image_pool: ThreadPool,
 }
 
 impl Delegate {
     pub fn new() -> Self {
-        const IMAGE_CACHE_SIZE: usize = 256;
-        let image_cache = LruCache::new(IMAGE_CACHE_SIZE);
+        const MAX_IMAGE_THREADS: usize = 32;
 
         Self {
-            image_cache,
             main_window: None,
             preferences_window: None,
+            image_pool: ThreadPool::with_name("image_loading".into(), MAX_IMAGE_THREADS),
         }
     }
 
@@ -117,7 +113,7 @@ impl Delegate {
     ) -> Handled {
         if let Some(location) = cmd.get(remote_image::REQUEST_DATA).cloned() {
             let sink = ctx.get_external_handle();
-            if let Some(image_buf) = self.image_cache.get_mut(&location).cloned() {
+            if let Some(image_buf) = WebApi::global().get_cached_image(&location) {
                 let payload = remote_image::ImagePayload {
                     location,
                     image_buf,
@@ -125,9 +121,8 @@ impl Delegate {
                 sink.submit_command(remote_image::PROVIDE_DATA, payload, target)
                     .unwrap();
             } else {
-                thread::spawn(move || {
-                    let dyn_image = WebApi::global().get_image(&location).unwrap();
-                    let image_buf = ImageBuf::from_dynamic_image(dyn_image);
+                self.image_pool.execute(move || {
+                    let image_buf = WebApi::global().get_image(location.clone()).unwrap();
                     let payload = remote_image::ImagePayload {
                         location,
                         image_buf,
@@ -137,9 +132,6 @@ impl Delegate {
                 });
             }
             Handled::Yes
-        } else if let Some(payload) = cmd.get(remote_image::PROVIDE_DATA).cloned() {
-            self.image_cache.insert(payload.location, payload.image_buf);
-            Handled::No
         } else {
             Handled::No
         }

@@ -57,6 +57,16 @@ impl ItemId {
         }
     }
 
+    /// Converts an ID to an URI as described in: https://developer.spotify.com/documentation/web-api/#spotify-uris-and-ids
+    pub fn to_uri(&self) -> Option<String> {
+        let b64 = self.to_base62();
+        match self.id_type {
+            ItemIdType::Track => Some(format!("spotify:track:{}", b64)),
+            ItemIdType::Podcast => Some(format!("spotify:podcast:{}", b64)),
+            ItemIdType::Unknown => None,
+        }
+    }
+
     pub fn to_base16(&self) -> String {
         format!("{:032x}", self.id)
     }

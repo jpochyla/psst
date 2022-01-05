@@ -2,7 +2,10 @@ use std::time::Duration;
 
 use druid::{Selector, WidgetId};
 
-use crate::data::{Nav, PlaybackPayload, QueueBehavior, TrackId};
+use crate::{
+    data::{Nav, PlaybackPayload, QueueBehavior, TrackId},
+    ui::find::Find,
+};
 
 // Widget IDs
 
@@ -13,6 +16,11 @@ pub const WIDGET_SEARCH_INPUT: WidgetId = WidgetId::reserved(1);
 pub const SHOW_MAIN: Selector = Selector::new("app.show-main");
 pub const SET_FOCUS: Selector = Selector::new("app.set-focus");
 pub const COPY: Selector<String> = Selector::new("app.copy-to-clipboard");
+
+// Find
+
+pub const TOGGLE_FINDER: Selector = Selector::new("app.show-finder");
+pub const FIND_IN_PLAYLIST: Selector<Find> = Selector::new("find-in-playlist");
 
 // Session
 

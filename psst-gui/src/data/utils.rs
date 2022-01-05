@@ -1,38 +1,34 @@
 use std::{
+    convert::TryFrom,
     fmt, hash,
     sync::Arc,
     time::{Duration, SystemTime},
 };
 
-use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
 use druid::{im::Vector, Data, Lens};
 use serde::{Deserialize, Deserializer, Serialize};
+use time::{Date, Month};
 
 #[derive(Clone, Data, Lens)]
 pub struct Cached<T: Data> {
     pub data: T,
     #[data(ignore)]
-    pub cached_at: Option<NaiveDateTime>,
+    pub cached_at: Option<SystemTime>,
 }
 
 impl<T: Data> Cached<T> {
+    pub fn new(data: T, at: SystemTime) -> Self {
+        Self {
+            data,
+            cached_at: Some(at),
+        }
+    }
+
     pub fn fresh(data: T) -> Self {
         Self {
             data,
             cached_at: None,
         }
-    }
-
-    pub fn cached(data: T, at: SystemTime) -> Self {
-        let datetime: DateTime<Utc> = at.into();
-        Self {
-            data,
-            cached_at: Some(datetime.naive_utc()),
-        }
-    }
-
-    pub fn is_cached(&self) -> bool {
-        self.cached_at.is_some()
     }
 
     pub fn map<U: Data>(self, f: impl Fn(T) -> U) -> Cached<U> {
@@ -133,25 +129,27 @@ where
     Ok(duration)
 }
 
-pub fn deserialize_date<'de, D>(deserializer: D) -> Result<NaiveDate, D::Error>
+pub fn deserialize_date<'de, D>(deserializer: D) -> Result<Date, D::Error>
 where
     D: Deserializer<'de>,
 {
     let date = String::deserialize(deserializer)?;
     let mut parts = date.splitn(3, '-');
     let year = parts.next().and_then(|p| p.parse().ok()).unwrap_or(0);
-    let month = parts.next().and_then(|p| p.parse().ok()).unwrap_or(1);
+    let month: u8 = parts.next().and_then(|p| p.parse().ok()).unwrap_or(1);
+    let month = Month::try_from(month).unwrap_or(Month::January);
     let day = parts.next().and_then(|p| p.parse().ok()).unwrap_or(1);
-    NaiveDate::from_ymd_opt(year, month, day)
-        .ok_or_else(|| serde::de::Error::custom("Invalid date"))
+
+    Date::from_calendar_date(year, month, day)
+        .map_err(|_err| serde::de::Error::custom("Invalid date"))
 }
 
-pub fn deserialize_date_option<'de, D>(deserializer: D) -> Result<Option<NaiveDate>, D::Error>
+pub fn deserialize_date_option<'de, D>(deserializer: D) -> Result<Option<Date>, D::Error>
 where
     D: Deserializer<'de>,
 {
     #[derive(Deserialize)]
-    struct Wrapper(#[serde(deserialize_with = "deserialize_date")] NaiveDate);
+    struct Wrapper(#[serde(deserialize_with = "deserialize_date")] Date);
 
     Ok(Option::deserialize(deserializer)?.map(|Wrapper(val)| val))
 }

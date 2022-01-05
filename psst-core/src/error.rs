@@ -4,14 +4,16 @@ use std::{error, fmt, io};
 pub enum Error {
     SessionDisconnected,
     UnexpectedResponse,
-    AudioFileNotFound,
+    MediaFileNotFound,
     ProxyUrlInvalid,
     AuthFailed { code: i32 },
     JsonError(Box<dyn error::Error + Send>),
     AudioFetchingError(Box<dyn error::Error + Send>),
     AudioDecodingError(Box<dyn error::Error + Send>),
     AudioOutputError(Box<dyn error::Error + Send>),
+    ResamplingError(i32),
     IoError(io::Error),
+    SendError,
 }
 
 impl error::Error for Error {}
@@ -21,7 +23,7 @@ impl fmt::Display for Error {
         match self {
             Self::SessionDisconnected => write!(f, "Session disconnected"),
             Self::UnexpectedResponse => write!(f, "Unknown server response"),
-            Self::AudioFileNotFound => write!(f, "Audio file not found"),
+            Self::MediaFileNotFound => write!(f, "Audio file not found"),
             Self::ProxyUrlInvalid => write!(f, "Invalid proxy URL"),
             Self::AuthFailed { code } => match code {
                 0 => write!(f, "Authentication failed: protocol error"),
@@ -35,17 +37,17 @@ impl fmt::Display for Error {
                 15 => write!(f, "Authentication failed: extra verification required"),
                 16 => write!(f, "Authentication failed: invalid app key"),
                 17 => write!(f, "Authentication failed: application banned"),
-                _ => write!(
-                    f,
-                    "Authentication failed with error code {code}",
-                    code = code
-                ),
+                _ => write!(f, "Authentication failed with error code {}", code),
             },
+            Self::ResamplingError(code) => {
+                write!(f, "Resampling failed with error code {}", code)
+            }
             Self::JsonError(err)
             | Self::AudioFetchingError(err)
             | Self::AudioDecodingError(err)
             | Self::AudioOutputError(err) => err.fmt(f),
             Self::IoError(err) => err.fmt(f),
+            Self::SendError => write!(f, "Failed to send into a channel"),
         }
     }
 }
@@ -53,5 +55,11 @@ impl fmt::Display for Error {
 impl From<io::Error> for Error {
     fn from(err: io::Error) -> Error {
         Error::IoError(err)
+    }
+}
+
+impl<T> From<crossbeam_channel::SendError<T>> for Error {
+    fn from(_: crossbeam_channel::SendError<T>) -> Self {
+        Error::SendError
     }
 }

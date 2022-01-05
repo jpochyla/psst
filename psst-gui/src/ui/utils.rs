@@ -105,5 +105,5 @@ pub fn error_widget() -> impl Widget<Error> {
 pub fn as_minutes_and_seconds(dur: &Duration) -> String {
     let minutes = dur.as_secs() / 60;
     let seconds = dur.as_secs() % 60;
-    format!("{}:{:02}", minutes, seconds)
+    format!("{}∶{:02}", minutes, seconds)
 }

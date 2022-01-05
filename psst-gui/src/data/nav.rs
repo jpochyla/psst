@@ -8,7 +8,19 @@ use crate::data::{AlbumLink, ArtistLink, PlaylistLink};
 
 use super::RecommendationsRequest;
 
-#[derive(Clone, Debug, Data, PartialEq, Eq, Hash, Deserialize, Serialize)]
+#[derive(Copy, Clone, Debug, Data, PartialEq, Eq, Hash)]
+pub enum Route {
+    Home,
+    SavedTracks,
+    SavedAlbums,
+    SearchResults,
+    ArtistDetail,
+    AlbumDetail,
+    PlaylistDetail,
+    Recommendations,
+}
+
+#[derive(Clone, Debug, Data, PartialEq, Eq, Deserialize, Serialize)]
 pub enum Nav {
     Home,
     SavedTracks,
@@ -21,6 +33,19 @@ pub enum Nav {
 }
 
 impl Nav {
+    pub fn route(&self) -> Route {
+        match self {
+            Nav::Home => Route::Home,
+            Nav::SavedTracks => Route::SavedTracks,
+            Nav::SavedAlbums => Route::SavedAlbums,
+            Nav::SearchResults(_) => Route::SearchResults,
+            Nav::ArtistDetail(_) => Route::ArtistDetail,
+            Nav::AlbumDetail(_) => Route::AlbumDetail,
+            Nav::PlaylistDetail(_) => Route::PlaylistDetail,
+            Nav::Recommendations(_) => Route::Recommendations,
+        }
+    }
+
     pub fn title(&self) -> String {
         match self {
             Nav::Home => "Home".to_string(),

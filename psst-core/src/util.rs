@@ -1,10 +1,4 @@
-use std::{
-    io,
-    io::SeekFrom,
-    mem,
-    net::{Shutdown, TcpStream},
-    time::Duration,
-};
+use std::{io, io::SeekFrom, mem, time::Duration};
 
 use num_traits::{One, WrappingAdd};
 use quick_protobuf::{BytesReader, MessageRead, MessageWrite, Writer};
@@ -82,28 +76,48 @@ impl<T: io::Seek> io::Seek for OffsetFile<T> {
     }
 }
 
-pub struct TcpShutdown {
-    stream: TcpStream,
-    shutdown: bool,
+pub struct FileWithConstSize<T> {
+    stream: T,
+    len: u64,
 }
 
-impl TcpShutdown {
-    pub fn new(stream: TcpStream) -> Self {
-        Self {
-            stream,
-            shutdown: false,
-        }
+impl<T> FileWithConstSize<T> {
+    pub fn len(&self) -> u64 {
+        self.len
     }
 
-    pub fn shutdown(&mut self) {
-        if !self.shutdown {
-            self.shutdown = true;
-            let _ = self.stream.shutdown(Shutdown::Both);
-        }
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
+}
 
-    pub fn has_been_shut_down(&self) -> bool {
-        self.shutdown
+impl<T> FileWithConstSize<T>
+where
+    T: io::Seek,
+{
+    pub fn new(mut stream: T) -> Self {
+        stream.seek(SeekFrom::End(0)).unwrap();
+        let len = stream.stream_position().unwrap();
+        stream.seek(SeekFrom::Start(0)).unwrap();
+        Self { stream, len }
+    }
+}
+
+impl<T> io::Read for FileWithConstSize<T>
+where
+    T: io::Read,
+{
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        self.stream.read(buf)
+    }
+}
+
+impl<T> io::Seek for FileWithConstSize<T>
+where
+    T: io::Seek,
+{
+    fn seek(&mut self, pos: io::SeekFrom) -> io::Result<u64> {
+        self.stream.seek(pos)
     }
 }
 

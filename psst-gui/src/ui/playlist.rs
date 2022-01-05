@@ -5,18 +5,24 @@ use druid::{
 
 use crate::{
     cmd,
-    data::{AppState, Ctx, Library, Nav, Playlist, PlaylistDetail, PlaylistLink, PlaylistTracks},
+    data::{
+        AppState, Ctx, Library, Nav, Playlist, PlaylistAddTrack, PlaylistDetail, PlaylistLink,
+        PlaylistTracks,
+    },
+    error::Error,
     webapi::WebApi,
     widget::{Async, MyWidgetExt, RemoteImage},
 };
 
 use super::{
     theme,
-    track::{tracklist_widget, TrackDisplay},
+    track::{findable_tracklist_widget, TrackDisplay},
     utils::{error_widget, placeholder_widget, spinner_widget},
 };
 
+pub const LOAD_LIST: Selector = Selector::new("app.playlist.load-list");
 pub const LOAD_DETAIL: Selector<PlaylistLink> = Selector::new("app.playlist.load-detail");
+pub const ADD_TRACK: Selector<PlaylistAddTrack> = Selector::new("app.playlist.add-track");
 
 pub fn list_widget() -> impl Widget<AppState> {
     Async::new(
@@ -40,8 +46,34 @@ pub fn list_widget() -> impl Widget<AppState> {
         },
         error_widget,
     )
-    .on_deferred(|_| WebApi::global().get_playlists())
     .lens(AppState::library.then(Library::playlists.in_arc()))
+    .on_command_async(
+        LOAD_LIST,
+        |_| WebApi::global().get_playlists(),
+        |_, data, d| data.with_library_mut(|l| l.playlists.defer(d)),
+        |_, data, r| data.with_library_mut(|l| l.playlists.update(r)),
+    )
+    .on_command_async(
+        ADD_TRACK,
+        |d| {
+            WebApi::global().add_track_to_playlist(
+                &d.link.id,
+                &d.track_id
+                    .to_uri()
+                    .ok_or_else(|| Error::WebApiError("Item doesn't have URI".to_string()))?,
+            )
+        },
+        |_, data, d| {
+            data.with_library_mut(|library| library.increment_playlist_track_count(&d.link))
+        },
+        |_, data, (_, r)| {
+            if let Err(err) = r {
+                data.error_alert(err);
+            } else {
+                data.info_alert("Added to playlist.");
+            }
+        },
+    )
 }
 
 pub fn playlist_widget() -> impl Widget<Playlist> {
@@ -95,12 +127,16 @@ pub fn detail_widget() -> impl Widget<AppState> {
     Async::new(
         spinner_widget,
         || {
-            tracklist_widget(TrackDisplay {
-                title: true,
-                artist: true,
-                album: true,
-                ..TrackDisplay::empty()
-            })
+            findable_tracklist_widget(
+                TrackDisplay {
+                    title: true,
+                    artist: true,
+                    album: true,
+                    cover: true,
+                    ..TrackDisplay::empty()
+                },
+                cmd::FIND_IN_PLAYLIST,
+            )
         },
         error_widget,
     )
