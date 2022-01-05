@@ -27,7 +27,7 @@ raw-window-handle = "0.3"
 regex = "1.5"
 serde = { version = "1.0", features = ["derive", "rc"] }
 serde_json = "1.0"
-souvlaki = "=0.4.0"
+souvlaki = "0.5.0"
 time = { version = "0.3", features = ["macros", "formatting"] }
 threadpool = "1.8"
 ureq = { version = "2.1", features = ["json", "socks-proxy"] }
