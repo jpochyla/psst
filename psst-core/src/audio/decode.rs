@@ -2,11 +2,12 @@ use std::{io, time::Duration};
 
 use symphonia::{
     core::{
-        audio::{AudioBufferRef, SignalSpec},
-        codecs::{CodecParameters, Decoder},
+        audio::{SampleBuffer, SignalSpec},
+        codecs::{CodecParameters, Decoder, DecoderOptions},
+        conv::ConvertibleSample,
         errors::Error as SymphoniaError,
-        formats::{FormatReader, SeekMode, SeekTo},
-        io::{MediaSource, MediaSourceStream},
+        formats::{FormatOptions, FormatReader, SeekMode, SeekTo},
+        io::{MediaSource, MediaSourceStream, MediaSourceStreamOptions},
         units::TimeStamp,
     },
     default::{codecs::VorbisDecoder, formats::OggReader},
@@ -38,14 +39,14 @@ impl AudioDecoder {
     where
         T: io::Read + io::Seek + Send + 'static,
     {
-        let mss_opts = Default::default();
+        let mss_opts = MediaSourceStreamOptions::default();
         let mss = MediaSourceStream::new(Box::new(FileWithConstSize::new(input)), mss_opts);
 
-        let format_opts = Default::default();
+        let format_opts = FormatOptions::default();
         let format = OggReader::try_new(mss, &format_opts)?;
 
         let track = format.default_track().unwrap();
-        let decoder_opts = Default::default();
+        let decoder_opts = DecoderOptions::default();
         let decoder = VorbisDecoder::try_new(&track.codec_params, &decoder_opts)?;
 
         let p = &track.codec_params;
@@ -86,24 +87,52 @@ impl AudioDecoder {
         Ok(seeked_to.actual_ts)
     }
 
-    pub fn next_packet(&mut self) -> Option<(TimeStamp, AudioBufferRef)> {
-        let packet = match self.format.next_packet() {
-            Ok(packet) => packet,
-            Err(SymphoniaError::IoError(io)) if io.kind() == io::ErrorKind::UnexpectedEof => {
-                return None;
+    /// Read a next packet of audio from this decoder.  Returns `None` in case of EOF or internal error.
+    pub fn read_packet<S>(&mut self, samples: &mut SampleBuffer<S>) -> Option<TimeStamp>
+    where
+        S: ConvertibleSample,
+    {
+        loop {
+            // Demux an encoded packet from the media format.
+            let packet = match self.format.next_packet() {
+                Ok(packet) => packet,
+                Err(SymphoniaError::IoError(io)) if io.kind() == io::ErrorKind::UnexpectedEof => {
+                    return None; // End of this stream.
+                }
+                Err(err) => {
+                    log::error!("format error: {}", err);
+                    return None; // We cannot recover from format errors, quit.
+                }
+            };
+            while !self.format.metadata().is_latest() {
+                // Consume any new metadata that has been read since the last packet.
             }
-            Err(err) => {
-                log::error!("format error: {}", err);
-                return None;
+            // If the packet does not belong to the selected track, skip over it.
+            if packet.track_id() != self.track_id {
+                continue;
             }
-        };
-        match self.decoder.decode(&packet) {
-            Ok(decoded) => Some((packet.pts(), decoded)),
-            // TODO: Handle non-fatal decoding errors and retry.
-            Err(err) => {
-                log::error!("fatal decode error: {}", err);
-                None
-            }
+            // Decode the packet into an audio buffer.
+            match self.decoder.decode(&packet) {
+                Ok(decoded) => {
+                    // Interleave the samples into the buffer.
+                    samples.copy_interleaved_ref(decoded);
+                    return Some(packet.pts());
+                }
+                Err(SymphoniaError::IoError(err)) => {
+                    // The packet failed to decode due to an IO error, skip the packet.
+                    log::error!("io decode error: {}", err);
+                    continue;
+                }
+                Err(SymphoniaError::DecodeError(err)) => {
+                    // The packet failed to decode due to invalid data, skip the packet.
+                    log::error!("decode error: {}", err);
+                    continue;
+                }
+                Err(err) => {
+                    log::error!("fatal decode error: {}", err);
+                    return None;
+                }
+            };
         }
     }
 }
