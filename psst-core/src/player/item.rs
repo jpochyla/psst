@@ -1,5 +1,3 @@
-use psst_protocol::metadata::Track;
-
 use crate::{
     audio::{decode::AudioDecoder, decrypt::AudioKey, normalize::NormalizationLevel},
     cache::CacheHandle,
@@ -7,6 +5,7 @@ use crate::{
     error::Error,
     item_id::{ItemId, ItemIdType},
     metadata::{Fetch, ToMediaPath},
+    protocol::metadata::{Episode, Track},
     session::SessionService,
 };
 
@@ -35,7 +34,7 @@ impl PlaybackItem {
         cache: CacheHandle,
         config: &PlaybackConfig,
     ) -> Result<LoadedPlaybackItem, Error> {
-        let path = load_audio_path(self.item_id, session, &cache, config)?;
+        let path = load_media_path(self.item_id, session, &cache, config)?;
         let key = load_audio_key(&path, session, &cache)?;
         let file = MediaFile::open(path, cdn, cache)?;
         let (source, norm_data) = file.audio_source(key)?;
@@ -48,7 +47,7 @@ impl PlaybackItem {
     }
 }
 
-fn load_audio_path(
+fn load_media_path(
     item_id: ItemId,
     session: &SessionService,
     cache: &CacheHandle,
@@ -56,13 +55,14 @@ fn load_audio_path(
 ) -> Result<MediaPath, Error> {
     match item_id.id_type {
         ItemIdType::Track => {
-            load_audio_path_from_track_or_alternative(item_id, session, cache, config)
+            load_media_path_from_track_or_alternative(item_id, session, cache, config)
         }
-        ItemIdType::Podcast | ItemIdType::Unknown => unimplemented!(),
+        ItemIdType::Podcast => load_media_path_from_episode(item_id, session, cache, config),
+        ItemIdType::Unknown => unimplemented!(),
     }
 }
 
-fn load_audio_path_from_track_or_alternative(
+fn load_media_path_from_track_or_alternative(
     item_id: ItemId,
     session: &SessionService,
     cache: &CacheHandle,
@@ -100,6 +100,26 @@ fn load_audio_path_from_track_or_alternative(
     Ok(path)
 }
 
+fn load_media_path_from_episode(
+    item_id: ItemId,
+    session: &SessionService,
+    cache: &CacheHandle,
+    config: &PlaybackConfig,
+) -> Result<MediaPath, Error> {
+    let episode = load_episode(item_id, session, cache)?;
+    let country = get_country_code(session, cache);
+    let path = match country {
+        Some(user_country) if episode.is_restricted_in_region(&user_country) => {
+            // Episode is restricted, and doesn't have any alternatives.
+            return Err(Error::MediaFileNotFound);
+        }
+        _ => episode
+            .to_media_path(config.bitrate)
+            .ok_or(Error::MediaFileNotFound)?,
+    };
+    Ok(path)
+}
+
 fn get_country_code(session: &SessionService, cache: &CacheHandle) -> Option<String> {
     if let Some(cached_country_code) = cache.get_country_code() {
         Some(cached_country_code)
@@ -125,6 +145,22 @@ fn load_track(
             log::warn!("failed to save track to cache: {:?}", err);
         }
         Ok(track)
+    }
+}
+
+fn load_episode(
+    item_id: ItemId,
+    session: &SessionService,
+    cache: &CacheHandle,
+) -> Result<Episode, Error> {
+    if let Some(cached_episode) = cache.get_episode(item_id) {
+        Ok(cached_episode)
+    } else {
+        let episode = Episode::fetch(session, item_id)?;
+        if let Err(err) = cache.save_episode(item_id, &episode) {
+            log::warn!("failed to save episode to cache: {:?}", err);
+        }
+        Ok(episode)
     }
 }
 
