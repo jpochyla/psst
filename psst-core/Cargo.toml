@@ -27,7 +27,7 @@ serde_json = "1.0"
 sha-1 = "0.9"
 shannon = "0.2"
 socks = "0.3"
-symphonia = { version = "0.4", default-features = false, features = ["ogg", "vorbis"]}
+symphonia = { version = "0.4", default-features = false, features = ["ogg", "vorbis", "mp3"]}
 tempfile = "3.2"
 ureq = { version = "2.2", features = ["json"] }
 url = "2.2"

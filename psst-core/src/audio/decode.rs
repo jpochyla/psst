@@ -10,58 +10,73 @@ use symphonia::{
         io::{MediaSource, MediaSourceStream, MediaSourceStreamOptions},
         units::TimeStamp,
     },
-    default::{codecs::VorbisDecoder, formats::OggReader},
+    default::{
+        codecs::{Mp3Decoder, VorbisDecoder},
+        formats::{Mp3Reader, OggReader},
+    },
 };
 
 use crate::{error::Error, util::FileWithConstSize};
 
-impl<T> MediaSource for FileWithConstSize<T>
-where
-    T: io::Read + io::Seek + Send,
-{
-    fn is_seekable(&self) -> bool {
-        true
+pub enum AudioCodecFormat {
+    Mp3,
+    OggVorbis,
+}
+
+impl AudioCodecFormat {
+    fn format_reader(
+        &self,
+        mss: MediaSourceStream,
+    ) -> Result<Box<dyn FormatReader>, SymphoniaError> {
+        match self {
+            Self::Mp3 => Ok(Box::new(Mp3Reader::try_new(
+                mss,
+                &FormatOptions::default(),
+            )?)),
+            Self::OggVorbis => Ok(Box::new(OggReader::try_new(
+                mss,
+                &FormatOptions::default(),
+            )?)),
+        }
     }
 
-    fn byte_len(&self) -> Option<u64> {
-        Some(self.len())
+    fn decoder(&self, codec_params: &CodecParameters) -> Result<Box<dyn Decoder>, SymphoniaError> {
+        match self {
+            Self::Mp3 => Ok(Box::new(Mp3Decoder::try_new(
+                codec_params,
+                &DecoderOptions::default(),
+            )?)),
+            Self::OggVorbis => Ok(Box::new(VorbisDecoder::try_new(
+                codec_params,
+                &DecoderOptions::default(),
+            )?)),
+        }
     }
 }
 
 pub struct AudioDecoder {
-    track_id: u32, // Internal OGG track index.
+    track_id: u32, // Internal track index.
     decoder: Box<dyn Decoder>,
     format: Box<dyn FormatReader>,
 }
 
 impl AudioDecoder {
-    pub fn new<T>(input: T) -> Result<Self, Error>
+    pub fn new<T>(input: T, codec: AudioCodecFormat) -> Result<Self, Error>
     where
         T: io::Read + io::Seek + Send + 'static,
     {
-        let mss_opts = MediaSourceStreamOptions::default();
-        let mss = MediaSourceStream::new(Box::new(FileWithConstSize::new(input)), mss_opts);
-
-        let format_opts = FormatOptions::default();
-        let format = OggReader::try_new(mss, &format_opts)?;
-
-        let track = format.default_track().unwrap();
-        let decoder_opts = DecoderOptions::default();
-        let decoder = VorbisDecoder::try_new(&track.codec_params, &decoder_opts)?;
-
-        let p = &track.codec_params;
-        log::debug!(
-            "loaded vorbis: sample_rate={:?} n_frames={:?} start_ts={:?} channels={:?}",
-            p.sample_rate,
-            p.n_frames,
-            p.start_ts,
-            p.channels
+        let mss = MediaSourceStream::new(
+            Box::new(FileWithConstSize::new(input)),
+            MediaSourceStreamOptions::default(),
         );
+        let format = codec.format_reader(mss)?;
+        let track = format.default_track().unwrap();
+        let decoder = codec.decoder(&track.codec_params)?;
 
         Ok(Self {
             track_id: track.id,
-            decoder: Box::new(decoder),
-            format: Box::new(format),
+            decoder,
+            format,
         })
     }
 
@@ -134,6 +149,19 @@ impl AudioDecoder {
                 }
             };
         }
+    }
+}
+
+impl<T> MediaSource for FileWithConstSize<T>
+where
+    T: io::Read + io::Seek + Send,
+{
+    fn is_seekable(&self) -> bool {
+        true
+    }
+
+    fn byte_len(&self) -> Option<u64> {
+        Some(self.len())
     }
 }
 
