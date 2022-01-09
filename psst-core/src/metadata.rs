@@ -6,7 +6,7 @@ use crate::{
     error::Error,
     item_id::{FileId, ItemId, ItemIdType},
     player::file::{MediaFile, MediaPath},
-    protocol::metadata::{Restriction, Track},
+    protocol::metadata::{AudioFile, Episode, Restriction, Track},
     session::SessionService,
 };
 
@@ -20,6 +20,12 @@ pub trait Fetch: MessageRead<'static> {
 impl Fetch for Track {
     fn uri(id: ItemId) -> String {
         format!("hm://metadata/3/track/{}", id.to_base16())
+    }
+}
+
+impl Fetch for Episode {
+    fn uri(id: ItemId) -> String {
+        format!("hm://metadata/3/episode/{}", id.to_base16())
     }
 }
 
@@ -45,24 +51,46 @@ impl ToMediaPath for Track {
     }
 
     fn to_media_path(&self, preferred_bitrate: usize) -> Option<MediaPath> {
-        let file = MediaFile::supported_audio_formats_for_bitrate(preferred_bitrate)
-            .iter()
-            .find_map(|&preferred_format| {
-                self.file
-                    .iter()
-                    .find(|file| file.format == Some(preferred_format))
-            })?;
-        let file_format = file.format?;
-        let item_id = ItemId::from_raw(self.gid.as_ref()?, ItemIdType::Track)?;
-        let file_id = FileId::from_raw(file.file_id.as_ref()?)?;
-        let duration = Duration::from_millis(self.duration? as u64);
+        let file = select_preferred_file(&self.file, preferred_bitrate)?;
         Some(MediaPath {
-            item_id,
-            file_id,
-            file_format,
-            duration,
+            item_id: ItemId::from_raw(self.gid.as_ref()?, ItemIdType::Track)?,
+            file_id: FileId::from_raw(file.file_id.as_ref()?)?,
+            file_format: file.format?,
+            duration: Duration::from_millis(self.duration? as u64),
         })
     }
+}
+
+impl ToMediaPath for Episode {
+    fn is_restricted_in_region(&self, country: &str) -> bool {
+        self.restriction
+            .iter()
+            .any(|rest| is_restricted_in_region(rest, country))
+    }
+
+    fn find_allowed_alternative(&self, _country: &str) -> Option<ItemId> {
+        None
+    }
+
+    fn to_media_path(&self, preferred_bitrate: usize) -> Option<MediaPath> {
+        let file = select_preferred_file(&self.file, preferred_bitrate)?;
+        Some(MediaPath {
+            item_id: ItemId::from_raw(self.gid.as_ref()?, ItemIdType::Podcast)?,
+            file_id: FileId::from_raw(file.file_id.as_ref()?)?,
+            file_format: file.format?,
+            duration: Duration::from_millis(self.duration? as u64),
+        })
+    }
+}
+
+fn select_preferred_file(files: &[AudioFile], preferred_bitrate: usize) -> Option<&AudioFile> {
+    MediaFile::supported_audio_formats_for_bitrate(preferred_bitrate)
+        .iter()
+        .find_map(|&preferred_format| {
+            files
+                .iter()
+                .find(|file| file.format == Some(preferred_format))
+        })
 }
 
 fn is_restricted_in_region(restriction: &Restriction, country: &str) -> bool {
