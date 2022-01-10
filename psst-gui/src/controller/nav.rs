@@ -3,7 +3,7 @@ use druid::widget::{prelude::*, Controller};
 use crate::{
     cmd,
     data::{AppState, Nav, SpotifyUrl},
-    ui::{album, artist, library, playlist, recommend, search},
+    ui::{album, artist, library, playlist, recommend, search, show},
 };
 
 pub struct NavController;
@@ -50,7 +50,9 @@ impl NavController {
                 }
             }
             Nav::ShowDetail(link) => {
-
+                if !data.show_detail.show.contains(link) {
+                    ctx.submit_command(show::LOAD_DETAIL.with(link.to_owned()));
+                }
             }
             Nav::Recommendations(request) => {
                 if !data.recommend.results.contains(request) {

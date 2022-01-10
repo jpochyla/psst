@@ -231,7 +231,7 @@ fn route_widget() -> impl Widget<AppState> {
                     1.0,
                 )
                 .boxed(),
-            Route::ShowDetail => Scroll::new(artist::detail_widget().padding(theme::grid(1.0)))
+            Route::ShowDetail => Scroll::new(show::detail_widget().padding(theme::grid(1.0)))
                 .vertical()
                 .boxed(),
             Route::Recommendations => {

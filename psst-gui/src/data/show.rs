@@ -1,24 +1,25 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use druid::{im::Vector, Data, Lens};
 use serde::{Deserialize, Serialize};
+use time::Date;
 
-use crate::data::{Album, Cached, Image, Promise, Track};
+use crate::data::{Image, Promise};
 
-// #[derive(Clone, Data, Lens)]
-// pub struct ArtistDetail {
-//     pub artist: Promise<Artist, ArtistLink>,
-//     pub albums: Promise<ArtistAlbums, ArtistLink>,
-//     pub top_tracks: Promise<ArtistTracks, ArtistLink>,
-//     pub related_artists: Promise<Cached<Vector<Artist>>, ArtistLink>,
-// }
+use super::album::DatePrecision;
+
+#[derive(Clone, Data, Lens)]
+pub struct ShowDetail {
+    pub show: Promise<Arc<Show>, ShowLink>,
+    pub episodes: Promise<ShowEpisodes, ShowLink>,
+}
 
 #[derive(Clone, Data, Lens, Deserialize)]
 pub struct Show {
     pub id: Arc<str>,
     pub name: Arc<str>,
     pub images: Vector<Image>,
-    pub publisher: Arc<str>
+    pub publisher: Arc<str>,
 }
 
 impl Show {
@@ -34,27 +35,15 @@ impl Show {
     }
 }
 
-// #[derive(Clone, Data, Lens)]
-// pub struct ArtistAlbums {
-//     pub albums: Vector<Arc<Album>>,
-//     pub singles: Vector<Arc<Album>>,
-//     pub compilations: Vector<Arc<Album>>,
-//     pub appears_on: Vector<Arc<Album>>,
-// }
-
 #[derive(Clone, Data, Lens)]
 pub struct ShowEpisodes {
-    pub id: Arc<str>,
-    pub name: Arc<str>,
-    pub episodes: Vector<Arc<Track>>,
+    pub show: ShowLink,
+    pub episodes: Vector<Arc<Episode>>,
 }
 
 impl ShowEpisodes {
     pub fn link(&self) -> ShowLink {
-        ShowLink {
-            id: self.id.clone(),
-            name: self.name.clone(),
-        }
+        self.show.clone()
     }
 }
 
@@ -68,4 +57,27 @@ impl ShowLink {
     pub fn url(&self) -> String {
         format!("https://open.spotify.com/show/{id}", id = self.id)
     }
+}
+
+#[derive(Clone, Data, Lens, Deserialize)]
+pub struct Episode {
+    pub id: Arc<str>,
+    pub name: Arc<str>,
+    pub images: Vector<Image>,
+    pub description: Arc<str>,
+    pub languages: Vector<Arc<str>>,
+    #[serde(deserialize_with = "super::utils::deserialize_date_option")]
+    #[data(same_fn = "PartialEq::eq")]
+    pub release_date: Option<Date>,
+    #[data(same_fn = "PartialEq::eq")]
+    pub release_date_precision: Option<DatePrecision>,
+    pub resume_point: Option<ResumePoint>,
+}
+
+#[derive(Clone, Data, Lens, Deserialize)]
+pub struct ResumePoint {
+    pub fully_played: bool,
+    #[serde(rename = "resume_position_ms")]
+    #[serde(deserialize_with = "super::utils::deserialize_millis")]
+    pub resume_position: Duration,
 }
