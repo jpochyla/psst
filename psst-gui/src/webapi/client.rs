@@ -24,9 +24,9 @@ use ureq::{Agent, Request, Response};
 
 use crate::{
     data::{
-        Album, AlbumType, Artist, ArtistAlbums, AudioAnalysis, Cached, Nav, Page, Playlist, Range,
-        Recommendations, RecommendationsRequest, SearchResults, SearchTopic, Show, SpotifyUrl, Track,
-        UserProfile,
+        Album, AlbumType, Artist, ArtistAlbums, AudioAnalysis, Cached, Episode, Nav, Page,
+        Playlist, Range, Recommendations, RecommendationsRequest, SearchResults, SearchTopic, Show,
+        SpotifyUrl, Track, UserProfile,
     },
     error::Error,
 };
@@ -290,15 +290,23 @@ impl WebApi {
     }
 }
 
-
 /// Show endpoints. (Podcasts)
 impl WebApi {
     // https://developer.spotify.com/documentation/web-api/reference/#/operations/get-a-show
-    pub fn get_show(&self, id: &str) -> Result<Cached<Arc<Show>>, Error> {
+    pub fn get_show(&self, id: &str) -> Result<Arc<Show>, Error> {
         let request = self
             .get(format!("v1/shows/{}", id))?
             .query("market", "from_token");
-        let result = self.load_cached(request, "show", id)?;
+        let result = self.load(request)?;
+        Ok(result)
+    }
+
+    // https://developer.spotify.com/documentation/web-api/reference/#/operations/get-a-shows-episodes
+    pub fn get_show_episodes(&self, id: &str) -> Result<Vector<Arc<Episode>>, Error> {
+        let request = self
+            .get(format!("v1/shows/{}/episodes", id))?
+            .query("market", "from_token");
+        let result = self.load_all_pages(request)?;
         Ok(result)
     }
 }
@@ -375,7 +383,7 @@ impl WebApi {
         Ok(self
             .load_all_pages(request)?
             .into_iter()
-            .map(|item: SavedShow | item.show)
+            .map(|item: SavedShow| item.show)
             .collect())
     }
 
