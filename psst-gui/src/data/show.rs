@@ -74,6 +74,12 @@ pub struct Episode {
     pub resume_point: Option<ResumePoint>,
 }
 
+impl Episode {
+    pub fn image(&self, width: f64, height: f64) -> Option<&Image> {
+        Image::at_least_of_size(&self.images, width, height)
+    }
+}
+
 #[derive(Clone, Data, Lens, Deserialize)]
 pub struct ResumePoint {
     pub fully_played: bool,

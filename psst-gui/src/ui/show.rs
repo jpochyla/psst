@@ -73,12 +73,46 @@ fn async_episodes_widget() -> impl Widget<AppState> {
 }
 
 fn episodes_widget() -> impl Widget<WithCtx<ShowEpisodes>> {
-    List::new(|| Label::raw().lens(Episode::name.in_arc()))
-        .lens(Ctx::data().then(ShowEpisodes::episodes))
+    List::new(episode_widget).lens(Ctx::map(ShowEpisodes::episodes))
+}
+
+fn episode_widget() -> impl Widget<WithCtx<Arc<Episode>>> {
+    let cover = episode_cover_widget(theme::grid(4.0));
+
+    let name = Label::raw()
+        .with_font(theme::UI_FONT_MEDIUM)
+        .with_line_break_mode(LineBreaking::WordWrap)
+        .lens(Episode::name.in_arc());
+
+    let description = Label::raw()
+        .with_text_size(theme::TEXT_SIZE_SMALL)
+        .with_text_color(theme::PLACEHOLDER_COLOR)
+        .with_line_break_mode(LineBreaking::WordWrap)
+        .lens(Episode::description.in_arc());
+
+    Flex::row()
+        .cross_axis_alignment(CrossAxisAlignment::Start)
+        .with_child(cover)
+        .with_default_spacer()
+        .with_flex_child(
+            Flex::column()
+                .cross_axis_alignment(CrossAxisAlignment::Start)
+                .with_child(name)
+                .with_default_spacer()
+                .with_child(description),
+            1.0,
+        )
+        .padding(theme::grid(1.0))
+        .link()
+        .rounded(theme::BUTTON_BORDER_RADIUS)
+        .on_click(|ctx, row, _| {
+            // TODO
+        })
+        .lens(Ctx::data())
 }
 
 pub fn show_widget() -> impl Widget<WithCtx<Arc<Show>>> {
-    let show_image = cover_widget(theme::grid(7.0));
+    let show_image = show_cover_widget(theme::grid(7.0));
 
     let show_name = Label::raw()
         .with_font(theme::UI_FONT_MEDIUM)
@@ -101,6 +135,7 @@ pub fn show_widget() -> impl Widget<WithCtx<Arc<Show>>> {
         .with_default_spacer()
         .with_flex_child(show_info, 1.0)
         .lens(Ctx::data());
+
     show.padding(theme::grid(0.5))
         .link()
         .on_click(|ctx, show, _| {
@@ -109,7 +144,14 @@ pub fn show_widget() -> impl Widget<WithCtx<Arc<Show>>> {
         .context_menu(show_ctx_menu)
 }
 
-pub fn cover_widget(size: f64) -> impl Widget<Arc<Show>> {
+pub fn episode_cover_widget(size: f64) -> impl Widget<Arc<Episode>> {
+    RemoteImage::new(placeholder_widget(), move |episode: &Arc<Episode>, _| {
+        episode.image(size, size).map(|image| image.url.clone())
+    })
+    .fix_size(size, size)
+}
+
+fn show_cover_widget(size: f64) -> impl Widget<Arc<Show>> {
     RemoteImage::new(placeholder_widget(), move |show: &Arc<Show>, _| {
         show.image(size, size).map(|image| image.url.clone())
     })
