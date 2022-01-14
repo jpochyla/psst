@@ -42,12 +42,6 @@ pub struct ShowEpisodes {
     pub episodes: Vector<Arc<Episode>>,
 }
 
-impl ShowEpisodes {
-    pub fn link(&self) -> ShowLink {
-        self.show.clone()
-    }
-}
-
 #[derive(Clone, Debug, Data, Lens, Eq, PartialEq, Hash, Deserialize, Serialize)]
 pub struct ShowLink {
     pub id: Arc<str>,
@@ -64,6 +58,7 @@ impl ShowLink {
 pub struct Episode {
     pub id: EpisodeId,
     pub name: Arc<str>,
+    pub show: ShowLink,
     pub images: Vector<Image>,
     pub description: Arc<str>,
     pub languages: Vector<Arc<str>>,
@@ -82,6 +77,19 @@ impl Episode {
     pub fn image(&self, width: f64, height: f64) -> Option<&Image> {
         Image::at_least_of_size(&self.images, width, height)
     }
+
+    pub fn url(&self) -> String {
+        format!(
+            "https://open.spotify.com/episode/{id}",
+            id = self.id.0.to_base62()
+        )
+    }
+}
+
+#[derive(Clone, Debug, Data, Lens, Deserialize)]
+pub struct EpisodeLink {
+    pub id: EpisodeId,
+    pub name: Arc<str>,
 }
 
 #[derive(Clone, Debug, Data, Lens, Deserialize)]

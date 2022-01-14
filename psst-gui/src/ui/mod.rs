@@ -10,7 +10,7 @@ use druid::{
 use crate::{
     cmd,
     controller::{AfterDelay, NavController, SessionController},
-    data::{Alert, AlertStyle, AppState, Nav, Playback, PlaybackItem, PlaylistDetail, Route},
+    data::{Alert, AlertStyle, AppState, Nav, Playable, Playback, PlaylistDetail, Route},
     widget::{
         icons, icons::SvgIcon, Border, Empty, MyWidgetExt, Overlay, ThemeScope, ViewDispatcher,
     },
@@ -18,10 +18,12 @@ use crate::{
 
 pub mod album;
 pub mod artist;
+pub mod episode;
 pub mod find;
 pub mod home;
 pub mod library;
 pub mod menu;
+pub mod playable;
 pub mod playback;
 pub mod playlist;
 pub mod preferences;
@@ -401,10 +403,10 @@ fn route_title_widget() -> impl Widget<Nav> {
 fn compute_main_window_title(data: &AppState, _env: &Env) -> String {
     if let Some(now_playing) = &data.playback.now_playing {
         match &now_playing.item {
-            PlaybackItem::Track(track) => {
+            Playable::Track(track) => {
                 format!("{} - {}", track.artist_name(), track.name)
             }
-            PlaybackItem::Episode(episode) => episode.name.to_string(),
+            Playable::Episode(episode) => episode.name.to_string(),
         }
     } else {
         "Psst".to_owned()

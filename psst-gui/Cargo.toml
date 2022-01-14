@@ -11,8 +11,9 @@ repository = "https://github.com/jpochyla/psst"
 psst-core = { path = "../psst-core" }
 
 crossbeam-channel = "0.5"
-druid-shell = { git = "https://github.com/jpochyla/druid", branch = "psst", features = ["raw-win-handle"] }
 druid = { git = "https://github.com/jpochyla/druid", branch = "psst", features = ["im", "image", "jpeg", "png", "serde"] }
+druid-enums = { git = "https://github.com/luleyleo/druid-enums" }
+druid-shell = { git = "https://github.com/jpochyla/druid", branch = "psst", features = ["raw-win-handle"] }
 env_logger = "0.9"
 fs_extra = "1.2"
 itertools = "0.10"
@@ -28,8 +29,8 @@ regex = "1.5"
 serde = { version = "1.0", features = ["derive", "rc"] }
 serde_json = "1.0"
 souvlaki = "0.5.0"
-time = { version = "0.3", features = ["macros", "formatting"] }
 threadpool = "1.8"
+time = { version = "0.3", features = ["macros", "formatting"] }
 ureq = { version = "2.1", features = ["json", "socks-proxy"] }
 url = "2.2"
 

@@ -11,12 +11,7 @@ use crate::{
     widget::{Async, MyWidgetExt},
 };
 
-use super::{
-    album::album_widget,
-    show::show_widget,
-    track::{tracklist_widget, TrackDisplay},
-    utils::{error_widget, spinner_widget},
-};
+use super::{album, playable, show, track, utils};
 
 pub const LOAD_TRACKS: Selector = Selector::new("app.library.load-tracks");
 pub const LOAD_ALBUMS: Selector = Selector::new("app.library.load-albums");
@@ -33,16 +28,18 @@ pub const UNSAVE_SHOW: Selector<ShowLink> = Selector::new("app.library.unsave-sh
 
 pub fn saved_tracks_widget() -> impl Widget<AppState> {
     Async::new(
-        spinner_widget,
+        utils::spinner_widget,
         || {
-            tracklist_widget(TrackDisplay {
-                title: true,
-                artist: true,
-                album: true,
-                ..TrackDisplay::empty()
+            playable::list_widget(playable::Display {
+                track: track::Display {
+                    title: true,
+                    artist: true,
+                    album: true,
+                    ..track::Display::empty()
+                },
             })
         },
-        error_widget,
+        utils::error_widget,
     )
     .lens(
         Ctx::make(
@@ -101,9 +98,9 @@ pub fn saved_tracks_widget() -> impl Widget<AppState> {
 
 pub fn saved_albums_widget() -> impl Widget<AppState> {
     Async::new(
-        spinner_widget,
-        || List::new(album_widget).lens(Ctx::map(SavedAlbums::albums)),
-        error_widget,
+        utils::spinner_widget,
+        || List::new(album::album_widget).lens(Ctx::map(SavedAlbums::albums)),
+        utils::error_widget,
     )
     .lens(
         Ctx::make(
@@ -162,9 +159,9 @@ pub fn saved_albums_widget() -> impl Widget<AppState> {
 
 pub fn saved_shows_widget() -> impl Widget<AppState> {
     Async::new(
-        spinner_widget,
-        || List::new(show_widget).lens(Ctx::map(SavedShows::shows)),
-        error_widget,
+        utils::spinner_widget,
+        || List::new(show::show_widget).lens(Ctx::map(SavedShows::shows)),
+        utils::error_widget,
     )
     .lens(
         Ctx::make(

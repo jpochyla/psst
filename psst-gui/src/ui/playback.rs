@@ -13,17 +13,17 @@ use crate::{
     cmd,
     controller::PlaybackController,
     data::{
-        AppState, AudioAnalysis, NowPlaying, Playback, PlaybackItem, PlaybackOrigin, PlaybackState,
-        QueueBehavior, Track,
+        AppState, AudioAnalysis, Episode, NowPlaying, Playable, PlayableMatcher, Playback,
+        PlaybackOrigin, PlaybackState, QueueBehavior, ShowLink, Track,
     },
     widget::{icons, icons::SvgIcon, Empty, Maybe, MyWidgetExt, RemoteImage},
 };
 
-use super::{theme, track, utils};
+use super::{episode, theme, track, utils};
 
 pub fn panel_widget() -> impl Widget<AppState> {
     let seek_bar = Maybe::or_empty(SeekBar::new).lens(Playback::now_playing);
-    let item_info = Maybe::or_empty(playback_item_widget).lens(Playback::now_playing);
+    let item_info = Maybe::or_empty(playing_item_widget).lens(Playback::now_playing);
     let controls = Either::new(
         |playback, _| playback.now_playing.is_some(),
         player_widget(),
@@ -36,26 +36,40 @@ pub fn panel_widget() -> impl Widget<AppState> {
         .controller(PlaybackController::new())
 }
 
-fn playback_item_widget() -> impl Widget<NowPlaying> {
+fn playing_item_widget() -> impl Widget<NowPlaying> {
     let cover_art = cover_widget(theme::grid(8.0));
 
-    let track_name = Maybe::or_empty(|| {
-        Label::raw()
-            .with_line_break_mode(LineBreaking::Clip)
-            .with_font(theme::UI_FONT_MEDIUM)
-            .lens(Track::name.in_arc())
-    })
-    .lens(NowPlaying::item.then(PlaybackItem::lens_track()));
+    let name = PlayableMatcher::new()
+        .track(
+            Label::raw()
+                .with_line_break_mode(LineBreaking::Clip)
+                .with_font(theme::UI_FONT_MEDIUM)
+                .lens(Track::name.in_arc()),
+        )
+        .episode(
+            Label::raw()
+                .with_line_break_mode(LineBreaking::Clip)
+                .with_font(theme::UI_FONT_MEDIUM)
+                .lens(Episode::name.in_arc()),
+        )
+        .lens(NowPlaying::item);
 
-    let track_artist = Maybe::or_empty(|| {
-        Label::raw()
-            .with_line_break_mode(LineBreaking::Clip)
-            .with_text_size(theme::TEXT_SIZE_SMALL)
-            .lens(Track::lens_artist_name().in_arc())
-    })
-    .lens(NowPlaying::item.then(PlaybackItem::lens_track()));
+    let detail = PlayableMatcher::new()
+        .track(
+            Label::raw()
+                .with_line_break_mode(LineBreaking::Clip)
+                .with_text_size(theme::TEXT_SIZE_SMALL)
+                .lens(Track::lens_artist_name().in_arc()),
+        )
+        .episode(
+            Label::raw()
+                .with_line_break_mode(LineBreaking::Clip)
+                .with_text_size(theme::TEXT_SIZE_SMALL)
+                .lens(Episode::show.in_arc().then(ShowLink::name)),
+        )
+        .lens(NowPlaying::item);
 
-    let track_origin = ViewSwitcher::new(
+    let origin = ViewSwitcher::new(
         |origin: &PlaybackOrigin, _| origin.clone(),
         |origin, _, _| {
             Flex::row()
@@ -79,11 +93,11 @@ fn playback_item_widget() -> impl Widget<NowPlaying> {
         .with_flex_child(
             Flex::column()
                 .cross_axis_alignment(CrossAxisAlignment::Start)
-                .with_child(track_name)
+                .with_child(name)
                 .with_spacer(2.0)
-                .with_child(track_artist)
+                .with_child(detail)
                 .with_spacer(2.0)
-                .with_child(track_origin),
+                .with_child(origin),
             1.0,
         )
         .padding(theme::grid(1.0))
@@ -91,7 +105,10 @@ fn playback_item_widget() -> impl Widget<NowPlaying> {
         .on_click(|ctx, now_playing, _| {
             ctx.submit_command(cmd::NAVIGATE.with(now_playing.origin.to_nav()));
         })
-    // .context_menu(|now_playing| track::track_menu(&now_playing.item, &now_playing.library))
+        .context_menu(|now_playing| match &now_playing.item {
+            Playable::Track(track) => track::track_menu(track, &now_playing.library),
+            Playable::Episode(episode) => episode::episode_menu(episode, &now_playing.library),
+        })
 }
 
 fn cover_widget(size: f64) -> impl Widget<NowPlaying> {
