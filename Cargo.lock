@@ -663,6 +663,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "druid-enums"
+version = "0.1.0"
+source = "git+https://github.com/luleyleo/druid-enums#ed307acce2207ad0997985ca5c18ff827be1f9d3"
+dependencies = [
+ "heck",
+ "log",
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "druid-shell"
 version = "0.7.0"
 source = "git+https://github.com/jpochyla/druid?branch=psst#625374b59c3772152045528c4914d3b3be0e54cf"
@@ -2002,6 +2014,7 @@ version = "0.1.0"
 dependencies = [
  "crossbeam-channel",
  "druid",
+ "druid-enums",
  "druid-shell",
  "env_logger 0.9.0",
  "fs_extra",

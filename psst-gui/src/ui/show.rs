@@ -7,17 +7,15 @@ use druid::{
 
 use crate::{
     cmd,
-    data::{
-        AppState, Ctx, Episode, Library, Nav, Show, ShowDetail, ShowEpisodes, ShowLink, WithCtx,
-    },
+    data::{AppState, Ctx, Library, Nav, Show, ShowDetail, ShowEpisodes, ShowLink, WithCtx},
     webapi::WebApi,
     widget::{Async, MyWidgetExt, RemoteImage},
 };
 
 use super::{
-    library, theme,
-    track::{tracklist_widget, TrackDisplay},
-    utils::{error_widget, placeholder_widget, spinner_widget},
+    library,
+    playable,
+    theme, track, utils,
 };
 
 pub const LOAD_DETAIL: Selector<ShowLink> = Selector::new("app.show.load-detail");
@@ -30,7 +28,7 @@ pub fn detail_widget() -> impl Widget<AppState> {
 }
 
 fn async_info_widget() -> impl Widget<AppState> {
-    Async::new(spinner_widget, info_widget, error_widget)
+    Async::new(utils::spinner_widget, info_widget, utils::error_widget)
         .lens(
             Ctx::make(
                 AppState::common_ctx,
@@ -52,9 +50,13 @@ fn info_widget() -> impl Widget<WithCtx<Arc<Show>>> {
 
 fn async_episodes_widget() -> impl Widget<AppState> {
     Async::new(
-        spinner_widget,
-        || tracklist_widget(TrackDisplay::empty()),
-        error_widget,
+        utils::spinner_widget,
+        || {
+            playable::list_widget(playable::Display {
+                track: track::Display::empty(),
+            })
+        },
+        utils::error_widget,
     )
     .lens(
         Ctx::make(
@@ -78,7 +80,7 @@ fn async_episodes_widget() -> impl Widget<AppState> {
 }
 
 pub fn show_widget() -> impl Widget<WithCtx<Arc<Show>>> {
-    let show_image = show_cover_widget(theme::grid(7.0));
+    let show_image = cover_widget(theme::grid(7.0));
 
     let show_name = Label::raw()
         .with_font(theme::UI_FONT_MEDIUM)
@@ -110,15 +112,8 @@ pub fn show_widget() -> impl Widget<WithCtx<Arc<Show>>> {
         .context_menu(show_ctx_menu)
 }
 
-pub fn episode_cover_widget(size: f64) -> impl Widget<Arc<Episode>> {
-    RemoteImage::new(placeholder_widget(), move |episode: &Arc<Episode>, _| {
-        episode.image(size, size).map(|image| image.url.clone())
-    })
-    .fix_size(size, size)
-}
-
-fn show_cover_widget(size: f64) -> impl Widget<Arc<Show>> {
-    RemoteImage::new(placeholder_widget(), move |show: &Arc<Show>, _| {
+fn cover_widget(size: f64) -> impl Widget<Arc<Show>> {
+    RemoteImage::new(utils::placeholder_widget(), move |show: &Arc<Show>, _| {
         show.image(size, size).map(|image| image.url.clone())
     })
     .fix_size(size, size)

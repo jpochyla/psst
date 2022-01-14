@@ -14,11 +14,7 @@ use crate::{
     widget::{Async, Checkbox, MyWidgetExt},
 };
 
-use super::{
-    theme,
-    track::{tracklist_widget, TrackDisplay},
-    utils::{error_widget, spinner_widget},
-};
+use super::{playable, theme, track, utils};
 
 const KNOBS_DEBOUNCE_DELAY: Duration = Duration::from_millis(500);
 
@@ -28,28 +24,32 @@ pub const LOAD_RESULTS: Selector<Arc<RecommendationsRequest>> =
     Selector::new("app.recommend.load-results");
 
 pub fn results_widget() -> impl Widget<AppState> {
-    let track_results = Async::new(spinner_widget, track_results_widget, error_widget)
-        .lens(
-            Ctx::make(
-                AppState::common_ctx,
-                AppState::recommend.then(Recommend::results),
-            )
-            .then(Ctx::in_promise()),
+    let track_results = Async::new(
+        utils::spinner_widget,
+        track_results_widget,
+        utils::error_widget,
+    )
+    .lens(
+        Ctx::make(
+            AppState::common_ctx,
+            AppState::recommend.then(Recommend::results),
         )
-        .on_command_async(
-            LOAD_RESULTS,
-            |d| WebApi::global().get_recommendations(d),
-            |_, data, d| data.recommend.results.defer(d),
-            |_, data, r| data.recommend.results.update(r),
-        )
-        .on_command(UPDATE_PARAMS, |ctx, params, data| {
-            if let Some(previous) = data.recommend.results.deferred() {
-                let previous = (**previous).clone();
-                let params = params.to_owned();
-                let request = previous.with_params(params);
-                ctx.submit_command(LOAD_RESULTS.with(Arc::new(request)));
-            }
-        });
+        .then(Ctx::in_promise()),
+    )
+    .on_command_async(
+        LOAD_RESULTS,
+        |d| WebApi::global().get_recommendations(d),
+        |_, data, d| data.recommend.results.defer(d),
+        |_, data, r| data.recommend.results.update(r),
+    )
+    .on_command(UPDATE_PARAMS, |ctx, params, data| {
+        if let Some(previous) = data.recommend.results.deferred() {
+            let previous = (**previous).clone();
+            let params = params.to_owned();
+            let request = previous.with_params(params);
+            ctx.submit_command(LOAD_RESULTS.with(Arc::new(request)));
+        }
+    });
 
     let param_knobs = params_widget()
         .on_debounce(KNOBS_DEBOUNCE_DELAY, |ctx, knobs, _| {
@@ -126,10 +126,12 @@ fn params_widget() -> impl Widget<Arc<RecommendationsKnobs>> {
 }
 
 fn track_results_widget() -> impl Widget<WithCtx<Recommendations>> {
-    tracklist_widget(TrackDisplay {
-        title: true,
-        artist: true,
-        album: true,
-        ..TrackDisplay::empty()
+    playable::list_widget(playable::Display {
+        track: track::Display {
+            title: true,
+            artist: true,
+            album: true,
+            ..track::Display::empty()
+        },
     })
 }

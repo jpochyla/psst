@@ -24,9 +24,9 @@ use ureq::{Agent, Request, Response};
 
 use crate::{
     data::{
-        Album, AlbumType, Artist, ArtistAlbums, AudioAnalysis, Cached, Episode, Nav, Page,
-        Playlist, Range, Recommendations, RecommendationsRequest, SearchResults, SearchTopic, Show,
-        SpotifyUrl, Track, UserProfile,
+        Album, AlbumType, Artist, ArtistAlbums, AudioAnalysis, Cached, Episode, EpisodeId,
+        EpisodeLink, Nav, Page, Playlist, Range, Recommendations, RecommendationsRequest,
+        SearchResults, SearchTopic, Show, SpotifyUrl, Track, UserProfile,
     },
     error::Error,
 };
@@ -149,17 +149,17 @@ impl WebApi {
         }
     }
 
-    /// Load a paginated result set by sending `request` with added pagination
-    /// parameters and return the aggregated results.  Use with GET requests.
-    fn load_all_pages<T: DeserializeOwned + Clone>(
+    /// Iterate a paginated result set by sending `request` with added pagination
+    /// parameters.  Mostly used through `load_all_pages`.
+    fn for_all_pages<T: DeserializeOwned + Clone>(
         &self,
         request: Request,
-    ) -> Result<Vector<T>, Error> {
+        mut func: impl FnMut(Page<T>) -> Result<(), Error>,
+    ) -> Result<(), Error> {
         // TODO: Some result sets, like very long playlists and saved tracks/albums can
         // be very big.  Implement virtualized scrolling and lazy-loading of results.
         const PAGED_ITEMS_LIMIT: usize = 500;
 
-        let mut results = Vector::new();
         let mut limit = 50;
         let mut offset = 0;
         loop {
@@ -169,15 +169,34 @@ impl WebApi {
                 .query("offset", &offset.to_string());
             let page: Page<T> = self.load(req)?;
 
-            results.extend(page.items);
+            let page_total = page.total;
+            let page_offset = page.offset;
+            let page_limit = page.limit;
+            func(page)?;
 
-            if page.total > results.len() && results.len() < PAGED_ITEMS_LIMIT {
-                limit = page.limit;
-                offset = page.offset + page.limit;
+            if page_total > offset && offset < PAGED_ITEMS_LIMIT {
+                limit = page_limit;
+                offset = page_offset + page_limit;
             } else {
                 break;
             }
         }
+        Ok(())
+    }
+
+    /// Load a paginated result set by sending `request` with added pagination
+    /// parameters and return the aggregated results.  Use with GET requests.
+    fn load_all_pages<T: DeserializeOwned + Clone>(
+        &self,
+        request: Request,
+    ) -> Result<Vector<T>, Error> {
+        let mut results = Vector::new();
+
+        self.for_all_pages(request, |page| {
+            results.append(page.items);
+            Ok(())
+        })?;
+
         Ok(results)
     }
 
@@ -301,13 +320,41 @@ impl WebApi {
         Ok(result)
     }
 
+    // https://developer.spotify.com/documentation/web-api/reference/#/operations/get-multiple-episodes
+    pub fn get_episodes(
+        &self,
+        ids: impl IntoIterator<Item = EpisodeId>,
+    ) -> Result<Vector<Arc<Episode>>, Error> {
+        #[derive(Deserialize)]
+        struct Episodes {
+            episodes: Vector<Arc<Episode>>,
+        }
+
+        let request = self
+            .get("v1/episodes")?
+            .query("ids", &ids.into_iter().map(|id| id.0.to_base62()).join(","))
+            .query("market", "from_token");
+        let result: Episodes = self.load(request)?;
+        Ok(result.episodes)
+    }
+
     // https://developer.spotify.com/documentation/web-api/reference/#/operations/get-a-shows-episodes
     pub fn get_show_episodes(&self, id: &str) -> Result<Vector<Arc<Episode>>, Error> {
         let request = self
             .get(format!("v1/shows/{}/episodes", id))?
             .query("market", "from_token");
-        let result = self.load_all_pages(request)?;
-        Ok(result)
+        let mut results = Vector::new();
+
+        self.for_all_pages(request, |page: Page<EpisodeLink>| {
+            if !page.items.is_empty() {
+                let ids = page.items.into_iter().map(|link| link.id);
+                let episodes = self.get_episodes(ids)?;
+                results.append(episodes);
+            }
+            Ok(())
+        })?;
+
+        Ok(results)
     }
 }
 

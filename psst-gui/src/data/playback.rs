@@ -1,6 +1,7 @@
 use std::{fmt, sync::Arc, time::Duration};
 
 use druid::{im::Vector, lens::Map, Data, Lens};
+use druid_enums::Matcher;
 use psst_core::item_id::ItemId;
 use serde::{Deserialize, Serialize};
 
@@ -20,17 +21,17 @@ pub struct Playback {
 
 #[derive(Clone, Debug, Data, Lens)]
 pub struct QueueEntry {
-    pub item: PlaybackItem,
+    pub item: Playable,
     pub origin: PlaybackOrigin,
 }
 
-#[derive(Clone, Debug, Data)]
-pub enum PlaybackItem {
+#[derive(Clone, Debug, Data, Matcher)]
+pub enum Playable {
     Track(Arc<Track>),
     Episode(Arc<Episode>),
 }
 
-impl PlaybackItem {
+impl Playable {
     pub fn lens_track() -> impl Lens<Self, Option<Arc<Track>>> {
         Map::new(
             |item: &Self| item.track().cloned(),
@@ -67,22 +68,22 @@ impl PlaybackItem {
 
     pub fn id(&self) -> ItemId {
         match self {
-            PlaybackItem::Track(track) => track.id.0,
-            PlaybackItem::Episode(episode) => episode.id.0,
+            Playable::Track(track) => track.id.0,
+            Playable::Episode(episode) => episode.id.0,
         }
     }
 
     pub fn name(&self) -> &Arc<str> {
         match self {
-            PlaybackItem::Track(track) => &track.name,
-            PlaybackItem::Episode(episode) => &episode.name,
+            Playable::Track(track) => &track.name,
+            Playable::Episode(episode) => &episode.name,
         }
     }
 
     pub fn duration(&self) -> Duration {
         match self {
-            PlaybackItem::Track(track) => track.duration,
-            PlaybackItem::Episode(episode) => episode.duration,
+            Playable::Track(track) => track.duration,
+            Playable::Episode(episode) => episode.duration,
         }
     }
 }
@@ -111,7 +112,7 @@ pub enum PlaybackState {
 
 #[derive(Clone, Data, Lens)]
 pub struct NowPlaying {
-    pub item: PlaybackItem,
+    pub item: Playable,
     pub origin: PlaybackOrigin,
     pub progress: Duration,
 
@@ -123,14 +124,14 @@ pub struct NowPlaying {
 impl NowPlaying {
     pub fn cover_image_url(&self, width: f64, height: f64) -> Option<&str> {
         match &self.item {
-            PlaybackItem::Track(track) => {
+            Playable::Track(track) => {
                 let album = track.album.as_ref().or(match &self.origin {
                     PlaybackOrigin::Album(album) => Some(album),
                     _ => None,
                 })?;
                 Some(&album.image(width, height)?.url)
             }
-            PlaybackItem::Episode(episode) => Some(&episode.image(width, height)?.url),
+            Playable::Episode(episode) => Some(&episode.image(width, height)?.url),
         }
     }
 }
@@ -177,6 +178,6 @@ impl fmt::Display for PlaybackOrigin {
 #[derive(Clone, Debug, Data)]
 pub struct PlaybackPayload {
     pub origin: PlaybackOrigin,
-    pub items: Vector<PlaybackItem>,
+    pub items: Vector<Playable>,
     pub position: usize,
 }

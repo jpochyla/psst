@@ -39,8 +39,8 @@ pub use crate::data::{
     find::{FindQuery, Finder, MatchFindQuery},
     nav::{Nav, Route, SpotifyUrl},
     playback::{
-        NowPlaying, Playback, PlaybackItem, PlaybackOrigin, PlaybackPayload, PlaybackState,
-        QueueBehavior, QueueEntry,
+        NowPlaying, Playable, PlayableMatcher, Playback, PlaybackOrigin, PlaybackPayload,
+        PlaybackState, QueueBehavior, QueueEntry,
     },
     playlist::{Playlist, PlaylistAddTrack, PlaylistDetail, PlaylistLink, PlaylistTracks},
     promise::{Promise, PromiseState},
@@ -49,7 +49,7 @@ pub use crate::data::{
         RecommendationsRequest, Toggled,
     },
     search::{Search, SearchResults, SearchTopic},
-    show::{Episode, Show, ShowDetail, ShowEpisodes, ShowLink},
+    show::{Episode, EpisodeLink, Show, ShowDetail, ShowEpisodes, ShowLink, EpisodeId},
     track::{AudioAnalysis, AudioSegment, TimeInterval, Track, TrackId},
     user::UserProfile,
     utils::{Cached, Float64, Image, Page},
@@ -87,7 +87,7 @@ impl AppState {
             playlists: Promise::Empty,
         });
         let common_ctx = Arc::new(CommonCtx {
-            playback_item: None,
+            now_playing: None,
             library: Arc::clone(&library),
             show_track_cover: config.show_track_cover,
         });
@@ -177,8 +177,8 @@ impl AppState {
             .cloned()
     }
 
-    pub fn loading_playback(&mut self, item: PlaybackItem, origin: PlaybackOrigin) {
-        self.common_ctx_mut().playback_item.take();
+    pub fn loading_playback(&mut self, item: Playable, origin: PlaybackOrigin) {
+        self.common_ctx_mut().now_playing.take();
         self.playback.state = PlaybackState::Loading;
         self.playback.now_playing.replace(NowPlaying {
             item,
@@ -188,13 +188,8 @@ impl AppState {
         });
     }
 
-    pub fn start_playback(
-        &mut self,
-        item: PlaybackItem,
-        origin: PlaybackOrigin,
-        progress: Duration,
-    ) {
-        self.common_ctx_mut().playback_item.replace(item.clone());
+    pub fn start_playback(&mut self, item: Playable, origin: PlaybackOrigin, progress: Duration) {
+        self.common_ctx_mut().now_playing.replace(item.clone());
         self.playback.state = PlaybackState::Playing;
         self.playback.now_playing.replace(NowPlaying {
             item,
@@ -225,7 +220,7 @@ impl AppState {
     pub fn stop_playback(&mut self) {
         self.playback.state = PlaybackState::Stopped;
         self.playback.now_playing.take();
-        self.common_ctx_mut().playback_item.take();
+        self.common_ctx_mut().now_playing.take();
     }
 
     pub fn set_queue_behavior(&mut self, queue_behavior: QueueBehavior) {
@@ -420,14 +415,14 @@ impl SavedShows {
 
 #[derive(Clone, Data)]
 pub struct CommonCtx {
-    pub playback_item: Option<PlaybackItem>,
+    pub now_playing: Option<Playable>,
     pub library: Arc<Library>,
     pub show_track_cover: bool,
 }
 
 impl CommonCtx {
-    pub fn is_playing(&self, item: &PlaybackItem) -> bool {
-        matches!(&self.playback_item, Some(i) if i.same(item))
+    pub fn is_playing(&self, item: &Playable) -> bool {
+        matches!(&self.now_playing, Some(i) if i.same(item))
     }
 }
 
