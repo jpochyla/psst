@@ -59,6 +59,7 @@ pub fn list_widget() -> impl Widget<AppState> {
             WebApi::global().add_track_to_playlist(
                 &d.link.id,
                 &d.track_id
+                    .0
                     .to_uri()
                     .ok_or_else(|| Error::WebApiError("Item doesn't have URI".to_string()))?,
             )

@@ -3,7 +3,10 @@ use std::sync::Arc;
 use druid::{widget::List, LensExt, Selector, Widget, WidgetExt};
 
 use crate::{
-    data::{Album, AlbumLink, AppState, Ctx, Library, SavedAlbums, SavedTracks, SavedShows, Show, ShowLink, Track, TrackId},
+    data::{
+        Album, AlbumLink, AppState, Ctx, Library, SavedAlbums, SavedShows, SavedTracks, Show,
+        ShowLink, Track, TrackId,
+    },
     webapi::WebApi,
     widget::{Async, MyWidgetExt},
 };
@@ -64,7 +67,7 @@ pub fn saved_tracks_widget() -> impl Widget<AppState> {
     )
     .on_command_async(
         SAVE_TRACK,
-        |t| WebApi::global().save_track(&t.id.to_base62()),
+        |t| WebApi::global().save_track(&t.id.0.to_base62()),
         |_, data, t| {
             data.with_library_mut(|library| {
                 library.add_track(t);
@@ -80,7 +83,7 @@ pub fn saved_tracks_widget() -> impl Widget<AppState> {
     )
     .on_command_async(
         UNSAVE_TRACK,
-        |i| WebApi::global().unsave_track(&i.to_base62()),
+        |i| WebApi::global().unsave_track(&i.0.to_base62()),
         |_, data, i| {
             data.with_library_mut(|library| {
                 library.remove_track(&i);
