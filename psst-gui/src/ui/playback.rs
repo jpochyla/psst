@@ -13,7 +13,7 @@ use crate::{
     cmd,
     controller::PlaybackController,
     data::{
-        AppState, AudioAnalysis, NowPlaying, Playback, PlaybackOrigin, PlaybackState,
+        AppState, AudioAnalysis, NowPlaying, Playback, PlaybackItem, PlaybackOrigin, PlaybackState,
         QueueBehavior, Track,
     },
     widget::{icons, icons::SvgIcon, Empty, Maybe, MyWidgetExt, RemoteImage},
@@ -39,15 +39,21 @@ pub fn panel_widget() -> impl Widget<AppState> {
 fn playback_item_widget() -> impl Widget<NowPlaying> {
     let cover_art = cover_widget(theme::grid(8.0));
 
-    let track_name = Label::raw()
-        .with_line_break_mode(LineBreaking::Clip)
-        .with_font(theme::UI_FONT_MEDIUM)
-        .lens(NowPlaying::item.then(Track::name.in_arc()));
+    let track_name = Maybe::or_empty(|| {
+        Label::raw()
+            .with_line_break_mode(LineBreaking::Clip)
+            .with_font(theme::UI_FONT_MEDIUM)
+            .lens(Track::name.in_arc())
+    })
+    .lens(NowPlaying::item.then(PlaybackItem::lens_track()));
 
-    let track_artist = Label::raw()
-        .with_line_break_mode(LineBreaking::Clip)
-        .with_text_size(theme::TEXT_SIZE_SMALL)
-        .lens(NowPlaying::item.then(Track::lens_artist_name().in_arc()));
+    let track_artist = Maybe::or_empty(|| {
+        Label::raw()
+            .with_line_break_mode(LineBreaking::Clip)
+            .with_text_size(theme::TEXT_SIZE_SMALL)
+            .lens(Track::lens_artist_name().in_arc())
+    })
+    .lens(NowPlaying::item.then(PlaybackItem::lens_track()));
 
     let track_origin = ViewSwitcher::new(
         |origin: &PlaybackOrigin, _| origin.clone(),
@@ -85,7 +91,7 @@ fn playback_item_widget() -> impl Widget<NowPlaying> {
         .on_click(|ctx, now_playing, _| {
             ctx.submit_command(cmd::NAVIGATE.with(now_playing.origin.to_nav()));
         })
-        .context_menu(|now_playing| track::track_menu(&now_playing.item, &now_playing.library))
+    // .context_menu(|now_playing| track::track_menu(&now_playing.item, &now_playing.library))
 }
 
 fn cover_widget(size: f64) -> impl Widget<NowPlaying> {
@@ -102,6 +108,7 @@ fn playback_origin_icon(origin: &PlaybackOrigin) -> &'static SvgIcon {
         PlaybackOrigin::Album { .. } => &icons::ALBUM,
         PlaybackOrigin::Artist { .. } => &icons::ARTIST,
         PlaybackOrigin::Playlist { .. } => &icons::PLAYLIST,
+        PlaybackOrigin::Show { .. } => &icons::PLAYLIST, // TODO
         PlaybackOrigin::Search { .. } => &icons::SEARCH,
         PlaybackOrigin::Recommendations { .. } => &icons::SEARCH,
     }
@@ -215,7 +222,7 @@ fn durations_widget() -> impl Widget<NowPlaying> {
         format!(
             "{} / {}",
             utils::as_minutes_and_seconds(&now_playing.progress),
-            utils::as_minutes_and_seconds(&now_playing.item.duration)
+            utils::as_minutes_and_seconds(&now_playing.item.duration())
         )
     })
     .with_text_size(theme::TEXT_SIZE_SMALL)
@@ -460,7 +467,7 @@ fn paint_audio_analysis(ctx: &mut PaintCtx, data: &NowPlaying, path: &BezPath, e
     let bounds = ctx.size();
 
     let elapsed_time = data.progress.as_secs_f64();
-    let total_time = data.item.duration.as_secs_f64();
+    let total_time = data.item.duration().as_secs_f64();
     let elapsed_frac = elapsed_time / total_time;
     let elapsed_width = bounds.width * elapsed_frac;
     let elapsed = Size::new(elapsed_width, bounds.height).to_rect();
@@ -480,7 +487,7 @@ fn paint_audio_analysis(ctx: &mut PaintCtx, data: &NowPlaying, path: &BezPath, e
 
 fn paint_progress_bar(ctx: &mut PaintCtx, data: &NowPlaying, env: &Env) {
     let elapsed_time = data.progress.as_secs_f64();
-    let total_time = data.item.duration.as_secs_f64();
+    let total_time = data.item.duration().as_secs_f64();
 
     let (elapsed_color, remaining_color) = if ctx.is_hot() {
         (env.get(theme::GREY_200), env.get(theme::GREY_500))

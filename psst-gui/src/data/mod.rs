@@ -29,7 +29,7 @@ use druid::{
     im::{HashSet, Vector},
     Data, Lens,
 };
-use psst_core::session::SessionService;
+use psst_core::{item_id::ItemId, session::SessionService};
 
 pub use crate::data::{
     album::{Album, AlbumDetail, AlbumLink, AlbumType, Copyright, CopyrightType},
@@ -39,8 +39,8 @@ pub use crate::data::{
     find::{FindQuery, Finder, MatchFindQuery},
     nav::{Nav, Route, SpotifyUrl},
     playback::{
-        NowPlaying, Playback, PlaybackOrigin, PlaybackPayload, PlaybackState, QueueBehavior,
-        QueuedTrack,
+        NowPlaying, Playback, PlaybackItem, PlaybackOrigin, PlaybackPayload, PlaybackState,
+        QueueBehavior, QueueEntry,
     },
     playlist::{Playlist, PlaylistAddTrack, PlaylistDetail, PlaylistLink, PlaylistTracks},
     promise::{Promise, PromiseState},
@@ -169,15 +169,15 @@ impl AppState {
 }
 
 impl AppState {
-    pub fn queued_track(&self, track_id: &TrackId) -> Option<QueuedTrack> {
+    pub fn queued_entry(&self, item_id: ItemId) -> Option<QueueEntry> {
         self.playback
             .queue
             .iter()
-            .find(|queued| queued.track.id.same(track_id))
+            .find(|queued| queued.item.id() == item_id)
             .cloned()
     }
 
-    pub fn loading_playback(&mut self, item: Arc<Track>, origin: PlaybackOrigin) {
+    pub fn loading_playback(&mut self, item: PlaybackItem, origin: PlaybackOrigin) {
         self.common_ctx_mut().playback_item.take();
         self.playback.state = PlaybackState::Loading;
         self.playback.now_playing.replace(NowPlaying {
@@ -188,7 +188,12 @@ impl AppState {
         });
     }
 
-    pub fn start_playback(&mut self, item: Arc<Track>, origin: PlaybackOrigin, progress: Duration) {
+    pub fn start_playback(
+        &mut self,
+        item: PlaybackItem,
+        origin: PlaybackOrigin,
+        progress: Duration,
+    ) {
         self.common_ctx_mut().playback_item.replace(item.clone());
         self.playback.state = PlaybackState::Playing;
         self.playback.now_playing.replace(NowPlaying {
@@ -415,17 +420,14 @@ impl SavedShows {
 
 #[derive(Clone, Data)]
 pub struct CommonCtx {
-    pub playback_item: Option<Arc<Track>>,
+    pub playback_item: Option<PlaybackItem>,
     pub library: Arc<Library>,
     pub show_track_cover: bool,
 }
 
 impl CommonCtx {
-    pub fn is_track_playing(&self, track: &Track) -> bool {
-        self.playback_item
-            .as_ref()
-            .map(|t| t.id.same(&track.id))
-            .unwrap_or(false)
+    pub fn is_playing(&self, item: &PlaybackItem) -> bool {
+        matches!(&self.playback_item, Some(i) if i.same(item))
     }
 }
 

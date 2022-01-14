@@ -1,23 +1,90 @@
 use std::{fmt, sync::Arc, time::Duration};
 
-use druid::{im::Vector, Data, Lens};
+use druid::{im::Vector, lens::Map, Data, Lens};
+use psst_core::item_id::ItemId;
 use serde::{Deserialize, Serialize};
 
-use super::{AlbumLink, ArtistLink, Library, Nav, PlaylistLink, RecommendationsRequest, Track};
+use super::{
+    AlbumLink, ArtistLink, Episode, Library, Nav, PlaylistLink, RecommendationsRequest, ShowLink,
+    Track,
+};
 
 #[derive(Clone, Data, Lens)]
 pub struct Playback {
     pub state: PlaybackState,
     pub now_playing: Option<NowPlaying>,
     pub queue_behavior: QueueBehavior,
-    pub queue: Vector<QueuedTrack>,
+    pub queue: Vector<QueueEntry>,
     pub volume: f64,
 }
 
 #[derive(Clone, Debug, Data, Lens)]
-pub struct QueuedTrack {
-    pub track: Arc<Track>,
+pub struct QueueEntry {
+    pub item: PlaybackItem,
     pub origin: PlaybackOrigin,
+}
+
+#[derive(Clone, Debug, Data)]
+pub enum PlaybackItem {
+    Track(Arc<Track>),
+    Episode(Arc<Episode>),
+}
+
+impl PlaybackItem {
+    pub fn lens_track() -> impl Lens<Self, Option<Arc<Track>>> {
+        Map::new(
+            |item: &Self| item.track().cloned(),
+            |_, _| {
+                // Immutable.
+            },
+        )
+    }
+
+    pub fn lens_episode() -> impl Lens<Self, Option<Arc<Episode>>> {
+        Map::new(
+            |item: &Self| item.episode().cloned(),
+            |_, _| {
+                // Immutable.
+            },
+        )
+    }
+
+    pub fn track(&self) -> Option<&Arc<Track>> {
+        if let Self::Track(track) = self {
+            Some(track)
+        } else {
+            None
+        }
+    }
+
+    pub fn episode(&self) -> Option<&Arc<Episode>> {
+        if let Self::Episode(episode) = self {
+            Some(episode)
+        } else {
+            None
+        }
+    }
+
+    pub fn id(&self) -> ItemId {
+        match self {
+            PlaybackItem::Track(track) => track.id.0,
+            PlaybackItem::Episode(episode) => episode.id.0,
+        }
+    }
+
+    pub fn name(&self) -> &Arc<str> {
+        match self {
+            PlaybackItem::Track(track) => &track.name,
+            PlaybackItem::Episode(episode) => &episode.name,
+        }
+    }
+
+    pub fn duration(&self) -> Duration {
+        match self {
+            PlaybackItem::Track(track) => track.duration,
+            PlaybackItem::Episode(episode) => episode.duration,
+        }
+    }
 }
 
 #[derive(Copy, Clone, Debug, Data, Eq, PartialEq, Serialize, Deserialize)]
@@ -44,7 +111,7 @@ pub enum PlaybackState {
 
 #[derive(Clone, Data, Lens)]
 pub struct NowPlaying {
-    pub item: Arc<Track>,
+    pub item: PlaybackItem,
     pub origin: PlaybackOrigin,
     pub progress: Duration,
 
@@ -55,16 +122,16 @@ pub struct NowPlaying {
 
 impl NowPlaying {
     pub fn cover_image_url(&self, width: f64, height: f64) -> Option<&str> {
-        self.item_album()
-            .and_then(|album| album.image(width, height))
-            .map(|image| image.url.as_ref())
-    }
-
-    pub fn item_album(&self) -> Option<&AlbumLink> {
-        self.item.album.as_ref().or_else(|| match &self.origin {
-            PlaybackOrigin::Album(album) => Some(album),
-            _ => None,
-        })
+        match &self.item {
+            PlaybackItem::Track(track) => {
+                let album = track.album.as_ref().or(match &self.origin {
+                    PlaybackOrigin::Album(album) => Some(album),
+                    _ => None,
+                })?;
+                Some(&album.image(width, height)?.url)
+            }
+            PlaybackItem::Episode(episode) => Some(&episode.image(width, height)?.url),
+        }
     }
 }
 
@@ -74,6 +141,7 @@ pub enum PlaybackOrigin {
     Album(AlbumLink),
     Artist(ArtistLink),
     Playlist(PlaylistLink),
+    Show(ShowLink),
     Search(Arc<str>),
     Recommendations(Arc<RecommendationsRequest>),
 }
@@ -85,6 +153,7 @@ impl PlaybackOrigin {
             PlaybackOrigin::Album(link) => Nav::AlbumDetail(link.clone()),
             PlaybackOrigin::Artist(link) => Nav::ArtistDetail(link.clone()),
             PlaybackOrigin::Playlist(link) => Nav::PlaylistDetail(link.clone()),
+            PlaybackOrigin::Show(link) => Nav::ShowDetail(link.clone()),
             PlaybackOrigin::Search(query) => Nav::SearchResults(query.clone()),
             PlaybackOrigin::Recommendations(request) => Nav::Recommendations(request.clone()),
         }
@@ -98,6 +167,7 @@ impl fmt::Display for PlaybackOrigin {
             PlaybackOrigin::Album(link) => link.name.fmt(f),
             PlaybackOrigin::Artist(link) => link.name.fmt(f),
             PlaybackOrigin::Playlist(link) => link.name.fmt(f),
+            PlaybackOrigin::Show(link) => link.name.fmt(f),
             PlaybackOrigin::Search(query) => query.fmt(f),
             PlaybackOrigin::Recommendations(_) => f.write_str("Recommended"),
         }
@@ -107,6 +177,6 @@ impl fmt::Display for PlaybackOrigin {
 #[derive(Clone, Debug, Data)]
 pub struct PlaybackPayload {
     pub origin: PlaybackOrigin,
-    pub tracks: Vector<Arc<Track>>,
+    pub items: Vector<PlaybackItem>,
     pub position: usize,
 }

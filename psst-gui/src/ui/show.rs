@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use druid::{
-    widget::{CrossAxisAlignment, Flex, Label, LineBreaking, List},
+    widget::{CrossAxisAlignment, Flex, Label, LineBreaking},
     LensExt, LocalizedString, Menu, MenuItem, Selector, Widget, WidgetExt,
 };
 
@@ -16,6 +16,7 @@ use crate::{
 
 use super::{
     library, theme,
+    track::{tracklist_widget, TrackDisplay},
     utils::{error_widget, placeholder_widget, spinner_widget},
 };
 
@@ -50,65 +51,30 @@ fn info_widget() -> impl Widget<WithCtx<Arc<Show>>> {
 }
 
 fn async_episodes_widget() -> impl Widget<AppState> {
-    Async::new(spinner_widget, episodes_widget, error_widget)
-        .lens(
-            Ctx::make(
-                AppState::common_ctx,
-                AppState::show_detail.then(ShowDetail::episodes),
-            )
-            .then(Ctx::in_promise()),
+    Async::new(
+        spinner_widget,
+        || tracklist_widget(TrackDisplay::empty()),
+        error_widget,
+    )
+    .lens(
+        Ctx::make(
+            AppState::common_ctx,
+            AppState::show_detail.then(ShowDetail::episodes),
         )
-        .on_command_async(
-            LOAD_DETAIL,
-            |d| WebApi::global().get_show_episodes(&d.id),
-            |_, data, d| data.show_detail.episodes.defer(d),
-            |_, data, (d, r)| {
-                let r = r.map(|episodes| ShowEpisodes {
-                    show: d.clone(),
-                    episodes,
-                });
-                data.show_detail.episodes.update((d, r))
-            },
-        )
-}
-
-fn episodes_widget() -> impl Widget<WithCtx<ShowEpisodes>> {
-    List::new(episode_widget).lens(Ctx::map(ShowEpisodes::episodes))
-}
-
-fn episode_widget() -> impl Widget<WithCtx<Arc<Episode>>> {
-    let cover = episode_cover_widget(theme::grid(4.0));
-
-    let name = Label::raw()
-        .with_font(theme::UI_FONT_MEDIUM)
-        .with_line_break_mode(LineBreaking::WordWrap)
-        .lens(Episode::name.in_arc());
-
-    let description = Label::raw()
-        .with_text_size(theme::TEXT_SIZE_SMALL)
-        .with_text_color(theme::PLACEHOLDER_COLOR)
-        .with_line_break_mode(LineBreaking::WordWrap)
-        .lens(Episode::description.in_arc());
-
-    Flex::row()
-        .cross_axis_alignment(CrossAxisAlignment::Start)
-        .with_child(cover)
-        .with_default_spacer()
-        .with_flex_child(
-            Flex::column()
-                .cross_axis_alignment(CrossAxisAlignment::Start)
-                .with_child(name)
-                .with_default_spacer()
-                .with_child(description),
-            1.0,
-        )
-        .padding(theme::grid(1.0))
-        .link()
-        .rounded(theme::BUTTON_BORDER_RADIUS)
-        .on_click(|ctx, row, _| {
-            // TODO
-        })
-        .lens(Ctx::data())
+        .then(Ctx::in_promise()),
+    )
+    .on_command_async(
+        LOAD_DETAIL,
+        |d| WebApi::global().get_show_episodes(&d.id),
+        |_, data, d| data.show_detail.episodes.defer(d),
+        |_, data, (d, r)| {
+            let r = r.map(|episodes| ShowEpisodes {
+                show: d.clone(),
+                episodes,
+            });
+            data.show_detail.episodes.update((d, r))
+        },
+    )
 }
 
 pub fn show_widget() -> impl Widget<WithCtx<Arc<Show>>> {

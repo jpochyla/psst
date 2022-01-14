@@ -562,7 +562,7 @@ impl WebApi {
         let seed_tracks = data
             .seed_tracks
             .iter()
-            .map(|track| track.to_base62())
+            .map(|track| track.0.to_base62())
             .join(", ");
 
         let mut request = self
