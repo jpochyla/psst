@@ -9,9 +9,8 @@ repository = "https://github.com/jpochyla/psst"
 
 [dependencies]
 psst-core = { path = "../psst-core" }
-
+dark-light = { git = "https://github.com/Be-ing/rust-dark-light", branch = "freedesktop" }
 crossbeam-channel = "0.5"
-detect-desktop-environment = "0.2.0"
 druid-shell = { git = "https://github.com/jpochyla/druid", branch = "psst", features = ["raw-win-handle"] }
 druid = { git = "https://github.com/jpochyla/druid", branch = "psst", features = ["im", "image", "jpeg", "png", "serde"] }
 env_logger = "0.9"
@@ -37,8 +36,6 @@ url = "2.2"
 [target.'cfg(windows)'.build-dependencies]
 winres = "0.1.11"
 
-[target.'cfg(any(target_os = "macos", target_os = "windows"))'.dependencies]
-dark-light = "0.1.1"
 
 [package.metadata.bundle]
 name = "Psst"

@@ -1,6 +1,5 @@
 use std::{env, env::VarError, fs::File, path::PathBuf};
 
-#[cfg(any(target_os = "macos", target_os = "windows"))]
 use dark_light::{detect, Mode};
 use druid::{Data, Lens};
 use platform_dirs::AppDirs;
@@ -12,7 +11,6 @@ use psst_core::{
 };
 use serde::{Deserialize, Serialize};
 
-use detect_desktop_environment::DesktopEnvironment;
 use super::{Nav, Promise, QueueBehavior};
 
 #[derive(Clone, Debug, Data, Lens)]
@@ -211,11 +209,6 @@ pub enum Theme {
 }
 
 impl Default for Theme {
-    #[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
-    fn default() -> Self {
-        Self::Light
-    }
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
     fn default() -> Self {
         match detect() {
             Mode::Dark => {
@@ -224,34 +217,6 @@ impl Default for Theme {
             Mode::Light => {
                 Theme::Light
             }
-        }
-    }
-    #[cfg(target_os = "linux")]
-    fn default() -> Self {
-        match DesktopEnvironment::detect() {
-            DesktopEnvironment::Unknown => Theme::Light,
-            DesktopEnvironment::Cinnamon => Theme::Light,
-            DesktopEnvironment::Enlightenment => Theme::Light,
-            DesktopEnvironment::Gnome => Theme::Light,
-            DesktopEnvironment::Kde => {
-                if let Ok(content) = std::fs::read_to_string("/home/eduardo/.config/kdeglobals") {
-                    let theme = content.lines().filter(|line| line.contains("Name=")).collect::<String>();
-                    if theme.to_lowercase().contains("dark") {
-                        Theme::Dark
-                    } else {
-                        Theme::Light
-                    }
-                } else {
-                    Theme::Light
-                }
-            }
-            DesktopEnvironment::Lxde => Theme::Light,
-            DesktopEnvironment::Lxqt => Theme::Light,
-            DesktopEnvironment::MacOs => Theme::Light,
-            DesktopEnvironment::Mate => Theme::Light,
-            DesktopEnvironment::Unity => Theme::Light,
-            DesktopEnvironment::Windows => Theme::Light,
-            DesktopEnvironment::Xfce => Theme::Light,
         }
     }
 }
