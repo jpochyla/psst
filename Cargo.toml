@@ -6,9 +6,6 @@ members = [
     "psst-gui",
 ]
 
-[profile.dev]
-split-debuginfo = "unpacked"
-
 [profile.dev.package.symphonia]
 opt-level = 2
 [profile.dev.package.libsamplerate]

@@ -363,9 +363,8 @@ impl Worker {
                 })
             }
         } else {
-            match self.input.next_packet() {
-                Some((_, packet)) => {
-                    self.input_packet.copy_interleaved_ref(packet);
+            match self.input.read_packet(&mut self.input_packet) {
+                Some(_) => {
                     self.samples_to_write = 0..self.input_packet.samples().len();
                     self.is_reading = true;
                     self.this.send(Msg::Read)?;

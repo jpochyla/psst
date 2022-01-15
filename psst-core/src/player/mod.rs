@@ -213,8 +213,8 @@ impl Player {
     }
 
     fn load_and_play(&mut self, item: PlaybackItem) {
-        // Make sure to pause the sink, so any current playback is stopped.
-        self.audio_output_sink.pause();
+        // Make sure to stop the sink, so any current audio source is cleared and the playback stopped.
+        self.audio_output_sink.stop();
 
         // Check if the item is already in the preloader state.
         let loading_handle = match mem::replace(&mut self.preload, PreloadState::None) {

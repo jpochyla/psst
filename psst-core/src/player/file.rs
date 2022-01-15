@@ -10,7 +10,7 @@ use std::{
 
 use crate::{
     audio::{
-        decode::AudioDecoder,
+        decode::{AudioCodecFormat, AudioDecoder},
         decrypt::{AudioDecrypt, AudioKey},
         normalize::NormalizationData,
     },
@@ -43,22 +43,37 @@ pub enum MediaFile {
 }
 
 impl MediaFile {
-    pub fn compatible_audio_formats(preferred_bitrate: usize) -> &'static [Format] {
-        match preferred_bitrate {
+    pub fn supported_audio_formats_for_bitrate(bitrate: usize) -> &'static [Format] {
+        match bitrate {
             96 => &[
                 Format::OGG_VORBIS_96,
+                Format::MP3_96,
                 Format::OGG_VORBIS_160,
+                Format::MP3_160,
+                Format::MP3_160_ENC,
+                Format::MP3_256,
                 Format::OGG_VORBIS_320,
+                Format::MP3_320,
             ],
             160 => &[
                 Format::OGG_VORBIS_160,
+                Format::MP3_160,
+                Format::MP3_160_ENC,
+                Format::MP3_256,
                 Format::OGG_VORBIS_320,
+                Format::MP3_320,
                 Format::OGG_VORBIS_96,
+                Format::MP3_96,
             ],
             320 => &[
                 Format::OGG_VORBIS_320,
+                Format::MP3_320,
+                Format::MP3_256,
                 Format::OGG_VORBIS_160,
+                Format::MP3_160,
+                Format::MP3_160_ENC,
                 Format::OGG_VORBIS_96,
+                Format::MP3_96,
             ],
             _ => unreachable!(),
         }
@@ -105,7 +120,7 @@ impl MediaFile {
         let mut decrypted = AudioDecrypt::new(key, reader);
         let normalization = NormalizationData::parse(&mut decrypted)?;
         let encoded = OffsetFile::new(decrypted, self.header_length())?;
-        let decoded = AudioDecoder::new(encoded)?;
+        let decoded = AudioDecoder::new(encoded, self.codec_format())?;
         Ok((decoded, normalization))
     }
 
@@ -113,6 +128,20 @@ impl MediaFile {
         match self.path().file_format {
             Format::OGG_VORBIS_96 | Format::OGG_VORBIS_160 | Format::OGG_VORBIS_320 => 167,
             _ => 0,
+        }
+    }
+
+    fn codec_format(&self) -> AudioCodecFormat {
+        match self.path().file_format {
+            Format::OGG_VORBIS_96 | Format::OGG_VORBIS_160 | Format::OGG_VORBIS_320 => {
+                AudioCodecFormat::OggVorbis
+            }
+            Format::MP3_256
+            | Format::MP3_320
+            | Format::MP3_160
+            | Format::MP3_96
+            | Format::MP3_160_ENC => AudioCodecFormat::Mp3,
+            _ => unreachable!(),
         }
     }
 }

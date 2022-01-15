@@ -45,7 +45,7 @@ impl ToMediaPath for Track {
     }
 
     fn to_media_path(&self, preferred_bitrate: usize) -> Option<MediaPath> {
-        let file = MediaFile::compatible_audio_formats(preferred_bitrate)
+        let file = MediaFile::supported_audio_formats_for_bitrate(preferred_bitrate)
             .iter()
             .find_map(|&preferred_format| {
                 self.file

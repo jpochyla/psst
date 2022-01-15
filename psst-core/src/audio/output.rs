@@ -109,6 +109,11 @@ impl AudioSink {
         self.send_to_callback(CallbackMsg::Resume);
     }
 
+    pub fn stop(&self) {
+        self.play(Empty);
+        self.pause();
+    }
+
     pub fn close(&self) {
         self.send_to_stream(StreamMsg::Close);
     }
