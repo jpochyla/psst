@@ -61,7 +61,7 @@ impl PlaybackController {
             &output,
         );
 
-        self.media_controls = Self::create_media_controls(player.sender())
+        self.media_controls = Self::create_media_controls(player.sender(), &window)
             .map_err(|err| log::error!("failed to connect to media control interface: {:?}", err))
             .ok();
 
@@ -123,6 +123,7 @@ impl PlaybackController {
 
     fn create_media_controls(
         sender: Sender<PlayerEvent>,
+        #[allow(unused_variables)] window: &WindowHandle,
     ) -> Result<MediaControls, souvlaki::Error> {
         let hwnd = {
             #[cfg(target_os = "windows")]
