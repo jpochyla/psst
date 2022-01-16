@@ -12,7 +12,7 @@ audio_thread_priority = "0.23"
 byteorder = "1.4"
 cpal = "0.13"
 crossbeam-channel = "0.5"
-hmac = "0.11"
+hmac = "0.12"
 libsamplerate = "0.1"
 log = "0.4"
 num-bigint = { version = "0.4", features = ["rand"] }
@@ -24,10 +24,10 @@ rangemap = "0.1"
 rb = "0.3"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-sha-1 = "0.9"
+sha-1 = "0.10"
 shannon = "0.2"
 socks = "0.3"
 symphonia = { version = "0.4", default-features = false, features = ["ogg", "vorbis", "mp3"]}
-tempfile = "3.2"
-ureq = { version = "2.2", features = ["json"] }
+tempfile = "3.3"
+ureq = { version = "2.4", features = ["json"] }
 url = "2.2"

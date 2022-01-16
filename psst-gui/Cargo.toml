@@ -19,19 +19,19 @@ fs_extra = "1.2"
 itertools = "0.10"
 log = "0.4"
 lru-cache = "0.1"
-once_cell = "1.8"
+once_cell = "1.9"
 open = "2.0"
 parking_lot = "0.11"
 platform-dirs = "0.3"
 rand = "0.8"
-raw-window-handle = "0.3"
+raw-window-handle = "0.4"
 regex = "1.5"
 serde = { version = "1.0", features = ["derive", "rc"] }
 serde_json = "1.0"
 souvlaki = "0.5.0"
 threadpool = "1.8"
 time = { version = "0.3", features = ["macros", "formatting"] }
-ureq = { version = "2.1", features = ["json", "socks-proxy"] }
+ureq = { version = "2.4", features = ["json", "socks-proxy"] }
 url = "2.2"
 
 [target.'cfg(windows)'.build-dependencies]
