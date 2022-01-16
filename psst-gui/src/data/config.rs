@@ -1,5 +1,6 @@
 use std::{env, env::VarError, fs::File, path::PathBuf};
 
+use dark_light::{detect, Mode};
 use druid::{Data, Lens};
 use platform_dirs::AppDirs;
 use psst_core::{
@@ -204,10 +205,18 @@ impl Default for AudioQuality {
 pub enum Theme {
     Light,
     Dark,
+    Auto
 }
 
 impl Default for Theme {
     fn default() -> Self {
-        Self::Light
+        match detect() {
+            Mode::Dark => {
+                Theme::Dark
+            },
+            Mode::Light => {
+                Theme::Light
+            }
+        }
     }
 }

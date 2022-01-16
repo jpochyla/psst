@@ -9,7 +9,7 @@ repository = "https://github.com/jpochyla/psst"
 
 [dependencies]
 psst-core = { path = "../psst-core" }
-
+dark-light = { git = "https://github.com/Be-ing/rust-dark-light", branch = "freedesktop" }
 crossbeam-channel = "0.5"
 druid-shell = { git = "https://github.com/jpochyla/druid", branch = "psst", features = ["raw-win-handle"] }
 druid = { git = "https://github.com/jpochyla/druid", branch = "psst", features = ["im", "image", "jpeg", "png", "serde"] }
@@ -35,6 +35,7 @@ url = "2.2"
 
 [target.'cfg(windows)'.build-dependencies]
 winres = "0.1.11"
+
 
 [package.metadata.bundle]
 name = "Psst"
