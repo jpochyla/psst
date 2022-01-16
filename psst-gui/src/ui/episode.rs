@@ -11,38 +11,63 @@ use crate::{
     widget::{MyWidgetExt, RemoteImage},
 };
 
-use super::{playable::PlayRow, theme, utils};
+use super::{
+    playable::{self, PlayRow},
+    theme, utils,
+};
 
 pub fn playable_widget() -> impl Widget<PlayRow<Arc<Episode>>> {
-    let cover = episode_cover_widget(theme::grid(4.0));
+    let cover = episode_cover_widget(theme::grid(4.0)).lens(PlayRow::item);
 
     let name = Label::raw()
         .with_font(theme::UI_FONT_MEDIUM)
         .with_line_break_mode(LineBreaking::WordWrap)
-        .lens(Episode::name.in_arc());
+        .lens(PlayRow::item.then(Episode::name.in_arc()));
 
     let description = Label::raw()
         .with_text_size(theme::TEXT_SIZE_SMALL)
         .with_text_color(theme::PLACEHOLDER_COLOR)
         .with_line_break_mode(LineBreaking::WordWrap)
-        .lens(Episode::description.in_arc());
+        .lens(PlayRow::item.then(Episode::description.in_arc()));
 
-    Flex::row()
+    let release = Label::<Arc<Episode>>::dynamic(|episode, _| episode.release())
+        .with_text_size(theme::TEXT_SIZE_SMALL)
+        .with_text_color(theme::GREY_300)
+        .lens(PlayRow::item);
+
+    let is_playing = playable::is_playing_marker_widget().lens(PlayRow::is_playing);
+
+    let duration = Label::<Arc<Episode>>::dynamic(|episode, _| {
+        utils::as_minutes_and_seconds(&episode.duration)
+    })
+    .with_text_size(theme::TEXT_SIZE_SMALL)
+    .with_text_color(theme::PLACEHOLDER_COLOR)
+    .lens(PlayRow::item);
+
+    Flex::column()
         .cross_axis_alignment(CrossAxisAlignment::Start)
-        .with_child(cover)
-        .with_default_spacer()
-        .with_flex_child(
-            Flex::column()
-                .cross_axis_alignment(CrossAxisAlignment::Start)
-                .with_child(name)
+        .with_child(
+            Flex::row()
+                .cross_axis_alignment(CrossAxisAlignment::Center)
+                .with_child(cover)
                 .with_default_spacer()
-                .with_child(description),
-            1.0,
+                .with_flex_child(name, 1.0),
+        )
+        .with_default_spacer()
+        .with_child(description)
+        .with_default_spacer()
+        .with_child(
+            Flex::row()
+                .cross_axis_alignment(CrossAxisAlignment::Center)
+                .with_child(release)
+                .with_default_spacer()
+                .with_flex_child(is_playing, 1.0)
+                .with_default_spacer()
+                .with_child(duration),
         )
         .padding(theme::grid(1.0))
         .link()
         .rounded(theme::BUTTON_BORDER_RADIUS)
-        .lens(PlayRow::item)
         .on_click(|ctx, row, _| ctx.submit_notification(cmd::PLAY.with(row.position)))
         .context_menu(episode_row_menu)
 }

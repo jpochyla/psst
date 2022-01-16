@@ -3,7 +3,7 @@ use std::{convert::TryFrom, sync::Arc, time::Duration};
 use druid::{im::Vector, Data, Lens};
 use psst_core::item_id::{ItemId, ItemIdType};
 use serde::{Deserialize, Serialize};
-use time::Date;
+use time::{macros::format_description, Date};
 
 use crate::data::{Image, Promise};
 
@@ -21,6 +21,7 @@ pub struct Show {
     pub name: Arc<str>,
     pub images: Vector<Image>,
     pub publisher: Arc<str>,
+    pub description: Arc<str>,
 }
 
 impl Show {
@@ -83,6 +84,14 @@ impl Episode {
             "https://open.spotify.com/episode/{id}",
             id = self.id.0.to_base62()
         )
+    }
+
+    pub fn release(&self) -> String {
+        let format = format_description!("[month repr:short] [day], [year]");
+        self.release_date
+            .as_ref()
+            .map(|date| date.format(format).expect("Invalid format"))
+            .unwrap_or_else(|| '-'.to_string())
     }
 }
 

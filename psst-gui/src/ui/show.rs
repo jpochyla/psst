@@ -12,41 +12,38 @@ use crate::{
     widget::{Async, MyWidgetExt, RemoteImage},
 };
 
-use super::{
-    library,
-    playable,
-    theme, track, utils,
-};
+use super::{library, playable, theme, track, utils};
 
 pub const LOAD_DETAIL: Selector<ShowLink> = Selector::new("app.show.load-detail");
 
 pub fn detail_widget() -> impl Widget<AppState> {
     Flex::column()
-        .with_child(async_info_widget())
-        .with_default_spacer()
+        .cross_axis_alignment(CrossAxisAlignment::Start)
+        // .with_child(async_info_widget())
+        // .with_default_spacer()
         .with_child(async_episodes_widget())
 }
 
-fn async_info_widget() -> impl Widget<AppState> {
-    Async::new(utils::spinner_widget, info_widget, utils::error_widget)
-        .lens(
-            Ctx::make(
-                AppState::common_ctx,
-                AppState::show_detail.then(ShowDetail::show),
-            )
-            .then(Ctx::in_promise()),
-        )
-        .on_command_async(
-            LOAD_DETAIL,
-            |d| WebApi::global().get_show(&d.id),
-            |_, data, d| data.show_detail.show.defer(d),
-            |_, data, (d, r)| data.show_detail.show.update((d, r)),
-        )
-}
+// fn async_info_widget() -> impl Widget<AppState> {
+//     Async::new(utils::spinner_widget, info_widget, utils::error_widget)
+//         .lens(
+//             Ctx::make(
+//                 AppState::common_ctx,
+//                 AppState::show_detail.then(ShowDetail::show),
+//             )
+//             .then(Ctx::in_promise()),
+//         )
+//         .on_command_async(
+//             LOAD_DETAIL,
+//             |d| WebApi::global().get_show(&d.id),
+//             |_, data, d| data.show_detail.show.defer(d),
+//             |_, data, (d, r)| data.show_detail.show.update((d, r)),
+//         )
+// }
 
-fn info_widget() -> impl Widget<WithCtx<Arc<Show>>> {
-    Label::raw().lens(Ctx::data().then(Show::name.in_arc()))
-}
+// fn info_widget() -> impl Widget<WithCtx<Arc<Show>>> {
+//     Label::raw().lens(Ctx::data().then(Show::description.in_arc()))
+// }
 
 fn async_episodes_widget() -> impl Widget<AppState> {
     Async::new(

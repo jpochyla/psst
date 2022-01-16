@@ -2,9 +2,11 @@ use std::{mem, sync::Arc};
 
 use druid::{
     im::Vector,
+    kurbo::Line,
     lens::Map,
-    widget::{Controller, ControllerHost, List, ListIter, ViewSwitcher},
-    Data, Env, Event, EventCtx, Lens, Selector, Widget, WidgetExt,
+    piet::StrokeStyle,
+    widget::{Controller, ControllerHost, List, ListIter, Painter, ViewSwitcher},
+    Data, Env, Event, EventCtx, Lens, RenderContext, Selector, Widget, WidgetExt,
 };
 
 use crate::{
@@ -14,6 +16,7 @@ use crate::{
         PlaybackPayload, PlaylistTracks, Recommendations, SavedTracks, SearchResults, ShowEpisodes,
         WithCtx,
     },
+    ui::theme,
 };
 
 use super::{
@@ -74,6 +77,21 @@ fn playable_widget(display: Display) -> impl Widget<PlayRow<Playable>> {
     )
 }
 
+pub fn is_playing_marker_widget() -> impl Widget<bool> {
+    Painter::new(|ctx, is_playing, env| {
+        const STYLE: StrokeStyle = StrokeStyle::new().dash_pattern(&[1.0, 2.0]);
+
+        let line = Line::new((0.0, 0.0), (ctx.size().width, 0.0));
+        let color = if *is_playing {
+            env.get(theme::GREY_200)
+        } else {
+            env.get(theme::GREY_500)
+        };
+        ctx.stroke_styled(line, &color, 1.0, &STYLE);
+    })
+    .fix_height(1.0)
+}
+
 #[derive(Clone, Data, Lens)]
 pub struct PlayRow<T> {
     pub item: T,
@@ -101,9 +119,10 @@ impl MatchFindQuery for PlayRow<Playable> {
                     || track.album.iter().any(|a| q.matches_str(&a.name))
                     || track.artists.iter().any(|a| q.matches_str(&a.name))
             }
-            Playable::Episode(_episode) => {
-                // TODO: Matching episodes.
-                false
+            Playable::Episode(episode) => {
+                q.matches_str(&episode.name)
+                    || q.matches_str(&episode.description)
+                    || q.matches_str(&episode.show.name)
             }
         }
     }

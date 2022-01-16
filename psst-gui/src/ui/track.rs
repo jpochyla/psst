@@ -1,11 +1,8 @@
 use std::sync::Arc;
 
 use druid::{
-    kurbo::Line,
-    piet::StrokeStyle,
-    widget::{CrossAxisAlignment, Either, Flex, Label, List, Painter},
-    LensExt, LocalizedString, Menu, MenuItem, RenderContext, Size, TextAlignment, Widget,
-    WidgetExt,
+    widget::{CrossAxisAlignment, Either, Flex, Label, List},
+    LensExt, LocalizedString, Menu, MenuItem, Size, TextAlignment, Widget, WidgetExt,
 };
 
 use crate::{
@@ -17,7 +14,7 @@ use crate::{
 
 use super::{
     library,
-    playable::PlayRow,
+    playable::{self, PlayRow},
     theme,
     utils::{self, placeholder_widget},
 };
@@ -107,21 +104,9 @@ pub fn playable_widget(display: Display) -> impl Widget<PlayRow<Arc<Track>>> {
         minor.add_child(track_album);
     }
 
-    let line_painter = Painter::new(|ctx, is_playing, env| {
-        const STYLE: StrokeStyle = StrokeStyle::new().dash_pattern(&[1.0, 2.0]);
-
-        let line = Line::new((0.0, 0.0), (ctx.size().width, 0.0));
-        let color = if *is_playing {
-            env.get(theme::GREY_200)
-        } else {
-            env.get(theme::GREY_500)
-        };
-        ctx.stroke_styled(line, &color, 1.0, &STYLE);
-    })
-    .lens(PlayRow::is_playing)
-    .fix_height(1.0);
+    let is_playing = playable::is_playing_marker_widget().lens(PlayRow::is_playing);
     major.add_default_spacer();
-    major.add_flex_child(line_painter, 1.0);
+    major.add_flex_child(is_playing, 1.0);
 
     if display.popularity {
         let track_popularity = Label::<Arc<Track>>::dynamic(|track, _| {
