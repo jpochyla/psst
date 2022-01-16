@@ -25,7 +25,7 @@ sudo apt-get install libssl-dev libgtk-3-dev libcairo2-dev libasound2-dev
 RHEL/Fedora:
 
 ```shell
-sudo dnf install openssl-devel gtk3-devel cairo-devel
+sudo dnf install openssl-devel gtk3-devel cairo-devel alsa-lib-devel
 ```
 
 ##### Building
