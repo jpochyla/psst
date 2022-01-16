@@ -558,6 +558,7 @@ impl WebApi {
             albums: Option<Page<Arc<Album>>>,
             tracks: Option<Page<Arc<Track>>>,
             playlists: Option<Page<Playlist>>,
+            shows: Option<Page<Arc<Show>>>,
         }
 
         let topics = topics.iter().map(SearchTopic::as_str).join(",");
@@ -572,12 +573,14 @@ impl WebApi {
         let albums = result.albums.map_or_else(Vector::new, |page| page.items);
         let tracks = result.tracks.map_or_else(Vector::new, |page| page.items);
         let playlists = result.playlists.map_or_else(Vector::new, |page| page.items);
+        let shows = result.shows.map_or_else(Vector::new, |page| page.items);
         Ok(SearchResults {
             query: query.into(),
             artists,
             albums,
             tracks,
             playlists,
+            shows,
         })
     }
 
