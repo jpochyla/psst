@@ -16,6 +16,8 @@ use crate::{
     webapi::WebApi,
     widget::{Async, Empty, MyWidgetExt},
 };
+use crate::data::Show;
+use crate::ui::show;
 
 use super::{album, artist, playable, playlist, theme, track, utils};
 
@@ -75,6 +77,7 @@ fn loaded_results_widget() -> impl Widget<WithCtx<SearchResults>> {
                 && results.data.albums.is_empty()
                 && results.data.tracks.is_empty()
                 && results.data.playlists.is_empty()
+                && results.data.shows.is_empty()
         },
         Label::new("No results")
             .with_text_size(theme::TEXT_SIZE_LARGE)
@@ -86,7 +89,8 @@ fn loaded_results_widget() -> impl Widget<WithCtx<SearchResults>> {
             .with_child(artist_results_widget())
             .with_child(album_results_widget())
             .with_child(track_results_widget())
-            .with_child(playlist_results_widget()),
+            .with_child(playlist_results_widget())
+            .with_child(show_results_widget()),
     )
 }
 
@@ -139,6 +143,17 @@ fn playlist_results_widget() -> impl Widget<WithCtx<SearchResults>> {
             .with_child(List::new(playlist::playlist_widget)),
     )
     .lens(Ctx::data().then(SearchResults::playlists))
+}
+
+fn show_results_widget() -> impl Widget<WithCtx<SearchResults>> {
+    Either::new(
+        |shows: &WithCtx<Vector<Arc<Show>>>, _| shows.data.is_empty(),
+        Empty,
+        Flex::column()
+            .with_child(header_widget("Podcasts"))
+            .with_child(List::new(show::show_widget)),
+    )
+        .lens(Ctx::map(SearchResults::shows))
 }
 
 fn header_widget<T: Data>(text: impl Into<LabelText<T>>) -> impl Widget<T> {
