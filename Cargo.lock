@@ -524,12 +524,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "cty"
-version = "0.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b365fabc795046672053e29c954733ec3b05e4be654ab130fe8f1f94d7051f35"
-
-[[package]]
 name = "darling"
 version = "0.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -713,7 +707,7 @@ dependencies = [
  "lazy_static",
  "objc",
  "piet-common",
- "raw-window-handle 0.3.3",
+ "raw-window-handle",
  "scopeguard",
  "time",
  "tracing",
@@ -2071,7 +2065,7 @@ dependencies = [
  "platform-dirs",
  "psst-core",
  "rand",
- "raw-window-handle 0.4.2",
+ "raw-window-handle",
  "regex",
  "serde",
  "serde_json",
@@ -2176,15 +2170,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0a441a7a6c80ad6473bd4b74ec1c9a4c951794285bf941c2126f607c72e48211"
 dependencies = [
  "libc",
-]
-
-[[package]]
-name = "raw-window-handle"
-version = "0.4.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fba75eee94a9d5273a68c9e1e105d9cffe1ef700532325788389e5a83e2522b7"
-dependencies = [
- "cty",
 ]
 
 [[package]]
@@ -2448,7 +2433,7 @@ dependencies = [
  "dbus-crossroads",
  "dispatch",
  "objc",
- "raw-window-handle 0.3.3",
+ "raw-window-handle",
  "windows",
 ]
 
