@@ -364,6 +364,7 @@ impl Player {
 
     fn stop(&mut self) {
         self.sender.send(PlayerEvent::Stopped).unwrap();
+        self.audio_output_sink.stop();
         self.state = PlayerState::Stopped;
         self.queue.clear();
         self.consecutive_loading_failures = 0;
