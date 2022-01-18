@@ -2,12 +2,12 @@ use std::sync::Arc;
 
 use druid::{
     widget::{CrossAxisAlignment, Flex, Label, LineBreaking},
-    LensExt, LocalizedString, Menu, MenuItem, Widget, WidgetExt,
+    LensExt, LocalizedString, Menu, MenuItem, Size, Widget, WidgetExt,
 };
 
 use crate::{
     cmd,
-    data::{AppState, Episode, Library},
+    data::{AppState, Episode, Library, Nav},
     widget::{MyWidgetExt, RemoteImage},
 };
 
@@ -17,7 +17,7 @@ use super::{
 };
 
 pub fn playable_widget() -> impl Widget<PlayRow<Arc<Episode>>> {
-    let cover = episode_cover_widget(theme::grid(4.0)).lens(PlayRow::item);
+    let cover = rounded_cover_widget(theme::grid(4.0)).lens(PlayRow::item);
 
     let name = Label::raw()
         .with_font(theme::UI_FONT_MEDIUM)
@@ -72,12 +72,17 @@ pub fn playable_widget() -> impl Widget<PlayRow<Arc<Episode>>> {
         .context_menu(episode_row_menu)
 }
 
-fn episode_cover_widget(size: f64) -> impl Widget<Arc<Episode>> {
+fn cover_widget(size: f64) -> impl Widget<Arc<Episode>> {
     RemoteImage::new(
         utils::placeholder_widget(),
         move |episode: &Arc<Episode>, _| episode.image(size, size).map(|image| image.url.clone()),
     )
     .fix_size(size, size)
+}
+
+fn rounded_cover_widget(size: f64) -> impl Widget<Arc<Episode>> {
+    // TODO: Take the radius from theme.
+    cover_widget(size).clip(Size::new(size, size).to_rounded_rect(4.0))
 }
 
 fn episode_row_menu(row: &PlayRow<Arc<Episode>>) -> Menu<AppState> {
@@ -86,6 +91,11 @@ fn episode_row_menu(row: &PlayRow<Arc<Episode>>) -> Menu<AppState> {
 
 pub fn episode_menu(episode: &Episode, _library: &Arc<Library>) -> Menu<AppState> {
     let mut menu = Menu::empty();
+
+    menu = menu.entry(
+        MenuItem::new(LocalizedString::new("menu-item-show-show").with_placeholder("Go To Show"))
+            .command(cmd::NAVIGATE.with(Nav::ShowDetail(episode.show.clone()))),
+    );
 
     menu = menu.entry(
         MenuItem::new(

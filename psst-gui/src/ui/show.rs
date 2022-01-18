@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use druid::{
     widget::{CrossAxisAlignment, Flex, Label, LineBreaking},
-    LensExt, LocalizedString, Menu, MenuItem, Selector, Widget, WidgetExt,
+    LensExt, LocalizedString, Menu, MenuItem, Selector, Size, Widget, WidgetExt,
 };
 
 use crate::{
@@ -77,7 +77,7 @@ fn async_episodes_widget() -> impl Widget<AppState> {
 }
 
 pub fn show_widget() -> impl Widget<WithCtx<Arc<Show>>> {
-    let show_image = cover_widget(theme::grid(7.0));
+    let show_image = rounded_cover_widget(theme::grid(6.0));
 
     let show_name = Label::raw()
         .with_font(theme::UI_FONT_MEDIUM)
@@ -101,7 +101,7 @@ pub fn show_widget() -> impl Widget<WithCtx<Arc<Show>>> {
         .with_flex_child(show_info, 1.0)
         .lens(Ctx::data());
 
-    show.padding(theme::grid(0.5))
+    show.padding(theme::grid(1.0))
         .link()
         .on_click(|ctx, show, _| {
             ctx.submit_command(cmd::NAVIGATE.with(Nav::ShowDetail(show.data.link())));
@@ -114,6 +114,11 @@ fn cover_widget(size: f64) -> impl Widget<Arc<Show>> {
         show.image(size, size).map(|image| image.url.clone())
     })
     .fix_size(size, size)
+}
+
+fn rounded_cover_widget(size: f64) -> impl Widget<Arc<Show>> {
+    // TODO: Take the radius from theme.
+    cover_widget(size).clip(Size::new(size, size).to_rounded_rect(4.0))
 }
 
 fn show_ctx_menu(show: &WithCtx<Arc<Show>>) -> Menu<AppState> {

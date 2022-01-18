@@ -1,6 +1,6 @@
 use std::{fmt, sync::Arc, time::Duration};
 
-use druid::{im::Vector, lens::Map, Data, Lens};
+use druid::{im::Vector, Data, Lens};
 use druid_enums::Matcher;
 use psst_core::item_id::ItemId;
 use serde::{Deserialize, Serialize};
@@ -32,24 +32,6 @@ pub enum Playable {
 }
 
 impl Playable {
-    pub fn lens_track() -> impl Lens<Self, Option<Arc<Track>>> {
-        Map::new(
-            |item: &Self| item.track().cloned(),
-            |_, _| {
-                // Immutable.
-            },
-        )
-    }
-
-    pub fn lens_episode() -> impl Lens<Self, Option<Arc<Episode>>> {
-        Map::new(
-            |item: &Self| item.episode().cloned(),
-            |_, _| {
-                // Immutable.
-            },
-        )
-    }
-
     pub fn track(&self) -> Option<&Arc<Track>> {
         if let Self::Track(track) = self {
             Some(track)
