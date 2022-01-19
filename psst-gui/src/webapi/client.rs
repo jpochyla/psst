@@ -241,6 +241,16 @@ impl WebApi {
             appears_on: Vector::new(),
         };
         for album in result {
+            if album
+                .artists
+                .iter()
+                .find(|artist_link| artist_link.name.to_lowercase() == "various artists")
+                .is_some()
+            {
+                artist_albums.appears_on.push_back(album);
+                continue;
+            }
+
             match album.album_type {
                 AlbumType::Album => artist_albums.albums.push_back(album),
                 AlbumType::Single => artist_albums.singles.push_back(album),
