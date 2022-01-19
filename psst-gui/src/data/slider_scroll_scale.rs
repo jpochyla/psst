@@ -32,7 +32,6 @@ impl SliderScrollScale {
 }
 impl Default for SliderScrollScale {
     fn default() -> Self {
-        log::info!("Getting defaults for SliderScrollScale");
         Self {
             scale: Some(5.),
             y: Some(1.),
