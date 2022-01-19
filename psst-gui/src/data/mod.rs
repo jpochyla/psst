@@ -10,6 +10,7 @@ mod playlist;
 mod promise;
 mod recommend;
 mod search;
+mod slider_scroll_scale;
 mod track;
 mod user;
 pub mod utils;
@@ -48,6 +49,7 @@ pub use crate::data::{
         RecommendationsRequest, Toggled,
     },
     search::{Search, SearchResults, SearchTopic},
+    slider_scroll_scale::SliderScrollScale,
     track::{AudioAnalysis, AudioSegment, TimeInterval, Track, TrackId},
     user::UserProfile,
     utils::{Cached, Float64, Image, Page},

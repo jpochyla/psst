@@ -10,7 +10,7 @@ use psst_core::{
 };
 use serde::{Deserialize, Serialize};
 
-use super::{Nav, Promise, QueueBehavior};
+use super::{Nav, Promise, QueueBehavior, SliderScrollScale};
 
 #[derive(Clone, Debug, Data, Lens)]
 pub struct Preferences {
@@ -76,6 +76,7 @@ pub struct Config {
     pub last_route: Option<Nav>,
     pub queue_behavior: QueueBehavior,
     pub show_track_cover: bool,
+    pub volume_scroll_scale: SliderScrollScale,
 }
 
 impl Default for Config {
@@ -88,6 +89,7 @@ impl Default for Config {
             last_route: Default::default(),
             queue_behavior: Default::default(),
             show_track_cover: Default::default(),
+            volume_scroll_scale: Default::default(),
         }
     }
 }

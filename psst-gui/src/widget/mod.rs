@@ -30,7 +30,7 @@ pub use theme::ThemeScope;
 pub use utils::{Border, Clip, Logger};
 
 use crate::{
-    controller::{ExClick, OnCommand, OnCommandAsync, OnDebounce, OnUpdate},
+    controller::{ExClick, ExScroll, OnCommand, OnCommandAsync, OnDebounce, OnUpdate},
     data::AppState,
 };
 
@@ -79,6 +79,13 @@ pub trait MyWidgetExt<T: Data>: Widget<T> + Sized + 'static {
         func: impl Fn(&mut EventCtx, &MouseEvent, &mut T, &Env) + 'static,
     ) -> ControllerHost<Self, ExClick<T>> {
         ControllerHost::new(self, ExClick::new(Some(MouseButton::Right), func))
+    }
+
+    fn on_scroll(
+        self,
+        func: impl Fn(&mut EventCtx, &MouseEvent, &mut T, &Env) + 'static,
+    ) -> ControllerHost<Self, ExScroll<T>> {
+        ControllerHost::new(self, ExScroll::new(func))
     }
 
     fn on_command<U, F>(
