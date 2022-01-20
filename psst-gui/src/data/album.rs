@@ -48,6 +48,16 @@ impl Album {
         self.release_with_format(format_description!("[year]"))
     }
 
+    pub fn release_year_int(&self) -> usize {
+        match self.release_year().parse::<usize>() {
+            Err(e) => {
+                log::error!("Error parsing release year for {}: {}", self.name, e);
+                std::usize::MAX
+            }
+            Ok(year) => year,
+        }
+    }
+
     fn release_with_format(&self, format: &(impl Formattable + ?Sized)) -> String {
         self.release_date
             .as_ref()
