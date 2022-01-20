@@ -244,16 +244,6 @@ impl WebApi {
         let mut last_release_year = std::usize::MAX;
 
         for album in result {
-            if album
-                .artists
-                .iter()
-                .find(|artist_link| artist_link.name.to_lowercase() == "various artists")
-                .is_some()
-            {
-                artist_albums.appears_on.push_back(album);
-                continue;
-            }
-
             match album.album_type {
                 AlbumType::Album => {
                     // Spotify is labeling albums that should be labeled `appears_on` as `album`
