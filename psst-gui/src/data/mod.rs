@@ -49,7 +49,7 @@ pub use crate::data::{
         RecommendationsRequest, Toggled,
     },
     search::{Search, SearchResults, SearchTopic},
-    show::{Episode, EpisodeLink, Show, ShowDetail, ShowEpisodes, ShowLink, EpisodeId},
+    show::{Episode, EpisodeId, EpisodeLink, Show, ShowDetail, ShowEpisodes, ShowLink},
     track::{AudioAnalysis, AudioSegment, TimeInterval, Track, TrackId},
     user::UserProfile,
     utils::{Cached, Float64, Image, Page},

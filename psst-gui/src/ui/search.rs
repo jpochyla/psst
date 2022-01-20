@@ -6,6 +6,8 @@ use druid::{
     Data, LensExt, Selector, Widget, WidgetExt,
 };
 
+use crate::data::Show;
+use crate::ui::show;
 use crate::{
     cmd,
     controller::InputController,
@@ -16,8 +18,6 @@ use crate::{
     webapi::WebApi,
     widget::{Async, Empty, MyWidgetExt},
 };
-use crate::data::Show;
-use crate::ui::show;
 
 use super::{album, artist, playable, playlist, theme, track, utils};
 
@@ -153,7 +153,7 @@ fn show_results_widget() -> impl Widget<WithCtx<SearchResults>> {
             .with_child(header_widget("Podcasts"))
             .with_child(List::new(show::show_widget)),
     )
-        .lens(Ctx::map(SearchResults::shows))
+    .lens(Ctx::map(SearchResults::shows))
 }
 
 fn header_widget<T: Data>(text: impl Into<LabelText<T>>) -> impl Widget<T> {

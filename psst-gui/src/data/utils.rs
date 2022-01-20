@@ -127,7 +127,7 @@ where
     let millis = match u64::deserialize(deserializer) {
         Ok(v) => v,
         // Sometimes spotify will provide a negative number for a duration
-        Err(_) => 0
+        Err(_) => 0,
     };
     let duration = Duration::from_millis(millis);
     Ok(duration)
