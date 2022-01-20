@@ -16,7 +16,7 @@ pub enum SearchTopic {
     Album,
     Track,
     Playlist,
-    Show
+    Show,
 }
 
 impl SearchTopic {
@@ -31,7 +31,13 @@ impl SearchTopic {
     }
 
     pub fn all() -> &'static [Self] {
-        &[Self::Artist, Self::Album, Self::Track, Self::Playlist, Self::Show]
+        &[
+            Self::Artist,
+            Self::Album,
+            Self::Track,
+            Self::Playlist,
+            Self::Show,
+        ]
     }
 }
 
