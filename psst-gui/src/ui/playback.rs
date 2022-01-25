@@ -125,7 +125,7 @@ fn playback_origin_icon(origin: &PlaybackOrigin) -> &'static SvgIcon {
         PlaybackOrigin::Album { .. } => &icons::ALBUM,
         PlaybackOrigin::Artist { .. } => &icons::ARTIST,
         PlaybackOrigin::Playlist { .. } => &icons::PLAYLIST,
-        PlaybackOrigin::Show { .. } => &icons::PLAYLIST, // TODO
+        PlaybackOrigin::Show { .. } => &icons::PODCAST,
         PlaybackOrigin::Search { .. } => &icons::SEARCH,
         PlaybackOrigin::Recommendations { .. } => &icons::SEARCH,
     }

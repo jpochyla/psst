@@ -377,7 +377,7 @@ fn route_icon_widget() -> impl Widget<Nav> {
     ViewSwitcher::new(
         |nav: &Nav, _| nav.clone(),
         |nav: &Nav, _, _| {
-            let icon = |icon: &SvgIcon| icon.scale(theme::ICON_SIZE_SMALL);
+            let icon = |icon: &SvgIcon| icon.scale(theme::ICON_SIZE_MEDIUM);
             match &nav {
                 Nav::Home => Empty.boxed(),
                 Nav::SavedTracks => Empty.boxed(),
@@ -387,7 +387,7 @@ fn route_icon_widget() -> impl Widget<Nav> {
                 Nav::AlbumDetail(_) => icon(&icons::ALBUM).boxed(),
                 Nav::ArtistDetail(_) => icon(&icons::ARTIST).boxed(),
                 Nav::PlaylistDetail(_) => icon(&icons::PLAYLIST).boxed(),
-                Nav::ShowDetail(_) => icon(&icons::PLAYLIST).boxed(),
+                Nav::ShowDetail(_) => icon(&icons::PODCAST).boxed(),
                 Nav::Recommendations(_) => icon(&icons::SEARCH).boxed(),
             }
         },
