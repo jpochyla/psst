@@ -57,7 +57,7 @@ impl Nav {
             Nav::Home => "Home".to_string(),
             Nav::SavedTracks => "Saved Tracks".to_string(),
             Nav::SavedAlbums => "Saved Albums".to_string(),
-            Nav::SavedShows => "Saved Shows".to_string(),
+            Nav::SavedShows => "Saved Podcasts".to_string(),
             Nav::SearchResults(query) => query.to_string(),
             Nav::AlbumDetail(link) => link.name.to_string(),
             Nav::ArtistDetail(link) => link.name.to_string(),
