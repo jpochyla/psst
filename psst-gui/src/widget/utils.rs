@@ -90,35 +90,35 @@ where
                 self.inner.paint(ctx, data, env);
             });
             // Paint the gradient.
-            let gradient_rect = match self.axis {
-                Axis::Horizontal => Rect::new(
-                    0.0f64.max(size.width - Self::FADE_LENGTH_MAX),
-                    0.0,
-                    size.width,
-                    size.height,
-                ),
-                Axis::Vertical => Rect::new(
-                    0.0,
-                    0.0f64.max(size.height - Self::FADE_LENGTH_MAX),
-                    size.width,
-                    size.height,
-                ),
-            };
-            let (start, end) = match self.axis {
-                Axis::Horizontal => (UnitPoint::LEFT, UnitPoint::RIGHT),
-                Axis::Vertical => (UnitPoint::TOP, UnitPoint::BOTTOM),
-            };
-            ctx.fill(
-                &gradient_rect,
-                &LinearGradient::new(
-                    start,
-                    end,
-                    (
-                        self.color.resolve(env).with_alpha(0.0),
-                        self.color.resolve(env),
-                    ),
-                ),
-            );
+            // let gradient_rect = match self.axis {
+            //     Axis::Horizontal => Rect::new(
+            //         0.0f64.max(size.width - Self::FADE_LENGTH_MAX),
+            //         0.0,
+            //         size.width,
+            //         size.height,
+            //     ),
+            //     Axis::Vertical => Rect::new(
+            //         0.0,
+            //         0.0f64.max(size.height - Self::FADE_LENGTH_MAX),
+            //         size.width,
+            //         size.height,
+            //     ),
+            // };
+            // let (start, end) = match self.axis {
+            //     Axis::Horizontal => (UnitPoint::LEFT, UnitPoint::RIGHT),
+            //     Axis::Vertical => (UnitPoint::TOP, UnitPoint::BOTTOM),
+            // };
+            // ctx.fill(
+            //     &gradient_rect,
+            //     &LinearGradient::new(
+            //         start,
+            //         end,
+            //         (
+            //             self.color.resolve(env).with_alpha(0.0),
+            //             self.color.resolve(env),
+            //         ),
+            //     ),
+            // );
         } else {
             self.inner.paint(ctx, data, env);
         }
