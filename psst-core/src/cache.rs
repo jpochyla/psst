@@ -25,6 +25,7 @@ impl Cache {
         // Create the cache structure.
         mkdir_if_not_exists(&base)?;
         mkdir_if_not_exists(&base.join("track"))?;
+        mkdir_if_not_exists(&base.join("episode"))?;
         mkdir_if_not_exists(&base.join("audio"))?;
         mkdir_if_not_exists(&base.join("key"))?;
 
