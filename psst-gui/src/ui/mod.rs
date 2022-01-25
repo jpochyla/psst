@@ -199,11 +199,17 @@ fn route_widget() -> impl Widget<AppState> {
             Route::Home => Scroll::new(home::home_widget().padding(theme::grid(1.0)))
                 .vertical()
                 .boxed(),
-            Route::SavedTracks => {
-                Scroll::new(library::saved_tracks_widget().padding(theme::grid(1.0)))
-                    .vertical()
-                    .boxed()
-            }
+            Route::SavedTracks => Flex::column()
+                .with_child(
+                    find::finder_widget(cmd::FIND_IN_SAVED_TRACKS, "Find in Saved Tracks...")
+                        .lens(AppState::finder),
+                )
+                .with_flex_child(
+                    Scroll::new(library::saved_tracks_widget().padding(theme::grid(1.0)))
+                        .vertical(),
+                    1.0,
+                )
+                .boxed(),
             Route::SavedAlbums => {
                 Scroll::new(library::saved_albums_widget().padding(theme::grid(1.0)))
                     .vertical()
@@ -226,7 +232,7 @@ fn route_widget() -> impl Widget<AppState> {
             Route::PlaylistDetail => Flex::column()
                 .with_child(
                     find::finder_widget(cmd::FIND_IN_PLAYLIST, "Find in Playlist...")
-                        .lens(AppState::playlist_detail.then(PlaylistDetail::finder)),
+                        .lens(AppState::finder),
                 )
                 .with_flex_child(
                     Scroll::new(playlist::detail_widget().padding(theme::grid(1.0))).vertical(),

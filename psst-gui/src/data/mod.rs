@@ -75,6 +75,7 @@ pub struct AppState {
     pub common_ctx: Arc<CommonCtx>,
     pub personalized: Personalized,
     pub alerts: Vector<Alert>,
+    pub finder: Finder,
 }
 
 impl AppState {
@@ -133,7 +134,6 @@ impl AppState {
             playlist_detail: PlaylistDetail {
                 playlist: Promise::Empty,
                 tracks: Promise::Empty,
-                finder: Default::default(),
             },
             show_detail: ShowDetail {
                 show: Promise::Empty,
@@ -145,6 +145,7 @@ impl AppState {
                 made_for_you: Promise::Empty,
             },
             alerts: Vector::new(),
+            finder: Finder::new(),
         }
     }
 }

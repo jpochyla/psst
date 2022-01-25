@@ -3,6 +3,7 @@ use std::sync::Arc;
 use druid::{widget::List, LensExt, Selector, Widget, WidgetExt};
 
 use crate::{
+    cmd,
     data::{
         Album, AlbumLink, AppState, Ctx, Library, SavedAlbums, SavedShows, SavedTracks, Show,
         ShowLink, Track, TrackId,
@@ -30,14 +31,17 @@ pub fn saved_tracks_widget() -> impl Widget<AppState> {
     Async::new(
         utils::spinner_widget,
         || {
-            playable::list_widget(playable::Display {
-                track: track::Display {
-                    title: true,
-                    artist: true,
-                    album: true,
-                    ..track::Display::empty()
+            playable::list_widget_with_find(
+                playable::Display {
+                    track: track::Display {
+                        title: true,
+                        artist: true,
+                        album: true,
+                        ..track::Display::empty()
+                    },
                 },
-            })
+                cmd::FIND_IN_SAVED_TRACKS,
+            )
         },
         utils::error_widget,
     )

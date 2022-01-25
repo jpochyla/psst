@@ -22,6 +22,7 @@ pub const COPY: Selector<String> = Selector::new("app.copy-to-clipboard");
 
 pub const TOGGLE_FINDER: Selector = Selector::new("app.show-finder");
 pub const FIND_IN_PLAYLIST: Selector<Find> = Selector::new("find-in-playlist");
+pub const FIND_IN_SAVED_TRACKS: Selector<Find> = Selector::new("find-in-saved-tracks");
 
 // Session
 
