@@ -27,7 +27,7 @@ pub use overlay::{Overlay, OverlayPosition};
 pub use promise::Async;
 pub use remote_image::RemoteImage;
 pub use theme::ThemeScope;
-pub use utils::{Border, Clip, Logger};
+pub use utils::{Border, Clip, FadeOut, Logger};
 
 use crate::{
     controller::{ExClick, OnCommand, OnCommandAsync, OnDebounce, OnUpdate},

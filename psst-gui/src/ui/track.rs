@@ -120,7 +120,7 @@ pub fn playable_widget(display: Display) -> impl Widget<PlayRow<Arc<Track>>> {
     }
 
     let track_duration =
-        Label::<Arc<Track>>::dynamic(|track, _| utils::as_minutes_and_seconds(&track.duration))
+        Label::<Arc<Track>>::dynamic(|track, _| utils::as_minutes_and_seconds(track.duration))
             .with_text_size(theme::TEXT_SIZE_SMALL)
             .with_text_color(theme::PLACEHOLDER_COLOR)
             .lens(PlayRow::item);

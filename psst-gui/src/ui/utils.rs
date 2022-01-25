@@ -5,6 +5,7 @@ use druid::{
     widget::{prelude::*, CrossAxisAlignment, Flex, Label, SizedBox},
     Data, Vec2, Widget, WidgetExt,
 };
+use time_humanize::HumanTime;
 
 use crate::{error::Error, widget::icons};
 
@@ -102,8 +103,15 @@ pub fn error_widget() -> impl Widget<Error> {
         .center()
 }
 
-pub fn as_minutes_and_seconds(dur: &Duration) -> String {
+pub fn as_minutes_and_seconds(dur: Duration) -> String {
     let minutes = dur.as_secs() / 60;
     let seconds = dur.as_secs() % 60;
     format!("{}∶{:02}", minutes, seconds)
+}
+
+pub fn as_human(dur: Duration) -> String {
+    HumanTime::from(dur).to_text_en(
+        time_humanize::Accuracy::Rough,
+        time_humanize::Tense::Present,
+    )
 }

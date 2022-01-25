@@ -31,6 +31,7 @@ serde_json = "1.0"
 souvlaki = "0.5.0"
 threadpool = "1.8"
 time = { version = "0.3", features = ["macros", "formatting"] }
+time-humanize = "0.1"
 ureq = { version = "2.4", features = ["json", "socks-proxy"] }
 url = "2.2"
 

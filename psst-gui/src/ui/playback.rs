@@ -238,8 +238,8 @@ fn durations_widget() -> impl Widget<NowPlaying> {
     Label::dynamic(|now_playing: &NowPlaying, _| {
         format!(
             "{} / {}",
-            utils::as_minutes_and_seconds(&now_playing.progress),
-            utils::as_minutes_and_seconds(&now_playing.item.duration())
+            utils::as_minutes_and_seconds(now_playing.progress),
+            utils::as_minutes_and_seconds(now_playing.item.duration())
         )
     })
     .with_text_size(theme::TEXT_SIZE_SMALL)
