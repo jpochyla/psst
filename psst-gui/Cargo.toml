@@ -40,6 +40,7 @@ souvlaki = { version = "0.5.1" }
 
 [target.'cfg(windows)'.build-dependencies]
 winres = { version = "0.1.12" }
+ico = "0.1"
 
 [package.metadata.bundle]
 name = "Psst"
