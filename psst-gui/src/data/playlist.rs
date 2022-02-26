@@ -11,7 +11,6 @@ use super::Finder;
 pub struct PlaylistDetail {
     pub playlist: Promise<Playlist, PlaylistLink>,
     pub tracks: Promise<PlaylistTracks, PlaylistLink>,
-    pub finder: Finder,
 }
 
 #[derive(Clone, Debug, Data, Lens, Deserialize)]

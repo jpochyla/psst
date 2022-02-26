@@ -9,7 +9,7 @@ use std::{
 };
 
 use byteorder::{ReadBytesExt, BE};
-use hmac::{Hmac, Mac, NewMac};
+use hmac::{Hmac, Mac};
 use serde::{Deserialize, Serialize};
 use sha1::Sha1;
 use socks::Socks5Stream;

@@ -15,12 +15,7 @@ use crate::{
     widget::{Async, MyWidgetExt, RemoteImage},
 };
 
-use super::{
-    album::album_widget,
-    theme,
-    track::{tracklist_widget, TrackDisplay},
-    utils::{error_widget, placeholder_widget, spinner_widget},
-};
+use super::{album, playable, theme, track, utils};
 
 pub const LOAD_DETAIL: Selector<ArtistLink> = Selector::new("app.artist.load-detail");
 
@@ -32,31 +27,35 @@ pub fn detail_widget() -> impl Widget<AppState> {
 }
 
 fn async_top_tracks_widget() -> impl Widget<AppState> {
-    Async::new(spinner_widget, top_tracks_widget, error_widget)
-        .lens(
-            Ctx::make(
-                AppState::common_ctx,
-                AppState::artist_detail.then(ArtistDetail::top_tracks),
-            )
-            .then(Ctx::in_promise()),
+    Async::new(
+        utils::spinner_widget,
+        top_tracks_widget,
+        utils::error_widget,
+    )
+    .lens(
+        Ctx::make(
+            AppState::common_ctx,
+            AppState::artist_detail.then(ArtistDetail::top_tracks),
         )
-        .on_command_async(
-            LOAD_DETAIL,
-            |d| WebApi::global().get_artist_top_tracks(&d.id),
-            |_, data, d| data.artist_detail.top_tracks.defer(d),
-            |_, data, (d, r)| {
-                let r = r.map(|tracks| ArtistTracks {
-                    id: d.id.clone(),
-                    name: d.name.clone(),
-                    tracks,
-                });
-                data.artist_detail.top_tracks.update((d, r))
-            },
-        )
+        .then(Ctx::in_promise()),
+    )
+    .on_command_async(
+        LOAD_DETAIL,
+        |d| WebApi::global().get_artist_top_tracks(&d.id),
+        |_, data, d| data.artist_detail.top_tracks.defer(d),
+        |_, data, (d, r)| {
+            let r = r.map(|tracks| ArtistTracks {
+                id: d.id.clone(),
+                name: d.name.clone(),
+                tracks,
+            });
+            data.artist_detail.top_tracks.update((d, r))
+        },
+    )
 }
 
 fn async_albums_widget() -> impl Widget<AppState> {
-    Async::new(spinner_widget, albums_widget, error_widget)
+    Async::new(utils::spinner_widget, albums_widget, utils::error_widget)
         .lens(
             Ctx::make(
                 AppState::common_ctx,
@@ -73,7 +72,7 @@ fn async_albums_widget() -> impl Widget<AppState> {
 }
 
 fn async_related_widget() -> impl Widget<AppState> {
-    Async::new(spinner_widget, related_widget, error_widget)
+    Async::new(utils::spinner_widget, related_widget, utils::error_widget)
         .lens(AppState::artist_detail.then(ArtistDetail::related_artists))
         .on_command_async(
             LOAD_DETAIL,
@@ -101,7 +100,7 @@ pub fn artist_widget() -> impl Widget<Artist> {
         .context_menu(|artist| artist_menu(&artist.link()))
 }
 
-pub fn artist_link_widget() -> impl Widget<ArtistLink> {
+pub fn link_widget() -> impl Widget<ArtistLink> {
     Label::raw()
         .with_line_break_mode(LineBreaking::WordWrap)
         .with_font(theme::UI_FONT_MEDIUM)
@@ -115,7 +114,7 @@ pub fn artist_link_widget() -> impl Widget<ArtistLink> {
 
 pub fn cover_widget(size: f64) -> impl Widget<Artist> {
     let radius = size / 2.0;
-    RemoteImage::new(placeholder_widget(), move |artist: &Artist, _| {
+    RemoteImage::new(utils::placeholder_widget(), move |artist: &Artist, _| {
         artist.image(size, size).map(|image| image.url.clone())
     })
     .fix_size(size, size)
@@ -123,11 +122,13 @@ pub fn cover_widget(size: f64) -> impl Widget<Artist> {
 }
 
 fn top_tracks_widget() -> impl Widget<WithCtx<ArtistTracks>> {
-    tracklist_widget(TrackDisplay {
-        title: true,
-        album: true,
-        popularity: true,
-        ..TrackDisplay::empty()
+    playable::list_widget(playable::Display {
+        track: track::Display {
+            title: true,
+            album: true,
+            popularity: true,
+            ..track::Display::empty()
+        },
     })
 }
 
@@ -135,11 +136,11 @@ fn albums_widget() -> impl Widget<WithCtx<ArtistAlbums>> {
     Flex::column()
         .cross_axis_alignment(CrossAxisAlignment::Start)
         .with_child(header_widget("Albums"))
-        .with_child(List::new(album_widget).lens(Ctx::map(ArtistAlbums::albums)))
+        .with_child(List::new(album::album_widget).lens(Ctx::map(ArtistAlbums::albums)))
         .with_child(header_widget("Singles"))
-        .with_child(List::new(album_widget).lens(Ctx::map(ArtistAlbums::singles)))
+        .with_child(List::new(album::album_widget).lens(Ctx::map(ArtistAlbums::singles)))
         .with_child(header_widget("Compilations"))
-        .with_child(List::new(album_widget).lens(Ctx::map(ArtistAlbums::compilations)))
+        .with_child(List::new(album::album_widget).lens(Ctx::map(ArtistAlbums::compilations)))
 }
 
 fn related_widget() -> impl Widget<Cached<Vector<Artist>>> {

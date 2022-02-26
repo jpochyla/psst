@@ -1,8 +1,133 @@
 use druid::{
     kurbo::{Line, Shape},
-    widget::{prelude::*, BackgroundBrush, Painter},
-    Color, Data, KeyOrValue,
+    widget::{prelude::*, Axis, BackgroundBrush, Painter},
+    Color, Data, KeyOrValue, LinearGradient, Rect, UnitPoint,
 };
+
+pub struct FadeOut<W> {
+    inner: W,
+    axis: Axis,
+    limit: KeyOrValue<f64>,
+    color: KeyOrValue<Color>,
+    over_limit: bool,
+}
+
+impl<W> FadeOut<W> {
+    const FADE_LENGTH_MAX: f64 = 32.0;
+
+    pub fn new(inner: W, axis: Axis, limit: KeyOrValue<f64>) -> Self {
+        Self {
+            inner,
+            axis,
+            limit,
+            color: Color::BLACK.into(),
+            over_limit: false,
+        }
+    }
+
+    pub fn right(inner: W, width: impl Into<KeyOrValue<f64>>) -> Self {
+        Self::new(inner, Axis::Horizontal, width.into())
+    }
+
+    pub fn bottom(inner: W, height: impl Into<KeyOrValue<f64>>) -> Self {
+        Self::new(inner, Axis::Vertical, height.into())
+    }
+
+    pub fn with_color(mut self, color: impl Into<KeyOrValue<Color>>) -> Self {
+        self.color = color.into();
+        self
+    }
+}
+
+impl<T, W> Widget<T> for FadeOut<W>
+where
+    T: Data,
+    W: Widget<T>,
+{
+    fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut T, env: &Env) {
+        self.inner.event(ctx, event, data, env);
+    }
+
+    fn lifecycle(&mut self, ctx: &mut LifeCycleCtx, event: &LifeCycle, data: &T, env: &Env) {
+        self.inner.lifecycle(ctx, event, data, env);
+    }
+
+    fn update(&mut self, ctx: &mut UpdateCtx, old_data: &T, data: &T, env: &Env) {
+        self.inner.update(ctx, old_data, data, env);
+    }
+
+    fn layout(&mut self, ctx: &mut LayoutCtx, bc: &BoxConstraints, data: &T, env: &Env) -> Size {
+        let size = self.inner.layout(
+            ctx,
+            &BoxConstraints::new(
+                bc.min(),
+                match self.axis {
+                    // Unbounded with.
+                    Axis::Horizontal => Size::new(f64::INFINITY, bc.max().height),
+                    // Unbounded height.
+                    Axis::Vertical => Size::new(bc.max().width, f64::INFINITY),
+                },
+            ),
+            data,
+            env,
+        );
+        let limit = self.limit.resolve(env);
+        self.over_limit = self.axis.major(size) > limit;
+        if self.over_limit {
+            Size::from(self.axis.pack(limit, self.axis.minor(size)))
+        } else {
+            size
+        }
+    }
+
+    fn paint(&mut self, ctx: &mut PaintCtx, data: &T, env: &Env) {
+        let size = ctx.size();
+        let rect = size.to_rect();
+        if self.over_limit {
+            // Clip and paint inner widget.
+            ctx.with_save(|ctx| {
+                ctx.clip(&rect);
+                self.inner.paint(ctx, data, env);
+            });
+            // Paint the gradient.
+            // let gradient_rect = match self.axis {
+            //     Axis::Horizontal => Rect::new(
+            //         0.0f64.max(size.width - Self::FADE_LENGTH_MAX),
+            //         0.0,
+            //         size.width,
+            //         size.height,
+            //     ),
+            //     Axis::Vertical => Rect::new(
+            //         0.0,
+            //         0.0f64.max(size.height - Self::FADE_LENGTH_MAX),
+            //         size.width,
+            //         size.height,
+            //     ),
+            // };
+            // let (start, end) = match self.axis {
+            //     Axis::Horizontal => (UnitPoint::LEFT, UnitPoint::RIGHT),
+            //     Axis::Vertical => (UnitPoint::TOP, UnitPoint::BOTTOM),
+            // };
+            // ctx.fill(
+            //     &gradient_rect,
+            //     &LinearGradient::new(
+            //         start,
+            //         end,
+            //         (
+            //             self.color.resolve(env).with_alpha(0.0),
+            //             self.color.resolve(env),
+            //         ),
+            //     ),
+            // );
+        } else {
+            self.inner.paint(ctx, data, env);
+        }
+    }
+
+    fn id(&self) -> Option<WidgetId> {
+        self.inner.id()
+    }
+}
 
 pub struct Clip<S, W> {
     shape: S,
@@ -29,8 +154,9 @@ impl<T: Data, S: Shape, W: Widget<T>> Widget<T> for Clip<S, W> {
     }
 
     fn layout(&mut self, ctx: &mut LayoutCtx, bc: &BoxConstraints, data: &T, env: &Env) -> Size {
-        self.inner.layout(ctx, bc, data, env)
-        // TODO: Clip the returned size.
+        let size = self.inner.layout(ctx, bc, data, env);
+        let bbox = self.shape.bounding_box().size();
+        Size::new(size.width.min(bbox.width), size.height.min(bbox.height))
     }
 
     fn paint(&mut self, ctx: &mut PaintCtx, data: &T, env: &Env) {
@@ -38,6 +164,10 @@ impl<T: Data, S: Shape, W: Widget<T>> Widget<T> for Clip<S, W> {
             ctx.clip(&self.shape);
             self.inner.paint(ctx, data, env);
         });
+    }
+
+    fn id(&self) -> Option<WidgetId> {
+        self.inner.id()
     }
 }
 
@@ -154,5 +284,9 @@ impl<T: Data, W: Widget<T>> Widget<T> for Logger<W> {
             log::info!("{:?} paint", self.label);
         }
         self.inner.paint(ctx, data, env)
+    }
+
+    fn id(&self) -> Option<WidgetId> {
+        self.inner.id()
     }
 }

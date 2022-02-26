@@ -24,9 +24,9 @@ use ureq::{Agent, Request, Response};
 
 use crate::{
     data::{
-        Album, AlbumType, Artist, ArtistAlbums, AudioAnalysis, Cached, Nav, Page, Playlist, Range,
-        Recommendations, RecommendationsRequest, SearchResults, SearchTopic, SpotifyUrl, Track,
-        UserProfile,
+        Album, AlbumType, Artist, ArtistAlbums, AudioAnalysis, Cached, Episode, EpisodeId,
+        EpisodeLink, Nav, Page, Playlist, Range, Recommendations, RecommendationsRequest,
+        SearchResults, SearchTopic, Show, SpotifyUrl, Track, UserProfile,
     },
     error::Error,
 };
@@ -149,17 +149,17 @@ impl WebApi {
         }
     }
 
-    /// Load a paginated result set by sending `request` with added pagination
-    /// parameters and return the aggregated results.  Use with GET requests.
-    fn load_all_pages<T: DeserializeOwned + Clone>(
+    /// Iterate a paginated result set by sending `request` with added pagination
+    /// parameters.  Mostly used through `load_all_pages`.
+    fn for_all_pages<T: DeserializeOwned + Clone>(
         &self,
         request: Request,
-    ) -> Result<Vector<T>, Error> {
+        mut func: impl FnMut(Page<T>) -> Result<(), Error>,
+    ) -> Result<(), Error> {
         // TODO: Some result sets, like very long playlists and saved tracks/albums can
         // be very big.  Implement virtualized scrolling and lazy-loading of results.
         const PAGED_ITEMS_LIMIT: usize = 500;
 
-        let mut results = Vector::new();
         let mut limit = 50;
         let mut offset = 0;
         loop {
@@ -169,15 +169,34 @@ impl WebApi {
                 .query("offset", &offset.to_string());
             let page: Page<T> = self.load(req)?;
 
-            results.extend(page.items);
+            let page_total = page.total;
+            let page_offset = page.offset;
+            let page_limit = page.limit;
+            func(page)?;
 
-            if page.total > results.len() && results.len() < PAGED_ITEMS_LIMIT {
-                limit = page.limit;
-                offset = page.offset + page.limit;
+            if page_total > offset && offset < PAGED_ITEMS_LIMIT {
+                limit = page_limit;
+                offset = page_offset + page_limit;
             } else {
                 break;
             }
         }
+        Ok(())
+    }
+
+    /// Load a paginated result set by sending `request` with added pagination
+    /// parameters and return the aggregated results.  Use with GET requests.
+    fn load_all_pages<T: DeserializeOwned + Clone>(
+        &self,
+        request: Request,
+    ) -> Result<Vector<T>, Error> {
+        let mut results = Vector::new();
+
+        self.for_all_pages(request, |page| {
+            results.append(page.items);
+            Ok(())
+        })?;
+
         Ok(results)
     }
 
@@ -290,6 +309,55 @@ impl WebApi {
     }
 }
 
+/// Show endpoints. (Podcasts)
+impl WebApi {
+    // https://developer.spotify.com/documentation/web-api/reference/#/operations/get-a-show
+    pub fn get_show(&self, id: &str) -> Result<Arc<Show>, Error> {
+        let request = self
+            .get(format!("v1/shows/{}", id))?
+            .query("market", "from_token");
+        let result = self.load(request)?;
+        Ok(result)
+    }
+
+    // https://developer.spotify.com/documentation/web-api/reference/#/operations/get-multiple-episodes
+    pub fn get_episodes(
+        &self,
+        ids: impl IntoIterator<Item = EpisodeId>,
+    ) -> Result<Vector<Arc<Episode>>, Error> {
+        #[derive(Deserialize)]
+        struct Episodes {
+            episodes: Vector<Arc<Episode>>,
+        }
+
+        let request = self
+            .get("v1/episodes")?
+            .query("ids", &ids.into_iter().map(|id| id.0.to_base62()).join(","))
+            .query("market", "from_token");
+        let result: Episodes = self.load(request)?;
+        Ok(result.episodes)
+    }
+
+    // https://developer.spotify.com/documentation/web-api/reference/#/operations/get-a-shows-episodes
+    pub fn get_show_episodes(&self, id: &str) -> Result<Vector<Arc<Episode>>, Error> {
+        let request = self
+            .get(format!("v1/shows/{}/episodes", id))?
+            .query("market", "from_token");
+        let mut results = Vector::new();
+
+        self.for_all_pages(request, |page: Page<EpisodeLink>| {
+            if !page.items.is_empty() {
+                let ids = page.items.into_iter().map(|link| link.id);
+                let episodes = self.get_episodes(ids)?;
+                results.append(episodes);
+            }
+            Ok(())
+        })?;
+
+        Ok(results)
+    }
+}
+
 /// Track endpoints.
 impl WebApi {
     // https://developer.spotify.com/documentation/web-api/reference/#endpoint-get-track
@@ -350,6 +418,22 @@ impl WebApi {
             .collect())
     }
 
+    // https://developer.spotify.com/documentation/web-api/reference/#/operations/get-users-saved-shows
+    pub fn get_saved_shows(&self) -> Result<Vector<Arc<Show>>, Error> {
+        #[derive(Clone, Deserialize)]
+        struct SavedShow {
+            show: Arc<Show>,
+        }
+
+        let request = self.get("v1/me/shows")?.query("market", "from_token");
+
+        Ok(self
+            .load_all_pages(request)?
+            .into_iter()
+            .map(|item: SavedShow| item.show)
+            .collect())
+    }
+
     // https://developer.spotify.com/documentation/web-api/reference/library/save-tracks-user/
     pub fn save_track(&self, id: &str) -> Result<(), Error> {
         let request = self.put("v1/me/tracks")?.query("ids", id);
@@ -360,6 +444,20 @@ impl WebApi {
     // https://developer.spotify.com/documentation/web-api/reference/library/remove-tracks-user/
     pub fn unsave_track(&self, id: &str) -> Result<(), Error> {
         let request = self.delete("v1/me/tracks")?.query("ids", id);
+        self.send_empty_json(request)?;
+        Ok(())
+    }
+
+    // https://developer.spotify.com/documentation/web-api/reference/#/operations/save-shows-user
+    pub fn save_show(&self, id: &str) -> Result<(), Error> {
+        let request = self.put("v1/me/shows")?.query("ids", id);
+        self.send_empty_json(request)?;
+        Ok(())
+    }
+
+    // https://developer.spotify.com/documentation/web-api/reference/#/operations/remove-shows-user
+    pub fn unsave_show(&self, id: &str) -> Result<(), Error> {
+        let request = self.delete("v1/me/shows")?.query("ids", id);
         self.send_empty_json(request)?;
         Ok(())
     }
@@ -460,6 +558,7 @@ impl WebApi {
             albums: Option<Page<Arc<Album>>>,
             tracks: Option<Page<Arc<Track>>>,
             playlists: Option<Page<Playlist>>,
+            shows: Option<Page<Arc<Show>>>,
         }
 
         let topics = topics.iter().map(SearchTopic::as_str).join(",");
@@ -474,12 +573,14 @@ impl WebApi {
         let albums = result.albums.map_or_else(Vector::new, |page| page.items);
         let tracks = result.tracks.map_or_else(Vector::new, |page| page.items);
         let playlists = result.playlists.map_or_else(Vector::new, |page| page.items);
+        let shows = result.shows.map_or_else(Vector::new, |page| page.items);
         Ok(SearchResults {
             query: query.into(),
             artists,
             albums,
             tracks,
             playlists,
+            shows,
         })
     }
 
@@ -488,6 +589,7 @@ impl WebApi {
             SpotifyUrl::Playlist(id) => Nav::PlaylistDetail(self.get_playlist(id)?.link()),
             SpotifyUrl::Artist(id) => Nav::ArtistDetail(self.get_artist(id)?.link()),
             SpotifyUrl::Album(id) => Nav::AlbumDetail(self.get_album(id)?.data.link()),
+            SpotifyUrl::Show(id) => Nav::AlbumDetail(self.get_album(id)?.data.link()),
             SpotifyUrl::Track(id) => Nav::AlbumDetail(
                 // TODO: We should highlight the exact track in the album.
                 self.get_track(id)?.album.clone().ok_or_else(|| {
@@ -510,7 +612,7 @@ impl WebApi {
         let seed_tracks = data
             .seed_tracks
             .iter()
-            .map(|track| track.to_base62())
+            .map(|track| track.0.to_base62())
             .join(", ");
 
         let mut request = self

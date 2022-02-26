@@ -22,10 +22,7 @@ use souvlaki::{
 
 use crate::{
     cmd,
-    data::{
-        AppState, Config, Playback, PlaybackOrigin, PlaybackState, QueueBehavior, QueuedTrack,
-        TrackId,
-    },
+    data::{AppState, Config, Playback, PlaybackOrigin, PlaybackState, QueueBehavior, QueueEntry},
 };
 
 pub struct PlaybackController {
@@ -63,45 +60,16 @@ impl PlaybackController {
             config,
             &output,
         );
-        let sender = player.sender();
 
-        let thread = thread::spawn(move || {
+        self.media_controls = Self::create_media_controls(player.sender(), &window)
+            .map_err(|err| log::error!("failed to connect to media control interface: {:?}", err))
+            .ok();
+
+        self.sender = Some(player.sender());
+        self.thread = Some(thread::spawn(move || {
             Self::service_events(player, event_sink, widget_id);
-        });
-
-        let hwnd = {
-            #[cfg(target_os = "windows")]
-            {
-                use raw_window_handle::{HasRawWindowHandle, RawWindowHandle};
-                let handle = match window.raw_window_handle() {
-                    RawWindowHandle::Windows(h) => h,
-                    _ => unreachable!(),
-                };
-                Some(handle.hwnd)
-            }
-            #[cfg(not(target_os = "windows"))]
-            None
-        };
-
-        let config = PlatformConfig {
-            dbus_name: "psst",
-            display_name: "Psst",
-            hwnd,
-        };
-        let mut media_controls = MediaControls::new(config).unwrap();
-        media_controls
-            .attach({
-                let sender = sender.clone();
-                move |event| {
-                    Self::handle_media_control_event(event, &sender);
-                }
-            })
-            .unwrap();
-
-        self.sender.replace(sender);
-        self.thread.replace(thread);
+        }));
         self.output.replace(output);
-        self.media_controls.replace(media_controls);
     }
 
     fn service_events(mut player: Player, event_sink: ExtEventSink, widget_id: WidgetId) {
@@ -109,16 +77,14 @@ impl PlaybackController {
             // Forward events that affect the UI state to the UI thread.
             match &event {
                 PlayerEvent::Loading { item } => {
-                    let item: TrackId = item.item_id.into();
                     event_sink
-                        .submit_command(cmd::PLAYBACK_LOADING, item, widget_id)
+                        .submit_command(cmd::PLAYBACK_LOADING, item.item_id, widget_id)
                         .unwrap();
                 }
                 PlayerEvent::Playing { path, position } => {
-                    let item: TrackId = path.item_id.into();
                     let progress = position.to_owned();
                     event_sink
-                        .submit_command(cmd::PLAYBACK_PLAYING, (item, progress), widget_id)
+                        .submit_command(cmd::PLAYBACK_PLAYING, (path.item_id, progress), widget_id)
                         .unwrap();
                 }
                 PlayerEvent::Pausing { .. } => {
@@ -155,6 +121,37 @@ impl PlaybackController {
         }
     }
 
+    fn create_media_controls(
+        sender: Sender<PlayerEvent>,
+        #[allow(unused_variables)] window: &WindowHandle,
+    ) -> Result<MediaControls, souvlaki::Error> {
+        let hwnd = {
+            #[cfg(target_os = "windows")]
+            {
+                use raw_window_handle::{HasRawWindowHandle, RawWindowHandle};
+                let handle = match window.raw_window_handle() {
+                    RawWindowHandle::Windows(h) => h,
+                    _ => unreachable!(),
+                };
+                Some(handle.hwnd)
+            }
+            #[cfg(not(target_os = "windows"))]
+            None
+        };
+
+        let mut media_controls = MediaControls::new(PlatformConfig {
+            dbus_name: "psst",
+            display_name: "Psst",
+            hwnd,
+        })?;
+
+        media_controls.attach(move |event| {
+            Self::handle_media_control_event(event, &sender);
+        })?;
+
+        Ok(media_controls)
+    }
+
     fn handle_media_control_event(event: MediaControlEvent, sender: &Sender<PlayerEvent>) {
         let cmd = match event {
             MediaControlEvent::Play => PlayerEvent::Command(PlayerCommand::Resume),
@@ -187,10 +184,18 @@ impl PlaybackController {
 
     fn update_media_control_metadata(&mut self, playback: &Playback) {
         if let Some(media_controls) = self.media_controls.as_mut() {
-            let title = playback.now_playing.as_ref().map(|p| p.item.name.clone());
-            let album = playback.now_playing.as_ref().map(|p| p.item.album_name());
-            let artist = playback.now_playing.as_ref().map(|p| p.item.artist_name());
-            let duration = playback.now_playing.as_ref().map(|p| p.item.duration);
+            let title = playback.now_playing.as_ref().map(|p| p.item.name().clone());
+            let album = playback
+                .now_playing
+                .as_ref()
+                .and_then(|p| p.item.track())
+                .map(|t| t.album_name());
+            let artist = playback
+                .now_playing
+                .as_ref()
+                .and_then(|p| p.item.track())
+                .map(|t| t.artist_name());
+            let duration = playback.now_playing.as_ref().map(|p| p.item.duration());
             let cover_url = playback
                 .now_playing
                 .as_ref()
@@ -211,11 +216,11 @@ impl PlaybackController {
         self.sender.as_mut().unwrap().send(event).unwrap();
     }
 
-    fn play(&mut self, items: &Vector<QueuedTrack>, position: usize) {
+    fn play(&mut self, items: &Vector<QueueEntry>, position: usize) {
         let items = items
             .iter()
             .map(|queued| PlaybackItem {
-                item_id: *queued.track.id,
+                item_id: queued.item.id(),
                 norm_level: match queued.origin {
                     PlaybackOrigin::Album(_) => NormalizationLevel::Album,
                     _ => NormalizationLevel::Track,
@@ -288,11 +293,12 @@ where
             Event::Command(cmd) if cmd.is(cmd::SET_FOCUS) => {
                 ctx.request_focus();
             }
+            // Player events.
             Event::Command(cmd) if cmd.is(cmd::PLAYBACK_LOADING) => {
                 let item = cmd.get_unchecked(cmd::PLAYBACK_LOADING);
 
-                if let Some(queued) = data.queued_track(item) {
-                    data.loading_playback(queued.track, queued.origin);
+                if let Some(queued) = data.queued_entry(*item) {
+                    data.loading_playback(queued.item, queued.origin);
                     self.update_media_control_playback(&data.playback);
                     self.update_media_control_metadata(&data.playback);
                 } else {
@@ -302,10 +308,9 @@ where
             }
             Event::Command(cmd) if cmd.is(cmd::PLAYBACK_PLAYING) => {
                 let (item, progress) = cmd.get_unchecked(cmd::PLAYBACK_PLAYING);
-                log::info!("playing");
 
-                if let Some(queued) = data.queued_track(item) {
-                    data.start_playback(queued.track, queued.origin, progress.to_owned());
+                if let Some(queued) = data.queued_entry(*item) {
+                    data.start_playback(queued.item, queued.origin, progress.to_owned());
                     self.update_media_control_playback(&data.playback);
                     self.update_media_control_metadata(&data.playback);
                 } else {
@@ -337,15 +342,15 @@ where
                 self.update_media_control_playback(&data.playback);
                 ctx.set_handled();
             }
-            //
+            // Playback actions.
             Event::Command(cmd) if cmd.is(cmd::PLAY_TRACKS) => {
                 let payload = cmd.get_unchecked(cmd::PLAY_TRACKS);
                 data.playback.queue = payload
-                    .tracks
+                    .items
                     .iter()
-                    .map(|track| QueuedTrack {
+                    .map(|item| QueueEntry {
                         origin: payload.origin.to_owned(),
-                        track: track.to_owned(),
+                        item: item.to_owned(),
                     })
                     .collect();
                 self.play(&data.playback.queue, payload.position);
@@ -380,13 +385,14 @@ where
             Event::Command(cmd) if cmd.is(cmd::PLAY_SEEK) => {
                 if let Some(now_playing) = &data.playback.now_playing {
                     let fraction = cmd.get_unchecked(cmd::PLAY_SEEK);
-                    let position =
-                        Duration::from_secs_f64(now_playing.item.duration.as_secs_f64() * fraction);
+                    let position = Duration::from_secs_f64(
+                        now_playing.item.duration().as_secs_f64() * fraction,
+                    );
                     self.seek(position);
                 }
                 ctx.set_handled();
             }
-            //
+            // Keyboard shortcuts.
             Event::KeyDown(key) if key.code == Code::Space => {
                 self.pause_or_resume();
                 ctx.set_handled();

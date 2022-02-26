@@ -4,12 +4,11 @@ use std::{
     sync::Arc,
 };
 
-use psst_protocol::metadata::Track;
-
 use crate::{
     audio::decrypt::AudioKey,
     error::Error,
     item_id::{FileId, ItemId},
+    protocol::metadata::{Episode, Track},
     util::{deserialize_protobuf, serialize_protobuf},
 };
 
@@ -26,6 +25,7 @@ impl Cache {
         // Create the cache structure.
         mkdir_if_not_exists(&base)?;
         mkdir_if_not_exists(&base.join("track"))?;
+        mkdir_if_not_exists(&base.join("episode"))?;
         mkdir_if_not_exists(&base.join("audio"))?;
         mkdir_if_not_exists(&base.join("key"))?;
 
@@ -49,6 +49,24 @@ impl Cache {
 
     fn track_path(&self, item_id: ItemId) -> PathBuf {
         self.base.join("track").join(item_id.to_base62())
+    }
+}
+
+// Cache of `Episode` protobuf structures.
+impl Cache {
+    pub fn get_episode(&self, item_id: ItemId) -> Option<Episode> {
+        let buf = fs::read(self.episode_path(item_id)).ok()?;
+        deserialize_protobuf(&buf).ok()
+    }
+
+    pub fn save_episode(&self, item_id: ItemId, episode: &Episode) -> Result<(), Error> {
+        log::debug!("saving episode to cache: {:?}", item_id);
+        fs::write(self.episode_path(item_id), &serialize_protobuf(episode)?)?;
+        Ok(())
+    }
+
+    fn episode_path(&self, item_id: ItemId) -> PathBuf {
+        self.base.join("episode").join(item_id.to_base62())
     }
 }
 
