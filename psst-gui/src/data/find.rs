@@ -10,6 +10,10 @@ pub struct Finder {
 }
 
 impl Finder {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
     pub fn reset(&mut self) {
         self.query = String::new();
         self.results = 0;

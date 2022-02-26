@@ -14,11 +14,7 @@ use crate::{
     widget::{Async, MyWidgetExt, RemoteImage},
 };
 
-use super::{
-    theme,
-    track::{findable_tracklist_widget, TrackDisplay},
-    utils::{error_widget, placeholder_widget, spinner_widget},
-};
+use super::{playable, theme, track, utils};
 
 pub const LOAD_LIST: Selector = Selector::new("app.playlist.load-list");
 pub const LOAD_DETAIL: Selector<PlaylistLink> = Selector::new("app.playlist.load-detail");
@@ -26,7 +22,7 @@ pub const ADD_TRACK: Selector<PlaylistAddTrack> = Selector::new("app.playlist.ad
 
 pub fn list_widget() -> impl Widget<AppState> {
     Async::new(
-        spinner_widget,
+        utils::spinner_widget,
         || {
             List::new(|| {
                 Label::raw()
@@ -44,7 +40,7 @@ pub fn list_widget() -> impl Widget<AppState> {
                     .context_menu(playlist_menu)
             })
         },
-        error_widget,
+        utils::error_widget,
     )
     .lens(AppState::library.then(Library::playlists.in_arc()))
     .on_command_async(
@@ -59,6 +55,7 @@ pub fn list_widget() -> impl Widget<AppState> {
             WebApi::global().add_track_to_playlist(
                 &d.link.id,
                 &d.track_id
+                    .0
                     .to_uri()
                     .ok_or_else(|| Error::WebApiError("Item doesn't have URI".to_string()))?,
             )
@@ -112,9 +109,10 @@ pub fn playlist_widget() -> impl Widget<Playlist> {
 }
 
 fn cover_widget(size: f64) -> impl Widget<Playlist> {
-    RemoteImage::new(placeholder_widget(), move |playlist: &Playlist, _| {
-        playlist.image(size, size).map(|image| image.url.clone())
-    })
+    RemoteImage::new(
+        utils::placeholder_widget(),
+        move |playlist: &Playlist, _| playlist.image(size, size).map(|image| image.url.clone()),
+    )
     .fix_size(size, size)
 }
 
@@ -125,20 +123,22 @@ fn rounded_cover_widget(size: f64) -> impl Widget<Playlist> {
 
 pub fn detail_widget() -> impl Widget<AppState> {
     Async::new(
-        spinner_widget,
+        utils::spinner_widget,
         || {
-            findable_tracklist_widget(
-                TrackDisplay {
-                    title: true,
-                    artist: true,
-                    album: true,
-                    cover: true,
-                    ..TrackDisplay::empty()
+            playable::list_widget_with_find(
+                playable::Display {
+                    track: track::Display {
+                        title: true,
+                        artist: true,
+                        album: true,
+                        cover: true,
+                        ..track::Display::empty()
+                    },
                 },
                 cmd::FIND_IN_PLAYLIST,
             )
         },
-        error_widget,
+        utils::error_widget,
     )
     .lens(
         Ctx::make(

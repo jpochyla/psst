@@ -13,17 +13,17 @@ use crate::{
     cmd,
     controller::PlaybackController,
     data::{
-        AppState, AudioAnalysis, NowPlaying, Playback, PlaybackOrigin, PlaybackState,
-        QueueBehavior, Track,
+        AppState, AudioAnalysis, Episode, NowPlaying, Playable, PlayableMatcher, Playback,
+        PlaybackOrigin, PlaybackState, QueueBehavior, ShowLink, Track,
     },
     widget::{icons, icons::SvgIcon, Empty, Maybe, MyWidgetExt, RemoteImage},
 };
 
-use super::{theme, track, utils};
+use super::{episode, theme, track, utils};
 
 pub fn panel_widget() -> impl Widget<AppState> {
     let seek_bar = Maybe::or_empty(SeekBar::new).lens(Playback::now_playing);
-    let item_info = Maybe::or_empty(playback_item_widget).lens(Playback::now_playing);
+    let item_info = Maybe::or_empty(playing_item_widget).lens(Playback::now_playing);
     let controls = Either::new(
         |playback, _| playback.now_playing.is_some(),
         player_widget(),
@@ -36,20 +36,40 @@ pub fn panel_widget() -> impl Widget<AppState> {
         .controller(PlaybackController::new())
 }
 
-fn playback_item_widget() -> impl Widget<NowPlaying> {
+fn playing_item_widget() -> impl Widget<NowPlaying> {
     let cover_art = cover_widget(theme::grid(8.0));
 
-    let track_name = Label::raw()
-        .with_line_break_mode(LineBreaking::Clip)
-        .with_font(theme::UI_FONT_MEDIUM)
-        .lens(NowPlaying::item.then(Track::name.in_arc()));
+    let name = PlayableMatcher::new()
+        .track(
+            Label::raw()
+                .with_line_break_mode(LineBreaking::Clip)
+                .with_font(theme::UI_FONT_MEDIUM)
+                .lens(Track::name.in_arc()),
+        )
+        .episode(
+            Label::raw()
+                .with_line_break_mode(LineBreaking::Clip)
+                .with_font(theme::UI_FONT_MEDIUM)
+                .lens(Episode::name.in_arc()),
+        )
+        .lens(NowPlaying::item);
 
-    let track_artist = Label::raw()
-        .with_line_break_mode(LineBreaking::Clip)
-        .with_text_size(theme::TEXT_SIZE_SMALL)
-        .lens(NowPlaying::item.then(Track::lens_artist_name().in_arc()));
+    let detail = PlayableMatcher::new()
+        .track(
+            Label::raw()
+                .with_line_break_mode(LineBreaking::Clip)
+                .with_text_size(theme::TEXT_SIZE_SMALL)
+                .lens(Track::lens_artist_name().in_arc()),
+        )
+        .episode(
+            Label::raw()
+                .with_line_break_mode(LineBreaking::Clip)
+                .with_text_size(theme::TEXT_SIZE_SMALL)
+                .lens(Episode::show.in_arc().then(ShowLink::name)),
+        )
+        .lens(NowPlaying::item);
 
-    let track_origin = ViewSwitcher::new(
+    let origin = ViewSwitcher::new(
         |origin: &PlaybackOrigin, _| origin.clone(),
         |origin, _, _| {
             Flex::row()
@@ -73,11 +93,11 @@ fn playback_item_widget() -> impl Widget<NowPlaying> {
         .with_flex_child(
             Flex::column()
                 .cross_axis_alignment(CrossAxisAlignment::Start)
-                .with_child(track_name)
+                .with_child(name)
                 .with_spacer(2.0)
-                .with_child(track_artist)
+                .with_child(detail)
                 .with_spacer(2.0)
-                .with_child(track_origin),
+                .with_child(origin),
             1.0,
         )
         .padding(theme::grid(1.0))
@@ -85,7 +105,10 @@ fn playback_item_widget() -> impl Widget<NowPlaying> {
         .on_click(|ctx, now_playing, _| {
             ctx.submit_command(cmd::NAVIGATE.with(now_playing.origin.to_nav()));
         })
-        .context_menu(|now_playing| track::track_menu(&now_playing.item, &now_playing.library))
+        .context_menu(|now_playing| match &now_playing.item {
+            Playable::Track(track) => track::track_menu(track, &now_playing.library),
+            Playable::Episode(episode) => episode::episode_menu(episode, &now_playing.library),
+        })
 }
 
 fn cover_widget(size: f64) -> impl Widget<NowPlaying> {
@@ -102,6 +125,7 @@ fn playback_origin_icon(origin: &PlaybackOrigin) -> &'static SvgIcon {
         PlaybackOrigin::Album { .. } => &icons::ALBUM,
         PlaybackOrigin::Artist { .. } => &icons::ARTIST,
         PlaybackOrigin::Playlist { .. } => &icons::PLAYLIST,
+        PlaybackOrigin::Show { .. } => &icons::PODCAST,
         PlaybackOrigin::Search { .. } => &icons::SEARCH,
         PlaybackOrigin::Recommendations { .. } => &icons::SEARCH,
     }
@@ -214,8 +238,8 @@ fn durations_widget() -> impl Widget<NowPlaying> {
     Label::dynamic(|now_playing: &NowPlaying, _| {
         format!(
             "{} / {}",
-            utils::as_minutes_and_seconds(&now_playing.progress),
-            utils::as_minutes_and_seconds(&now_playing.item.duration)
+            utils::as_minutes_and_seconds(now_playing.progress),
+            utils::as_minutes_and_seconds(now_playing.item.duration())
         )
     })
     .with_text_size(theme::TEXT_SIZE_SMALL)
@@ -460,7 +484,7 @@ fn paint_audio_analysis(ctx: &mut PaintCtx, data: &NowPlaying, path: &BezPath, e
     let bounds = ctx.size();
 
     let elapsed_time = data.progress.as_secs_f64();
-    let total_time = data.item.duration.as_secs_f64();
+    let total_time = data.item.duration().as_secs_f64();
     let elapsed_frac = elapsed_time / total_time;
     let elapsed_width = bounds.width * elapsed_frac;
     let elapsed = Size::new(elapsed_width, bounds.height).to_rect();
@@ -480,7 +504,7 @@ fn paint_audio_analysis(ctx: &mut PaintCtx, data: &NowPlaying, path: &BezPath, e
 
 fn paint_progress_bar(ctx: &mut PaintCtx, data: &NowPlaying, env: &Env) {
     let elapsed_time = data.progress.as_secs_f64();
-    let total_time = data.item.duration.as_secs_f64();
+    let total_time = data.item.duration().as_secs_f64();
 
     let (elapsed_color, remaining_color) = if ctx.is_hot() {
         (env.get(theme::GREY_200), env.get(theme::GREY_500))

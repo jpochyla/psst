@@ -1,36 +1,26 @@
 use std::sync::Arc;
 
 use druid::{
-    im::Vector,
-    kurbo::Line,
-    piet::StrokeStyle,
-    widget::{
-        Controller, ControllerHost, CrossAxisAlignment, Either, Flex, Label, List, ListIter,
-        Painter,
-    },
-    Data, Env, Event, EventCtx, Lens, LensExt, LocalizedString, Menu, MenuItem, RenderContext,
-    Selector, Size, TextAlignment, Widget, WidgetExt,
+    widget::{CrossAxisAlignment, Either, Flex, Label, List},
+    LensExt, LocalizedString, Menu, MenuItem, Size, TextAlignment, Widget, WidgetExt,
 };
 
 use crate::{
     cmd,
-    data::{
-        Album, AppState, ArtistLink, ArtistTracks, CommonCtx, FindQuery, Library, MatchFindQuery,
-        Nav, PlaybackOrigin, PlaybackPayload, PlaylistAddTrack, PlaylistTracks, Recommendations,
-        RecommendationsRequest, SavedTracks, SearchResults, Track, WithCtx,
-    },
+    data::{AppState, ArtistLink, Library, Nav, PlaylistAddTrack, RecommendationsRequest, Track},
     ui::playlist,
     widget::{Empty, MyWidgetExt, RemoteImage},
 };
 
 use super::{
-    find::{Find, Findable},
-    library, theme,
+    library,
+    playable::{self, PlayRow},
+    theme,
     utils::{self, placeholder_widget},
 };
 
 #[derive(Copy, Clone)]
-pub struct TrackDisplay {
+pub struct Display {
     pub number: bool,
     pub title: bool,
     pub artist: bool,
@@ -39,9 +29,9 @@ pub struct TrackDisplay {
     pub popularity: bool,
 }
 
-impl TrackDisplay {
+impl Display {
     pub fn empty() -> Self {
-        TrackDisplay {
+        Display {
             number: false,
             title: false,
             artist: false,
@@ -52,181 +42,7 @@ impl TrackDisplay {
     }
 }
 
-pub fn tracklist_widget<T>(display: TrackDisplay) -> impl Widget<WithCtx<T>>
-where
-    T: TrackIter + Data,
-{
-    let list = List::new(move || track_widget(display));
-    ControllerHost::new(list, PlayController)
-}
-
-pub fn findable_tracklist_widget<T>(
-    display: TrackDisplay,
-    selector: Selector<Find>,
-) -> impl Widget<WithCtx<T>>
-where
-    T: TrackIter + Data,
-{
-    let list = List::new(move || Findable::new(track_widget(display), selector));
-    ControllerHost::new(list, PlayController)
-}
-
-pub trait TrackIter {
-    fn origin(&self) -> PlaybackOrigin;
-    fn tracks(&self) -> &Vector<Arc<Track>>;
-}
-
-impl TrackIter for Arc<Album> {
-    fn origin(&self) -> PlaybackOrigin {
-        PlaybackOrigin::Album(self.link())
-    }
-
-    fn tracks(&self) -> &Vector<Arc<Track>> {
-        &self.tracks
-    }
-}
-
-impl TrackIter for ArtistTracks {
-    fn origin(&self) -> PlaybackOrigin {
-        PlaybackOrigin::Artist(self.link())
-    }
-
-    fn tracks(&self) -> &Vector<Arc<Track>> {
-        &self.tracks
-    }
-}
-
-impl TrackIter for SearchResults {
-    fn origin(&self) -> PlaybackOrigin {
-        PlaybackOrigin::Search(self.query.clone())
-    }
-
-    fn tracks(&self) -> &Vector<Arc<Track>> {
-        &self.tracks
-    }
-}
-
-impl TrackIter for Recommendations {
-    fn origin(&self) -> PlaybackOrigin {
-        PlaybackOrigin::Recommendations(self.request.clone())
-    }
-
-    fn tracks(&self) -> &Vector<Arc<Track>> {
-        &self.tracks
-    }
-}
-
-impl TrackIter for PlaylistTracks {
-    fn origin(&self) -> PlaybackOrigin {
-        PlaybackOrigin::Playlist(self.link())
-    }
-
-    fn tracks(&self) -> &Vector<Arc<Track>> {
-        &self.tracks
-    }
-}
-
-impl TrackIter for SavedTracks {
-    fn origin(&self) -> PlaybackOrigin {
-        PlaybackOrigin::Library
-    }
-
-    fn tracks(&self) -> &Vector<Arc<Track>> {
-        &self.tracks
-    }
-}
-
-impl<T> ListIter<TrackRow> for WithCtx<T>
-where
-    T: TrackIter + Data,
-{
-    fn for_each(&self, mut cb: impl FnMut(&TrackRow, usize)) {
-        let origin = self.data.origin();
-        let tracks = self.data.tracks();
-        ListIter::for_each(tracks, |track, index| {
-            let d = TrackRow {
-                ctx: self.ctx.to_owned(),
-                origin: origin.to_owned(),
-                track: track.to_owned(),
-                position: index,
-                is_playing: self.ctx.is_track_playing(track),
-            };
-            cb(&d, index);
-        });
-    }
-
-    fn for_each_mut(&mut self, mut cb: impl FnMut(&mut TrackRow, usize)) {
-        let origin = self.data.origin();
-        let tracks = self.data.tracks();
-        ListIter::for_each(tracks, |track, index| {
-            let mut d = TrackRow {
-                ctx: self.ctx.to_owned(),
-                origin: origin.to_owned(),
-                track: track.to_owned(),
-                position: index,
-                is_playing: self.ctx.is_track_playing(track),
-            };
-            cb(&mut d, index);
-
-            // Mutation intentionally ignored.
-        });
-    }
-
-    fn data_len(&self) -> usize {
-        self.data.tracks().len()
-    }
-}
-
-#[derive(Clone, Data, Lens)]
-struct TrackRow {
-    ctx: Arc<CommonCtx>,
-    track: Arc<Track>,
-    origin: PlaybackOrigin,
-    position: usize,
-    is_playing: bool,
-}
-
-impl MatchFindQuery for TrackRow {
-    fn matches_query(&self, q: &FindQuery) -> bool {
-        q.matches_str(&self.track.name)
-            || self.track.album.iter().any(|a| q.matches_str(&a.name))
-            || self.track.artists.iter().any(|a| q.matches_str(&a.name))
-    }
-}
-
-struct PlayController;
-
-impl<T, W> Controller<WithCtx<T>, W> for PlayController
-where
-    T: TrackIter + Data,
-    W: Widget<WithCtx<T>>,
-{
-    fn event(
-        &mut self,
-        child: &mut W,
-        ctx: &mut EventCtx,
-        event: &Event,
-        data: &mut WithCtx<T>,
-        env: &Env,
-    ) {
-        match event {
-            Event::Notification(note) => {
-                if let Some(position) = note.get(cmd::PLAY_TRACK_AT) {
-                    let payload = PlaybackPayload {
-                        origin: data.data.origin(),
-                        tracks: data.data.tracks().to_owned(),
-                        position: position.to_owned(),
-                    };
-                    ctx.submit_command(cmd::PLAY_TRACKS.with(payload));
-                    ctx.set_handled();
-                }
-            }
-            _ => child.event(ctx, event, data, env),
-        }
-    }
-}
-
-fn track_widget(display: TrackDisplay) -> impl Widget<TrackRow> {
+pub fn playable_widget(display: Display) -> impl Widget<PlayRow<Arc<Track>>> {
     let mut main_row = Flex::row();
     let mut major = Flex::row();
     let mut minor = Flex::row();
@@ -238,7 +54,7 @@ fn track_widget(display: TrackDisplay) -> impl Widget<TrackRow> {
             .with_text_alignment(TextAlignment::Center)
             .center()
             .fix_width(theme::grid(2.0))
-            .lens(TrackRow::track);
+            .lens(PlayRow::item);
         major.add_child(track_number);
         major.add_default_spacer();
 
@@ -250,7 +66,7 @@ fn track_widget(display: TrackDisplay) -> impl Widget<TrackRow> {
     if display.cover {
         let album_cover = rounded_cover_widget(theme::grid(4.0))
             .padding_right(theme::grid(1.0)) // Instead of `add_default_spacer`.
-            .lens(TrackRow::track);
+            .lens(PlayRow::item);
         main_row.add_child(Either::new(
             |row, _| row.ctx.show_track_cover,
             album_cover,
@@ -261,7 +77,7 @@ fn track_widget(display: TrackDisplay) -> impl Widget<TrackRow> {
     if display.title {
         let track_name = Label::raw()
             .with_font(theme::UI_FONT_MEDIUM)
-            .lens(TrackRow::track.then(Track::name.in_arc()));
+            .lens(PlayRow::item.then(Track::name.in_arc()));
         major.add_child(track_name);
     }
 
@@ -273,7 +89,7 @@ fn track_widget(display: TrackDisplay) -> impl Widget<TrackRow> {
         })
         .horizontal()
         .with_spacing(theme::grid(0.5))
-        .lens(TrackRow::track.then(Track::artists.in_arc()));
+        .lens(PlayRow::item.then(Track::artists.in_arc()));
         minor.add_child(track_artists);
     }
 
@@ -281,28 +97,16 @@ fn track_widget(display: TrackDisplay) -> impl Widget<TrackRow> {
         let track_album = Label::raw()
             .with_text_size(theme::TEXT_SIZE_SMALL)
             .with_text_color(theme::PLACEHOLDER_COLOR)
-            .lens(TrackRow::track.then(Track::lens_album_name().in_arc()));
+            .lens(PlayRow::item.then(Track::lens_album_name().in_arc()));
         if display.artist {
             minor.add_default_spacer();
         }
         minor.add_child(track_album);
     }
 
-    let line_painter = Painter::new(|ctx, is_playing, env| {
-        const STYLE: StrokeStyle = StrokeStyle::new().dash_pattern(&[1.0, 2.0]);
-
-        let line = Line::new((0.0, 0.0), (ctx.size().width, 0.0));
-        let color = if *is_playing {
-            env.get(theme::GREY_200)
-        } else {
-            env.get(theme::GREY_500)
-        };
-        ctx.stroke_styled(line, &color, 1.0, &STYLE);
-    })
-    .lens(TrackRow::is_playing)
-    .fix_height(1.0);
+    let is_playing = playable::is_playing_marker_widget().lens(PlayRow::is_playing);
     major.add_default_spacer();
-    major.add_flex_child(line_painter, 1.0);
+    major.add_flex_child(is_playing, 1.0);
 
     if display.popularity {
         let track_popularity = Label::<Arc<Track>>::dynamic(|track, _| {
@@ -310,16 +114,16 @@ fn track_widget(display: TrackDisplay) -> impl Widget<TrackRow> {
         })
         .with_text_size(theme::TEXT_SIZE_SMALL)
         .with_text_color(theme::PLACEHOLDER_COLOR)
-        .lens(TrackRow::track);
+        .lens(PlayRow::item);
         major.add_default_spacer();
         major.add_child(track_popularity);
     }
 
     let track_duration =
-        Label::<Arc<Track>>::dynamic(|track, _| utils::as_minutes_and_seconds(&track.duration))
+        Label::<Arc<Track>>::dynamic(|track, _| utils::as_minutes_and_seconds(track.duration))
             .with_text_size(theme::TEXT_SIZE_SMALL)
             .with_text_color(theme::PLACEHOLDER_COLOR)
-            .lens(TrackRow::track);
+            .lens(PlayRow::item);
     major.add_default_spacer();
     major.add_child(track_duration);
 
@@ -336,9 +140,7 @@ fn track_widget(display: TrackDisplay) -> impl Widget<TrackRow> {
         .link()
         .active(|row, _| row.is_playing)
         .rounded(theme::BUTTON_BORDER_RADIUS)
-        .on_click(|ctx, row, _| {
-            ctx.submit_notification(cmd::PLAY_TRACK_AT.with(row.position));
-        })
+        .on_click(|ctx, row, _| ctx.submit_notification(cmd::PLAY.with(row.position)))
         .context_menu(track_row_menu)
 }
 
@@ -373,8 +175,8 @@ fn popularity_stars(popularity: u32) -> String {
     stars
 }
 
-fn track_row_menu(row: &TrackRow) -> Menu<AppState> {
-    track_menu(&row.track, &row.ctx.library)
+fn track_row_menu(row: &PlayRow<Arc<Track>>) -> Menu<AppState> {
+    track_menu(&row.item, &row.ctx.library)
 }
 
 pub fn track_menu(track: &Arc<Track>, library: &Arc<Library>) -> Menu<AppState> {

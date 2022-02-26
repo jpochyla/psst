@@ -17,6 +17,8 @@ const BASE62_DIGITS: &[u8] = b"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLM
 const BASE16_DIGITS: &[u8] = b"0123456789abcdef";
 
 impl ItemId {
+    pub const INVALID: Self = Self::new(0u128, ItemIdType::Unknown);
+
     pub const fn new(id: u128, id_type: ItemIdType) -> Self {
         Self { id, id_type }
     }
@@ -83,6 +85,18 @@ impl ItemId {
 
     pub fn to_raw(&self) -> [u8; 16] {
         self.id.to_be_bytes()
+    }
+}
+
+impl Default for ItemId {
+    fn default() -> Self {
+        Self::INVALID
+    }
+}
+
+impl From<ItemId> for String {
+    fn from(id: ItemId) -> Self {
+        id.to_base62()
     }
 }
 

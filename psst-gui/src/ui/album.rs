@@ -14,30 +14,29 @@ use crate::{
     widget::{Async, MyWidgetExt, RemoteImage},
 };
 
-use super::{
-    artist::artist_link_widget,
-    library, theme,
-    track::{tracklist_widget, TrackDisplay},
-    utils::{error_widget, placeholder_widget, spinner_widget},
-};
+use super::{artist, library, playable, theme, track, utils};
 
 pub const LOAD_DETAIL: Selector<AlbumLink> = Selector::new("app.album.load-detail");
 
 pub fn detail_widget() -> impl Widget<AppState> {
-    Async::new(spinner_widget, loaded_detail_widget, error_widget)
-        .lens(
-            Ctx::make(
-                AppState::common_ctx,
-                AppState::album_detail.then(AlbumDetail::album),
-            )
-            .then(Ctx::in_promise()),
+    Async::new(
+        utils::spinner_widget,
+        loaded_detail_widget,
+        utils::error_widget,
+    )
+    .lens(
+        Ctx::make(
+            AppState::common_ctx,
+            AppState::album_detail.then(AlbumDetail::album),
         )
-        .on_command_async(
-            LOAD_DETAIL,
-            |d| WebApi::global().get_album(&d.id),
-            |_, data, d| data.album_detail.album.defer(d),
-            |_, data, r| data.album_detail.album.update(r),
-        )
+        .then(Ctx::in_promise()),
+    )
+    .on_command_async(
+        LOAD_DETAIL,
+        |d| WebApi::global().get_album(&d.id),
+        |_, data, d| data.album_detail.album.defer(d),
+        |_, data, r| data.album_detail.album.update(r),
+    )
 }
 
 fn loaded_detail_widget() -> impl Widget<WithCtx<Cached<Arc<Album>>>> {
@@ -45,7 +44,7 @@ fn loaded_detail_widget() -> impl Widget<WithCtx<Cached<Arc<Album>>>> {
         .lens(Ctx::data())
         .context_menu(album_ctx_menu);
 
-    let album_artists = List::new(artist_link_widget).lens(Album::artists.in_arc());
+    let album_artists = List::new(artist::link_widget).lens(Album::artists.in_arc());
 
     let album_date = Label::dynamic(|album: &Arc<Album>, _| album.release())
         .with_text_size(theme::TEXT_SIZE_SMALL);
@@ -71,11 +70,13 @@ fn loaded_detail_widget() -> impl Widget<WithCtx<Cached<Arc<Album>>>> {
         .with_default_spacer()
         .with_child(album_info.lens(Ctx::data()));
 
-    let album_tracks = tracklist_widget(TrackDisplay {
-        number: true,
-        title: true,
-        artist: true,
-        ..TrackDisplay::empty()
+    let album_tracks = playable::list_widget(playable::Display {
+        track: track::Display {
+            number: true,
+            title: true,
+            artist: true,
+            ..track::Display::empty()
+        },
     });
 
     Flex::column()
@@ -88,7 +89,7 @@ fn loaded_detail_widget() -> impl Widget<WithCtx<Cached<Arc<Album>>>> {
 }
 
 fn cover_widget(size: f64) -> impl Widget<Arc<Album>> {
-    RemoteImage::new(placeholder_widget(), move |album: &Arc<Album>, _| {
+    RemoteImage::new(utils::placeholder_widget(), move |album: &Arc<Album>, _| {
         album.image(size, size).map(|image| image.url.clone())
     })
     .fix_size(size, size)

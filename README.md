@@ -60,6 +60,13 @@ cargo run
 - [x] Save / unsave albums and tracks
 - [x] Browsing followed playlists
 - [x] Search for artist, albums, and tracks
+- [x] Podcast support
+- [x] Media keys control
+- [x] Open Spotify links through search bar
+- [x] Audio volume control
+- [x] Audio loudness normalization
+- [x] Genre playlists and "For You" content
+- [x] Dark theme
 - [ ] Resilience to network errors (automatically retry timed-out requests)
 - [ ] Managing playlists
     - Follow / unfollow
@@ -68,8 +75,6 @@ cargo run
     - Rename playlist
     - Playlist folders
 - [ ] Playback queue
-- [x] Audio volume control
-- [x] Audio loudness normalization
 - [ ] React to audio output device events
     - Pause after disconnecting headphones
     - Transfer playback after connecting headphones
@@ -78,21 +83,15 @@ cargo run
     - Visualize cache utilization
         - Total cache usage in the config dialog
         - Show time origin of cached data, allow to refresh
-- [x] Media keys control
-- [x] Open Spotify links
 - [ ] Trivia on the artist page, Wikipedia links
-- [x] Genre playlists and "For You" content
 - [ ] Downloading encrypted tracks
 - [ ] Reporting played tracks to Spotify servers
 - [ ] OS-specific application bundles
-- [ ] Podcast support
 - UI
     - [ ] Rethink current design, consider a two-pane layout
         - Left pane for browsing
         - Right pane for current playback
-    - [x] Dark theme
     - [ ] Detect light/dark OS theme
-    - [ ] Icon
     - [ ] Robust error states, ideally with retry button
     - [ ] Correct playback highlight
         - Highlight now-playing track only in the correct album / playlist

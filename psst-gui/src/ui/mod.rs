@@ -10,7 +10,7 @@ use druid::{
 use crate::{
     cmd,
     controller::{AfterDelay, NavController, SessionController},
-    data::{Alert, AlertStyle, AppState, Nav, Playback, PlaylistDetail, Route},
+    data::{Alert, AlertStyle, AppState, Nav, Playable, Playback, PlaylistDetail, Route},
     widget::{
         icons, icons::SvgIcon, Border, Empty, MyWidgetExt, Overlay, ThemeScope, ViewDispatcher,
     },
@@ -18,15 +18,18 @@ use crate::{
 
 pub mod album;
 pub mod artist;
+pub mod episode;
 pub mod find;
 pub mod home;
 pub mod library;
 pub mod menu;
+pub mod playable;
 pub mod playback;
 pub mod playlist;
 pub mod preferences;
 pub mod recommend;
 pub mod search;
+pub mod show;
 pub mod theme;
 pub mod track;
 pub mod user;
@@ -196,13 +199,24 @@ fn route_widget() -> impl Widget<AppState> {
             Route::Home => Scroll::new(home::home_widget().padding(theme::grid(1.0)))
                 .vertical()
                 .boxed(),
-            Route::SavedTracks => {
-                Scroll::new(library::saved_tracks_widget().padding(theme::grid(1.0)))
+            Route::SavedTracks => Flex::column()
+                .with_child(
+                    find::finder_widget(cmd::FIND_IN_SAVED_TRACKS, "Find in Saved Tracks...")
+                        .lens(AppState::finder),
+                )
+                .with_flex_child(
+                    Scroll::new(library::saved_tracks_widget().padding(theme::grid(1.0)))
+                        .vertical(),
+                    1.0,
+                )
+                .boxed(),
+            Route::SavedAlbums => {
+                Scroll::new(library::saved_albums_widget().padding(theme::grid(1.0)))
                     .vertical()
                     .boxed()
             }
-            Route::SavedAlbums => {
-                Scroll::new(library::saved_albums_widget().padding(theme::grid(1.0)))
+            Route::SavedShows => {
+                Scroll::new(library::saved_shows_widget().padding(theme::grid(1.0)))
                     .vertical()
                     .boxed()
             }
@@ -218,12 +232,15 @@ fn route_widget() -> impl Widget<AppState> {
             Route::PlaylistDetail => Flex::column()
                 .with_child(
                     find::finder_widget(cmd::FIND_IN_PLAYLIST, "Find in Playlist...")
-                        .lens(AppState::playlist_detail.then(PlaylistDetail::finder)),
+                        .lens(AppState::finder),
                 )
                 .with_flex_child(
                     Scroll::new(playlist::detail_widget().padding(theme::grid(1.0))).vertical(),
                     1.0,
                 )
+                .boxed(),
+            Route::ShowDetail => Scroll::new(show::detail_widget().padding(theme::grid(1.0)))
+                .vertical()
                 .boxed(),
             Route::Recommendations => {
                 Scroll::new(recommend::results_widget().padding(theme::grid(1.0)))
@@ -250,6 +267,7 @@ fn sidebar_menu_widget() -> impl Widget<AppState> {
         .with_child(sidebar_link_widget("Home", Nav::Home))
         .with_child(sidebar_link_widget("Tracks", Nav::SavedTracks))
         .with_child(sidebar_link_widget("Albums", Nav::SavedAlbums))
+        .with_child(sidebar_link_widget("Podcasts", Nav::SavedShows))
         .with_child(search::input_widget().padding((theme::grid(1.0), theme::grid(1.0))))
 }
 
@@ -365,15 +383,17 @@ fn route_icon_widget() -> impl Widget<Nav> {
     ViewSwitcher::new(
         |nav: &Nav, _| nav.clone(),
         |nav: &Nav, _, _| {
-            let icon = |icon: &SvgIcon| icon.scale(theme::ICON_SIZE_SMALL);
+            let icon = |icon: &SvgIcon| icon.scale(theme::ICON_SIZE_MEDIUM);
             match &nav {
                 Nav::Home => Empty.boxed(),
                 Nav::SavedTracks => Empty.boxed(),
                 Nav::SavedAlbums => Empty.boxed(),
+                Nav::SavedShows => Empty.boxed(),
                 Nav::SearchResults(_) => icon(&icons::SEARCH).boxed(),
                 Nav::AlbumDetail(_) => icon(&icons::ALBUM).boxed(),
                 Nav::ArtistDetail(_) => icon(&icons::ARTIST).boxed(),
                 Nav::PlaylistDetail(_) => icon(&icons::PLAYLIST).boxed(),
+                Nav::ShowDetail(_) => icon(&icons::PODCAST).boxed(),
                 Nav::Recommendations(_) => icon(&icons::SEARCH).boxed(),
             }
         },
@@ -388,11 +408,12 @@ fn route_title_widget() -> impl Widget<Nav> {
 
 fn compute_main_window_title(data: &AppState, _env: &Env) -> String {
     if let Some(now_playing) = &data.playback.now_playing {
-        format!(
-            "{} - {}",
-            now_playing.item.artist_name(),
-            now_playing.item.name
-        )
+        match &now_playing.item {
+            Playable::Track(track) => {
+                format!("{} - {}", track.artist_name(), track.name)
+            }
+            Playable::Episode(episode) => episode.name.to_string(),
+        }
     } else {
         "Psst".to_owned()
     }
