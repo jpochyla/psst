@@ -5,8 +5,6 @@ use serde::{Deserialize, Deserializer, Serialize};
 
 use crate::data::{user::PublicUser, Image, Promise, Track, TrackId};
 
-use super::Finder;
-
 #[derive(Clone, Debug, Data, Lens)]
 pub struct PlaylistDetail {
     pub playlist: Promise<Playlist, PlaylistLink>,

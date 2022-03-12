@@ -47,7 +47,7 @@ impl Cdn {
             .set("Authorization", &format!("Bearer {}", access_token.token))
             .call()?;
 
-        #[derive(Deserialize, Debug, Clone)]
+        #[derive(Deserialize)]
         struct AudioFileLocations {
             result: String,
             cdnurl: Vec<String>,

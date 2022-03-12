@@ -206,7 +206,7 @@ struct LocalArtistLinkJson {
     pub name: Arc<str>,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Deserialize)]
 struct LocalTrackJson {
     #[serde(default)]
     pub id: Option<TrackId>,
