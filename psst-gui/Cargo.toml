@@ -10,33 +10,36 @@ repository = "https://github.com/jpochyla/psst"
 [dependencies]
 psst-core = { path = "../psst-core" }
 
-crossbeam-channel = "0.5"
+# Common
+crossbeam-channel = { version = "0.5.2" }
+env_logger = { version = "0.9.0" }
+fs_extra = { version = "1.2.0" }
+itertools = { version = "0.10.3" }
+log = { version = "0.4.14" }
+lru-cache = { version = "0.1.2" }
+once_cell = { version = "1.10.0" }
+parking_lot = { version = "0.12.0" }
+platform-dirs = { version = "0.3.0" }
+rand = { version = "0.8.5" }
+regex = { version = "1.5.5" }
+serde = { version = "1.0.136", features = ["derive", "rc"] }
+serde_json = { version = "1.0.79" }
+threadpool = { version = "1.8.1" }
+time = { version = "0.3.7", features = ["macros", "formatting"] }
+time-humanize = { version = "0.1.3" }
+ureq = { version = "2.4.0", features = ["json", "socks-proxy"] }
+url = { version = "2.2.2" }
+
+# GUI
 druid = { git = "https://github.com/jpochyla/druid", branch = "psst", features = ["im", "image", "jpeg", "png", "serde"] }
 druid-enums = { git = "https://github.com/luleyleo/druid-enums" }
 druid-shell = { git = "https://github.com/jpochyla/druid", branch = "psst", features = ["raw-win-handle"] }
-env_logger = "0.9"
-fs_extra = "1.2"
-itertools = "0.10"
-log = "0.4"
-lru-cache = "0.1"
-once_cell = "1.9"
-open = "2.0"
-parking_lot = "0.11"
-platform-dirs = "0.3"
-rand = "0.8"
-raw-window-handle = "0.3"
-regex = "1.5"
-serde = { version = "1.0", features = ["derive", "rc"] }
-serde_json = "1.0"
-souvlaki = "0.5.0"
-threadpool = "1.8"
-time = { version = "0.3", features = ["macros", "formatting"] }
-time-humanize = "0.1"
-ureq = { version = "2.4", features = ["json", "socks-proxy"] }
-url = "2.2"
+open = { version = "2.1.1" }
+raw-window-handle = { version = "0.3.3" }  # Needs to be compatible with what druid is using.
+souvlaki = { version = "0.5.1" }
 
 [target.'cfg(windows)'.build-dependencies]
-winres = "0.1.11"
+winres = { version = "0.1.12" }
 
 [package.metadata.bundle]
 name = "Psst"

@@ -2,32 +2,38 @@
 name = "psst-core"
 version = "0.1.0"
 authors = ["Jan Pochyla <jpochyla@gmail.com>"]
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 psst-protocol = { path = "../psst-protocol" }
 
-aes = { version = "0.7", features = ["ctr"] }
-audio_thread_priority = "0.23"
-byteorder = "1.4"
-cpal = "0.13"
-crossbeam-channel = "0.5"
-hmac = "0.12"
-libsamplerate = "0.1"
-log = "0.4"
-num-bigint = { version = "0.4", features = ["rand"] }
-num-traits = "0.2"
-parking_lot = "0.11"
-quick-protobuf = "0.8"
-rand = "0.8"
-rangemap = "0.1"
-rb = "0.3"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-sha-1 = "0.10"
-shannon = "0.2"
-socks = "0.3"
-symphonia = { version = "0.4", default-features = false, features = ["ogg", "vorbis", "mp3"]}
-tempfile = "3.3"
-ureq = { version = "2.4", features = ["json"] }
-url = "2.2"
+# Common
+byteorder = { version = "1.4.3" }
+crossbeam-channel = { version = "0.5.2" }
+log = { version = "0.4.14" }
+num-bigint = { version = "0.4.3", features = ["rand"] }
+num-traits = { version = "0.2.14" }
+parking_lot = { version = "0.12.0" }
+quick-protobuf = { version = "0.8.0" }
+rand = { version = "0.8.5" }
+rangemap = { version = "1.0.1" }
+serde = { version = "1.0.136", features = ["derive"] }
+serde_json = { version = "1.0.79" }
+socks = { version = "0.3.4" }
+tempfile = { version = "3.3.0" }
+ureq = { version = "2.4.0", features = ["json"] }
+url = { version = "2.2.2" }
+
+# Cryptography
+aes = { version = "0.8.1" }
+ctr = { version = "0.9.1" }
+hmac = { version = "0.12.1" }
+sha-1 = { version = "0.10.0" }
+shannon = { version = "0.2.0" }
+
+# Audio
+audio_thread_priority = { version = "0.26.0", default-features = false, features = ["winapi"] }
+cpal = { version = "0.13.5" }
+libsamplerate = { version = "0.1.0" }
+rb = { version = "0.4.0" }
+symphonia = { version = "0.5.0", default-features = false, features = ["ogg", "vorbis", "mp3"]}

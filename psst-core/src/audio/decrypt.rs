@@ -1,9 +1,10 @@
 use std::{convert::TryInto, io};
 
 use aes::{
-    cipher::{generic_array::GenericArray, NewCipher, StreamCipher, StreamCipherSeek},
-    Aes128Ctr,
+    cipher::{generic_array::GenericArray, KeyIvInit, StreamCipher, StreamCipherSeek},
+    Aes128,
 };
+use ctr::Ctr128BE;
 
 const AUDIO_AESIV: [u8; 16] = [
     0x72, 0xe0, 0x67, 0xfb, 0xdd, 0xcb, 0xcf, 0x77, 0xeb, 0xe8, 0xbc, 0x64, 0x3f, 0x63, 0x0d, 0x93,
@@ -19,13 +20,13 @@ impl AudioKey {
 }
 
 pub struct AudioDecrypt<T> {
-    cipher: Aes128Ctr,
+    cipher: Ctr128BE<Aes128>,
     reader: T,
 }
 
 impl<T: io::Read> AudioDecrypt<T> {
     pub fn new(key: AudioKey, reader: T) -> AudioDecrypt<T> {
-        let cipher = Aes128Ctr::new(
+        let cipher = Ctr128BE::<Aes128>::new(
             GenericArray::from_slice(&key.0),
             GenericArray::from_slice(&AUDIO_AESIV),
         );

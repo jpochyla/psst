@@ -63,7 +63,7 @@ pub struct AudioDecoder {
 impl AudioDecoder {
     pub fn new<T>(input: T, codec: AudioCodecFormat) -> Result<Self, Error>
     where
-        T: io::Read + io::Seek + Send + 'static,
+        T: io::Read + io::Seek + Send + Sync + 'static,
     {
         let mss = MediaSourceStream::new(
             Box::new(FileWithConstSize::new(input)),
@@ -102,7 +102,8 @@ impl AudioDecoder {
         Ok(seeked_to.actual_ts)
     }
 
-    /// Read a next packet of audio from this decoder.  Returns `None` in case of EOF or internal error.
+    /// Read a next packet of audio from this decoder.  Returns `None` in case
+    /// of EOF or internal error.
     pub fn read_packet<S>(&mut self, samples: &mut SampleBuffer<S>) -> Option<TimeStamp>
     where
         S: ConvertibleSample,
@@ -120,7 +121,8 @@ impl AudioDecoder {
                 }
             };
             while !self.format.metadata().is_latest() {
-                // Consume any new metadata that has been read since the last packet.
+                // Consume any new metadata that has been read since the last
+                // packet.
             }
             // If the packet does not belong to the selected track, skip over it.
             if packet.track_id() != self.track_id {
@@ -131,7 +133,7 @@ impl AudioDecoder {
                 Ok(decoded) => {
                     // Interleave the samples into the buffer.
                     samples.copy_interleaved_ref(decoded);
-                    return Some(packet.pts());
+                    return Some(packet.ts());
                 }
                 Err(SymphoniaError::IoError(err)) => {
                     // The packet failed to decode due to an IO error, skip the packet.
@@ -154,7 +156,7 @@ impl AudioDecoder {
 
 impl<T> MediaSource for FileWithConstSize<T>
 where
-    T: io::Read + io::Seek + Send,
+    T: io::Read + io::Seek + Send + Sync,
 {
     fn is_seekable(&self) -> bool {
         true
