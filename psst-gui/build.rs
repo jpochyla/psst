@@ -1,31 +1,41 @@
 fn main() {
     #[cfg(windows)]
     {
-        build_logo_ico();
+        let ico_path = "assets/logo.ico";
+        if std::fs::metadata(ico_path).is_err() {
+            let ico_frames = load_images();
+            save_ico(&ico_frames, ico_path);
+        }
         let mut res = winres::WindowsResource::new();
-        res.set_icon("assets/logo.ico");
+        res.set_icon(ico_path);
         res.compile().expect("Could not attach exe icon");
     }
 }
+
 use image::{
     codecs::ico::{IcoEncoder, IcoFrame},
-    io::Reader as ImageReader,
     ColorType,
 };
-fn build_logo_ico() {
-    let sizes = vec![16, 32, 64, 128, 256];
-    let images = sizes.iter().map(|s| {
-        IcoFrame::as_png(
-            image::open(format!("assets/logo_{}.png", s))
-                .unwrap()
-                .as_bytes(),
-            *s,
-            *s,
-            ColorType::Rgba8,
-        )
-        .unwrap()
-    }).collect::<Vec<IcoFrame<'_>>>();
-    let file = std::fs::File::open("assets/logo_256.png").unwrap();
+fn load_images() -> Vec<IcoFrame<'static>> {
+    let sizes = vec![32, 64, 128, 256];
+    sizes
+        .iter()
+        .map(|s| {
+            IcoFrame::as_png(
+                image::open(format!("assets/logo_{}.png", s))
+                    .unwrap()
+                    .as_bytes(),
+                *s,
+                *s,
+                ColorType::Rgba8,
+            )
+            .unwrap()
+        })
+        .collect()
+}
+
+fn save_ico(images: &[IcoFrame<'_>], ico_path: &str) {
+    let file = std::fs::File::create(ico_path).unwrap();
     let encoder = IcoEncoder::new(file);
-    encoder.encode_images(&images);
+    encoder.encode_images(&images).unwrap();
 }
