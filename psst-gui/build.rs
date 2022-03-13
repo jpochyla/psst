@@ -7,14 +7,25 @@ fn main() {
         res.compile().expect("Could not attach exe icon");
     }
 }
-
+use image::{
+    codecs::ico::{IcoEncoder, IcoFrame},
+    io::Reader as ImageReader,
+    ColorType,
+};
 fn build_logo_ico() {
-    let mut icon_dir = ico::IconDir::new(ico::ResourceType::Icon);
-    // Read a PNG file from disk and add it to the collection:
+    let sizes = vec![16, 32, 64, 128, 256];
+    let images = sizes.iter().map(|s| {
+        IcoFrame::as_png(
+            image::open(format!("assets/logo_{}.png", s))
+                .unwrap()
+                .as_bytes(),
+            *s,
+            *s,
+            ColorType::Rgba8,
+        )
+        .unwrap()
+    }).collect::<Vec<IcoFrame<'_>>>();
     let file = std::fs::File::open("assets/logo_256.png").unwrap();
-    let image = ico::IconImage::read_png(file).unwrap();
-    icon_dir.add_entry(ico::IconDirEntry::encode(&image).unwrap());
-    // Finally, write the ICO file to disk:
-    let file = std::fs::File::create("assets/logo.ico").unwrap();
-    icon_dir.write(file).unwrap();
+    let encoder = IcoEncoder::new(file);
+    encoder.encode_images(&images);
 }
