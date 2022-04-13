@@ -42,7 +42,10 @@ pub use crate::data::{
         NowPlaying, Playable, PlayableMatcher, Playback, PlaybackOrigin, PlaybackPayload,
         PlaybackState, QueueBehavior, QueueEntry,
     },
-    playlist::{Playlist, PlaylistAddTrack, PlaylistRemoveTrack, PlaylistDetail, PlaylistLink, PlaylistTracks},
+    playlist::{
+        Playlist, PlaylistAddTrack, PlaylistDetail, PlaylistLink, PlaylistRemoveTrack,
+        PlaylistTracks,
+    },
     promise::{Promise, PromiseState},
     recommend::{
         Range, Recommend, Recommendations, RecommendationsKnobs, RecommendationsParams,

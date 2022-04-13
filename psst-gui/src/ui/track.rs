@@ -8,8 +8,8 @@ use druid::{
 use crate::{
     cmd,
     data::{
-        AppState, ArtistLink, Library, Nav, PlaylistAddTrack,
-        PlaylistRemoveTrack, RecommendationsRequest, Track,
+        AppState, ArtistLink, Library, Nav, PlaylistAddTrack, PlaylistRemoveTrack,
+        RecommendationsRequest, Track,
     },
     ui::playlist,
     widget::{Empty, MyWidgetExt, RemoteImage},
@@ -249,12 +249,12 @@ pub fn track_menu(track: &Arc<Track>, library: &Arc<Library>) -> Menu<AppState> 
         menu = menu.entry(
             MenuItem::new(
                 LocalizedString::new("menu-item-remove-from-playlist")
-                    .with_placeholder("Remove from this playlist")
+                    .with_placeholder("Remove from this playlist"),
             )
             .command(playlist::REMOVE_TRACK.with(PlaylistRemoveTrack {
                 link: playlist.to_owned(),
-                track_id: track.id
-            }))
+                track_id: track.id,
+            })),
         );
     }
 

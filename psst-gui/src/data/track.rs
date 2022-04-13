@@ -24,7 +24,7 @@ pub struct Track {
     pub local_path: Option<Arc<str>>,
     pub is_playable: Option<bool>,
     pub popularity: Option<u32>,
-    pub current_playlist: Option<PlaylistLink>
+    pub current_playlist: Option<PlaylistLink>,
 }
 
 impl Track {
