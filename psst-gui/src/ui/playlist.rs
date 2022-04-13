@@ -7,7 +7,7 @@ use crate::{
     cmd,
     data::{
         AppState, Ctx, Library, Nav, Playlist, PlaylistAddTrack, PlaylistDetail, PlaylistLink,
-        PlaylistTracks, PlaylistRemoveTrack
+        PlaylistRemoveTrack, PlaylistTracks,
     },
     error::Error,
     webapi::WebApi,
@@ -80,7 +80,7 @@ pub fn list_widget() -> impl Widget<AppState> {
                 &d.track_id
                     .0
                     .to_uri()
-                    .ok_or_else(|| Error::WebApiError("Item doesn't have URI".to_string()))?
+                    .ok_or_else(|| Error::WebApiError("Item doesn't have URI".to_string()))?,
             )
         },
         |_, data, d| {
@@ -94,7 +94,7 @@ pub fn list_widget() -> impl Widget<AppState> {
             }
             // re-submit the LOAD_DETAIL comand to reload the data
             e.submit_command(LOAD_DETAIL.with(p.link))
-        }
+        },
     )
 }
 

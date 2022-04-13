@@ -25,7 +25,7 @@ use ureq::{Agent, Request, Response};
 use crate::{
     data::{
         Album, AlbumType, Artist, ArtistAlbums, AudioAnalysis, Cached, Episode, EpisodeId,
-        EpisodeLink, Nav, Page, Playlist, PlaylistLink, Range, Recommendations, 
+        EpisodeLink, Nav, Page, Playlist, PlaylistLink, Range, Recommendations,
         RecommendationsRequest, SearchResults, SearchTopic, Show, SpotifyUrl, Track, UserProfile,
     },
     error::Error,
@@ -498,7 +498,10 @@ impl WebApi {
     }
 
     // https://developer.spotify.com/documentation/web-api/reference/#endpoint-get-playlists-tracks
-    pub fn get_playlist_tracks(&self, playlist: &PlaylistLink) -> Result<Vector<Arc<Track>>, Error> {
+    pub fn get_playlist_tracks(
+        &self,
+        playlist: &PlaylistLink,
+    ) -> Result<Vector<Arc<Track>>, Error> {
         #[derive(Clone, Deserialize)]
         struct PlaylistItem {
             is_local: bool,
@@ -533,7 +536,7 @@ impl WebApi {
                 PlaylistItem {
                     track: OptionalTrack::Json(track),
                     ..
-                } => local_track_manager.find_local_track(track)
+                } => local_track_manager.find_local_track(track),
             })
             .map(|mut t| {
                 t.current_playlist = Some(playlist.to_owned());
@@ -552,7 +555,11 @@ impl WebApi {
     }
 
     // https://developer.spotify.com/documentation/web-api/reference/#/operations/remove-tracks-playlist
-    pub fn remove_track_from_playlist(&self, playlist_id: &str, track_uri: &str) -> Result<(), Error> {
+    pub fn remove_track_from_playlist(
+        &self,
+        playlist_id: &str,
+        track_uri: &str,
+    ) -> Result<(), Error> {
         self.delete(&format!("v1/playlists/{}/tracks", playlist_id))?
             .send_json(ureq::json!({
                 "tracks": [{
