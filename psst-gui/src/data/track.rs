@@ -4,7 +4,7 @@ use druid::{im::Vector, lens::Map, Data, Lens};
 use psst_core::item_id::{ItemId, ItemIdType};
 use serde::{Deserialize, Serialize};
 
-use crate::data::{AlbumLink, ArtistLink};
+use crate::data::{AlbumLink, ArtistLink, PlaylistLink};
 
 #[derive(Clone, Debug, Data, Lens, Deserialize)]
 pub struct Track {
@@ -24,6 +24,7 @@ pub struct Track {
     pub local_path: Option<Arc<str>>,
     pub is_playable: Option<bool>,
     pub popularity: Option<u32>,
+    pub current_playlist: Option<PlaylistLink>
 }
 
 impl Track {

@@ -18,6 +18,12 @@ pub struct PlaylistAddTrack {
 }
 
 #[derive(Clone, Debug, Data, Lens, Deserialize)]
+pub struct PlaylistRemoveTrack {
+	pub link: PlaylistLink,
+	pub track_id: TrackId
+}
+
+#[derive(Clone, Debug, Data, Lens, Deserialize)]
 pub struct Playlist {
     pub id: Arc<str>,
     pub name: Arc<str>,

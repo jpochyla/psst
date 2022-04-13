@@ -7,7 +7,10 @@ use druid::{
 
 use crate::{
     cmd,
-    data::{AppState, ArtistLink, Library, Nav, PlaylistAddTrack, RecommendationsRequest, Track},
+    data::{
+        AppState, ArtistLink, Library, Nav, PlaylistAddTrack,
+        PlaylistRemoveTrack, RecommendationsRequest, Track,
+    },
     ui::playlist,
     widget::{Empty, MyWidgetExt, RemoteImage},
 };
@@ -239,6 +242,19 @@ pub fn track_menu(track: &Arc<Track>, library: &Arc<Library>) -> Menu<AppState> 
                     .with_placeholder("Save Track to Library"),
             )
             .command(library::SAVE_TRACK.with(track.clone())),
+        );
+    }
+
+    if let Some(ref playlist) = track.current_playlist {
+        menu = menu.entry(
+            MenuItem::new(
+                LocalizedString::new("menu-item-remove-from-playlist")
+                    .with_placeholder("Remove from this playlist")
+            )
+            .command(playlist::REMOVE_TRACK.with(PlaylistRemoveTrack {
+                link: playlist.to_owned(),
+                track_id: track.id
+            }))
         );
     }
 

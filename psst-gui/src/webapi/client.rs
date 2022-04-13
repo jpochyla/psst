@@ -25,8 +25,8 @@ use ureq::{Agent, Request, Response};
 use crate::{
     data::{
         Album, AlbumType, Artist, ArtistAlbums, AudioAnalysis, Cached, Episode, EpisodeId,
-        EpisodeLink, Nav, Page, Playlist, Range, Recommendations, RecommendationsRequest,
-        SearchResults, SearchTopic, Show, SpotifyUrl, Track, UserProfile,
+        EpisodeLink, Nav, Page, Playlist, PlaylistLink, Range, Recommendations, 
+        RecommendationsRequest, SearchResults, SearchTopic, Show, SpotifyUrl, Track, UserProfile,
     },
     error::Error,
 };
@@ -498,7 +498,7 @@ impl WebApi {
     }
 
     // https://developer.spotify.com/documentation/web-api/reference/#endpoint-get-playlists-tracks
-    pub fn get_playlist_tracks(&self, id: &str) -> Result<Vector<Arc<Track>>, Error> {
+    pub fn get_playlist_tracks(&self, playlist: &PlaylistLink) -> Result<Vector<Arc<Track>>, Error> {
         #[derive(Clone, Deserialize)]
         struct PlaylistItem {
             is_local: bool,
@@ -511,12 +511,12 @@ impl WebApi {
         #[derive(Clone, Deserialize)]
         #[serde(untagged)]
         enum OptionalTrack {
-            Track(Arc<Track>),
+            Track(Track),
             Json(serde_json::Value),
         }
 
         let request = self
-            .get(format!("v1/playlists/{}/tracks", id))?
+            .get(format!("v1/playlists/{}/tracks", playlist.id))?
             .query("marker", "from_token")
             .query("additional_types", "track");
         let result: Vector<PlaylistItem> = self.load_all_pages(request)?;
@@ -533,7 +533,11 @@ impl WebApi {
                 PlaylistItem {
                     track: OptionalTrack::Json(track),
                     ..
-                } => local_track_manager.find_local_track(track),
+                } => local_track_manager.find_local_track(track)
+            })
+            .map(|mut t| {
+                t.current_playlist = Some(playlist.to_owned());
+                Arc::new(t)
             })
             .collect())
     }
@@ -545,6 +549,18 @@ impl WebApi {
             .query("uris", track_uri);
         let result = self.send_empty_json(request)?;
         Ok(result)
+    }
+
+    // https://developer.spotify.com/documentation/web-api/reference/#/operations/remove-tracks-playlist
+    pub fn remove_track_from_playlist(&self, playlist_id: &str, track_uri: &str) -> Result<(), Error> {
+        self.delete(&format!("v1/playlists/{}/tracks", playlist_id))?
+            .send_json(ureq::json!({
+                "tracks": [{
+                    "uri": track_uri
+                }]
+            }))?;
+
+        Ok(())
     }
 }
 

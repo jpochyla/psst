@@ -42,7 +42,7 @@ pub use crate::data::{
         NowPlaying, Playable, PlayableMatcher, Playback, PlaybackOrigin, PlaybackPayload,
         PlaybackState, QueueBehavior, QueueEntry,
     },
-    playlist::{Playlist, PlaylistAddTrack, PlaylistDetail, PlaylistLink, PlaylistTracks},
+    playlist::{Playlist, PlaylistAddTrack, PlaylistRemoveTrack, PlaylistDetail, PlaylistLink, PlaylistTracks},
     promise::{Promise, PromiseState},
     recommend::{
         Range, Recommend, Recommendations, RecommendationsKnobs, RecommendationsParams,
@@ -369,6 +369,16 @@ impl Library {
             for playlist in saved.iter_mut() {
                 if playlist.id == link.id {
                     playlist.track_count += 1;
+                }
+            }
+        }
+    }
+
+    pub fn decrement_playlist_track_count(&mut self, link: &PlaylistLink) {
+        if let Some(saved) = self.playlists.resolved_mut() {
+            for playlist in saved.iter_mut() {
+                if playlist.id == link.id {
+                    playlist.track_count -= 1;
                 }
             }
         }
