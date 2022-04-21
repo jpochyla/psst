@@ -12,10 +12,13 @@ fn main() {
     }
 }
 
+#[cfg(windows)]
 use image::{
     codecs::ico::{IcoEncoder, IcoFrame},
     ColorType,
 };
+
+#[cfg(windows)]
 fn load_images() -> Vec<IcoFrame<'static>> {
     let sizes = vec![32, 64, 128, 256];
     sizes
@@ -34,6 +37,7 @@ fn load_images() -> Vec<IcoFrame<'static>> {
         .collect()
 }
 
+#[cfg(windows)]
 fn save_ico(images: &[IcoFrame<'_>], ico_path: &str) {
     let file = std::fs::File::create(ico_path).unwrap();
     let encoder = IcoEncoder::new(file);
