@@ -7,3 +7,4 @@ cache
 .env
 *.iml
 rust-toolchain
+psst-gui/mac/psst-gui.app/Contents/MacOS/psst-gui
