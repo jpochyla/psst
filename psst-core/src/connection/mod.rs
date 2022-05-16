@@ -360,6 +360,7 @@ fn client_response_encrypted(credentials: Credentials) -> ShannonMsg {
         },
         system_info: SystemInfo {
             device_id: Some(DEVICE_ID.to_string()),
+            system_information_string: Some("librespot_but_actually_psst".to_string()),
             ..SystemInfo::default()
         },
         ..ClientResponseEncrypted::default()
