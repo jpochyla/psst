@@ -8,7 +8,7 @@ use druid::{
 use crate::{
     cmd,
     data::{
-        AppState, ArtistLink, Library, Nav, PlaylistAddTrack, PlaylistRemoveTrack,
+        AppState, ArtistLink, Library, Nav, PlaybackOrigin, PlaylistAddTrack, PlaylistRemoveTrack,
         RecommendationsRequest, Track,
     },
     ui::playlist,
@@ -179,10 +179,14 @@ fn popularity_stars(popularity: u32) -> String {
 }
 
 fn track_row_menu(row: &PlayRow<Arc<Track>>) -> Menu<AppState> {
-    track_menu(&row.item, &row.ctx.library)
+    track_menu(&row.item, &row.ctx.library, &row.origin)
 }
 
-pub fn track_menu(track: &Arc<Track>, library: &Arc<Library>) -> Menu<AppState> {
+pub fn track_menu(
+    track: &Arc<Track>,
+    library: &Library,
+    origin: &PlaybackOrigin,
+) -> Menu<AppState> {
     let mut menu = Menu::empty();
 
     for artist_link in &track.artists {
@@ -245,7 +249,7 @@ pub fn track_menu(track: &Arc<Track>, library: &Arc<Library>) -> Menu<AppState> 
         );
     }
 
-    if let Some(ref playlist) = track.current_playlist {
+    if let PlaybackOrigin::Playlist(playlist) = origin {
         menu = menu.entry(
             MenuItem::new(
                 LocalizedString::new("menu-item-remove-from-playlist")

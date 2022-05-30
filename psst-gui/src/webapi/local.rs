@@ -123,7 +123,7 @@ impl LocalTrackManager {
         Ok(())
     }
 
-    pub fn find_local_track(&self, track_json: Value) -> Option<Track> {
+    pub fn find_local_track(&self, track_json: Value) -> Option<Arc<Track>> {
         let local_track: LocalTrackJson = match serde_json::from_value(track_json) {
             Ok(t) => t,
             Err(e) => {
@@ -136,7 +136,7 @@ impl LocalTrackManager {
 
         for parsed_track in matching_tracks {
             if Self::is_matching_in_addition_to_title(parsed_track, &local_track) {
-                return Some(Track {
+                return Some(Arc::new(Track {
                     id: TrackId::default(),
                     name: local_track.name,
                     album: local_track.album.map(|local_album| {
@@ -163,8 +163,7 @@ impl LocalTrackManager {
                     // TODO: Change this to true once playback is supported.
                     is_playable: Some(false),
                     popularity: local_track.popularity,
-                    current_playlist: None,
-                });
+                }));
             }
         }
 

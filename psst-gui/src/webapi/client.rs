@@ -25,7 +25,7 @@ use ureq::{Agent, Request, Response};
 use crate::{
     data::{
         Album, AlbumType, Artist, ArtistAlbums, AudioAnalysis, Cached, Episode, EpisodeId,
-        EpisodeLink, Nav, Page, Playlist, PlaylistLink, Range, Recommendations,
+        EpisodeLink, Nav, Page, Playlist, Range, Recommendations,
         RecommendationsRequest, SearchResults, SearchTopic, Show, SpotifyUrl, Track, UserProfile,
     },
     error::Error,
@@ -149,8 +149,8 @@ impl WebApi {
         }
     }
 
-    /// Iterate a paginated result set by sending `request` with added pagination
-    /// parameters.  Mostly used through `load_all_pages`.
+    /// Iterate a paginated result set by sending `request` with added
+    /// pagination parameters.  Mostly used through `load_all_pages`.
     fn for_all_pages<T: DeserializeOwned + Clone>(
         &self,
         request: Request,
@@ -498,10 +498,7 @@ impl WebApi {
     }
 
     // https://developer.spotify.com/documentation/web-api/reference/#endpoint-get-playlists-tracks
-    pub fn get_playlist_tracks(
-        &self,
-        playlist: &PlaylistLink,
-    ) -> Result<Vector<Arc<Track>>, Error> {
+    pub fn get_playlist_tracks(&self, id: &str) -> Result<Vector<Arc<Track>>, Error> {
         #[derive(Clone, Deserialize)]
         struct PlaylistItem {
             is_local: bool,
@@ -514,12 +511,12 @@ impl WebApi {
         #[derive(Clone, Deserialize)]
         #[serde(untagged)]
         enum OptionalTrack {
-            Track(Track),
+            Track(Arc<Track>),
             Json(serde_json::Value),
         }
 
         let request = self
-            .get(format!("v1/playlists/{}/tracks", playlist.id))?
+            .get(format!("v1/playlists/{}/tracks", id))?
             .query("marker", "from_token")
             .query("additional_types", "track");
         let result: Vector<PlaylistItem> = self.load_all_pages(request)?;
@@ -537,10 +534,6 @@ impl WebApi {
                     track: OptionalTrack::Json(track),
                     ..
                 } => local_track_manager.find_local_track(track),
-            })
-            .map(|mut t| {
-                t.current_playlist = Some(playlist.to_owned());
-                Arc::new(t)
             })
             .collect())
     }

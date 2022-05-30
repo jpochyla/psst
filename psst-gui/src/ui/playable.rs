@@ -96,6 +96,7 @@ pub fn is_playing_marker_widget() -> impl Widget<bool> {
 pub struct PlayRow<T> {
     pub item: T,
     pub ctx: Arc<CommonCtx>,
+    pub origin: Arc<PlaybackOrigin>,
     pub position: usize,
     pub is_playing: bool,
 }
@@ -105,6 +106,7 @@ impl<T> PlayRow<T> {
         PlayRow {
             item,
             ctx: self.ctx.clone(),
+            origin: self.origin.clone(),
             position: self.position,
             is_playing: self.is_playing,
         }
@@ -251,11 +253,13 @@ where
     T: PlayableIter + Data,
 {
     fn for_each(&self, mut cb: impl FnMut(&PlayRow<Playable>, usize)) {
+        let origin = Arc::new(self.data.origin());
         self.data.for_each(|item, position| {
             cb(
                 &PlayRow {
                     is_playing: self.ctx.is_playing(&item),
                     ctx: self.ctx.to_owned(),
+                    origin: origin.clone(),
                     item,
                     position,
                 },
@@ -265,11 +269,13 @@ where
     }
 
     fn for_each_mut(&mut self, mut cb: impl FnMut(&mut PlayRow<Playable>, usize)) {
+        let origin = Arc::new(self.data.origin());
         self.data.for_each(|item, position| {
             cb(
                 &mut PlayRow {
                     is_playing: self.ctx.is_playing(&item),
                     ctx: self.ctx.to_owned(),
+                    origin: origin.clone(),
                     item,
                     position,
                 },

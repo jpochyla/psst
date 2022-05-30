@@ -106,7 +106,9 @@ fn playing_item_widget() -> impl Widget<NowPlaying> {
             ctx.submit_command(cmd::NAVIGATE.with(now_playing.origin.to_nav()));
         })
         .context_menu(|now_playing| match &now_playing.item {
-            Playable::Track(track) => track::track_menu(track, &now_playing.library),
+            Playable::Track(track) => {
+                track::track_menu(track, &now_playing.library, &now_playing.origin)
+            }
             Playable::Episode(episode) => episode::episode_menu(episode, &now_playing.library),
         })
 }
