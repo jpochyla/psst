@@ -92,7 +92,7 @@ pub fn list_widget() -> impl Widget<AppState> {
             } else {
                 data.info_alert("Removed from playlist.");
             }
-            // re-submit the LOAD_DETAIL comand to reload the data
+            // Re-submit the `LOAD_DETAIL` command to reload the playlist data.
             e.submit_command(LOAD_DETAIL.with(p.link))
         },
     )
@@ -174,7 +174,7 @@ pub fn detail_widget() -> impl Widget<AppState> {
     )
     .on_command_async(
         LOAD_DETAIL,
-        |d| WebApi::global().get_playlist_tracks(&d),
+        |d| WebApi::global().get_playlist_tracks(&d.id),
         |_, data, d| data.playlist_detail.tracks.defer(d),
         |_, data, (d, r)| {
             let r = r.map(|tracks| PlaylistTracks {
