@@ -16,7 +16,7 @@ num-traits = { version = "0.2.14" }
 parking_lot = { version = "0.12.0" }
 quick-protobuf = { version = "0.8.0" }
 rand = { version = "0.8.5" }
-rangemap = { version = "1.0.1" }
+rangemap = { version = "1.0.3" }
 serde = { version = "1.0.136", features = ["derive"] }
 serde_json = { version = "1.0.79" }
 socks = { version = "0.3.4" }
