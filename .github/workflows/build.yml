@@ -97,6 +97,15 @@ jobs:
       run: mkdir -p ${{runner.workspace}}/pkg/usr/bin/; mv ${{runner.workspace}}/psst-gui $_
     - name: Move desktop
       run: mkdir -p ${{runner.workspace}}/pkg/usr/share/applications/; mv .pkg/psst.desktop $_
+    - name: Add icons
+      run: |
+        LOGOS=$(cd ./psst-gui/assets/ && ls logo_*.png)
+        for LOGO in $LOGOS
+        do
+          LOGO_SIZE=$(echo "${LOGO}" | grep -oE '[[:digit:]]{2,}')
+          mkdir -p "${{runner.workspace}}/pkg/usr/share/icons/hicolor/${LOGO_SIZE}x${LOGO_SIZE}/"
+          cp "./psst-gui/assets/${LOGO}" "$_"
+        done
     - name: Set permissions
       run: chmod 755 ${{runner.workspace}}/pkg/usr/bin/psst-gui
     - name: Move license
