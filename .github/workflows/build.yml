@@ -104,7 +104,7 @@ jobs:
         do
           LOGO_SIZE=$(echo "${LOGO}" | grep -oE '[[:digit:]]{2,}')
           mkdir -p "${{runner.workspace}}/pkg/usr/share/icons/hicolor/${LOGO_SIZE}x${LOGO_SIZE}/"
-          cp "./psst-gui/assets/${LOGO}" "$_"
+          cp "./psst-gui/assets/${LOGO}" "$_/psst.png"
         done
     - name: Set permissions
       run: chmod 755 ${{runner.workspace}}/pkg/usr/bin/psst-gui
