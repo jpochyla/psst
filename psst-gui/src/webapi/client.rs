@@ -25,8 +25,8 @@ use ureq::{Agent, Request, Response};
 use crate::{
     data::{
         Album, AlbumType, Artist, ArtistAlbums, AudioAnalysis, Cached, Episode, EpisodeId,
-        EpisodeLink, Nav, Page, Playlist, Range, Recommendations,
-        RecommendationsRequest, SearchResults, SearchTopic, Show, SpotifyUrl, Track, UserProfile,
+        EpisodeLink, Nav, Page, Playlist, Range, Recommendations, RecommendationsRequest,
+        SearchResults, SearchTopic, Show, SpotifyUrl, Track, UserProfile,
     },
     error::Error,
 };
