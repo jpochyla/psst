@@ -250,16 +250,44 @@ pub fn track_menu(
     }
 
     if let PlaybackOrigin::Playlist(playlist) = origin {
-        menu = menu.entry(
-            MenuItem::new(
-                LocalizedString::new("menu-item-remove-from-playlist")
-                    .with_placeholder("Remove from this playlist"),
-            )
-            .command(playlist::REMOVE_TRACK.with(PlaylistRemoveTrack {
-                link: playlist.to_owned(),
-                track_id: track.id,
-            })),
-        );
+        // do some (hopefully) quick checks to determine if we should give the
+        // option to remove items from this playlist, only allowing it if the
+        // playlist is collaborative or we are the owner of it
+        let should_show = {
+            if let Some(details) = library.playlists.resolved().and_then(|pl| 
+                pl.iter().find(|p| p.id == playlist.id)
+            ) {
+                if details.collaborative {
+                    true
+                } else if let Some(user) = library.user_profile.resolved() {
+                    user.id == details.owner.id
+                } else {
+                    // If we can find the playlist, but for some reason can't
+                    // resolve our own user, just show the option anyways and
+                    // we'll see an error at the bottom if it doesn't work
+                    // when they try to remove a track
+                    true
+                }
+            } else {
+                // If this playlist doesn't exist in our library,
+                // just assume that we can't edit it since we probably
+                // searched for it or something
+                false
+            }
+        };
+
+        if should_show {
+            menu = menu.entry(
+                MenuItem::new(
+                    LocalizedString::new("menu-item-remove-from-playlist")
+                        .with_placeholder("Remove from this playlist"),
+                )
+                .command(playlist::REMOVE_TRACK.with(PlaylistRemoveTrack {
+                    link: playlist.to_owned(),
+                    track_id: track.id,
+                })),
+            );
+        }
     }
 
     let mut playlist_menu = Menu::new(
