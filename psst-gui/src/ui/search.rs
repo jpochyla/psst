@@ -6,15 +6,14 @@ use druid::{
     Data, LensExt, Selector, Widget, WidgetExt,
 };
 
-use crate::data::Show;
-use crate::ui::show;
 use crate::{
     cmd,
     controller::InputController,
     data::{
-        Album, AppState, Artist, Ctx, Nav, Playlist, Search, SearchResults, SearchTopic,
+        Album, AppState, Artist, Ctx, Nav, Playlist, Search, SearchResults, SearchTopic, Show,
         SpotifyUrl, WithCtx,
     },
+    ui::show,
     webapi::WebApi,
     widget::{Async, Empty, MyWidgetExt},
 };

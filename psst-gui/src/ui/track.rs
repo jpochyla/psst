@@ -254,9 +254,11 @@ pub fn track_menu(
         // option to remove items from this playlist, only allowing it if the
         // playlist is collaborative or we are the owner of it
         let should_show = {
-            if let Some(details) = library.playlists.resolved().and_then(|pl| 
-                pl.iter().find(|p| p.id == playlist.id)
-            ) {
+            if let Some(details) = library
+                .playlists
+                .resolved()
+                .and_then(|pl| pl.iter().find(|p| p.id == playlist.id))
+            {
                 if details.collaborative {
                     true
                 } else if let Some(user) = library.user_profile.resolved() {
