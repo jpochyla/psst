@@ -32,6 +32,11 @@ fn mac_app_menu() -> Menu<AppState> {
                 .command(commands::HIDE_APPLICATION)
                 .hotkey(SysMods::Cmd, "h"),
         )
+        .entry(
+            MenuItem::new(LocalizedString::new("macos-menu-hide-others").with_placeholder("Hide Others"))
+                .command(commands::HIDE_OTHERS)
+                .hotkey(SysMods::AltCmd, "h"),
+        )
 }
 
 fn edit_menu() -> Menu<AppState> {
