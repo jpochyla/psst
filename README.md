@@ -28,6 +28,15 @@ RHEL/Fedora:
 sudo dnf install openssl-devel gtk3-devel cairo-devel alsa-lib-devel
 ```
 
+##### MacOS
+
+Install Psst on a mac using [Homebrew](https://brew.sh)
+
+```shell
+brew install --cask psst
+
+```
+
 ##### Building
 
 On all platforms, the **latest Rust stable** (at least 1.54.0) is needed.
