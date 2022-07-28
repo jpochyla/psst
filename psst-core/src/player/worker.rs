@@ -18,7 +18,7 @@ use crate::{
     actor::{Act, Actor, ActorHandle},
     audio::{
         decode::AudioDecoder,
-        output::AudioSink,
+        output::{AudioSink, DefaultAudioSink},
         resample::ResamplingQuality,
         source::{AudioSource, ResampledSource, StereoMappedSource},
     },
@@ -31,13 +31,13 @@ use super::{
 };
 
 pub struct PlaybackManager {
-    sink: AudioSink,
+    sink: DefaultAudioSink,
     event_send: Sender<PlayerEvent>,
     current: Option<(MediaPath, Sender<Msg>)>,
 }
 
 impl PlaybackManager {
-    pub fn new(sink: AudioSink, event_send: Sender<PlayerEvent>) -> Self {
+    pub fn new(sink: DefaultAudioSink, event_send: Sender<PlayerEvent>) -> Self {
         Self {
             sink,
             event_send,

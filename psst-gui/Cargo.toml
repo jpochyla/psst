@@ -34,8 +34,8 @@ url = { version = "2.2.2" }
 druid = { git = "https://github.com/jpochyla/druid", branch = "psst", features = ["im", "image", "jpeg", "png", "serde"] }
 druid-enums = { git = "https://github.com/luleyleo/druid-enums" }
 druid-shell = { git = "https://github.com/jpochyla/druid", branch = "psst", features = ["raw-win-handle"] }
-open = { version = "2.1.1" }
-raw-window-handle = { version = "0.3.3" }  # Needs to be compatible with what druid is using.
+open = { version = "3.0.2" }
+raw-window-handle = { version = "0.4.2" }  # Needs to be compatible with what druid is using.
 souvlaki = { version = "0.5.1" }
 
 [target.'cfg(windows)'.build-dependencies]

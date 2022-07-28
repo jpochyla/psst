@@ -10,7 +10,7 @@ use druid::{
     Code, ExtEventSink, InternalLifeCycle, KbKey, WindowHandle,
 };
 use psst_core::{
-    audio::{normalize::NormalizationLevel, output::AudioOutput},
+    audio::{normalize::NormalizationLevel, output::DefaultAudioOutput},
     cache::Cache,
     cdn::Cdn,
     player::{item::PlaybackItem, PlaybackConfig, Player, PlayerCommand, PlayerEvent},
@@ -28,7 +28,7 @@ use crate::{
 pub struct PlaybackController {
     sender: Option<Sender<PlayerEvent>>,
     thread: Option<JoinHandle<()>>,
-    output: Option<AudioOutput>,
+    output: Option<DefaultAudioOutput>,
     media_controls: Option<MediaControls>,
 }
 
@@ -50,7 +50,7 @@ impl PlaybackController {
         widget_id: WidgetId,
         #[allow(unused_variables)] window: &WindowHandle,
     ) {
-        let output = AudioOutput::open().unwrap();
+        let output = DefaultAudioOutput::open().unwrap();
         let cache_dir = Config::cache_dir().unwrap();
         let proxy_url = Config::proxy();
         let player = Player::new(

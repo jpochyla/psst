@@ -4,6 +4,9 @@ version = "0.1.0"
 authors = ["Jan Pochyla <jpochyla@gmail.com>"]
 edition = "2021"
 
+[features]
+default = ["cpal"]
+
 [dependencies]
 psst-protocol = { path = "../psst-protocol" }
 
@@ -33,7 +36,8 @@ shannon = { version = "0.2.0" }
 
 # Audio
 audio_thread_priority = { version = "0.26.0", default-features = false, features = ["winapi"] }
-cpal = { version = "0.13.5" }
+cpal = { version = "0.13.5", optional = true }
+cubeb = { git = "https://github.com/mozilla/cubeb-rs", optional = true }
 libsamplerate = { version = "0.1.0" }
 rb = { version = "0.4.0" }
 symphonia = { version = "0.5.0", default-features = false, features = ["ogg", "vorbis", "mp3"]}

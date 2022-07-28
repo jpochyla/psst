@@ -9,7 +9,7 @@ use std::{mem, thread, thread::JoinHandle, time::Duration};
 use crossbeam_channel::{unbounded, Receiver, Sender};
 
 use crate::{
-    audio::output::{AudioOutput, AudioSink},
+    audio::output::{AudioOutput, AudioSink, DefaultAudioOutput, DefaultAudioSink},
     cache::CacheHandle,
     cdn::CdnHandle,
     error::Error,
@@ -51,7 +51,7 @@ pub struct Player {
     queue: Queue,
     sender: Sender<PlayerEvent>,
     receiver: Receiver<PlayerEvent>,
-    audio_output_sink: AudioSink,
+    audio_output_sink: DefaultAudioSink,
     playback_mgr: PlaybackManager,
     consecutive_loading_failures: usize,
 }
@@ -62,7 +62,7 @@ impl Player {
         cdn: CdnHandle,
         cache: CacheHandle,
         config: PlaybackConfig,
-        audio_output: &AudioOutput,
+        audio_output: &DefaultAudioOutput,
     ) -> Self {
         let (sender, receiver) = unbounded();
         Self {
