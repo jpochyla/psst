@@ -142,7 +142,7 @@ fn general_tab_widget() -> impl Widget<AppState> {
         .with_child(Label::new("Theme").with_font(theme::UI_FONT_MEDIUM))
         .with_spacer(theme::grid(2.0))
         .with_child(
-            RadioGroup::new(vec![("Light", Theme::Light), ("Dark", Theme::Dark)])
+            RadioGroup::column(vec![("Light", Theme::Light), ("Dark", Theme::Dark)])
                 .lens(AppState::config.then(Config::theme)),
         );
 
@@ -161,7 +161,7 @@ fn general_tab_widget() -> impl Widget<AppState> {
         .with_child(Label::new("Audio quality").with_font(theme::UI_FONT_MEDIUM))
         .with_spacer(theme::grid(2.0))
         .with_child(
-            RadioGroup::new(vec![
+            RadioGroup::column(vec![
                 ("Low (96kbit)", AudioQuality::Low),
                 ("Normal (160kbit)", AudioQuality::Normal),
                 ("High (320kbit)", AudioQuality::High),

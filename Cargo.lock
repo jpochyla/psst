@@ -674,7 +674,7 @@ checksum = "bd0c93bb4b0c6d9b77f4435b0ae98c24d17f1c45b2ff844c6151a07256ca923b"
 [[package]]
 name = "druid"
 version = "0.7.0"
-source = "git+https://github.com/jpochyla/druid?branch=psst#c5c90d92539269430067460c275435ff6f97249e"
+source = "git+https://github.com/jpochyla/druid?branch=psst#4cfcf6e104aa8abd84a0acacd5dc278e6c5a7fbc"
 dependencies = [
  "console_error_panic_hook",
  "druid-derive",
@@ -696,7 +696,7 @@ dependencies = [
 [[package]]
 name = "druid-derive"
 version = "0.4.0"
-source = "git+https://github.com/jpochyla/druid?branch=psst#c5c90d92539269430067460c275435ff6f97249e"
+source = "git+https://github.com/jpochyla/druid?branch=psst#4cfcf6e104aa8abd84a0acacd5dc278e6c5a7fbc"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -718,7 +718,7 @@ dependencies = [
 [[package]]
 name = "druid-shell"
 version = "0.7.0"
-source = "git+https://github.com/jpochyla/druid?branch=psst#c5c90d92539269430067460c275435ff6f97249e"
+source = "git+https://github.com/jpochyla/druid?branch=psst#4cfcf6e104aa8abd84a0acacd5dc278e6c5a7fbc"
 dependencies = [
  "anyhow",
  "bitflags",
@@ -740,7 +740,7 @@ dependencies = [
  "lazy_static",
  "objc",
  "piet-common",
- "raw-window-handle 0.3.4",
+ "raw-window-handle 0.4.2",
  "scopeguard",
  "time",
  "tracing",
