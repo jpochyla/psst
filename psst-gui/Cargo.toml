@@ -7,6 +7,11 @@ build = "build.rs"
 description = "Fast Spotify client with native GUI"
 repository = "https://github.com/jpochyla/psst"
 
+[features]
+default = ["cpal"]
+cpal = ["psst-core/cpal"]
+cubeb = ["psst-core/cubeb"]
+
 [dependencies]
 psst-core = { path = "../psst-core" }
 
