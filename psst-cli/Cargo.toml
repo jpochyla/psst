@@ -4,6 +4,11 @@ version = "0.1.0"
 authors = ["Jan Pochyla <jpochyla@gmail.com>"]
 edition = "2018"
 
+[features]
+default = ["cpal"]
+cpal = ["psst-core/cpal"]
+cubeb = ["psst-core/cubeb"]
+
 [dependencies]
 psst-core = { path = "../psst-core" }
 
