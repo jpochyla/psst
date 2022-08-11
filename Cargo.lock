@@ -709,7 +709,7 @@ checksum = "bd0c93bb4b0c6d9b77f4435b0ae98c24d17f1c45b2ff844c6151a07256ca923b"
 [[package]]
 name = "druid"
 version = "0.7.0"
-source = "git+https://github.com/jpochyla/druid?branch=psst#4cfcf6e104aa8abd84a0acacd5dc278e6c5a7fbc"
+source = "git+https://github.com/jpochyla/druid?branch=psst#fa4fc64d5d41562f05c0db79c00a275d272b542f"
 dependencies = [
  "console_error_panic_hook",
  "druid-derive",
@@ -731,7 +731,7 @@ dependencies = [
 [[package]]
 name = "druid-derive"
 version = "0.4.0"
-source = "git+https://github.com/jpochyla/druid?branch=psst#4cfcf6e104aa8abd84a0acacd5dc278e6c5a7fbc"
+source = "git+https://github.com/jpochyla/druid?branch=psst#fa4fc64d5d41562f05c0db79c00a275d272b542f"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -753,7 +753,7 @@ dependencies = [
 [[package]]
 name = "druid-shell"
 version = "0.7.0"
-source = "git+https://github.com/jpochyla/druid?branch=psst#4cfcf6e104aa8abd84a0acacd5dc278e6c5a7fbc"
+source = "git+https://github.com/jpochyla/druid?branch=psst#fa4fc64d5d41562f05c0db79c00a275d272b542f"
 dependencies = [
  "anyhow",
  "bitflags",
@@ -775,7 +775,7 @@ dependencies = [
  "lazy_static",
  "objc",
  "piet-common",
- "raw-window-handle 0.4.2",
+ "raw-window-handle 0.5.0",
  "scopeguard",
  "time",
  "tracing",
@@ -2290,7 +2290,7 @@ dependencies = [
  "platform-dirs",
  "psst-core",
  "rand",
- "raw-window-handle 0.4.2",
+ "raw-window-handle 0.5.0",
  "regex",
  "serde",
  "serde_json",
@@ -2394,6 +2394,15 @@ name = "raw-window-handle"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fba75eee94a9d5273a68c9e1e105d9cffe1ef700532325788389e5a83e2522b7"
+dependencies = [
+ "cty",
+]
+
+[[package]]
+name = "raw-window-handle"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ed7e3d950b66e19e0c372f3fa3fbbcf85b1746b571f74e0c2af6042a5c93420a"
 dependencies = [
  "cty",
 ]
