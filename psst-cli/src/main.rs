@@ -1,5 +1,8 @@
 use psst_core::{
-    audio::{normalize::NormalizationLevel, output::{DefaultAudioOutput, AudioOutput, AudioSink}},
+    audio::{
+        normalize::NormalizationLevel,
+        output::{AudioOutput, AudioSink, DefaultAudioOutput},
+    },
     cache::{Cache, CacheHandle},
     cdn::{Cdn, CdnHandle},
     connection::Credentials,
