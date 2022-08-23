@@ -176,12 +176,11 @@ impl Read for StreamReader {
         // head is requested.
         let prefetch_len = needed_len.max(PREFETCH_READ_LENGTH).min(remaining_len);
         for (pos, len) in self.data_map.not_yet_requested(position, prefetch_len) {
-            let req_pos = round_down_to_multiple(pos, 4);
-            let req_len = round_up_to_multiple(len, 4).max(MINIMUM_READ_LENGTH);
-            self.data_map.mark_as_requested(req_pos, req_len);
+            let req_len = len.max(MINIMUM_READ_LENGTH);
+            self.data_map.mark_as_requested(pos, req_len);
             self.req_sender
                 .send(StreamRequest::Preload {
-                    offset: req_pos,
+                    offset: pos,
                     length: req_len,
                 })
                 .expect("Data request channel was closed");
@@ -205,14 +204,6 @@ impl Seek for StreamReader {
     fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
         self.reader.seek(pos)
     }
-}
-
-fn round_down_to_multiple(n: u64, m: u64) -> u64 {
-    n - n % m
-}
-
-fn round_up_to_multiple(n: u64, m: u64) -> u64 {
-    n + (m - n % m)
 }
 
 #[derive(Debug)]
