@@ -13,6 +13,7 @@ crossbeam-channel = { version = "0.5.6" }
 log = { version = "0.4.17" }
 num-bigint = { version = "0.4.3", features = ["rand"] }
 num-traits = { version = "0.2.15" }
+once_cell = { version = "1.10.0" }
 parking_lot = { version = "0.12.1" }
 quick-protobuf = { version = "0.8.0" }
 rand = { version = "0.8.5" }
