@@ -1,5 +1,5 @@
 use std::{
-    io,
+    fs, io,
     io::{Seek, SeekFrom},
     path::PathBuf,
     sync::Arc,
@@ -7,6 +7,8 @@ use std::{
     thread::JoinHandle,
     time::Duration,
 };
+
+use symphonia::core::codecs::CodecType;
 
 use crate::{
     audio::{
@@ -28,8 +30,38 @@ use super::storage::{StreamRequest, StreamStorage, StreamWriter};
 pub struct MediaPath {
     pub item_id: ItemId,
     pub file_id: FileId,
-    pub file_format: Format,
+    pub file_format: AudioFormat,
     pub duration: Duration,
+}
+
+// possibly should be combined with AudioCodecFormat?
+#[derive(Debug, Clone, Copy)]
+pub enum AudioFormat {
+    Mp3,
+    OggVorbis,
+    Unsupported,
+}
+
+impl AudioFormat {
+    pub fn from_protocol(format: Format) -> Self {
+        use Format::*;
+        match format {
+            MP3_256 | MP3_320 | MP3_160 | MP3_96 | MP3_160_ENC => Self::Mp3,
+            OGG_VORBIS_96 | OGG_VORBIS_160 | OGG_VORBIS_320 => Self::OggVorbis,
+            _ => Self::Unsupported,
+        }
+    }
+
+    pub fn from_codec(codec: CodecType) -> Self {
+        use symphonia::core::codecs::*;
+        if codec == CODEC_TYPE_MP3 {
+            return Self::Mp3;
+        } else if codec == CODEC_TYPE_VORBIS {
+            return Self::OggVorbis;
+        } else {
+            return Self::Unsupported;
+        }
+    }
 }
 
 pub enum MediaFile {
@@ -39,6 +71,9 @@ pub enum MediaFile {
     },
     Cached {
         cached_file: CachedFile,
+    },
+    Local {
+        path: MediaPath,
     },
 }
 
@@ -101,22 +136,34 @@ impl MediaFile {
         }
     }
 
+    pub fn local(path: MediaPath) -> Self {
+        Self::Local { path }
+    }
+
     pub fn path(&self) -> MediaPath {
         match self {
             Self::Streamed { streamed_file, .. } => streamed_file.path,
             Self::Cached { cached_file, .. } => cached_file.path,
+            Self::Local { path } => *path,
         }
     }
 
-    pub fn storage(&self) -> &StreamStorage {
+    pub fn storage(&self) -> Option<&StreamStorage> {
         match self {
-            Self::Streamed { streamed_file, .. } => &streamed_file.storage,
-            Self::Cached { cached_file, .. } => &cached_file.storage,
+            Self::Streamed { streamed_file, .. } => Some(&streamed_file.storage),
+            Self::Cached { cached_file, .. } => Some(&cached_file.storage),
+            Self::Local { .. } => None,
         }
     }
 
-    pub fn audio_source(&self, key: AudioKey) -> Result<(AudioDecoder, NormalizationData), Error> {
-        let reader = self.storage().reader()?;
+    pub fn remote_audio_source(
+        &self,
+        key: AudioKey,
+    ) -> Result<(AudioDecoder, NormalizationData), Error> {
+        let reader = self
+            .storage()
+            .expect("storage always set for remote files")
+            .reader()?;
         let mut decrypted = AudioDecrypt::new(key, reader);
         let normalization = NormalizationData::parse(&mut decrypted)?;
         let encoded = OffsetFile::new(decrypted, self.header_length())?;
@@ -124,24 +171,26 @@ impl MediaFile {
         Ok((decoded, normalization))
     }
 
+    pub fn local_audio_source(&self) -> Result<(AudioDecoder, NormalizationData), Error> {
+        let mut reader = fs::File::open(self.path().item_id.to_local())?;
+        let normalization = NormalizationData::parse(&mut reader)?;
+        let encoded = OffsetFile::new(reader, self.header_length())?;
+        let decoded = AudioDecoder::new(encoded, self.codec_format())?;
+        Ok((decoded, normalization))
+    }
+
     fn header_length(&self) -> u64 {
         match self.path().file_format {
-            Format::OGG_VORBIS_96 | Format::OGG_VORBIS_160 | Format::OGG_VORBIS_320 => 167,
+            AudioFormat::OggVorbis => 167,
             _ => 0,
         }
     }
 
     fn codec_format(&self) -> AudioCodecFormat {
         match self.path().file_format {
-            Format::OGG_VORBIS_96 | Format::OGG_VORBIS_160 | Format::OGG_VORBIS_320 => {
-                AudioCodecFormat::OggVorbis
-            }
-            Format::MP3_256
-            | Format::MP3_320
-            | Format::MP3_160
-            | Format::MP3_96
-            | Format::MP3_160_ENC => AudioCodecFormat::Mp3,
-            _ => unreachable!(),
+            AudioFormat::OggVorbis => AudioCodecFormat::OggVorbis,
+            AudioFormat::Mp3 => AudioCodecFormat::Mp3,
+            AudioFormat::Unsupported => unreachable!("unsupported codec"),
         }
     }
 }
