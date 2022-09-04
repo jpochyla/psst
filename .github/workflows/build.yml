@@ -120,3 +120,33 @@ jobs:
       with:
         name: psst-deb
         path: "*.deb"
+
+  appimage:
+    runs-on: ubuntu-latest
+    needs: deb
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        fetch-depth: 0
+    - uses: actions/download-artifact@v2
+      with:
+        name: psst-deb
+        path: ${{runner.workspace}}
+    - name: create a directory to work in
+      run: mkdir -p ${{runner.workspace}}/appimage
+    - name: download latest pkg2appimage
+      run: |
+        wget --directory-prefix=${{runner.workspace}}/appimage -c https://github.com/$(wget -q https://github.com/AppImage/pkg2appimage/releases -O - | grep "pkg2appimage-.*-x86_64.AppImage" | head -n 1 | cut -d '"' -f 2)
+    - name: grab pkg2appimage's executable name
+      id: grab_executable_name
+      run: echo "::set-output name=executable::$(ls ${{runner.workspace}}/appimage)"
+    - name: run pkg2appimage on debian package
+      run: |
+        app=${{runner.workspace}}/appimage/${{steps.grab_executable_name.outputs.executable}}
+        recipe=${{runner.workspace}}/psst/.pkg/APPIMAGE/pkg2appimage-ingredients.yml
+        chmod +x ${app}
+        ${app} ${recipe}
+    - uses: actions/upload-artifact@v2
+      with:
+        name: psst-appimage
+        path: ${{runner.workspace}}/out/*.AppImage

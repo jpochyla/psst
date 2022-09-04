@@ -1,0 +1,9 @@
+ingredients:
+  dist: focal
+  sources:
+    - deb http://us.archive.ubuntu.com/ubuntu/ focal main universe
+  debs:
+    - ../*.deb
+  script:
+    - mkdir -p /home/runner/work/psst/psst/.AppDir/
+    - cp /home/runner/work/psst/psst/psst-gui/assets/logo_256.png /home/runner/work/psst/psst/.AppDir/psst.png
