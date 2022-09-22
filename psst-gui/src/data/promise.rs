@@ -88,10 +88,10 @@ impl<T: Data, D: Data, E: Data> Promise<T, D, E> {
     }
 
     pub fn resolve_or_reject(&mut self, def: D, res: Result<T, E>) {
-        *self = match res {
-            Ok(val) => Self::Resolved { def, val },
-            Err(err) => Self::Rejected { def, err },
-        };
+        match res {
+            Ok(val) => self.resolve(def, val),
+            Err(err) => self.reject(def, err),
+        }
     }
 
     pub fn update(&mut self, (def, res): (D, Result<T, E>))

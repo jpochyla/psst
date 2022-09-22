@@ -49,9 +49,7 @@ impl Cdn {
 
         #[derive(Deserialize)]
         struct AudioFileLocations {
-            result: String,
             cdnurl: Vec<String>,
-            fileid: String,
         }
 
         // Deserialize the response and pick a file URL from the returned CDN list.

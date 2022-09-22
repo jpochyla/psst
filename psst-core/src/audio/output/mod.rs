@@ -1,5 +1,4 @@
 use crate::audio::source::AudioSource;
-use crossbeam_channel::{Receiver, Sender};
 
 #[cfg(feature = "cpal")]
 pub mod cpal;
