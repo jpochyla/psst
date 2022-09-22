@@ -24,8 +24,6 @@ const ENV_LOG: &str = "PSST_LOG";
 const ENV_LOG_STYLE: &str = "PSST_LOG_STYLE";
 
 fn main() {
-    LocalItemRegistry::init();
-
     // Setup logging from the env variables, with defaults.
     Builder::from_env(
         Env::new()

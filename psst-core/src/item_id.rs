@@ -1,10 +1,8 @@
-use once_cell::sync::OnceCell;
-use std::collections::HashMap;
-use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
-use std::{convert::TryInto, fmt, ops::Deref};
+use once_cell::sync::Lazy;
+use std::{collections::HashMap, convert::TryInto, fmt, ops::Deref, path::PathBuf, sync::Mutex};
 
-static LOCAL_REGISTRY: OnceCell<Arc<Mutex<LocalItemRegistry>>> = OnceCell::new();
+static LOCAL_REGISTRY: Lazy<Mutex<LocalItemRegistry>> =
+    Lazy::new(|| Mutex::new(LocalItemRegistry::new()));
 
 // LocalItemRegistry allows generating IDs for local music files, so they can be
 // treated similarly to files hosted on Spotify's remote servers. IDs are
@@ -33,15 +31,8 @@ impl LocalItemRegistry {
         }
     }
 
-    pub fn init() {
-        LOCAL_REGISTRY
-            .set(Arc::new(Mutex::new(Self::new())))
-            .map_err(|_| "cannot initialize more than once")
-            .unwrap();
-    }
-
     pub fn get_or_insert(path: PathBuf) -> u128 {
-        let mut registry = LOCAL_REGISTRY.get().unwrap().lock().unwrap();
+        let mut registry = LOCAL_REGISTRY.lock().unwrap();
         registry
             .path_to_id
             .get(&path)
@@ -55,7 +46,7 @@ impl LocalItemRegistry {
     }
 
     pub fn get(id: u128) -> Option<PathBuf> {
-        let registry = LOCAL_REGISTRY.get().unwrap().lock().unwrap();
+        let registry = LOCAL_REGISTRY.lock().unwrap();
         registry.id_to_path.get(&id).map(|path| path.clone())
     }
 }
