@@ -1,5 +1,6 @@
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use crossbeam_channel::{bounded, Receiver, Sender};
+use num_traits::Pow;
 
 use crate::{
     actor::{Act, Actor, ActorHandle},
@@ -257,8 +258,9 @@ impl StreamCallback {
             // output buffer.
             let written = self.source.write(output);
 
-            // Apply the global volume level.
-            output[..written].iter_mut().for_each(|s| *s *= self.volume);
+            // Apply scaled global volume level.
+            let scaled_volume = self.volume.pow(4);
+            output[..written].iter_mut().for_each(|s| *s *= scaled_volume);
 
             written
         } else {
