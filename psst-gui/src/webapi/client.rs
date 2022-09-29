@@ -567,7 +567,12 @@ impl WebApi {
 /// Search endpoints.
 impl WebApi {
     // https://developer.spotify.com/documentation/web-api/reference/search/
-    pub fn search(&self, query: &str, topics: &[SearchTopic]) -> Result<SearchResults, Error> {
+    pub fn search(
+        &self,
+        query: &str,
+        topics: &[SearchTopic],
+        limit: usize,
+    ) -> Result<SearchResults, Error> {
         #[derive(Deserialize)]
         struct ApiSearchResults {
             artists: Option<Page<Artist>>,
@@ -582,6 +587,7 @@ impl WebApi {
             .get("v1/search")?
             .query("q", query)
             .query("type", &topics)
+            .query("limit", &limit.to_string())
             .query("marker", "from_token");
         let result: ApiSearchResults = self.load(request)?;
 
