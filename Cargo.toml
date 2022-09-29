@@ -6,6 +6,12 @@ members = [
     "psst-gui",
 ]
 
+[profile.release]
+opt-level = 3
+strip = true
+lto = true
+codegen-units = 1
+
 [profile.dev.package.symphonia]
 opt-level = 2
 [profile.dev.package.libsamplerate]
