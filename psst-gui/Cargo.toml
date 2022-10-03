@@ -43,7 +43,7 @@ open = { version = "5.0.0" }
 raw-window-handle = { version = "0.5.2" } # Must stay compatible with Druid
 souvlaki = { version = "0.6.1" }
 webbrowser = {version = "0.8.11"}
-
+dark-light = "1.0.0"
 [target.'cfg(windows)'.build-dependencies]
 winres = { version = "0.1.12" }
 image = { version = "0.24.7" }
