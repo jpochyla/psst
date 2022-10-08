@@ -311,10 +311,6 @@ impl<W: Widget<AppState>> Controller<AppState, W> for Authenticate {
                 // Signal the auth result to the preferences UI.
                 data.preferences.auth.result.resolve_or_reject((), result);
 
-                // Clear the credentials from the UI.
-                data.preferences.auth.username.clear();
-                data.preferences.auth.password.clear();
-
                 match &self.tab {
                     AccountTab::FirstSetup => {
                         // We let the `SessionController` pick up the credentials when the main
@@ -328,6 +324,10 @@ impl<W: Widget<AppState>> Controller<AppState, W> for Authenticate {
                         ctx.submit_command(cmd::SESSION_CONNECT);
                     }
                 }
+
+                // Clear the credentials from the UI.
+                data.preferences.auth.username.clear();
+                data.preferences.auth.password.clear();
 
                 ctx.set_handled();
             }
