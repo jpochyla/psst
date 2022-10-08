@@ -248,6 +248,12 @@ fn account_tab_widget(tab: AccountTab) -> impl Widget<AppState> {
 
     col = col.with_spacer(theme::grid(3.0));
 
+    if matches!(tab, AccountTab::InPreferences) {
+        col = col.with_child(Button::new("Log Out").on_click(|ctx, _, _| {
+            ctx.submit_command(cmd::LOG_OUT);
+        }))
+    }
+
     col.controller(Authenticate::new(tab))
 }
 
@@ -329,6 +335,14 @@ impl<W: Widget<AppState>> Controller<AppState, W> for Authenticate {
                     }
                 }
 
+                ctx.set_handled();
+            }
+            Event::Command(cmd) if cmd.is(cmd::LOG_OUT) => {
+                data.config.clear_credentials();
+                data.config.save();
+                data.session.shutdown();
+                ctx.submit_command(cmd::CLOSE_ALL_WINDOWS);
+                ctx.submit_command(cmd::SHOW_ACCOUNT_SETUP);
                 ctx.set_handled();
             }
             _ => {

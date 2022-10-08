@@ -156,6 +156,10 @@ impl Config {
         self.credentials.replace(credentials);
     }
 
+    pub fn clear_credentials(&mut self) {
+        self.credentials = Default::default();
+    }
+
     pub fn username(&self) -> Option<&str> {
         self.credentials.as_ref().map(|c| c.username.as_str())
     }
