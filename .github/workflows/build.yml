@@ -136,7 +136,8 @@ jobs:
       run: mkdir -p ${{runner.workspace}}/appimage
     - name: download latest pkg2appimage
       run: |
-        wget --directory-prefix=${{runner.workspace}}/appimage -c https://github.com/$(wget -q https://github.com/AppImage/pkg2appimage/releases -O - | grep "pkg2appimage-.*-x86_64.AppImage" | head -n 1 | cut -d '"' -f 2)
+        latest_release_appimage_url=$(wget -q https://api.github.com/repos/AppImageCommunity/pkg2appimage/releases/latest -O - | jq -r '.assets[0].browser_download_url')
+        wget --directory-prefix=${{runner.workspace}}/appimage -c $latest_release_appimage_url
     - name: grab pkg2appimage's executable name
       id: grab_executable_name
       run: echo "::set-output name=executable::$(ls ${{runner.workspace}}/appimage)"
