@@ -308,20 +308,24 @@ impl<W: Widget<AppState>> Controller<AppState, W> for Authenticate {
                     data.config.store_credentials(credentials);
                     data.config.save();
                 });
+                let is_ok = result.is_ok();
+
                 // Signal the auth result to the preferences UI.
                 data.preferences.auth.result.resolve_or_reject((), result);
 
-                match &self.tab {
-                    AccountTab::FirstSetup => {
-                        // We let the `SessionController` pick up the credentials when the main
-                        // window gets created. Close the account setup window and open the main
-                        // one.
-                        ctx.submit_command(cmd::SHOW_MAIN);
-                        ctx.submit_command(commands::CLOSE_WINDOW);
-                    }
-                    AccountTab::InPreferences => {
-                        // Drop the old connection and connect again with the new credentials.
-                        ctx.submit_command(cmd::SESSION_CONNECT);
+                if is_ok {
+                    match &self.tab {
+                        AccountTab::FirstSetup => {
+                            // We let the `SessionController` pick up the credentials when the main
+                            // window gets created. Close the account setup window and open the main
+                            // one.
+                            ctx.submit_command(cmd::SHOW_MAIN);
+                            ctx.submit_command(commands::CLOSE_WINDOW);
+                        }
+                        AccountTab::InPreferences => {
+                            // Drop the old connection and connect again with the new credentials.
+                            ctx.submit_command(cmd::SESSION_CONNECT);
+                        }
                     }
                 }
 
