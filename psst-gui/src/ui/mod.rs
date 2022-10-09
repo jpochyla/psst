@@ -10,7 +10,7 @@ use druid::{
 use crate::{
     cmd,
     controller::{AfterDelay, NavController, SessionController},
-    data::{Alert, AlertStyle, AppState, Nav, Playable, Playback, Route},
+    data::{Alert, AlertStyle, AppState, Config, Nav, Playable, Playback, Route},
     widget::{
         icons, icons::SvgIcon, Border, Empty, MyWidgetExt, Overlay, ThemeScope, ViewDispatcher,
     },
@@ -35,11 +35,11 @@ pub mod track;
 pub mod user;
 pub mod utils;
 
-pub fn main_window() -> WindowDesc<AppState> {
+pub fn main_window(config: &Config) -> WindowDesc<AppState> {
     let win = WindowDesc::new(root_widget())
         .title(compute_main_window_title)
         .with_min_size((theme::grid(65.0), theme::grid(25.0)))
-        .window_size((theme::grid(80.0), theme::grid(100.0)))
+        .window_size(config.window_size)
         .show_title(false)
         .transparent_titlebar(true);
     if cfg!(target_os = "macos") {
