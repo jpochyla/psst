@@ -116,14 +116,15 @@ impl AppDelegate<AppState> for Delegate {
         id: WindowId,
         data: &mut AppState,
         _env: &Env,
-        _ctx: &mut DelegateCtx,
+        ctx: &mut DelegateCtx,
     ) {
         if self.preferences_window == Some(id) {
             self.preferences_window.take();
             data.preferences.reset();
         }
         if self.main_window == Some(id) {
-            self.main_window.take();
+            ctx.submit_command(commands::CLOSE_ALL_WINDOWS);
+            ctx.submit_command(commands::QUIT_APP);
         }
     }
 }
