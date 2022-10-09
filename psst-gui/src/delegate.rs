@@ -142,12 +142,9 @@ impl AppDelegate<AppState> for Delegate {
         data: &mut AppState,
         _env: &Env,
     ) -> Option<Event> {
-        match event {
-            Event::WindowSize(size) => {
-                data.config.window_size = size;
-                data.config.save();
-            }
-            _ => {}
+        if let Event::WindowSize(size) = event {
+            data.config.window_size = size;
+            data.config.save();
         }
         Some(event)
     }
