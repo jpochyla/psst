@@ -1,9 +1,15 @@
 use druid::{
-    commands, AppDelegate, Application, Command, DelegateCtx, Env, Handled, Target, WindowId,
+    commands, AppDelegate, Application, Command, DelegateCtx, Env, Event, Handled, Target, WindowId,
 };
 use threadpool::ThreadPool;
 
-use crate::{cmd, data::AppState, ui, webapi::WebApi, widget::remote_image};
+use crate::{
+    cmd,
+    data::{AppState, Config},
+    ui,
+    webapi::WebApi,
+    widget::remote_image,
+};
 
 pub struct Delegate {
     main_window: Option<WindowId>,
@@ -34,14 +40,27 @@ impl Delegate {
         this
     }
 
-    fn show_main(&mut self, ctx: &mut DelegateCtx) {
+    fn show_main(&mut self, config: &Config, ctx: &mut DelegateCtx) {
         match self.main_window {
             Some(id) => {
                 ctx.submit_command(commands::SHOW_WINDOW.to(id));
             }
             None => {
-                let window = ui::main_window();
+                let window = ui::main_window(config);
                 self.main_window.replace(window.id);
+                ctx.new_window(window);
+            }
+        }
+    }
+
+    fn show_account_setup(&mut self, ctx: &mut DelegateCtx) {
+        match self.preferences_window {
+            Some(id) => {
+                ctx.submit_command(commands::SHOW_WINDOW.to(id));
+            }
+            None => {
+                let window = ui::account_setup_window();
+                self.preferences_window.replace(window.id);
                 ctx.new_window(window);
             }
         }
@@ -59,6 +78,12 @@ impl Delegate {
             }
         }
     }
+
+    fn close_all_windows(&mut self, ctx: &mut DelegateCtx) {
+        ctx.submit_command(commands::CLOSE_ALL_WINDOWS);
+        self.main_window = None;
+        self.preferences_window = None;
+    }
 }
 
 impl AppDelegate<AppState> for Delegate {
@@ -71,10 +96,16 @@ impl AppDelegate<AppState> for Delegate {
         _env: &Env,
     ) -> Handled {
         if cmd.is(cmd::SHOW_MAIN) {
-            self.show_main(ctx);
+            self.show_main(&data.config, ctx);
+            Handled::Yes
+        } else if cmd.is(cmd::SHOW_ACCOUNT_SETUP) {
+            self.show_account_setup(ctx);
             Handled::Yes
         } else if cmd.is(commands::SHOW_PREFERENCES) {
             self.show_preferences(ctx);
+            Handled::Yes
+        } else if cmd.is(cmd::CLOSE_ALL_WINDOWS) {
+            self.close_all_windows(ctx);
             Handled::Yes
         } else if let Some(text) = cmd.get(cmd::COPY) {
             Application::global().clipboard().put_string(&text);
@@ -91,15 +122,31 @@ impl AppDelegate<AppState> for Delegate {
         id: WindowId,
         data: &mut AppState,
         _env: &Env,
-        _ctx: &mut DelegateCtx,
+        ctx: &mut DelegateCtx,
     ) {
         if self.preferences_window == Some(id) {
             self.preferences_window.take();
             data.preferences.reset();
         }
         if self.main_window == Some(id) {
-            self.main_window.take();
+            ctx.submit_command(commands::CLOSE_ALL_WINDOWS);
+            ctx.submit_command(commands::QUIT_APP);
         }
+    }
+
+    fn event(
+        &mut self,
+        _ctx: &mut DelegateCtx,
+        _window_id: WindowId,
+        event: Event,
+        data: &mut AppState,
+        _env: &Env,
+    ) -> Option<Event> {
+        if let Event::WindowSize(size) = event {
+            data.config.window_size = size;
+            data.config.save();
+        }
+        Some(event)
     }
 }
 

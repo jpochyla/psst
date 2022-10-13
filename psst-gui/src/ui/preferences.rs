@@ -248,6 +248,12 @@ fn account_tab_widget(tab: AccountTab) -> impl Widget<AppState> {
 
     col = col.with_spacer(theme::grid(3.0));
 
+    if matches!(tab, AccountTab::InPreferences) {
+        col = col.with_child(Button::new("Log Out").on_click(|ctx, _, _| {
+            ctx.submit_command(cmd::LOG_OUT);
+        }))
+    }
+
     col.controller(Authenticate::new(tab))
 }
 
@@ -308,20 +314,24 @@ impl<W: Widget<AppState>> Controller<AppState, W> for Authenticate {
                     data.config.store_credentials(credentials);
                     data.config.save();
                 });
+                let is_ok = result.is_ok();
+
                 // Signal the auth result to the preferences UI.
                 data.preferences.auth.result.resolve_or_reject((), result);
 
-                match &self.tab {
-                    AccountTab::FirstSetup => {
-                        // We let the `SessionController` pick up the credentials when the main
-                        // window gets created. Close the account setup window and open the main
-                        // one.
-                        ctx.submit_command(cmd::SHOW_MAIN);
-                        ctx.submit_command(commands::CLOSE_WINDOW);
-                    }
-                    AccountTab::InPreferences => {
-                        // Drop the old connection and connect again with the new credentials.
-                        ctx.submit_command(cmd::SESSION_CONNECT);
+                if is_ok {
+                    match &self.tab {
+                        AccountTab::FirstSetup => {
+                            // We let the `SessionController` pick up the credentials when the main
+                            // window gets created. Close the account setup window and open the main
+                            // one.
+                            ctx.submit_command(cmd::SHOW_MAIN);
+                            ctx.submit_command(commands::CLOSE_WINDOW);
+                        }
+                        AccountTab::InPreferences => {
+                            // Drop the old connection and connect again with the new credentials.
+                            ctx.submit_command(cmd::SESSION_CONNECT);
+                        }
                     }
                 }
 
@@ -329,6 +339,14 @@ impl<W: Widget<AppState>> Controller<AppState, W> for Authenticate {
                 data.preferences.auth.username.clear();
                 data.preferences.auth.password.clear();
 
+                ctx.set_handled();
+            }
+            Event::Command(cmd) if cmd.is(cmd::LOG_OUT) => {
+                data.config.clear_credentials();
+                data.config.save();
+                data.session.shutdown();
+                ctx.submit_command(cmd::CLOSE_ALL_WINDOWS);
+                ctx.submit_command(cmd::SHOW_ACCOUNT_SETUP);
                 ctx.set_handled();
             }
             _ => {

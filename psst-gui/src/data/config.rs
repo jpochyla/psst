@@ -4,7 +4,7 @@ use std::fs::OpenOptions;
 #[cfg(target_family = "unix")]
 use std::os::unix::fs::OpenOptionsExt;
 
-use druid::{Data, Lens};
+use druid::{Data, Lens, Size};
 use platform_dirs::AppDirs;
 use psst_core::{
     cache::mkdir_if_not_exists,
@@ -13,6 +13,8 @@ use psst_core::{
     session::{SessionConfig, SessionConnection},
 };
 use serde::{Deserialize, Serialize};
+
+use crate::ui::theme;
 
 use super::{Nav, Promise, QueueBehavior};
 
@@ -80,6 +82,7 @@ pub struct Config {
     pub last_route: Option<Nav>,
     pub queue_behavior: QueueBehavior,
     pub show_track_cover: bool,
+    pub window_size: Size,
 }
 
 impl Default for Config {
@@ -92,6 +95,7 @@ impl Default for Config {
             last_route: Default::default(),
             queue_behavior: Default::default(),
             show_track_cover: Default::default(),
+            window_size: Size::new(theme::grid(80.0), theme::grid(100.0)),
         }
     }
 }
@@ -154,6 +158,10 @@ impl Config {
 
     pub fn store_credentials(&mut self, credentials: Credentials) {
         self.credentials.replace(credentials);
+    }
+
+    pub fn clear_credentials(&mut self) {
+        self.credentials = Default::default();
     }
 
     pub fn username(&self) -> Option<&str> {
