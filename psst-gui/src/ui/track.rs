@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use druid::{
-    widget::{CrossAxisAlignment, Either, Flex, Label, List},
+    widget::{Button, CrossAxisAlignment, Either, Flex, Label, List},
     LensExt, LocalizedString, Menu, MenuItem, Size, TextAlignment, Widget, WidgetExt,
 };
 
@@ -121,6 +121,25 @@ pub fn playable_widget(display: Display) -> impl Widget<PlayRow<Arc<Track>>> {
         major.add_default_spacer();
         major.add_child(track_popularity);
     }
+
+    let saved = Button::<PlayRow<Arc<Track>>>::dynamic(|row, _| {
+        if row.ctx.library.contains_track(&row.item) {
+            "♥".to_string()
+        } else {
+            "♡".to_string()
+        }
+    })
+    .on_click(|ctx, row, _| {
+        let track = &row.item;
+        if row.ctx.library.contains_track(track) {
+            ctx.submit_command(library::UNSAVE_TRACK.with(track.id))
+        } else {
+            ctx.submit_command(library::SAVE_TRACK.with(track.clone()))
+        }
+    });
+
+    major.add_default_spacer();
+    major.add_child(saved);
 
     let track_duration =
         Label::<Arc<Track>>::dynamic(|track, _| utils::as_minutes_and_seconds(track.duration))
