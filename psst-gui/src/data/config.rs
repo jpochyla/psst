@@ -65,6 +65,11 @@ impl Authentication {
         let connection = SessionConnection::open(config).map_err(|err| err.to_string())?;
         Ok(connection.credentials)
     }
+
+    pub fn clear(&mut self) {
+        self.username.clear();
+        self.password.clear();
+    }
 }
 
 const APP_NAME: &str = "Psst";
