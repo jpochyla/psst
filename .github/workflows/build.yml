@@ -89,7 +89,7 @@ jobs:
     - uses: actions/checkout@v3
       with:
         fetch-depth: 0
-    - uses: actions/download-artifact@v2
+    - uses: actions/download-artifact@v3
       with:
         name: psst-gui
         path: ${{runner.workspace}}
@@ -128,7 +128,7 @@ jobs:
     - uses: actions/checkout@v3
       with:
         fetch-depth: 0
-    - uses: actions/download-artifact@v2
+    - uses: actions/download-artifact@v3
       with:
         name: psst-deb
         path: ${{runner.workspace}}
