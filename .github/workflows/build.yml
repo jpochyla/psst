@@ -18,9 +18,9 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
 
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
       with:
-        submodules: recursive 
+        submodules: recursive
 
     - uses: actions-rs/toolchain@v1
       with:
@@ -86,7 +86,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
       with:
         fetch-depth: 0
     - uses: actions/download-artifact@v2
@@ -125,7 +125,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: deb
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
       with:
         fetch-depth: 0
     - uses: actions/download-artifact@v2
