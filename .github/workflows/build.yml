@@ -64,19 +64,19 @@ jobs:
       run: chmod +x target/release/psst-gui
       if: ${{ runner.os == 'Linux' }}
 
-    - uses: actions/upload-artifact@v2
+    - uses: actions/upload-artifact@v3
       with:
         name: psst-gui
         path: target/release/psst-gui
       if: ${{ runner.os == 'Linux' }}
 
-    - uses: actions/upload-artifact@v2
+    - uses: actions/upload-artifact@v3
       with:
         name: Psst-x64.dmg
         path: ./Psst-x64.dmg
       if: ${{ runner.os == 'macOS' }}
 
-    - uses: actions/upload-artifact@v2
+    - uses: actions/upload-artifact@v3
       with:
         name: Psst.exe
         path: target/release/psst-gui.exe
@@ -116,7 +116,7 @@ jobs:
       run: "echo Version: $(git rev-list --count HEAD) >> ${{runner.workspace}}/pkg/DEBIAN/control"
     - name: Build package
       run: cat ${{runner.workspace}}/pkg/DEBIAN/control && dpkg-deb -b ${{runner.workspace}}/pkg/ psst_$(git rev-list --count HEAD)_amd64.deb
-    - uses: actions/upload-artifact@v2
+    - uses: actions/upload-artifact@v3
       with:
         name: psst-deb
         path: "*.deb"
@@ -147,7 +147,7 @@ jobs:
         recipe=${{runner.workspace}}/psst/.pkg/APPIMAGE/pkg2appimage-ingredients.yml
         chmod +x ${app}
         ${app} ${recipe}
-    - uses: actions/upload-artifact@v2
+    - uses: actions/upload-artifact@v3
       with:
         name: psst-appimage
         path: ${{runner.workspace}}/out/*.AppImage
