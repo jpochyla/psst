@@ -2572,8 +2572,9 @@ dependencies = [
 
 [[package]]
 name = "souvlaki"
-version = "0.5.2"
-source = "git+https://github.com/literallyjustroy/souvlaki?branch=macos_set_position#e2c80db6adf8144d42fa92a5f4e7fcbb95c8664c"
+version = "0.5.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "30e432507b92ffbb7df7d07de3a0e0aa23490ee78522b679ae068eeaeba45879"
 dependencies = [
  "block",
  "cocoa",
