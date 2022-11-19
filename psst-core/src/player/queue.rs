@@ -51,18 +51,30 @@ impl Queue {
     }
 
     fn compute_positions(&mut self) {
+        // In the case of switching away from shuffle, the position should be set back to
+        // where it appears in the actual playlist order.
+        let playlist_position = if self.positions.len() > 1 {
+            self.positions[self.position]
+        } else {
+            self.position
+        };
         // Start with an ordered 1:1 mapping.
         self.positions = (0..self.items.len()).collect();
 
-        if let QueueBehavior::Random = self.behavior {
-            // Swap the current position with the first item, so we will start from the
-            // beginning, with the full queue ahead of us.  Then shuffle the rest of the
-            // items and set the position to 0.
-            if self.positions.len() > 1 {
-                self.positions.swap(0, self.position);
-                self.positions[1..].shuffle(&mut rand::thread_rng());
+        match self.behavior {
+            QueueBehavior::Random => {
+                // Swap the current position with the first item, so we will start from the
+                // beginning, with the full queue ahead of us.  Then shuffle the rest of the
+                // items and set the position to 0.
+                if self.positions.len() > 1 {
+                    self.positions.swap(0, self.position);
+                    self.positions[1..].shuffle(&mut rand::thread_rng());
+                }
+                self.position = 0;
             }
-            self.position = 0;
+            _ => {
+                self.position = playlist_position;
+            }
         }
     }
 
