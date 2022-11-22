@@ -61,20 +61,17 @@ impl Queue {
         // Start with an ordered 1:1 mapping.
         self.positions = (0..self.items.len()).collect();
 
-        match self.behavior {
-            QueueBehavior::Random => {
-                // Swap the current position with the first item, so we will start from the
-                // beginning, with the full queue ahead of us.  Then shuffle the rest of the
-                // items and set the position to 0.
-                if self.positions.len() > 1 {
-                    self.positions.swap(0, self.position);
-                    self.positions[1..].shuffle(&mut rand::thread_rng());
-                }
-                self.position = 0;
+        if let QueueBehavior::Random = self.behavior {
+            // Swap the current position with the first item, so we will start from the
+            // beginning, with the full queue ahead of us.  Then shuffle the rest of the
+            // items and set the position to 0.
+            if self.positions.len() > 1 {
+                self.positions.swap(0, self.position);
+                self.positions[1..].shuffle(&mut rand::thread_rng());
             }
-            _ => {
-                self.position = playlist_position;
-            }
+            self.position = 0;
+        } else {
+            self.position = playlist_position;
         }
     }
 
