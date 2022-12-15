@@ -129,6 +129,7 @@ impl AppDelegate<AppState> for Delegate {
             data.preferences.reset();
         }
         if self.main_window == Some(id) {
+            data.config.save();
             ctx.submit_command(commands::CLOSE_ALL_WINDOWS);
             ctx.submit_command(commands::QUIT_APP);
         }
@@ -144,7 +145,6 @@ impl AppDelegate<AppState> for Delegate {
     ) -> Option<Event> {
         if let Event::WindowSize(size) = event {
             data.config.window_size = size;
-            data.config.save();
         }
         Some(event)
     }
