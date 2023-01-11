@@ -333,7 +333,11 @@ impl<W: Widget<AppState>> Controller<AppState, W> for Authenticate {
                             ctx.submit_command(cmd::SESSION_CONNECT);
                         }
                     }
+                    // Only clear username if login is successful.
+                    data.preferences.auth.username.clear();
                 }
+                // Always clear password after login attempt.
+                data.preferences.auth.password.clear();
 
                 ctx.set_handled();
             }

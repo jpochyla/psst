@@ -127,6 +127,7 @@ impl AppDelegate<AppState> for Delegate {
         if self.preferences_window == Some(id) {
             self.preferences_window.take();
             data.preferences.reset();
+            data.preferences.auth.clear();
         }
         if self.main_window == Some(id) {
             ctx.submit_command(commands::CLOSE_ALL_WINDOWS);
