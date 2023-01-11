@@ -47,7 +47,7 @@ jobs:
 
       - name: Install Linux Dependencies
         if: ${{ runner.os == 'Linux' }}
-        run: sudo apt-get install -y libgtk-3-dev libssl-dev libasound2-dev
+        run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev libssl-dev libasound2-dev
 
       - name: Run Tests
         run: cargo test
