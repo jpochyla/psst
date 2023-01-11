@@ -145,6 +145,7 @@ jobs:
           path: "*.deb"
 
   appimage:
+    if: false # Disable temporarily: https://github.com/jpochyla/psst/actions/runs/3897410142/jobs/6655282029
     runs-on: ubuntu-latest
     needs: deb
     steps:
