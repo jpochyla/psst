@@ -156,7 +156,7 @@ jobs:
         with:
           name: psst-deb
           path: ${{runner.workspace}}
-          
+
       - name: Install Dependencies
         run: sudo apt-get update && sudo apt-get install -y libfuse2
 
