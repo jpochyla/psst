@@ -169,6 +169,30 @@ fn general_tab_widget() -> impl Widget<AppState> {
             .lens(AppState::config.then(Config::audio_quality)),
         );
 
+    col = col.with_spacer(theme::grid(3.0));
+
+    // build info
+
+    let mut commit_hash = Flex::row();
+    commit_hash.add_child(
+        Label::new("Commit Hash:  ")
+    );
+    commit_hash.add_child(Label::new(psst_core::GIT_VERSION).with_text_color(theme::DISABLED_TEXT_COLOR));
+
+
+    let mut build_time = Flex::row();
+    build_time.add_child(
+        Label::new("Build time:   ")
+    );
+    build_time.add_child(Label::new(psst_core::BUILD_TIME).with_text_color(theme::DISABLED_TEXT_COLOR));
+
+
+    col = col
+        .with_child(Label::new("Build Info").with_font(theme::UI_FONT_MEDIUM))
+        .with_spacer(theme::grid(1.0))
+        .with_child(commit_hash)
+        .with_child(build_time);
+
     col
 }
 

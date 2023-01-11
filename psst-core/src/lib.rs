@@ -1,5 +1,10 @@
 #![allow(clippy::new_without_default)]
 
+use git_version::git_version;
+
+pub const GIT_VERSION: &str = git_version!();
+pub const BUILD_TIME: &str = include!(concat!(env!("OUT_DIR"), "/last-build.txt"));
+
 pub mod actor;
 pub mod audio;
 pub mod cache;

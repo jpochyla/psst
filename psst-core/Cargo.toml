@@ -4,12 +4,17 @@ version = "0.1.0"
 authors = ["Jan Pochyla <jpochyla@gmail.com>"]
 edition = "2021"
 
+
+[build-dependencies]
+chrono = { version = "0.4.23" }
+
 [dependencies]
 psst-protocol = { path = "../psst-protocol" }
 
 # Common
 byteorder = { version = "1.4.3" }
 crossbeam-channel = { version = "0.5.6" }
+git-version = { version = "0.3.5" }
 log = { version = "0.4.17" }
 num-bigint = { version = "0.4.3", features = ["rand"] }
 num-traits = { version = "0.2.15" }
