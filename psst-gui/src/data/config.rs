@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::ui::theme;
 
-use super::{Nav, Promise, QueueBehavior};
+use super::{Nav, Promise, QueueBehavior, SliderScrollScale};
 
 #[derive(Clone, Debug, Data, Lens)]
 pub struct Preferences {
@@ -88,6 +88,7 @@ pub struct Config {
     pub queue_behavior: QueueBehavior,
     pub show_track_cover: bool,
     pub window_size: Size,
+    pub slider_scroll_scale: SliderScrollScale,
 }
 
 impl Default for Config {
@@ -101,6 +102,7 @@ impl Default for Config {
             queue_behavior: Default::default(),
             show_track_cover: Default::default(),
             window_size: Size::new(theme::grid(80.0), theme::grid(100.0)),
+            slider_scroll_scale: Default::default(),
         }
     }
 }
