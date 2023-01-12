@@ -61,7 +61,7 @@ impl PlaybackController {
             &output,
         );
 
-        self.media_controls = Self::create_media_controls(player.sender(), &window)
+        self.media_controls = Self::create_media_controls(player.sender(), window)
             .map_err(|err| log::error!("failed to connect to media control interface: {:?}", err))
             .ok();
 

@@ -82,7 +82,7 @@ where
         if self.over_limit {
             // Clip and paint inner widget.
             ctx.with_save(|ctx| {
-                ctx.clip(&rect);
+                ctx.clip(rect);
                 self.inner.paint(ctx, data, env);
             });
             // Paint the gradient.

@@ -343,9 +343,9 @@ fn compute_keys(
     let digest = mac.finalize().into_bytes();
 
     (
-        (&*digest).to_vec(),
-        (&data[20..52]).to_vec(),
-        (&data[52..84]).to_vec(),
+        (*digest).to_vec(),
+        data[20..52].to_vec(),
+        data[52..84].to_vec(),
     )
 }
 

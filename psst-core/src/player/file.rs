@@ -55,11 +55,11 @@ impl AudioFormat {
     pub fn from_codec(codec: CodecType) -> Self {
         use symphonia::core::codecs::*;
         if codec == CODEC_TYPE_MP3 {
-            return Self::Mp3;
+            Self::Mp3
         } else if codec == CODEC_TYPE_VORBIS {
-            return Self::OggVorbis;
+            Self::OggVorbis
         } else {
-            return Self::Unsupported;
+            Self::Unsupported
         }
     }
 }

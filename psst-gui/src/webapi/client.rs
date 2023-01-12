@@ -311,15 +311,6 @@ impl WebApi {
 
 /// Show endpoints. (Podcasts)
 impl WebApi {
-    // https://developer.spotify.com/documentation/web-api/reference/#/operations/get-a-show
-    pub fn get_show(&self, id: &str) -> Result<Arc<Show>, Error> {
-        let request = self
-            .get(format!("v1/shows/{}", id))?
-            .query("market", "from_token");
-        let result = self.load(request)?;
-        Ok(result)
-    }
-
     // https://developer.spotify.com/documentation/web-api/reference/#/operations/get-multiple-episodes
     pub fn get_episodes(
         &self,
@@ -501,7 +492,6 @@ impl WebApi {
     pub fn get_playlist_tracks(&self, id: &str) -> Result<Vector<Arc<Track>>, Error> {
         #[derive(Clone, Deserialize)]
         struct PlaylistItem {
-            is_local: bool,
             track: OptionalTrack,
         }
 
@@ -543,8 +533,7 @@ impl WebApi {
         let request = self
             .post(format!("v1/playlists/{}/tracks", playlist_id))?
             .query("uris", track_uri);
-        let result = self.send_empty_json(request)?;
-        Ok(result)
+        self.send_empty_json(request)
     }
 
     // https://developer.spotify.com/documentation/web-api/reference/#/operations/remove-tracks-playlist

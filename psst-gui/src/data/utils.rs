@@ -124,11 +124,8 @@ pub fn deserialize_millis<'de, D>(deserializer: D) -> Result<Duration, D::Error>
 where
     D: Deserializer<'de>,
 {
-    let millis = match u64::deserialize(deserializer) {
-        Ok(v) => v,
-        // Sometimes spotify will provide a negative number for a duration
-        Err(_) => 0,
-    };
+    // Sometimes spotify will provide a negative number for a duration
+    let millis = u64::deserialize(deserializer).unwrap_or(0);
     let duration = Duration::from_millis(millis);
     Ok(duration)
 }

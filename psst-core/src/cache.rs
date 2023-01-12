@@ -84,7 +84,7 @@ impl Cache {
         key: &AudioKey,
     ) -> Result<(), Error> {
         log::debug!("saving audio key to cache: {:?}:{:?}", item_id, file_id);
-        fs::write(self.audio_key_path(item_id, file_id), &key.0)?;
+        fs::write(self.audio_key_path(item_id, file_id), key.0)?;
         Ok(())
     }
 

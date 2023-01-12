@@ -219,8 +219,6 @@ struct LocalArtistLinkJson {
 
 #[derive(Deserialize)]
 struct LocalTrackJson {
-    #[serde(default)]
-    pub id: Option<TrackId>,
     pub name: Arc<str>,
     #[serde(default)]
     pub album: Option<LocalAlbumLinkJson>,
@@ -232,7 +230,6 @@ struct LocalTrackJson {
     pub track_number: usize,
     pub explicit: bool,
     pub is_local: bool,
-    pub is_playable: Option<bool>,
     pub popularity: Option<u32>,
 }
 
