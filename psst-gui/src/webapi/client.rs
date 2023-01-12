@@ -149,8 +149,8 @@ impl WebApi {
         }
     }
 
-    /// Iterate a paginated result set by sending `request` with added pagination
-    /// parameters.  Mostly used through `load_all_pages`.
+    /// Iterate a paginated result set by sending `request` with added
+    /// pagination parameters.  Mostly used through `load_all_pages`.
     fn for_all_pages<T: DeserializeOwned + Clone>(
         &self,
         request: Request,
@@ -546,12 +546,33 @@ impl WebApi {
         let result = self.send_empty_json(request)?;
         Ok(result)
     }
+
+    // https://developer.spotify.com/documentation/web-api/reference/#/operations/remove-tracks-playlist
+    pub fn remove_track_from_playlist(
+        &self,
+        playlist_id: &str,
+        track_uri: &str,
+    ) -> Result<(), Error> {
+        self.delete(&format!("v1/playlists/{}/tracks", playlist_id))?
+            .send_json(ureq::json!({
+                "tracks": [{
+                    "uri": track_uri
+                }]
+            }))?;
+
+        Ok(())
+    }
 }
 
 /// Search endpoints.
 impl WebApi {
     // https://developer.spotify.com/documentation/web-api/reference/search/
-    pub fn search(&self, query: &str, topics: &[SearchTopic]) -> Result<SearchResults, Error> {
+    pub fn search(
+        &self,
+        query: &str,
+        topics: &[SearchTopic],
+        limit: usize,
+    ) -> Result<SearchResults, Error> {
         #[derive(Deserialize)]
         struct ApiSearchResults {
             artists: Option<Page<Artist>>,
@@ -566,6 +587,7 @@ impl WebApi {
             .get("v1/search")?
             .query("q", query)
             .query("type", &topics)
+            .query("limit", &limit.to_string())
             .query("marker", "from_token");
         let result: ApiSearchResults = self.load(request)?;
 

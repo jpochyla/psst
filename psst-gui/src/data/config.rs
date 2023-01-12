@@ -1,6 +1,10 @@
 use std::{env, env::VarError, fs::File, path::PathBuf};
 
-use druid::{Data, Lens};
+use std::fs::OpenOptions;
+#[cfg(target_family = "unix")]
+use std::os::unix::fs::OpenOptionsExt;
+
+use druid::{Data, Lens, Size};
 use platform_dirs::AppDirs;
 use psst_core::{
     cache::mkdir_if_not_exists,
@@ -9,6 +13,8 @@ use psst_core::{
     session::{SessionConfig, SessionConnection},
 };
 use serde::{Deserialize, Serialize};
+
+use crate::ui::theme;
 
 use super::{Nav, Promise, QueueBehavior, SliderScrollScale};
 
@@ -59,6 +65,11 @@ impl Authentication {
         let connection = SessionConnection::open(config).map_err(|err| err.to_string())?;
         Ok(connection.credentials)
     }
+
+    pub fn clear(&mut self) {
+        self.username.clear();
+        self.password.clear();
+    }
 }
 
 const APP_NAME: &str = "Psst";
@@ -76,6 +87,7 @@ pub struct Config {
     pub last_route: Option<Nav>,
     pub queue_behavior: QueueBehavior,
     pub show_track_cover: bool,
+    pub window_size: Size,
     pub volume_scroll_scale: SliderScrollScale,
 }
 
@@ -89,6 +101,7 @@ impl Default for Config {
             last_route: Default::default(),
             queue_behavior: Default::default(),
             show_track_cover: Default::default(),
+            window_size: Size::new(theme::grid(80.0), theme::grid(100.0)),
             volume_scroll_scale: Default::default(),
         }
     }
@@ -134,7 +147,14 @@ impl Config {
         let dir = Self::config_dir().expect("Failed to get config dir");
         let path = Self::config_path().expect("Failed to get config path");
         mkdir_if_not_exists(&dir).expect("Failed to create config dir");
-        let file = File::create(&path).expect("Failed to create config");
+
+        let mut options = OpenOptions::new();
+        options.write(true).create(true).truncate(true);
+        #[cfg(target_family = "unix")]
+        options.mode(0o600);
+
+        let file = options.open(&path).expect("Failed to create config");
+
         serde_json::to_writer_pretty(file, self).expect("Failed to write config");
         log::info!("saved config: {:?}", &path);
     }
@@ -145,6 +165,10 @@ impl Config {
 
     pub fn store_credentials(&mut self, credentials: Credentials) {
         self.credentials.replace(credentials);
+    }
+
+    pub fn clear_credentials(&mut self) {
+        self.credentials = Default::default();
     }
 
     pub fn username(&self) -> Option<&str> {

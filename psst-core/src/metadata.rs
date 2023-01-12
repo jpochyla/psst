@@ -5,7 +5,7 @@ use quick_protobuf::MessageRead;
 use crate::{
     error::Error,
     item_id::{FileId, ItemId, ItemIdType},
-    player::file::{MediaFile, MediaPath},
+    player::file::{AudioFormat, MediaFile, MediaPath},
     protocol::metadata::{AudioFile, Episode, Restriction, Track},
     session::SessionService,
 };
@@ -55,7 +55,7 @@ impl ToMediaPath for Track {
         Some(MediaPath {
             item_id: ItemId::from_raw(self.gid.as_ref()?, ItemIdType::Track)?,
             file_id: FileId::from_raw(file.file_id.as_ref()?)?,
-            file_format: file.format?,
+            file_format: AudioFormat::from_protocol(file.format?),
             duration: Duration::from_millis(self.duration? as u64),
         })
     }
@@ -77,7 +77,7 @@ impl ToMediaPath for Episode {
         Some(MediaPath {
             item_id: ItemId::from_raw(self.gid.as_ref()?, ItemIdType::Podcast)?,
             file_id: FileId::from_raw(file.file_id.as_ref()?)?,
-            file_format: file.format?,
+            file_format: AudioFormat::from_protocol(file.format?),
             duration: Duration::from_millis(self.duration? as u64),
         })
     }

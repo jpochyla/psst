@@ -100,7 +100,7 @@ fn rounded_cover_widget(size: f64) -> impl Widget<Arc<Album>> {
 }
 
 pub fn album_widget() -> impl Widget<WithCtx<Arc<Album>>> {
-    let album_cover = cover_widget(theme::grid(7.0));
+    let album_cover = rounded_cover_widget(theme::grid(6.0));
 
     let album_name = Label::raw()
         .with_font(theme::UI_FONT_MEDIUM)
@@ -133,10 +133,12 @@ pub fn album_widget() -> impl Widget<WithCtx<Arc<Album>>> {
         .with_child(album_cover)
         .with_default_spacer()
         .with_flex_child(album_info, 1.0)
+        .padding(theme::grid(1.0))
         .lens(Ctx::data());
 
     album
         .link()
+        .rounded(theme::BUTTON_BORDER_RADIUS)
         .on_click(|ctx, album, _| {
             ctx.submit_command(cmd::NAVIGATE.with(Nav::AlbumDetail(album.data.link())));
         })

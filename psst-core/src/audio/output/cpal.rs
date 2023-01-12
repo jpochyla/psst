@@ -1,20 +1,22 @@
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use crossbeam_channel::{bounded, Receiver, Sender};
+use num_traits::Pow;
 
 use crate::{
     actor::{Act, Actor, ActorHandle},
-    audio::source::Empty,
+    audio::{
+        output::{AudioOutput, AudioSink},
+        source::{AudioSource, Empty},
+    },
     error::Error,
 };
 
-use super::source::AudioSource;
-
-pub struct AudioOutput {
+pub struct CpalOutput {
     _handle: ActorHandle<StreamMsg>,
-    sink: AudioSink,
+    sink: CpalSink,
 }
 
-impl AudioOutput {
+impl CpalOutput {
     pub fn open() -> Result<Self, Error> {
         // Open the default output device.
         let device = cpal::default_host()
@@ -36,7 +38,7 @@ impl AudioOutput {
             // TODO: Support additional sample formats.
             move |this| Stream::open(device, config, callback_recv, this).unwrap()
         });
-        let sink = AudioSink {
+        let sink = CpalSink {
             channel_count: supported.channels(),
             sample_rate: supported.sample_rate(),
             stream_send: handle.sender(),
@@ -68,56 +70,25 @@ impl AudioOutput {
 
         Ok(device.default_output_config()?)
     }
+}
 
-    pub fn sink(&self) -> AudioSink {
+impl AudioOutput for CpalOutput {
+    type Sink = CpalSink;
+
+    fn sink(&self) -> Self::Sink {
         self.sink.clone()
     }
 }
 
 #[derive(Clone)]
-pub struct AudioSink {
+pub struct CpalSink {
     channel_count: cpal::ChannelCount,
     sample_rate: cpal::SampleRate,
     callback_send: Sender<CallbackMsg>,
     stream_send: Sender<StreamMsg>,
 }
 
-impl AudioSink {
-    pub fn channel_count(&self) -> usize {
-        self.channel_count as usize
-    }
-
-    pub fn sample_rate(&self) -> u32 {
-        self.sample_rate.0
-    }
-
-    pub fn set_volume(&self, volume: f32) {
-        self.send_to_callback(CallbackMsg::SetVolume(volume));
-    }
-
-    pub fn play(&self, source: impl AudioSource) {
-        self.send_to_callback(CallbackMsg::PlaySource(Box::new(source)));
-    }
-
-    pub fn pause(&self) {
-        self.send_to_stream(StreamMsg::Pause);
-        self.send_to_callback(CallbackMsg::Pause);
-    }
-
-    pub fn resume(&self) {
-        self.send_to_stream(StreamMsg::Resume);
-        self.send_to_callback(CallbackMsg::Resume);
-    }
-
-    pub fn stop(&self) {
-        self.play(Empty);
-        self.pause();
-    }
-
-    pub fn close(&self) {
-        self.send_to_stream(StreamMsg::Close);
-    }
-
+impl CpalSink {
     fn send_to_callback(&self, msg: CallbackMsg) {
         if self.callback_send.send(msg).is_err() {
             log::error!("output stream actor is dead");
@@ -131,10 +102,41 @@ impl AudioSink {
     }
 }
 
-enum StreamMsg {
-    Pause,
-    Resume,
-    Close,
+impl AudioSink for CpalSink {
+    fn channel_count(&self) -> usize {
+        self.channel_count as usize
+    }
+
+    fn sample_rate(&self) -> u32 {
+        self.sample_rate.0
+    }
+
+    fn set_volume(&self, volume: f32) {
+        self.send_to_callback(CallbackMsg::SetVolume(volume));
+    }
+
+    fn play(&self, source: impl AudioSource) {
+        self.send_to_callback(CallbackMsg::PlaySource(Box::new(source)));
+    }
+
+    fn pause(&self) {
+        self.send_to_stream(StreamMsg::Pause);
+        self.send_to_callback(CallbackMsg::Pause);
+    }
+
+    fn resume(&self) {
+        self.send_to_stream(StreamMsg::Resume);
+        self.send_to_callback(CallbackMsg::Resume);
+    }
+
+    fn stop(&self) {
+        self.play(Empty);
+        self.pause();
+    }
+
+    fn close(&self) {
+        self.send_to_stream(StreamMsg::Close);
+    }
 }
 
 struct Stream {
@@ -151,7 +153,7 @@ impl Stream {
     ) -> Result<Self, Error> {
         let mut callback = StreamCallback {
             callback_recv,
-            _stream_send: stream_send,
+            stream_send,
             source: Box::new(Empty),
             volume: 1.0, // We start with the full volume.
             state: CallbackState::Paused,
@@ -204,6 +206,12 @@ impl Actor for Stream {
     }
 }
 
+enum StreamMsg {
+    Pause,
+    Resume,
+    Close,
+}
+
 enum CallbackMsg {
     PlaySource(Box<dyn AudioSource>),
     SetVolume(f32),
@@ -217,7 +225,8 @@ enum CallbackState {
 }
 
 struct StreamCallback {
-    _stream_send: Sender<StreamMsg>,
+    #[allow(unused)]
+    stream_send: Sender<StreamMsg>,
     callback_recv: Receiver<CallbackMsg>,
     source: Box<dyn AudioSource>,
     state: CallbackState,
@@ -249,8 +258,11 @@ impl StreamCallback {
             // output buffer.
             let written = self.source.write(output);
 
-            // Apply the global volume level.
-            output[..written].iter_mut().for_each(|s| *s *= self.volume);
+            // Apply scaled global volume level.
+            let scaled_volume = self.volume.pow(4);
+            output[..written]
+                .iter_mut()
+                .for_each(|s| *s *= scaled_volume);
 
             written
         } else {

@@ -12,6 +12,7 @@ mod widget;
 
 use druid::AppLauncher;
 use env_logger::{Builder, Env};
+use psst_core::item_id::LocalItemRegistry;
 use webapi::WebApi;
 
 use crate::{
@@ -44,7 +45,7 @@ fn main() {
     let launcher;
     if state.config.has_credentials() {
         // Credentials are configured, open the main window.
-        let window = ui::main_window();
+        let window = ui::main_window(&state.config);
         delegate = Delegate::with_main(window.id);
         launcher = AppLauncher::with_window(window).configure_env(ui::theme::setup);
 

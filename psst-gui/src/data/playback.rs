@@ -40,14 +40,6 @@ impl Playable {
         }
     }
 
-    pub fn episode(&self) -> Option<&Arc<Episode>> {
-        if let Self::Episode(episode) = self {
-            Some(episode)
-        } else {
-            None
-        }
-    }
-
     pub fn id(&self) -> ItemId {
         match self {
             Playable::Track(track) => track.id.0,

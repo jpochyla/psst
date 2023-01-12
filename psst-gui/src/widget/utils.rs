@@ -1,7 +1,7 @@
 use druid::{
     kurbo::{Line, Shape},
     widget::{prelude::*, Axis, BackgroundBrush, Painter},
-    Color, Data, KeyOrValue, LinearGradient, Rect, UnitPoint,
+    Color, Data, KeyOrValue,
 };
 
 pub struct FadeOut<W> {
@@ -13,7 +13,7 @@ pub struct FadeOut<W> {
 }
 
 impl<W> FadeOut<W> {
-    const FADE_LENGTH_MAX: f64 = 32.0;
+    // const FADE_LENGTH_MAX: f64 = 32.0;
 
     pub fn new(inner: W, axis: Axis, limit: KeyOrValue<f64>) -> Self {
         Self {
@@ -23,10 +23,6 @@ impl<W> FadeOut<W> {
             color: Color::BLACK.into(),
             over_limit: false,
         }
-    }
-
-    pub fn right(inner: W, width: impl Into<KeyOrValue<f64>>) -> Self {
-        Self::new(inner, Axis::Horizontal, width.into())
     }
 
     pub fn bottom(inner: W, height: impl Into<KeyOrValue<f64>>) -> Self {
