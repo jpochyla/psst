@@ -1,14 +1,18 @@
-use druid::{
-    widget::Controller, Data, Env, Event, EventCtx, LifeCycle, LifeCycleCtx, MouseEvent, Widget,
-};
+use crate::data::SliderScrollScale;
+use druid::{widget::Controller, Data, Env, Event, EventCtx, LifeCycle, LifeCycleCtx, Widget};
 
 pub struct ExScroll<T> {
-    action: Box<dyn Fn(&mut EventCtx, &MouseEvent, &mut T, &Env)>,
+    scale_picker: Box<dyn Fn(&mut T) -> &SliderScrollScale>,
+    action: Box<dyn Fn(&mut EventCtx, &mut T, &Env, f64)>,
 }
 
 impl<T: Data> ExScroll<T> {
-    pub fn new(action: impl Fn(&mut EventCtx, &MouseEvent, &mut T, &Env) + 'static) -> Self {
+    pub fn new(
+        scale_picker: impl Fn(&mut T) -> &SliderScrollScale + 'static,
+        action: impl Fn(&mut EventCtx, &mut T, &Env, f64) + 'static,
+    ) -> Self {
         ExScroll {
+            scale_picker: Box::new(scale_picker),
             action: Box::new(action),
         }
     }
@@ -19,7 +23,19 @@ impl<T: Data, W: Widget<T>> Controller<T, W> for ExScroll<T> {
         match event {
             Event::Wheel(mouse_event) => {
                 ctx.set_active(true);
-                (self.action)(ctx, mouse_event, data, env);
+
+                let delta = mouse_event.wheel_delta;
+                let scale_config = (self.scale_picker)(data);
+                let scale = scale_config.scale / 100.;
+
+                let (directional_scale, delta) = if delta.x == 0. {
+                    (scale_config.y, -delta.y)
+                } else {
+                    (scale_config.x, delta.x)
+                };
+                let scaled_delta = delta.signum() * scale * 1. / directional_scale;
+                (self.action)(ctx, data, env, scaled_delta);
+
                 ctx.set_active(false);
                 ctx.request_paint()
             }

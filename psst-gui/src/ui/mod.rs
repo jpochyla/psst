@@ -327,20 +327,12 @@ fn volume_slider() -> impl Widget<AppState> {
         .padding((theme::grid(1.5), 0.0))
         .on_debounce(SAVE_DELAY, |ctx, _, _| ctx.submit_command(SAVE_TO_CONFIG))
         .lens(AppState::playback.then(Playback::volume))
-        .on_scroll(|_, ev, data, _| {
-            let delta = ev.wheel_delta;
-            let scale_config = &data.config.volume_scroll_scale;
-            let scale = scale_config.scale() / 100.;
-
-            let (directional_scale, delta) = if delta.x == 0. {
-                (scale_config.y(), -delta.y)
-            } else {
-                (scale_config.x(), delta.x)
-            };
-
-            let scaled_delta = delta.signum() * scale * 1. / directional_scale;
-            data.playback.volume = (data.playback.volume + scaled_delta).clamp(0.0, 1.0);
-        })
+        .on_scroll(
+            |data| &data.config.slider_scroll_scale,
+            |_, data, _, scaled_delta| {
+                data.playback.volume = (data.playback.volume + scaled_delta).clamp(0.0, 1.0);
+            },
+        )
         .on_command(SAVE_TO_CONFIG, |_, _, data| {
             data.config.volume = data.playback.volume;
             data.config.save();
