@@ -16,6 +16,8 @@ pub fn main_menu(_window: Option<WindowId>, _data: &AppState, _env: &Env) -> Men
 }
 
 fn mac_app_menu() -> Menu<AppState> {
+    // macOS-only commands are deprecated on other systems.
+    #[cfg_attr(not(target_os = "macos"), allow(deprecated))]
     Menu::new(LocalizedString::new("macos-menu-application-menu"))
         .entry(platform_menus::mac::application::preferences())
         .separator()

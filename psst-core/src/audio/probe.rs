@@ -53,7 +53,7 @@ impl TrackProbe {
         let track = probe_result
             .format
             .default_track()
-            .ok_or(probe_err!("file contained no tracks"))?;
+            .ok_or_else(|| probe_err!("file contained no tracks"))?;
         let params = &track.codec_params;
 
         let duration =

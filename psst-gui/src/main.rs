@@ -12,7 +12,6 @@ mod widget;
 
 use druid::AppLauncher;
 use env_logger::{Builder, Env};
-use psst_core::item_id::LocalItemRegistry;
 use webapi::WebApi;
 
 use crate::{

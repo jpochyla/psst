@@ -108,7 +108,7 @@ impl AppDelegate<AppState> for Delegate {
             self.close_all_windows(ctx);
             Handled::Yes
         } else if let Some(text) = cmd.get(cmd::COPY) {
-            Application::global().clipboard().put_string(&text);
+            Application::global().clipboard().put_string(text);
             Handled::Yes
         } else if let Handled::Yes = self.command_image(ctx, target, cmd, data) {
             Handled::Yes

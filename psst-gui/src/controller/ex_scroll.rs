@@ -20,26 +20,23 @@ impl<T: Data> ExScroll<T> {
 
 impl<T: Data, W: Widget<T>> Controller<T, W> for ExScroll<T> {
     fn event(&mut self, child: &mut W, ctx: &mut EventCtx, event: &Event, data: &mut T, env: &Env) {
-        match event {
-            Event::Wheel(mouse_event) => {
-                ctx.set_active(true);
+        if let Event::Wheel(mouse_event) = event {
+            ctx.set_active(true);
 
-                let delta = mouse_event.wheel_delta;
-                let scale_config = (self.scale_picker)(data);
-                let scale = scale_config.scale / 100.;
+            let delta = mouse_event.wheel_delta;
+            let scale_config = (self.scale_picker)(data);
+            let scale = scale_config.scale / 100.;
 
-                let (directional_scale, delta) = if delta.x == 0. {
-                    (scale_config.y, -delta.y)
-                } else {
-                    (scale_config.x, delta.x)
-                };
-                let scaled_delta = delta.signum() * scale * 1. / directional_scale;
-                (self.action)(ctx, data, env, scaled_delta);
+            let (directional_scale, delta) = if delta.x == 0. {
+                (scale_config.y, -delta.y)
+            } else {
+                (scale_config.x, delta.x)
+            };
+            let scaled_delta = delta.signum() * scale * 1. / directional_scale;
+            (self.action)(ctx, data, env, scaled_delta);
 
-                ctx.set_active(false);
-                ctx.request_paint()
-            }
-            _ => {}
+            ctx.set_active(false);
+            ctx.request_paint()
         }
 
         child.event(ctx, event, data, env);
