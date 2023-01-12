@@ -108,7 +108,7 @@ impl AppDelegate<AppState> for Delegate {
             self.close_all_windows(ctx);
             Handled::Yes
         } else if let Some(text) = cmd.get(cmd::COPY) {
-            Application::global().clipboard().put_string(&text);
+            Application::global().clipboard().put_string(text);
             Handled::Yes
         } else if let Handled::Yes = self.command_image(ctx, target, cmd, data) {
             Handled::Yes
@@ -127,8 +127,10 @@ impl AppDelegate<AppState> for Delegate {
         if self.preferences_window == Some(id) {
             self.preferences_window.take();
             data.preferences.reset();
+            data.preferences.auth.clear();
         }
         if self.main_window == Some(id) {
+            data.config.save();
             ctx.submit_command(commands::CLOSE_ALL_WINDOWS);
             ctx.submit_command(commands::QUIT_APP);
         }
@@ -144,7 +146,6 @@ impl AppDelegate<AppState> for Delegate {
     ) -> Option<Event> {
         if let Event::WindowSize(size) = event {
             data.config.window_size = size;
-            data.config.save();
         }
         Some(event)
     }

@@ -4,7 +4,7 @@ use druid::{
     commands,
     widget::{
         Button, Controller, CrossAxisAlignment, Flex, Label, LineBreaking, MainAxisAlignment,
-        RadioGroup, TextBox, ViewSwitcher,
+        RadioGroup, SizedBox, Slider, TextBox, ViewSwitcher,
     },
     Data, Env, Event, EventCtx, LensExt, LifeCycle, LifeCycleCtx, Selector, Widget, WidgetExt,
 };
@@ -14,7 +14,8 @@ use crate::{
     cmd,
     controller::InputController,
     data::{
-        AppState, AudioQuality, Authentication, Config, Preferences, PreferencesTab, Promise, Theme,
+        AppState, AudioQuality, Authentication, Config, Preferences, PreferencesTab, Promise,
+        SliderScrollScale, Theme,
     },
     webapi::WebApi,
     widget::{icons, Async, Border, Checkbox, MyWidgetExt},
@@ -88,6 +89,9 @@ pub fn preferences_widget() -> impl Widget<AppState> {
         .on_command(PROPAGATE_FLAGS, |_, _, data| {
             data.common_ctx_mut().show_track_cover = data.config.show_track_cover;
         })
+        .scroll()
+        .vertical()
+        .content_must_fill(true)
 }
 
 fn tabs_widget() -> impl Widget<AppState> {
@@ -135,7 +139,9 @@ fn tab_link_widget(
 }
 
 fn general_tab_widget() -> impl Widget<AppState> {
-    let mut col = Flex::column().cross_axis_alignment(CrossAxisAlignment::Start);
+    let mut col = Flex::column()
+        .cross_axis_alignment(CrossAxisAlignment::Start)
+        .must_fill_main_axis(true);
 
     // Theme
     col = col
@@ -171,21 +177,44 @@ fn general_tab_widget() -> impl Widget<AppState> {
 
     col = col.with_spacer(theme::grid(3.0));
 
-    // build info
+    // Sliders
+    col = col
+        .with_child(Label::new("Slider Scrolling").with_font(theme::UI_FONT_MEDIUM))
+        .with_spacer(theme::grid(2.0))
+        .with_child(
+            Flex::row()
+                .with_child(
+                    SizedBox::new(Label::dynamic(|state: &AppState, _| {
+                        format!("{:.1}", state.config.slider_scroll_scale.scale)
+                    }))
+                    .width(20.0),
+                )
+                .with_spacer(theme::grid(0.5))
+                .with_child(
+                    Slider::new().with_range(0.0, 7.0).lens(
+                        AppState::config
+                            .then(Config::slider_scroll_scale)
+                            .then(SliderScrollScale::scale),
+                    ),
+                )
+                .with_spacer(theme::grid(0.5))
+                .with_child(Label::new("Sensitivity")),
+        );
 
+    col = col.with_spacer(theme::grid(3.0));
+
+    // Build Info
     let mut commit_hash = Flex::row();
     commit_hash.add_child(
         Label::new("Commit Hash:  ")
     );
     commit_hash.add_child(Label::new(psst_core::GIT_VERSION).with_text_color(theme::DISABLED_TEXT_COLOR));
 
-
     let mut build_time = Flex::row();
     build_time.add_child(
         Label::new("Build time:   ")
     );
     build_time.add_child(Label::new(psst_core::BUILD_TIME).with_text_color(theme::DISABLED_TEXT_COLOR));
-
 
     col = col
         .with_child(Label::new("Build Info").with_font(theme::UI_FONT_MEDIUM))
@@ -357,7 +386,11 @@ impl<W: Widget<AppState>> Controller<AppState, W> for Authenticate {
                             ctx.submit_command(cmd::SESSION_CONNECT);
                         }
                     }
+                    // Only clear username if login is successful.
+                    data.preferences.auth.username.clear();
                 }
+                // Always clear password after login attempt.
+                data.preferences.auth.password.clear();
 
                 ctx.set_handled();
             }

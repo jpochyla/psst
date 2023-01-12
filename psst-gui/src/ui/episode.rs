@@ -40,11 +40,10 @@ pub fn playable_widget() -> impl Widget<PlayRow<Arc<Episode>>> {
 
     let is_playing = playable::is_playing_marker_widget().lens(PlayRow::is_playing);
 
-    let duration =
-        Label::<Arc<Episode>>::dynamic(|episode, _| utils::as_human(episode.duration).to_string())
-            .with_text_size(theme::TEXT_SIZE_SMALL)
-            .with_text_color(theme::PLACEHOLDER_COLOR)
-            .lens(PlayRow::item);
+    let duration = Label::<Arc<Episode>>::dynamic(|episode, _| utils::as_human(episode.duration))
+        .with_text_size(theme::TEXT_SIZE_SMALL)
+        .with_text_color(theme::PLACEHOLDER_COLOR)
+        .lens(PlayRow::item);
 
     Flex::column()
         .cross_axis_alignment(CrossAxisAlignment::Start)

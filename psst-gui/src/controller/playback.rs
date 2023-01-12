@@ -61,7 +61,7 @@ impl PlaybackController {
             &output,
         );
 
-        self.media_controls = Self::create_media_controls(player.sender(), &window)
+        self.media_controls = Self::create_media_controls(player.sender(), window)
             .map_err(|err| log::error!("failed to connect to media control interface: {:?}", err))
             .ok();
 
@@ -159,6 +159,9 @@ impl PlaybackController {
             MediaControlEvent::Toggle => PlayerEvent::Command(PlayerCommand::PauseOrResume),
             MediaControlEvent::Next => PlayerEvent::Command(PlayerCommand::Next),
             MediaControlEvent::Previous => PlayerEvent::Command(PlayerCommand::Previous),
+            MediaControlEvent::SetPosition(MediaPosition(duration)) => {
+                PlayerEvent::Command(PlayerCommand::Seek { position: duration })
+            }
             _ => {
                 return;
             }
@@ -321,6 +324,7 @@ where
             Event::Command(cmd) if cmd.is(cmd::PLAYBACK_PROGRESS) => {
                 let progress = cmd.get_unchecked(cmd::PLAYBACK_PROGRESS);
                 data.progress_playback(progress.to_owned());
+                self.update_media_control_playback(&data.playback);
                 ctx.set_handled();
             }
             Event::Command(cmd) if cmd.is(cmd::PLAYBACK_PAUSING) => {

@@ -30,8 +30,8 @@ pub use theme::ThemeScope;
 pub use utils::{Border, Clip, FadeOut, Logger};
 
 use crate::{
-    controller::{ExClick, OnCommand, OnCommandAsync, OnDebounce, OnUpdate},
-    data::AppState,
+    controller::{ExClick, ExScroll, OnCommand, OnCommandAsync, OnDebounce, OnUpdate},
+    data::{AppState, SliderScrollScale},
 };
 
 pub trait MyWidgetExt<T: Data>: Widget<T> + Sized + 'static {
@@ -79,6 +79,14 @@ pub trait MyWidgetExt<T: Data>: Widget<T> + Sized + 'static {
         func: impl Fn(&mut EventCtx, &MouseEvent, &mut T, &Env) + 'static,
     ) -> ControllerHost<Self, ExClick<T>> {
         ControllerHost::new(self, ExClick::new(Some(MouseButton::Right), func))
+    }
+
+    fn on_scroll(
+        self,
+        scale_picker: impl Fn(&mut T) -> &SliderScrollScale + 'static,
+        action: impl Fn(&mut EventCtx, &mut T, &Env, f64) + 'static,
+    ) -> ControllerHost<Self, ExScroll<T>> {
+        ControllerHost::new(self, ExScroll::new(scale_picker, action))
     }
 
     fn on_command<U, F>(
