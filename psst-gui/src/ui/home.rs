@@ -1,9 +1,9 @@
-use druid::{widget::List, LensExt, Widget, WidgetExt};
+use druid::{widget::List, LensExt, Selector, Widget, WidgetExt};
 
 use crate::{
     data::{AppState, Personalized},
     webapi::WebApi,
-    widget::Async,
+    widget::{Async, MyWidgetExt},
 };
 
 use super::{
@@ -11,12 +11,19 @@ use super::{
     utils::{error_widget, spinner_widget},
 };
 
+pub const LOAD_MADE_FOR_YOU: Selector = Selector::new("app.home.load-made-for-your");
+
 pub fn home_widget() -> impl Widget<AppState> {
     Async::new(
         spinner_widget,
         || List::new(playlist::playlist_widget),
         error_widget,
     )
-    .on_deferred(|_| WebApi::global().get_made_for_you())
     .lens(AppState::personalized.then(Personalized::made_for_you))
+    .on_command_async(
+        LOAD_MADE_FOR_YOU,
+        |_| WebApi::global().get_made_for_you(),
+        |_, data, d| data.personalized.made_for_you.defer(d),
+        |_, data, r| data.personalized.made_for_you.update(r),
+    )
 }

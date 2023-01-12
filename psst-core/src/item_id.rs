@@ -1,9 +1,57 @@
-use std::{convert::TryInto, fmt, ops::Deref};
+use once_cell::sync::Lazy;
+use std::{collections::HashMap, convert::TryInto, fmt, ops::Deref, path::PathBuf, sync::Mutex};
+
+static LOCAL_REGISTRY: Lazy<Mutex<LocalItemRegistry>> =
+    Lazy::new(|| Mutex::new(LocalItemRegistry::new()));
+
+// LocalItemRegistry allows generating IDs for local music files, so they can be
+// treated similarly to files hosted on Spotify's remote servers. IDs are
+// easier to pass around since they implement `Copy`, as opposed to passing
+// around a `PathBuf` or `File` pointing to the file.
+//
+// The registry stores two complementary maps for bi-directional lookup. This
+// allows for quick registration of new tracks and quick lookup of existing
+// tracks by ID, at the cost of increased memory usage. The ID-to-path lookup
+// should be prioritized, as that is required to begin playback. Path-to-ID
+// lookup is helpful to avoid registering the same path under multiple IDs,
+// but is okay to be a bit slower since it's only done once per track when
+// (when loading the list of local files from Spotify's config).
+pub struct LocalItemRegistry {
+    next_id: u128,
+    path_to_id: HashMap<PathBuf, u128>,
+    id_to_path: HashMap<u128, PathBuf>,
+}
+
+impl LocalItemRegistry {
+    fn new() -> Self {
+        Self {
+            next_id: 1,
+            path_to_id: HashMap::new(),
+            id_to_path: HashMap::new(),
+        }
+    }
+
+    pub fn get_or_insert(path: PathBuf) -> u128 {
+        let mut registry = LOCAL_REGISTRY.lock().unwrap();
+        registry.path_to_id.get(&path).copied().unwrap_or_else(|| {
+            let id = registry.next_id;
+            registry.next_id += 1;
+            registry.id_to_path.insert(id, path.clone());
+            id
+        })
+    }
+
+    pub fn get(id: u128) -> Option<PathBuf> {
+        let registry = LOCAL_REGISTRY.lock().unwrap();
+        registry.id_to_path.get(&id).cloned()
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ItemIdType {
     Track,
     Podcast,
+    LocalFile,
     Unknown,
 }
 
@@ -17,6 +65,8 @@ const BASE62_DIGITS: &[u8] = b"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLM
 const BASE16_DIGITS: &[u8] = b"0123456789abcdef";
 
 impl ItemId {
+    pub const INVALID: Self = Self::new(0u128, ItemIdType::Unknown);
+
     pub const fn new(id: u128, id_type: ItemIdType) -> Self {
         Self { id, id_type }
     }
@@ -57,6 +107,18 @@ impl ItemId {
         }
     }
 
+    /// Converts an ID to an URI as described in: https://developer.spotify.com/documentation/web-api/#spotify-uris-and-ids
+    pub fn to_uri(&self) -> Option<String> {
+        let b64 = self.to_base62();
+        match self.id_type {
+            ItemIdType::Track => Some(format!("spotify:track:{}", b64)),
+            ItemIdType::Podcast => Some(format!("spotify:podcast:{}", b64)),
+            // TODO: support adding local files to playlists
+            ItemIdType::LocalFile => None,
+            ItemIdType::Unknown => None,
+        }
+    }
+
     pub fn to_base16(&self) -> String {
         format!("{:032x}", self.id)
     }
@@ -74,9 +136,36 @@ impl ItemId {
     pub fn to_raw(&self) -> [u8; 16] {
         self.id.to_be_bytes()
     }
+
+    pub fn from_local(path: PathBuf) -> Self {
+        Self::new(
+            LocalItemRegistry::get_or_insert(path),
+            ItemIdType::LocalFile,
+        )
+    }
+
+    pub fn to_local(&self) -> PathBuf {
+        match self.id_type {
+            // local items should only be constructed with `from_local`
+            ItemIdType::LocalFile => LocalItemRegistry::get(self.id).expect("valid item ID"),
+            _ => panic!("expected local file"),
+        }
+    }
 }
 
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+impl Default for ItemId {
+    fn default() -> Self {
+        Self::INVALID
+    }
+}
+
+impl From<ItemId> for String {
+    fn from(id: ItemId) -> Self {
+        id.to_base62()
+    }
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 pub struct FileId(pub [u8; 20]);
 
 impl FileId {

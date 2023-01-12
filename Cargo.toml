@@ -4,9 +4,20 @@ members = [
     "psst-core",
     "psst-cli",
     "psst-gui",
-    "minivorbis-sys",
-    "minivorbis",
 ]
 
-[profile.dev]
-split-debuginfo = "unpacked"
+[profile.release]
+opt-level = 3
+strip = true
+lto = true
+codegen-units = 1
+
+[profile.dev.package.symphonia]
+opt-level = 2
+[profile.dev.package.libsamplerate]
+opt-level = 2
+
+[patch.crates-io]
+piet = { git = "https://github.com/jpochyla/piet", branch = "psst" }
+piet-common = { git = "https://github.com/jpochyla/piet", branch = "psst" }
+piet-coregraphics = { git = "https://github.com/jpochyla/piet", branch = "psst" }

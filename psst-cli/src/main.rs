@@ -1,12 +1,14 @@
 use psst_core::{
-    audio_normalize::NormalizationLevel,
-    audio_output::AudioOutput,
-    audio_player::{PlaybackConfig, PlaybackItem, Player, PlayerCommand, PlayerEvent},
+    audio::{
+        normalize::NormalizationLevel,
+        output::{AudioOutput, AudioSink, DefaultAudioOutput},
+    },
     cache::{Cache, CacheHandle},
     cdn::{Cdn, CdnHandle},
     connection::Credentials,
     error::Error,
     item_id::{ItemId, ItemIdType},
+    player::{item::PlaybackItem, PlaybackConfig, Player, PlayerCommand, PlayerEvent},
     session::{SessionConfig, SessionService},
 };
 use std::{env, io, io::BufRead, path::PathBuf, thread};
@@ -51,23 +53,13 @@ fn play_item(
     cache: CacheHandle,
     item: PlaybackItem,
 ) -> Result<(), Error> {
-    let output = AudioOutput::open()?;
-    let output_remote = output.remote();
+    let output = DefaultAudioOutput::open()?;
     let config = PlaybackConfig::default();
 
-    let mut player = Player::new(session, cdn, cache, config, output.remote());
-
-    let output_thread = thread::spawn({
-        let player_source = player.audio_source();
-        move || {
-            output
-                .start_playback(player_source)
-                .expect("Playback failed");
-        }
-    });
+    let mut player = Player::new(session, cdn, cache, config, &output);
 
     let _ui_thread = thread::spawn({
-        let player_sender = player.event_sender();
+        let player_sender = player.sender();
 
         player_sender
             .send(PlayerEvent::Command(PlayerCommand::LoadQueue {
@@ -110,11 +102,10 @@ fn play_item(
         }
     });
 
-    for event in player.event_receiver() {
+    for event in player.receiver() {
         player.handle(event);
     }
-    output_remote.close();
-    output_thread.join().unwrap();
+    output.sink().close();
 
     Ok(())
 }

@@ -1,8 +1,8 @@
-use std::{convert::TryFrom, ops::Deref, str::FromStr, sync::Arc, time::Duration};
+use std::{convert::TryFrom, sync::Arc, time::Duration};
 
 use druid::{im::Vector, lens::Map, Data, Lens};
 use psst_core::item_id::{ItemId, ItemIdType};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::data::{AlbumLink, ArtistLink};
 
@@ -20,6 +20,8 @@ pub struct Track {
     pub track_number: usize,
     pub explicit: bool,
     pub is_local: bool,
+    #[serde(skip_deserializing)]
+    pub local_path: Option<Arc<str>>,
     pub is_playable: Option<bool>,
     pub popularity: Option<u32>,
 }
@@ -58,23 +60,14 @@ impl Track {
     }
 
     pub fn url(&self) -> String {
-        format!("https://open.spotify.com/track/{}", self.id.to_base62())
+        format!("https://open.spotify.com/track/{}", self.id.0.to_base62())
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash, Deserialize)]
+#[derive(Clone, Copy, Default, PartialEq, Eq, Debug, Hash, Deserialize, Serialize)]
 #[serde(try_from = "String")]
-pub struct TrackId(ItemId);
-
-impl TrackId {
-    pub const INVALID: Self = Self(ItemId::new(0u128, ItemIdType::Unknown));
-}
-
-impl Default for TrackId {
-    fn default() -> Self {
-        Self::INVALID
-    }
-}
+#[serde(into = "String")]
+pub struct TrackId(pub ItemId);
 
 impl Data for TrackId {
     fn same(&self, other: &Self) -> bool {
@@ -82,37 +75,19 @@ impl Data for TrackId {
     }
 }
 
-impl Deref for TrackId {
-    type Target = ItemId;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl From<ItemId> for TrackId {
-    fn from(id: ItemId) -> Self {
-        Self(id)
-    }
-}
-
-impl FromStr for TrackId {
-    type Err = &'static str;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if let Some(id) = ItemId::from_base62(s, ItemIdType::Track) {
-            Ok(Self(id))
-        } else {
-            Err("Invalid track ID")
-        }
-    }
-}
-
 impl TryFrom<String> for TrackId {
     type Error = &'static str;
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
-        Self::from_str(&value)
+        ItemId::from_base62(&value, ItemIdType::Track)
+            .ok_or("Invalid ID")
+            .map(Self)
+    }
+}
+
+impl From<TrackId> for String {
+    fn from(id: TrackId) -> Self {
+        id.0.to_base62()
     }
 }
 

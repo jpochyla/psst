@@ -16,6 +16,8 @@ pub fn main_menu(_window: Option<WindowId>, _data: &AppState, _env: &Env) -> Men
 }
 
 fn mac_app_menu() -> Menu<AppState> {
+    // macOS-only commands are deprecated on other systems.
+    #[cfg_attr(not(target_os = "macos"), allow(deprecated))]
     Menu::new(LocalizedString::new("macos-menu-application-menu"))
         .entry(platform_menus::mac::application::preferences())
         .separator()
@@ -31,6 +33,13 @@ fn mac_app_menu() -> Menu<AppState> {
             MenuItem::new(LocalizedString::new("macos-menu-hide").with_placeholder("Hide Psst"))
                 .command(commands::HIDE_APPLICATION)
                 .hotkey(SysMods::Cmd, "h"),
+        )
+        .entry(
+            MenuItem::new(
+                LocalizedString::new("macos-menu-hide-others").with_placeholder("Hide Others"),
+            )
+            .command(commands::HIDE_OTHERS)
+            .hotkey(SysMods::AltCmd, "h"),
         )
 }
 
@@ -63,8 +72,20 @@ fn view_menu() -> Menu<AppState> {
             .hotkey(SysMods::Cmd, "3"),
         )
         .entry(
+            MenuItem::new(
+                LocalizedString::new("menu-item-saved-shows").with_placeholder("Saved Shows"),
+            )
+            .command(cmd::NAVIGATE.with(Nav::SavedShows))
+            .hotkey(SysMods::Cmd, "4"),
+        )
+        .entry(
             MenuItem::new(LocalizedString::new("menu-item-search").with_placeholder("Search..."))
                 .command(cmd::SET_FOCUS.to(cmd::WIDGET_SEARCH_INPUT))
                 .hotkey(SysMods::Cmd, "l"),
+        )
+        .entry(
+            MenuItem::new(LocalizedString::new("menu-item-find").with_placeholder("Find..."))
+                .command(cmd::TOGGLE_FINDER)
+                .hotkey(SysMods::Cmd, "f"),
         )
 }

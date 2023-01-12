@@ -34,7 +34,8 @@ pub const TEXT_SIZE_SMALL: Key<f64> = Key::new("app.text-size-small");
 
 pub const ICON_COLOR: Key<Color> = Key::new("app.icon-color");
 pub const ICON_SIZE_SMALL: Size = Size::new(14.0, 14.0);
-pub const ICON_SIZE: Size = Size::new(22.0, 22.0);
+pub const ICON_SIZE_MEDIUM: Size = Size::new(16.0, 16.0);
+pub const ICON_SIZE_LARGE: Size = Size::new(22.0, 22.0);
 
 pub const LINK_HOT_COLOR: Key<Color> = Key::new("app.link-hot-color");
 pub const LINK_ACTIVE_COLOR: Key<Color> = Key::new("app.link-active-color");
@@ -48,8 +49,8 @@ pub fn setup(env: &mut Env, state: &AppState) {
 
     env.set(WINDOW_BACKGROUND_COLOR, env.get(GREY_700));
     env.set(TEXT_COLOR, env.get(GREY_100));
-    env.set(ICON_COLOR, env.get(GREY_300));
-    env.set(PLACEHOLDER_COLOR, env.get(GREY_300));
+    env.set(ICON_COLOR, env.get(GREY_400));
+    env.set(PLACEHOLDER_COLOR, env.get(GREY_400));
     env.set(PRIMARY_LIGHT, env.get(BLUE_100));
     env.set(PRIMARY_DARK, env.get(BLUE_200));
 
@@ -140,8 +141,8 @@ fn setup_light_theme(env: &mut Env) {
 
     env.set(RED, Color::rgba8(0xEB, 0x57, 0x57, 0xFF));
 
-    env.set(LINK_HOT_COLOR, Color::rgba(0.0, 0.0, 0.0, 0.05));
-    env.set(LINK_ACTIVE_COLOR, Color::rgba(0.0, 0.0, 0.0, 0.025));
+    env.set(LINK_HOT_COLOR, Color::rgba(0.0, 0.0, 0.0, 0.06));
+    env.set(LINK_ACTIVE_COLOR, Color::rgba(0.0, 0.0, 0.0, 0.04));
     env.set(LINK_COLD_COLOR, Color::rgba(0.0, 0.0, 0.0, 0.0));
 }
 

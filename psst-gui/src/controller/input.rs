@@ -6,8 +6,10 @@ use druid::{
 
 use crate::cmd;
 
+type SubmitHandler = Box<dyn Fn(&mut EventCtx, &mut String, &Env)>;
+
 pub struct InputController {
-    on_submit: Option<Box<dyn Fn(&mut EventCtx, &mut String, &Env)>>,
+    on_submit: Option<SubmitHandler>,
 }
 
 impl InputController {

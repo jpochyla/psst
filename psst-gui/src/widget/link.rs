@@ -1,4 +1,4 @@
-use druid::{widget::prelude::*, Color, Data, KeyOrValue, Point, WidgetPod};
+use druid::{widget::prelude::*, Color, Data, KeyOrValue, Point, RoundedRectRadii, WidgetPod};
 
 use crate::ui::theme;
 
@@ -6,7 +6,7 @@ pub struct Link<T> {
     inner: WidgetPod<T, Box<dyn Widget<T>>>,
     border_color: KeyOrValue<Color>,
     border_width: KeyOrValue<f64>,
-    corner_radius: KeyOrValue<f64>,
+    corner_radius: KeyOrValue<RoundedRectRadii>,
     is_active: Option<Box<dyn Fn(&T, &Env) -> bool>>,
 }
 
@@ -16,7 +16,7 @@ impl<T: Data> Link<T> {
             inner: WidgetPod::new(inner).boxed(),
             border_color: theme::LINK_HOT_COLOR.into(),
             border_width: 0.0.into(),
-            corner_radius: 0.0.into(),
+            corner_radius: RoundedRectRadii::from(0.0).into(),
             is_active: None,
         }
     }
@@ -31,13 +31,13 @@ impl<T: Data> Link<T> {
         self
     }
 
-    pub fn rounded(mut self, radius: impl Into<KeyOrValue<f64>>) -> Self {
+    pub fn rounded(mut self, radius: impl Into<KeyOrValue<RoundedRectRadii>>) -> Self {
         self.corner_radius = radius.into();
         self
     }
 
     pub fn circle(self) -> Self {
-        self.rounded(f64::INFINITY)
+        self.rounded(RoundedRectRadii::from(f64::INFINITY))
     }
 
     pub fn active(mut self, predicate: impl Fn(&T, &Env) -> bool + 'static) -> Self {

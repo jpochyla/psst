@@ -3,10 +3,10 @@ use std::time::Duration;
 use quick_protobuf::MessageRead;
 
 use crate::{
-    audio_file::{AudioFile, AudioPath},
     error::Error,
     item_id::{FileId, ItemId, ItemIdType},
-    protocol::metadata::{Restriction, Track},
+    player::file::{AudioFormat, MediaFile, MediaPath},
+    protocol::metadata::{AudioFile, Episode, Restriction, Track},
     session::SessionService,
 };
 
@@ -23,13 +23,19 @@ impl Fetch for Track {
     }
 }
 
-pub trait ToAudioPath {
-    fn is_restricted_in_region(&self, country: &str) -> bool;
-    fn find_allowed_alternative(&self, country: &str) -> Option<ItemId>;
-    fn to_audio_path(&self, preferred_bitrate: usize) -> Option<AudioPath>;
+impl Fetch for Episode {
+    fn uri(id: ItemId) -> String {
+        format!("hm://metadata/3/episode/{}", id.to_base16())
+    }
 }
 
-impl ToAudioPath for Track {
+pub trait ToMediaPath {
+    fn is_restricted_in_region(&self, country: &str) -> bool;
+    fn find_allowed_alternative(&self, country: &str) -> Option<ItemId>;
+    fn to_media_path(&self, preferred_bitrate: usize) -> Option<MediaPath>;
+}
+
+impl ToMediaPath for Track {
     fn is_restricted_in_region(&self, country: &str) -> bool {
         self.restriction
             .iter()
@@ -44,40 +50,55 @@ impl ToAudioPath for Track {
         ItemId::from_raw(alt_track.gid.as_ref()?, ItemIdType::Track)
     }
 
-    fn to_audio_path(&self, preferred_bitrate: usize) -> Option<AudioPath> {
-        let file = AudioFile::compatible_audio_formats(preferred_bitrate)
-            .iter()
-            .find_map(|&preferred_format| {
-                self.file
-                    .iter()
-                    .find(|file| file.format == Some(preferred_format))
-            })?;
-        let file_format = file.format?;
-        let item_id = ItemId::from_raw(self.gid.as_ref()?, ItemIdType::Track)?;
-        let file_id = FileId::from_raw(file.file_id.as_ref()?)?;
-        let duration = Duration::from_millis(self.duration? as u64);
-        Some(AudioPath {
-            item_id,
-            file_id,
-            file_format,
-            duration,
+    fn to_media_path(&self, preferred_bitrate: usize) -> Option<MediaPath> {
+        let file = select_preferred_file(&self.file, preferred_bitrate)?;
+        Some(MediaPath {
+            item_id: ItemId::from_raw(self.gid.as_ref()?, ItemIdType::Track)?,
+            file_id: FileId::from_raw(file.file_id.as_ref()?)?,
+            file_format: AudioFormat::from_protocol(file.format?),
+            duration: Duration::from_millis(self.duration? as u64),
         })
     }
 }
 
+impl ToMediaPath for Episode {
+    fn is_restricted_in_region(&self, country: &str) -> bool {
+        self.restriction
+            .iter()
+            .any(|rest| is_restricted_in_region(rest, country))
+    }
+
+    fn find_allowed_alternative(&self, _country: &str) -> Option<ItemId> {
+        None
+    }
+
+    fn to_media_path(&self, preferred_bitrate: usize) -> Option<MediaPath> {
+        let file = select_preferred_file(&self.file, preferred_bitrate)?;
+        Some(MediaPath {
+            item_id: ItemId::from_raw(self.gid.as_ref()?, ItemIdType::Podcast)?,
+            file_id: FileId::from_raw(file.file_id.as_ref()?)?,
+            file_format: AudioFormat::from_protocol(file.format?),
+            duration: Duration::from_millis(self.duration? as u64),
+        })
+    }
+}
+
+fn select_preferred_file(files: &[AudioFile], preferred_bitrate: usize) -> Option<&AudioFile> {
+    MediaFile::supported_audio_formats_for_bitrate(preferred_bitrate)
+        .iter()
+        .find_map(|&preferred_format| {
+            files
+                .iter()
+                .find(|file| file.format == Some(preferred_format))
+        })
+}
+
 fn is_restricted_in_region(restriction: &Restriction, country: &str) -> bool {
     if let Some(allowed) = &restriction.countries_allowed {
-        if allowed.is_empty() {
-            return true;
-        }
-        if is_country_in_list(allowed.as_bytes(), country.as_bytes()) {
-            return false;
-        }
+        return !is_country_in_list(allowed.as_bytes(), country.as_bytes());
     }
     if let Some(forbidden) = &restriction.countries_forbidden {
-        if is_country_in_list(forbidden.as_bytes(), country.as_bytes()) {
-            return true;
-        }
+        return is_country_in_list(forbidden.as_bytes(), country.as_bytes());
     }
     false
 }

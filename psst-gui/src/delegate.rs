@@ -1,28 +1,30 @@
-use std::{sync::Arc, thread};
-
 use druid::{
-    commands, AppDelegate, Application, Command, DelegateCtx, Env, Handled, ImageBuf, Target,
-    WindowId,
+    commands, AppDelegate, Application, Command, DelegateCtx, Env, Event, Handled, Target, WindowId,
 };
-use lru_cache::LruCache;
+use threadpool::ThreadPool;
 
-use crate::{cmd, data::AppState, ui, webapi::WebApi, widget::remote_image};
+use crate::{
+    cmd,
+    data::{AppState, Config},
+    ui,
+    webapi::WebApi,
+    widget::remote_image,
+};
 
 pub struct Delegate {
-    image_cache: LruCache<Arc<str>, ImageBuf>,
     main_window: Option<WindowId>,
     preferences_window: Option<WindowId>,
+    image_pool: ThreadPool,
 }
 
 impl Delegate {
     pub fn new() -> Self {
-        const IMAGE_CACHE_SIZE: usize = 256;
-        let image_cache = LruCache::new(IMAGE_CACHE_SIZE);
+        const MAX_IMAGE_THREADS: usize = 32;
 
         Self {
-            image_cache,
             main_window: None,
             preferences_window: None,
+            image_pool: ThreadPool::with_name("image_loading".into(), MAX_IMAGE_THREADS),
         }
     }
 
@@ -38,14 +40,49 @@ impl Delegate {
         this
     }
 
-    fn spawn<F, T>(&self, f: F)
-    where
-        F: FnOnce() -> T,
-        F: Send + 'static,
-        T: Send + 'static,
-    {
-        // TODO: Use a thread pool.
-        thread::spawn(f);
+    fn show_main(&mut self, config: &Config, ctx: &mut DelegateCtx) {
+        match self.main_window {
+            Some(id) => {
+                ctx.submit_command(commands::SHOW_WINDOW.to(id));
+            }
+            None => {
+                let window = ui::main_window(config);
+                self.main_window.replace(window.id);
+                ctx.new_window(window);
+            }
+        }
+    }
+
+    fn show_account_setup(&mut self, ctx: &mut DelegateCtx) {
+        match self.preferences_window {
+            Some(id) => {
+                ctx.submit_command(commands::SHOW_WINDOW.to(id));
+            }
+            None => {
+                let window = ui::account_setup_window();
+                self.preferences_window.replace(window.id);
+                ctx.new_window(window);
+            }
+        }
+    }
+
+    fn show_preferences(&mut self, ctx: &mut DelegateCtx) {
+        match self.preferences_window {
+            Some(id) => {
+                ctx.submit_command(commands::SHOW_WINDOW.to(id));
+            }
+            None => {
+                let window = ui::preferences_window();
+                self.preferences_window.replace(window.id);
+                ctx.new_window(window);
+            }
+        }
+    }
+
+    fn close_all_windows(&mut self, ctx: &mut DelegateCtx) {
+        ctx.submit_command(commands::CLOSE_ALL_WINDOWS);
+        self.main_window = None;
+        self.preferences_window = None;
     }
 }
 
@@ -59,31 +96,19 @@ impl AppDelegate<AppState> for Delegate {
         _env: &Env,
     ) -> Handled {
         if cmd.is(cmd::SHOW_MAIN) {
-            match self.main_window {
-                Some(id) => {
-                    ctx.submit_command(commands::SHOW_WINDOW.to(id));
-                }
-                None => {
-                    let window = ui::main_window();
-                    self.main_window.replace(window.id);
-                    ctx.new_window(window);
-                }
-            }
+            self.show_main(&data.config, ctx);
+            Handled::Yes
+        } else if cmd.is(cmd::SHOW_ACCOUNT_SETUP) {
+            self.show_account_setup(ctx);
             Handled::Yes
         } else if cmd.is(commands::SHOW_PREFERENCES) {
-            match self.preferences_window {
-                Some(id) => {
-                    ctx.submit_command(commands::SHOW_WINDOW.to(id));
-                }
-                None => {
-                    let window = ui::preferences_window();
-                    self.preferences_window.replace(window.id);
-                    ctx.new_window(window);
-                }
-            }
+            self.show_preferences(ctx);
+            Handled::Yes
+        } else if cmd.is(cmd::CLOSE_ALL_WINDOWS) {
+            self.close_all_windows(ctx);
             Handled::Yes
         } else if let Some(text) = cmd.get(cmd::COPY) {
-            Application::global().clipboard().put_string(&text);
+            Application::global().clipboard().put_string(text);
             Handled::Yes
         } else if let Handled::Yes = self.command_image(ctx, target, cmd, data) {
             Handled::Yes
@@ -97,15 +122,32 @@ impl AppDelegate<AppState> for Delegate {
         id: WindowId,
         data: &mut AppState,
         _env: &Env,
-        _ctx: &mut DelegateCtx,
+        ctx: &mut DelegateCtx,
     ) {
         if self.preferences_window == Some(id) {
             self.preferences_window.take();
             data.preferences.reset();
+            data.preferences.auth.clear();
         }
         if self.main_window == Some(id) {
-            self.main_window.take();
+            data.config.save();
+            ctx.submit_command(commands::CLOSE_ALL_WINDOWS);
+            ctx.submit_command(commands::QUIT_APP);
         }
+    }
+
+    fn event(
+        &mut self,
+        _ctx: &mut DelegateCtx,
+        _window_id: WindowId,
+        event: Event,
+        data: &mut AppState,
+        _env: &Env,
+    ) -> Option<Event> {
+        if let Event::WindowSize(size) = event {
+            data.config.window_size = size;
+        }
+        Some(event)
     }
 }
 
@@ -119,7 +161,7 @@ impl Delegate {
     ) -> Handled {
         if let Some(location) = cmd.get(remote_image::REQUEST_DATA).cloned() {
             let sink = ctx.get_external_handle();
-            if let Some(image_buf) = self.image_cache.get_mut(&location).cloned() {
+            if let Some(image_buf) = WebApi::global().get_cached_image(&location) {
                 let payload = remote_image::ImagePayload {
                     location,
                     image_buf,
@@ -127,9 +169,8 @@ impl Delegate {
                 sink.submit_command(remote_image::PROVIDE_DATA, payload, target)
                     .unwrap();
             } else {
-                self.spawn(move || {
-                    let dyn_image = WebApi::global().get_image(&location).unwrap();
-                    let image_buf = ImageBuf::from_dynamic_image(dyn_image);
+                self.image_pool.execute(move || {
+                    let image_buf = WebApi::global().get_image(location.clone()).unwrap();
                     let payload = remote_image::ImagePayload {
                         location,
                         image_buf,
@@ -139,9 +180,6 @@ impl Delegate {
                 });
             }
             Handled::Yes
-        } else if let Some(payload) = cmd.get(remote_image::PROVIDE_DATA).cloned() {
-            self.image_cache.insert(payload.location, payload.image_buf);
-            Handled::No
         } else {
             Handled::No
         }

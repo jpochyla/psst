@@ -5,22 +5,25 @@ use druid::{
 
 use crate::{
     cmd,
-    data::{AppState, Ctx, Library, Nav, Playlist, PlaylistDetail, PlaylistLink, PlaylistTracks},
+    data::{
+        AppState, Ctx, Library, Nav, Playlist, PlaylistAddTrack, PlaylistDetail, PlaylistLink,
+        PlaylistRemoveTrack, PlaylistTracks,
+    },
+    error::Error,
     webapi::WebApi,
     widget::{Async, MyWidgetExt, RemoteImage},
 };
 
-use super::{
-    theme,
-    track::{tracklist_widget, TrackDisplay},
-    utils::{error_widget, placeholder_widget, spinner_widget},
-};
+use super::{playable, theme, track, utils};
 
+pub const LOAD_LIST: Selector = Selector::new("app.playlist.load-list");
 pub const LOAD_DETAIL: Selector<PlaylistLink> = Selector::new("app.playlist.load-detail");
+pub const ADD_TRACK: Selector<PlaylistAddTrack> = Selector::new("app.playlist.add-track");
+pub const REMOVE_TRACK: Selector<PlaylistRemoveTrack> = Selector::new("app.playlist.remove-track");
 
 pub fn list_widget() -> impl Widget<AppState> {
     Async::new(
-        spinner_widget,
+        utils::spinner_widget,
         || {
             List::new(|| {
                 Label::raw()
@@ -38,10 +41,61 @@ pub fn list_widget() -> impl Widget<AppState> {
                     .context_menu(playlist_menu)
             })
         },
-        error_widget,
+        utils::error_widget,
     )
-    .on_deferred(|_| WebApi::global().get_playlists())
     .lens(AppState::library.then(Library::playlists.in_arc()))
+    .on_command_async(
+        LOAD_LIST,
+        |_| WebApi::global().get_playlists(),
+        |_, data, d| data.with_library_mut(|l| l.playlists.defer(d)),
+        |_, data, r| data.with_library_mut(|l| l.playlists.update(r)),
+    )
+    .on_command_async(
+        ADD_TRACK,
+        |d| {
+            WebApi::global().add_track_to_playlist(
+                &d.link.id,
+                &d.track_id
+                    .0
+                    .to_uri()
+                    .ok_or_else(|| Error::WebApiError("Item doesn't have URI".to_string()))?,
+            )
+        },
+        |_, data, d| {
+            data.with_library_mut(|library| library.increment_playlist_track_count(&d.link))
+        },
+        |_, data, (_, r)| {
+            if let Err(err) = r {
+                data.error_alert(err);
+            } else {
+                data.info_alert("Added to playlist.");
+            }
+        },
+    )
+    .on_command_async(
+        REMOVE_TRACK,
+        |d| {
+            WebApi::global().remove_track_from_playlist(
+                &d.link.id,
+                &d.track_id
+                    .0
+                    .to_uri()
+                    .ok_or_else(|| Error::WebApiError("Item doesn't have URI".to_string()))?,
+            )
+        },
+        |_, data, d| {
+            data.with_library_mut(|library| library.decrement_playlist_track_count(&d.link))
+        },
+        |e, data, (p, r)| {
+            if let Err(err) = r {
+                data.error_alert(err);
+            } else {
+                data.info_alert("Removed from playlist.");
+            }
+            // Re-submit the `LOAD_DETAIL` command to reload the playlist data.
+            e.submit_command(LOAD_DETAIL.with(p.link))
+        },
+    )
 }
 
 pub fn playlist_widget() -> impl Widget<Playlist> {
@@ -80,9 +134,10 @@ pub fn playlist_widget() -> impl Widget<Playlist> {
 }
 
 fn cover_widget(size: f64) -> impl Widget<Playlist> {
-    RemoteImage::new(placeholder_widget(), move |playlist: &Playlist, _| {
-        playlist.image(size, size).map(|image| image.url.clone())
-    })
+    RemoteImage::new(
+        utils::placeholder_widget(),
+        move |playlist: &Playlist, _| playlist.image(size, size).map(|image| image.url.clone()),
+    )
     .fix_size(size, size)
 }
 
@@ -93,16 +148,22 @@ fn rounded_cover_widget(size: f64) -> impl Widget<Playlist> {
 
 pub fn detail_widget() -> impl Widget<AppState> {
     Async::new(
-        spinner_widget,
+        utils::spinner_widget,
         || {
-            tracklist_widget(TrackDisplay {
-                title: true,
-                artist: true,
-                album: true,
-                ..TrackDisplay::empty()
-            })
+            playable::list_widget_with_find(
+                playable::Display {
+                    track: track::Display {
+                        title: true,
+                        artist: true,
+                        album: true,
+                        cover: true,
+                        ..track::Display::empty()
+                    },
+                },
+                cmd::FIND_IN_PLAYLIST,
+            )
         },
-        error_widget,
+        utils::error_widget,
     )
     .lens(
         Ctx::make(
