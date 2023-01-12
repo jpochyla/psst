@@ -161,7 +161,7 @@ impl PlaybackController {
             MediaControlEvent::Previous => PlayerEvent::Command(PlayerCommand::Previous),
             MediaControlEvent::SetPosition(MediaPosition(duration)) => {
                 PlayerEvent::Command(PlayerCommand::Seek { position: duration })
-            },
+            }
             _ => {
                 return;
             }
