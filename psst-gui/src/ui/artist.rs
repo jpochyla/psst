@@ -141,6 +141,8 @@ fn albums_widget() -> impl Widget<WithCtx<ArtistAlbums>> {
         .with_child(List::new(album::album_widget).lens(Ctx::map(ArtistAlbums::singles)))
         .with_child(header_widget("Compilations"))
         .with_child(List::new(album::album_widget).lens(Ctx::map(ArtistAlbums::compilations)))
+        .with_child(header_widget("Appears On"))
+        .with_child(List::new(album::album_widget).lens(Ctx::map(ArtistAlbums::appears_on)))
 }
 
 fn related_widget() -> impl Widget<Cached<Vector<Artist>>> {
