@@ -49,13 +49,10 @@ impl Album {
     }
 
     pub fn release_year_int(&self) -> usize {
-        match self.release_year().parse::<usize>() {
-            Err(e) => {
-                log::error!("Error parsing release year for {}: {}", self.name, e);
-                std::usize::MAX
-            }
-            Ok(year) => year,
-        }
+        self.release_year().parse::<usize>().unwrap_or_else(|err| {
+            log::error!("Error parsing release year for {}: {}", self.name, err);
+            std::usize::MAX
+        })
     }
 
     fn release_with_format(&self, format: &(impl Formattable + ?Sized)) -> String {
