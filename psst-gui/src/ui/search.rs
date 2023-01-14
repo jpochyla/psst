@@ -6,20 +6,21 @@ use druid::{
     Data, LensExt, Selector, Widget, WidgetExt,
 };
 
-use crate::data::Show;
-use crate::ui::show;
 use crate::{
     cmd,
     controller::InputController,
     data::{
-        Album, AppState, Artist, Ctx, Nav, Playlist, Search, SearchResults, SearchTopic,
+        Album, AppState, Artist, Ctx, Nav, Playlist, Search, SearchResults, SearchTopic, Show,
         SpotifyUrl, WithCtx,
     },
+    ui::show,
     webapi::WebApi,
     widget::{Async, Empty, MyWidgetExt},
 };
 
 use super::{album, artist, playable, playlist, theme, track, utils};
+
+const NUMBER_OF_RESULTS_PER_TOPIC: usize = 5;
 
 pub const LOAD_RESULTS: Selector<Arc<str>> = Selector::new("app.search.load-results");
 pub const OPEN_LINK: Selector<SpotifyUrl> = Selector::new("app.search.open-link");
@@ -50,7 +51,7 @@ pub fn results_widget() -> impl Widget<AppState> {
     )
     .on_command_async(
         LOAD_RESULTS,
-        |q| WebApi::global().search(&q, SearchTopic::all()),
+        |q| WebApi::global().search(&q, SearchTopic::all(), NUMBER_OF_RESULTS_PER_TOPIC),
         |_, data, q| data.search.results.defer(q),
         |_, data, r| data.search.results.update(r),
     )

@@ -1,5 +1,8 @@
 use psst_core::{
-    audio::{normalize::NormalizationLevel, output::AudioOutput},
+    audio::{
+        normalize::NormalizationLevel,
+        output::{AudioOutput, AudioSink, DefaultAudioOutput},
+    },
     cache::{Cache, CacheHandle},
     cdn::{Cdn, CdnHandle},
     connection::Credentials,
@@ -50,7 +53,7 @@ fn play_item(
     cache: CacheHandle,
     item: PlaybackItem,
 ) -> Result<(), Error> {
-    let output = AudioOutput::open()?;
+    let output = DefaultAudioOutput::open()?;
     let config = PlaybackConfig::default();
 
     let mut player = Player::new(session, cdn, cache, config, &output);

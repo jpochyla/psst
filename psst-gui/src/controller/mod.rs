@@ -1,5 +1,6 @@
 mod after_delay;
 mod ex_click;
+mod ex_scroll;
 mod input;
 mod nav;
 mod on_command;
@@ -11,6 +12,7 @@ mod session;
 
 pub use after_delay::AfterDelay;
 pub use ex_click::ExClick;
+pub use ex_scroll::ExScroll;
 pub use input::InputController;
 pub use nav::NavController;
 pub use on_command::OnCommand;

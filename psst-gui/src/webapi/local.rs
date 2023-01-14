@@ -1,7 +1,9 @@
 use std::{
     collections::HashMap,
+    convert::TryInto,
     fs::File,
     io::{self, Cursor, Read},
+    path::PathBuf,
     str,
     sync::Arc,
     time::Duration,
@@ -13,6 +15,7 @@ use serde::Deserialize;
 use serde_json::Value;
 
 use crate::data::{config::Config, AlbumLink, ArtistLink, Image, Track, TrackId};
+use psst_core::item_id::ItemId;
 
 /**
  * All local files registered by the Spotify file can be found in the file
@@ -135,9 +138,17 @@ impl LocalTrackManager {
         let matching_tracks = self.tracks.get(&local_track.name)?;
 
         for parsed_track in matching_tracks {
+            let path: PathBuf = match (&*parsed_track.path).try_into() {
+                Ok(t) => t,
+                Err(e) => {
+                    log::error!("error loading local file {:?}", e);
+                    continue;
+                }
+            };
+
             if Self::is_matching_in_addition_to_title(parsed_track, &local_track) {
                 return Some(Arc::new(Track {
-                    id: TrackId::default(),
+                    id: TrackId(ItemId::from_local(path)),
                     name: local_track.name,
                     album: local_track.album.map(|local_album| {
                         AlbumLink {
@@ -206,10 +217,8 @@ struct LocalArtistLinkJson {
     pub name: Arc<str>,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Deserialize)]
 struct LocalTrackJson {
-    #[serde(default)]
-    pub id: Option<TrackId>,
     pub name: Arc<str>,
     #[serde(default)]
     pub album: Option<LocalAlbumLinkJson>,
@@ -221,7 +230,6 @@ struct LocalTrackJson {
     pub track_number: usize,
     pub explicit: bool,
     pub is_local: bool,
-    pub is_playable: Option<bool>,
     pub popularity: Option<u32>,
 }
 

@@ -1,16 +1,20 @@
+use std::time::Duration;
+
 use crate::{
-    audio::{decode::AudioDecoder, decrypt::AudioKey, normalize::NormalizationLevel},
+    audio::{
+        decode::AudioDecoder, decrypt::AudioKey, normalize::NormalizationLevel, probe::TrackProbe,
+    },
     cache::CacheHandle,
     cdn::CdnHandle,
     error::Error,
-    item_id::{ItemId, ItemIdType},
+    item_id::{ItemId, ItemIdType, LocalItemRegistry},
     metadata::{Fetch, ToMediaPath},
     protocol::metadata::{Episode, Track},
     session::SessionService,
 };
 
 use super::{
-    file::{MediaFile, MediaPath},
+    file::{AudioFormat, MediaFile, MediaPath},
     PlaybackConfig,
 };
 
@@ -35,9 +39,19 @@ impl PlaybackItem {
         config: &PlaybackConfig,
     ) -> Result<LoadedPlaybackItem, Error> {
         let path = load_media_path(self.item_id, session, &cache, config)?;
-        let key = load_audio_key(&path, session, &cache)?;
-        let file = MediaFile::open(path, cdn, cache)?;
-        let (source, norm_data) = file.audio_source(key)?;
+        let (file, source, norm_data) = match self.item_id.id_type {
+            ItemIdType::LocalFile => {
+                let file = MediaFile::local(path);
+                let (source, norm_data) = file.local_audio_source()?;
+                (file, source, norm_data)
+            }
+            _ => {
+                let key = load_audio_key(&path, session, &cache)?;
+                let file = MediaFile::open(path, cdn, cache)?;
+                let (source, norm_data) = file.remote_audio_source(key)?;
+                (file, source, norm_data)
+            }
+        };
         let norm_factor = norm_data.factor_for_level(self.norm_level, config.pregain);
         Ok(LoadedPlaybackItem {
             file,
@@ -58,6 +72,7 @@ fn load_media_path(
             load_media_path_from_track_or_alternative(item_id, session, cache, config)
         }
         ItemIdType::Podcast => load_media_path_from_episode(item_id, session, cache, config),
+        ItemIdType::LocalFile => load_media_path_from_local(item_id),
         ItemIdType::Unknown => unimplemented!(),
     }
 }
@@ -118,6 +133,20 @@ fn load_media_path_from_episode(
             .ok_or(Error::MediaFileNotFound)?,
     };
     Ok(path)
+}
+
+fn load_media_path_from_local(item_id: ItemId) -> Result<MediaPath, Error> {
+    let path = LocalItemRegistry::get(item_id.id).expect("valid local item ID");
+    let probe = TrackProbe::new(&path)?;
+    Ok(MediaPath {
+        item_id,
+        file_id: Default::default(),
+        file_format: AudioFormat::from_codec(probe.codec),
+        // It's possible (though unlikely) that we're unable to determine the track
+        // duration from the codec params; in that case, default to 0 and let it
+        // be calculated at runtime as we play the track.
+        duration: probe.duration.unwrap_or(Duration::from_millis(0)),
+    })
 }
 
 fn get_country_code(session: &SessionService, cache: &CacheHandle) -> Option<String> {

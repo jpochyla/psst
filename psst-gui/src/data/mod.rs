@@ -11,6 +11,7 @@ mod promise;
 mod recommend;
 mod search;
 mod show;
+mod slider_scroll_scale;
 mod track;
 mod user;
 pub mod utils;
@@ -42,7 +43,10 @@ pub use crate::data::{
         NowPlaying, Playable, PlayableMatcher, Playback, PlaybackOrigin, PlaybackPayload,
         PlaybackState, QueueBehavior, QueueEntry,
     },
-    playlist::{Playlist, PlaylistAddTrack, PlaylistDetail, PlaylistLink, PlaylistTracks},
+    playlist::{
+        Playlist, PlaylistAddTrack, PlaylistDetail, PlaylistLink, PlaylistRemoveTrack,
+        PlaylistTracks,
+    },
     promise::{Promise, PromiseState},
     recommend::{
         Range, Recommend, Recommendations, RecommendationsKnobs, RecommendationsParams,
@@ -50,6 +54,7 @@ pub use crate::data::{
     },
     search::{Search, SearchResults, SearchTopic},
     show::{Episode, EpisodeId, EpisodeLink, Show, ShowDetail, ShowEpisodes, ShowLink},
+    slider_scroll_scale::SliderScrollScale,
     track::{AudioAnalysis, AudioSegment, TimeInterval, Track, TrackId},
     user::UserProfile,
     utils::{Cached, Float64, Image, Page},
@@ -369,6 +374,16 @@ impl Library {
             for playlist in saved.iter_mut() {
                 if playlist.id == link.id {
                     playlist.track_count += 1;
+                }
+            }
+        }
+    }
+
+    pub fn decrement_playlist_track_count(&mut self, link: &PlaylistLink) {
+        if let Some(saved) = self.playlists.resolved_mut() {
+            for playlist in saved.iter_mut() {
+                if playlist.id == link.id {
+                    playlist.track_count -= 1;
                 }
             }
         }

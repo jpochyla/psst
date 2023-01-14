@@ -37,6 +37,7 @@ pub fn saved_tracks_widget() -> impl Widget<AppState> {
                         title: true,
                         artist: true,
                         album: true,
+                        cover: true,
                         ..track::Display::empty()
                     },
                 },

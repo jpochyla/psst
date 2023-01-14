@@ -106,7 +106,9 @@ fn playing_item_widget() -> impl Widget<NowPlaying> {
             ctx.submit_command(cmd::NAVIGATE.with(now_playing.origin.to_nav()));
         })
         .context_menu(|now_playing| match &now_playing.item {
-            Playable::Track(track) => track::track_menu(track, &now_playing.library),
+            Playable::Track(track) => {
+                track::track_menu(track, &now_playing.library, &now_playing.origin)
+            }
             Playable::Episode(episode) => episode::episode_menu(episode, &now_playing.library),
         })
 }
@@ -496,9 +498,9 @@ fn paint_audio_analysis(ctx: &mut PaintCtx, data: &NowPlaying, path: &BezPath, e
     };
 
     ctx.with_save(|ctx| {
-        ctx.fill(&path, &remaining_color);
-        ctx.clip(&elapsed);
-        ctx.fill(&path, &elapsed_color);
+        ctx.fill(path, &remaining_color);
+        ctx.clip(elapsed);
+        ctx.fill(path, &elapsed_color);
     });
 }
 
@@ -520,11 +522,11 @@ fn paint_progress_bar(ctx: &mut PaintCtx, data: &NowPlaying, env: &Env) {
     let remaining = Size::new(remaining_width, bounds.height).round();
 
     ctx.fill(
-        &Rect::from_origin_size(Point::ORIGIN, elapsed),
+        Rect::from_origin_size(Point::ORIGIN, elapsed),
         &elapsed_color,
     );
     ctx.fill(
-        &Rect::from_origin_size(Point::new(elapsed.width, 0.0), remaining),
+        Rect::from_origin_size(Point::new(elapsed.width, 0.0), remaining),
         &remaining_color,
     );
 }

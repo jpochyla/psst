@@ -16,6 +16,8 @@ pub fn main_menu(_window: Option<WindowId>, _data: &AppState, _env: &Env) -> Men
 }
 
 fn mac_app_menu() -> Menu<AppState> {
+    // macOS-only commands are deprecated on other systems.
+    #[cfg_attr(not(target_os = "macos"), allow(deprecated))]
     Menu::new(LocalizedString::new("macos-menu-application-menu"))
         .entry(platform_menus::mac::application::preferences())
         .separator()
@@ -31,6 +33,13 @@ fn mac_app_menu() -> Menu<AppState> {
             MenuItem::new(LocalizedString::new("macos-menu-hide").with_placeholder("Hide Psst"))
                 .command(commands::HIDE_APPLICATION)
                 .hotkey(SysMods::Cmd, "h"),
+        )
+        .entry(
+            MenuItem::new(
+                LocalizedString::new("macos-menu-hide-others").with_placeholder("Hide Others"),
+            )
+            .command(commands::HIDE_OTHERS)
+            .hotkey(SysMods::AltCmd, "h"),
         )
 }
 

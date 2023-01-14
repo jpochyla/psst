@@ -10,7 +10,7 @@ use druid::{
     Code, ExtEventSink, InternalLifeCycle, KbKey, WindowHandle,
 };
 use psst_core::{
-    audio::{normalize::NormalizationLevel, output::AudioOutput},
+    audio::{normalize::NormalizationLevel, output::DefaultAudioOutput},
     cache::Cache,
     cdn::Cdn,
     player::{item::PlaybackItem, PlaybackConfig, Player, PlayerCommand, PlayerEvent},
@@ -28,7 +28,7 @@ use crate::{
 pub struct PlaybackController {
     sender: Option<Sender<PlayerEvent>>,
     thread: Option<JoinHandle<()>>,
-    output: Option<AudioOutput>,
+    output: Option<DefaultAudioOutput>,
     media_controls: Option<MediaControls>,
 }
 
@@ -50,7 +50,7 @@ impl PlaybackController {
         widget_id: WidgetId,
         #[allow(unused_variables)] window: &WindowHandle,
     ) {
-        let output = AudioOutput::open().unwrap();
+        let output = DefaultAudioOutput::open().unwrap();
         let cache_dir = Config::cache_dir().unwrap();
         let proxy_url = Config::proxy();
         let player = Player::new(
@@ -61,7 +61,7 @@ impl PlaybackController {
             &output,
         );
 
-        self.media_controls = Self::create_media_controls(player.sender(), &window)
+        self.media_controls = Self::create_media_controls(player.sender(), window)
             .map_err(|err| log::error!("failed to connect to media control interface: {:?}", err))
             .ok();
 
@@ -130,7 +130,7 @@ impl PlaybackController {
             {
                 use raw_window_handle::{HasRawWindowHandle, RawWindowHandle};
                 let handle = match window.raw_window_handle() {
-                    RawWindowHandle::Windows(h) => h,
+                    RawWindowHandle::Win32(h) => h,
                     _ => unreachable!(),
                 };
                 Some(handle.hwnd)
@@ -159,6 +159,9 @@ impl PlaybackController {
             MediaControlEvent::Toggle => PlayerEvent::Command(PlayerCommand::PauseOrResume),
             MediaControlEvent::Next => PlayerEvent::Command(PlayerCommand::Next),
             MediaControlEvent::Previous => PlayerEvent::Command(PlayerCommand::Previous),
+            MediaControlEvent::SetPosition(MediaPosition(duration)) => {
+                PlayerEvent::Command(PlayerCommand::Seek { position: duration })
+            }
             _ => {
                 return;
             }
@@ -321,6 +324,7 @@ where
             Event::Command(cmd) if cmd.is(cmd::PLAYBACK_PROGRESS) => {
                 let progress = cmd.get_unchecked(cmd::PLAYBACK_PROGRESS);
                 data.progress_playback(progress.to_owned());
+                self.update_media_control_playback(&data.playback);
                 ctx.set_handled();
             }
             Event::Command(cmd) if cmd.is(cmd::PLAYBACK_PAUSING) => {

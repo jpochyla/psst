@@ -7,7 +7,7 @@ use crate::{
     cmd,
     data::{
         AppState, Ctx, Library, Nav, Playlist, PlaylistAddTrack, PlaylistDetail, PlaylistLink,
-        PlaylistTracks,
+        PlaylistRemoveTrack, PlaylistTracks,
     },
     error::Error,
     webapi::WebApi,
@@ -19,6 +19,7 @@ use super::{playable, theme, track, utils};
 pub const LOAD_LIST: Selector = Selector::new("app.playlist.load-list");
 pub const LOAD_DETAIL: Selector<PlaylistLink> = Selector::new("app.playlist.load-detail");
 pub const ADD_TRACK: Selector<PlaylistAddTrack> = Selector::new("app.playlist.add-track");
+pub const REMOVE_TRACK: Selector<PlaylistRemoveTrack> = Selector::new("app.playlist.remove-track");
 
 pub fn list_widget() -> impl Widget<AppState> {
     Async::new(
@@ -69,6 +70,30 @@ pub fn list_widget() -> impl Widget<AppState> {
             } else {
                 data.info_alert("Added to playlist.");
             }
+        },
+    )
+    .on_command_async(
+        REMOVE_TRACK,
+        |d| {
+            WebApi::global().remove_track_from_playlist(
+                &d.link.id,
+                &d.track_id
+                    .0
+                    .to_uri()
+                    .ok_or_else(|| Error::WebApiError("Item doesn't have URI".to_string()))?,
+            )
+        },
+        |_, data, d| {
+            data.with_library_mut(|library| library.decrement_playlist_track_count(&d.link))
+        },
+        |e, data, (p, r)| {
+            if let Err(err) = r {
+                data.error_alert(err);
+            } else {
+                data.info_alert("Removed from playlist.");
+            }
+            // Re-submit the `LOAD_DETAIL` command to reload the playlist data.
+            e.submit_command(LOAD_DETAIL.with(p.link))
         },
     )
 }
