@@ -311,7 +311,7 @@ where
         let total = Size::new(max.width, player.height.max(item.height));
 
         // Put the item to the top left.
-        self.item.set_origin(ctx, data, env, Point::ORIGIN);
+        self.item.set_origin(ctx, Point::ORIGIN);
 
         // Put the player either to the center or to the right.
         let player_pos = if player_centered {
@@ -325,7 +325,7 @@ where
                 total.height * 0.5 - player.height * 0.5,
             )
         };
-        self.player.set_origin(ctx, data, env, player_pos);
+        self.player.set_origin(ctx, player_pos);
 
         total
     }

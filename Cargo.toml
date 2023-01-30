@@ -16,8 +16,3 @@ codegen-units = 1
 opt-level = 2
 [profile.dev.package.libsamplerate]
 opt-level = 2
-
-[patch.crates-io]
-piet = { git = "https://github.com/jpochyla/piet", branch = "psst" }
-piet-common = { git = "https://github.com/jpochyla/piet", branch = "psst" }
-piet-coregraphics = { git = "https://github.com/jpochyla/piet", branch = "psst" }

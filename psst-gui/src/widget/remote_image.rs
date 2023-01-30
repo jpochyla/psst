@@ -90,11 +90,11 @@ impl<T: Data> Widget<T> for RemoteImage<T> {
     fn layout(&mut self, ctx: &mut LayoutCtx, bc: &BoxConstraints, data: &T, env: &Env) -> Size {
         if let Some(image) = self.image.as_mut() {
             let size = image.layout(ctx, bc, data, env);
-            image.set_origin(ctx, data, env, Point::ORIGIN);
+            image.set_origin(ctx, Point::ORIGIN);
             size
         } else {
             let size = self.placeholder.layout(ctx, bc, data, env);
-            self.placeholder.set_origin(ctx, data, env, Point::ORIGIN);
+            self.placeholder.set_origin(ctx, Point::ORIGIN);
             size
         }
     }

@@ -37,7 +37,7 @@ url = { version = "2.3.1" }
 
 # GUI
 druid = { git = "https://github.com/jpochyla/druid", branch = "psst", features = ["im", "image", "jpeg", "png", "serde"] }
-druid-enums = { git = "https://github.com/luleyleo/druid-enums" }
+druid-enums = { git = "https://github.com/jpochyla/druid-enums" }
 druid-shell = { git = "https://github.com/jpochyla/druid", branch = "psst", features = ["raw-win-handle"] }
 open = { version = "3.0.3" }
 raw-window-handle = { version = "0.5.0" }
@@ -45,7 +45,7 @@ souvlaki = { version = "0.5.3" }
 
 [target.'cfg(windows)'.build-dependencies]
 winres = { version = "0.1.12" }
-image = { version = "0.24.3"}
+image = { version = "0.23.14"}
 
 [package.metadata.bundle]
 name = "Psst"
