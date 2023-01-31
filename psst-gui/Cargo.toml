@@ -45,7 +45,7 @@ souvlaki = { version = "0.5.3" }
 
 [target.'cfg(windows)'.build-dependencies]
 winres = { version = "0.1.12" }
-image = { version = "0.23.14"}
+image = { version = "0.24.5" }
 
 [package.metadata.bundle]
 name = "Psst"
