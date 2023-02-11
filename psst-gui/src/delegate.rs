@@ -179,7 +179,7 @@ impl Delegate {
                             };
                             sink.submit_command(remote_image::PROVIDE_DATA, payload, target)
                                 .unwrap();
-                        },
+                        }
                         Err(err) => {
                             log::warn!("failed to fetch image: {}", err)
                         }
