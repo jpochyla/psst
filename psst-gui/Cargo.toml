@@ -42,6 +42,7 @@ druid-shell = { git = "https://github.com/jpochyla/druid", branch = "psst", feat
 open = { version = "3.0.3" }
 raw-window-handle = { version = "0.5.0" }
 souvlaki = { version = "0.5.3" }
+dark-light = "0.2.3"
 
 [target.'cfg(windows)'.build-dependencies]
 winres = { version = "0.1.12" }

@@ -45,6 +45,7 @@ pub fn setup(env: &mut Env, state: &AppState) {
     match state.config.theme {
         Theme::Light => setup_light_theme(env),
         Theme::Dark => setup_dark_theme(env),
+        Theme::System => setup_system_theme(env),
     };
 
     env.set(WINDOW_BACKGROUND_COLOR, env.get(GREY_700));
@@ -65,6 +66,11 @@ pub fn setup(env: &mut Env, state: &AppState) {
             env.set(BUTTON_DARK, env.get(GREY_600));
         }
         Theme::Dark => {
+            env.set(BUTTON_LIGHT, env.get(GREY_600));
+            env.set(BUTTON_DARK, env.get(GREY_700));
+        }
+        //TODO: fix this?
+        Theme::System => {
             env.set(BUTTON_LIGHT, env.get(GREY_600));
             env.set(BUTTON_DARK, env.get(GREY_700));
         }
@@ -163,4 +169,13 @@ fn setup_dark_theme(env: &mut Env) {
     env.set(LINK_HOT_COLOR, Color::rgba(1.0, 1.0, 1.0, 0.05));
     env.set(LINK_ACTIVE_COLOR, Color::rgba(1.0, 1.0, 1.0, 0.025));
     env.set(LINK_COLD_COLOR, Color::rgba(1.0, 1.0, 1.0, 0.0));
+}
+
+fn setup_system_theme(env: &mut Env) {
+    let current_theme = dark_light::detect();
+    if current_theme == dark_light::Mode::Dark {
+        setup_dark_theme(env);
+    } else {
+        setup_light_theme(env);
+    }
 }
