@@ -216,7 +216,11 @@ impl PlaybackController {
     }
 
     fn send(&mut self, event: PlayerEvent) {
-        self.sender.as_mut().unwrap().send(event).unwrap();
+        if let Some(s) = &self.sender {
+            s.send(event)
+                .map_err(|e| log::error!("Error sending message: {:?}", e))
+                .ok();
+        }
     }
 
     fn play(&mut self, items: &Vector<QueueEntry>, position: usize) {
