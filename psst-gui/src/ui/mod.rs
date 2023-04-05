@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{time::Duration};
 
 use druid::{
     im::Vector,
@@ -128,6 +128,7 @@ fn root_widget() -> impl Widget<AppState> {
         .must_fill_main_axis(true)
         .with_child(topbar_back_button_widget())
         .with_child(topbar_title_widget())
+        .with_child(topbar_sort_widget())
         .background(Border::Bottom.with_color(theme::BACKGROUND_DARK));
 
     let main = Flex::column()
@@ -337,6 +338,30 @@ fn volume_slider() -> impl Widget<AppState> {
             data.config.volume = data.playback.volume;
             data.config.save();
         })
+}
+
+fn topbar_sort_widget() -> impl Widget<AppState> {
+    let icon = icons::DROPDOWN.scale((10.0, theme::grid(2.0)));
+
+    let disabled = icon
+        .clone()
+        .with_color(theme::GREY_600)
+        .padding(theme::grid(1.0));
+    let enabled = icon
+        .padding(theme::grid(1.0))
+        .link()
+        .rounded(theme::BUTTON_BORDER_RADIUS)
+        .on_click(|ctx, _, _| {
+            ctx.submit_command(cmd::NAVIGATE_BACK.with(1));
+        })
+        .context_menu(history_menu);
+    Either::new(
+        |history: &Vector<Nav>, _| history.is_empty(),
+        disabled,
+        enabled,
+    )
+    .padding(theme::grid(1.0))
+    .lens(AppState::history)
 }
 
 fn topbar_back_button_widget() -> impl Widget<AppState> {
