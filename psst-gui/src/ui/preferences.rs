@@ -6,7 +6,8 @@ use druid::{
         Button, Controller, CrossAxisAlignment, Flex, Label, LineBreaking, MainAxisAlignment,
         RadioGroup, SizedBox, Slider, TextBox, ViewSwitcher,
     },
-    Data, Env, Event, EventCtx, LensExt, LifeCycle, LifeCycleCtx, Selector, Widget, WidgetExt,
+    Color, Data, Env, Event, EventCtx, LensExt, LifeCycle, LifeCycleCtx, Selector, Widget,
+    WidgetExt,
 };
 use psst_core::connection::Credentials;
 
@@ -66,6 +67,7 @@ pub fn preferences_widget() -> impl Widget<AppState> {
                         account_tab_widget(AccountTab::InPreferences).boxed()
                     }
                     PreferencesTab::Cache => cache_tab_widget().boxed(),
+                    PreferencesTab::Stats => stats_tab_widget().boxed(),
                 },
             )
             .padding(theme::grid(4.0))
@@ -114,6 +116,12 @@ fn tabs_widget() -> impl Widget<AppState> {
             "Cache",
             &icons::STORAGE,
             PreferencesTab::Cache,
+        ))
+        .with_default_spacer()
+        .with_child(tab_link_widget(
+            "Stats",
+            &icons::HEART,
+            PreferencesTab::Stats,
         ))
 }
 
@@ -200,27 +208,6 @@ fn general_tab_widget() -> impl Widget<AppState> {
                 .with_spacer(theme::grid(0.5))
                 .with_child(Label::new("Sensitivity")),
         );
-
-    col = col.with_spacer(theme::grid(3.0));
-
-    // Build Info
-    let mut commit_hash = Flex::row();
-    commit_hash.add_child(
-        Label::new("Commit Hash:  ")
-    );
-    commit_hash.add_child(Label::new(psst_core::GIT_VERSION).with_text_color(theme::DISABLED_TEXT_COLOR));
-
-    let mut build_time = Flex::row();
-    build_time.add_child(
-        Label::new("Build time:   ")
-    );
-    build_time.add_child(Label::new(psst_core::BUILD_TIME).with_text_color(theme::DISABLED_TEXT_COLOR));
-
-    col = col
-        .with_child(Label::new("Build Info").with_font(theme::UI_FONT_MEDIUM))
-        .with_spacer(theme::grid(1.0))
-        .with_child(commit_hash)
-        .with_child(build_time);
 
     col
 }
@@ -503,4 +490,43 @@ impl<W: Widget<Preferences>> Controller<Preferences, W> for MeasureCacheSize {
         }
         child.lifecycle(ctx, event, data, env);
     }
+}
+
+fn stats_tab_widget() -> impl Widget<AppState> {
+    let mut col = Flex::column()
+        .cross_axis_alignment(CrossAxisAlignment::Start)
+        .must_fill_main_axis(true);
+
+    col = col.with_spacer(theme::grid(3.0));
+
+    // Build Info
+    let mut commit_hash = Flex::row();
+    commit_hash.add_child(Label::new("Commit Hash:   "));
+    commit_hash
+        .add_child(Label::new(psst_core::GIT_VERSION).with_text_color(theme::DISABLED_TEXT_COLOR));
+
+    let mut build_time = Flex::row();
+    build_time.add_child(Label::new("Build time:   "));
+    build_time
+        .add_child(Label::new(psst_core::BUILD_TIME).with_text_color(theme::DISABLED_TEXT_COLOR));
+
+    let mut remote_url = Flex::row().main_axis_alignment(MainAxisAlignment::SpaceEvenly);
+    remote_url.add_child(Label::new("Source:  "));
+    #[allow(unused_must_use)]
+    remote_url.add_child(
+        Label::new(psst_core::REMOTE_URL)
+            .with_text_color(Color::rgb8(138, 180, 248))
+            .on_click(|_ctx, _t, _env| {
+                webbrowser::open(psst_core::REMOTE_URL);
+            }),
+    );
+
+    col = col
+        .with_child(Label::new("Build Info").with_font(theme::UI_FONT_MEDIUM))
+        .with_spacer(theme::grid(1.0))
+        .with_child(commit_hash)
+        .with_child(build_time)
+        .with_child(remote_url);
+
+    col
 }

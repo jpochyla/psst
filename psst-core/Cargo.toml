@@ -7,6 +7,7 @@ edition = "2021"
 
 [build-dependencies]
 chrono = { version = "0.4.23" }
+gix-config = { version = "0.20" }
 
 [dependencies]
 psst-protocol = { path = "../psst-protocol" }
