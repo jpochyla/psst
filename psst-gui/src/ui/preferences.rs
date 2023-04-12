@@ -67,7 +67,7 @@ pub fn preferences_widget() -> impl Widget<AppState> {
                         account_tab_widget(AccountTab::InPreferences).boxed()
                     }
                     PreferencesTab::Cache => cache_tab_widget().boxed(),
-                    PreferencesTab::Stats => stats_tab_widget().boxed(),
+                    PreferencesTab::About => stats_tab_widget().boxed(),
                 },
             )
             .padding(theme::grid(4.0))
@@ -119,9 +119,9 @@ fn tabs_widget() -> impl Widget<AppState> {
         ))
         .with_default_spacer()
         .with_child(tab_link_widget(
-            "Stats",
+            "About",
             &icons::HEART,
-            PreferencesTab::Stats,
+            PreferencesTab::About,
         ))
 }
 

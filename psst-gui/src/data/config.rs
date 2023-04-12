@@ -41,7 +41,7 @@ pub enum PreferencesTab {
     General,
     Account,
     Cache,
-    Stats,
+    About,
 }
 
 #[derive(Clone, Debug, Data, Lens)]
