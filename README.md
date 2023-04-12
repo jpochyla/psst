@@ -68,6 +68,9 @@ cargo run
 - [x] Audio loudness normalization
 - [x] Genre playlists and "For You" content
 - [x] Dark theme
+- [x] Correct playback highlight
+    - Highlight now-playing track only in the correct album / playlist
+    - Keep highlighted track in viewport
 - [ ] Resilience to network errors (automatically retry timed-out requests)
 - [ ] Managing playlists
     - Follow / unfollow
@@ -94,9 +97,6 @@ cargo run
         - Right pane for current playback
     - [ ] Detect light/dark OS theme
     - [ ] Robust error states, ideally with retry button
-    - [ ] Correct playback highlight
-        - Highlight now-playing track only in the correct album / playlist
-        - Keep highlighted track in viewport
     - [ ] Paging or virtualized lists for albums and tracks
     - [ ] Grid for albums and artists
     - [ ] Robust active/inactive menu visualization
