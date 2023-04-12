@@ -38,7 +38,8 @@ impl Queue {
         self.position = 0;
     }
 
-    pub fn fill(&mut self, items: Vec<PlaybackItem>, position: usize) {
+    pub fn fill(&mut self, items: &[PlaybackItem], position: usize) {
+        let items = items.to_vec();
         self.items = items;
         self.positions = (0..items.len()).collect();
         self.position = position;
