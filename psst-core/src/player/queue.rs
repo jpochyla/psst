@@ -1,6 +1,5 @@
-use rand::prelude::SliceRandom;
-
 use super::PlaybackItem;
+use rand::prelude::SliceRandom;
 
 #[derive(Debug)]
 pub enum QueueBehavior {
@@ -41,38 +40,38 @@ impl Queue {
 
     pub fn fill(&mut self, items: Vec<PlaybackItem>, position: usize) {
         self.items = items;
+        self.positions = (0..items.len()).collect();
         self.position = position;
-        self.compute_positions();
     }
 
     pub fn set_behaviour(&mut self, behavior: QueueBehavior) {
         self.behavior = behavior;
-        self.compute_positions();
+        self.positions = self.compute_positions();
     }
 
-    fn compute_positions(&mut self) {
-        // In the case of switching away from shuffle, the position should be set back to
-        // where it appears in the actual playlist order.
+    fn compute_positions(&self) -> Vec<usize> {
+        let mut positions = vec![0; self.items.len()];
+
         let playlist_position = if self.positions.len() > 1 {
             self.positions[self.position]
         } else {
             self.position
         };
-        // Start with an ordered 1:1 mapping.
-        self.positions = (0..self.items.len()).collect();
 
         if let QueueBehavior::Random = self.behavior {
-            // Swap the current position with the first item, so we will start from the
-            // beginning, with the full queue ahead of us.  Then shuffle the rest of the
-            // items and set the position to 0.
-            if self.positions.len() > 1 {
-                self.positions.swap(0, self.position);
-                self.positions[1..].shuffle(&mut rand::thread_rng());
+            if positions.len() > 1 {
+                positions.swap(0, self.position);
+                positions[1..].shuffle(&mut rand::thread_rng());
             }
-            self.position = 0;
+            positions[0] = playlist_position;
         } else {
-            self.position = playlist_position;
+            for i in 0..positions.len() {
+                positions[i] = i;
+            }
+            positions[playlist_position] = self.position;
         }
+
+        positions
     }
 
     pub fn skip_to_previous(&mut self) {
