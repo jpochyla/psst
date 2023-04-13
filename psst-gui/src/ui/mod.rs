@@ -357,12 +357,9 @@ fn topbar_sort_widget() -> impl Widget<AppState> {
     
     
     Either::new(
-         |history: &Vector<Nav>, _| {
+         |nav: &Nav, _| {
         // check if the last nav is PlaylistDetail
-        if let Some(Nav::PlaylistDetail(_)) = history.last() {
-            true
-        }
-        else if history.len() == 1 {
+        if let Nav::PlaylistDetail(_) = nav {
             true
         }
         else {
@@ -372,8 +369,7 @@ fn topbar_sort_widget() -> impl Widget<AppState> {
         enabled,
         disabled,
     )
-    .padding(theme::grid(1.0))
-    .lens(AppState::history)
+    .padding(theme::grid(1.0)).lens(AppState::nav)
     
 
 
