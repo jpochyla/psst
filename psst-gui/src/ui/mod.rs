@@ -362,7 +362,7 @@ fn topbar_sort_widget() -> impl Widget<AppState> {
         if let Some(Nav::PlaylistDetail(_)) = history.last() {
             true
         }
-        else if history.is_empty() {
+        else if history.len() == 1 {
             true
         }
         else {
