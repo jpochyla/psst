@@ -341,27 +341,44 @@ fn volume_slider() -> impl Widget<AppState> {
 }
 
 fn topbar_sort_widget() -> impl Widget<AppState> {
-    let icon = icons::DROPDOWN.scale((10.0, theme::grid(2.0)));
 
-    let disabled = icon
-        .clone()
-        .with_color(theme::GREY_600)
+    
+    let icon = icons::DROPDOWN.scale((10.0, theme::grid(2.0)));
+    
+    let disabled = Empty.boxed()
         .padding(theme::grid(1.0));
+
     let enabled = icon
         .padding(theme::grid(1.0))
         .link()
         .rounded(theme::BUTTON_BORDER_RADIUS)
-        .on_click(|ctx, _, _| {
-            ctx.submit_command(cmd::NAVIGATE_BACK.with(1));
-        })
-        .context_menu(history_menu);
+        //the sorting menu should appear when left clicking the button
+        .static_context(sorting_menu);
+    
+    
     Either::new(
-        |history: &Vector<Nav>, _| history.is_empty(),
-        disabled,
+         |history: &Vector<Nav>, _| {
+        // check if the last nav is PlaylistDetail
+        if let Some(Nav::PlaylistDetail(_)) = history.last() {
+            true
+        }
+        else if history.is_empty() {
+            true
+        }
+        else {
+            false
+        }
+    },
         enabled,
+        disabled,
     )
     .padding(theme::grid(1.0))
     .lens(AppState::history)
+    
+
+
+
+
 }
 
 fn topbar_back_button_widget() -> impl Widget<AppState> {
@@ -400,6 +417,34 @@ fn history_menu(history: &Vector<Nav>) -> Menu<AppState> {
 
     menu
 }
+
+
+
+fn sorting_menu() -> Menu<AppState> {
+    let mut menu = Menu::new("Sort by");
+
+
+    // Create menu items for sorting options
+    let sort_by_name = MenuItem::new("Title")
+    .command(cmd::SORT_BY_TITLE);
+    let sort_by_date = MenuItem::new("Date Added")
+        .command(cmd::SORT_BY_DATE_ADDED);
+    let sort_by_duration = MenuItem::new("Duration")
+        .command(cmd::SORT_BY_DURATION);
+
+ 
+    // Add the items and checkboxes to the menu
+    menu = menu.entry(sort_by_name);
+    menu = menu.entry(sort_by_date);
+    menu = menu.entry(sort_by_duration);
+
+  
+
+
+    menu
+}
+
+
 
 fn topbar_title_widget() -> impl Widget<AppState> {
     Flex::row()
