@@ -343,7 +343,7 @@ fn volume_slider() -> impl Widget<AppState> {
 fn topbar_sort_widget() -> impl Widget<AppState> {
 
     
-    let icon = icons::DROPDOWN.scale((10.0, theme::grid(2.0)));
+    let icon = icons::DOWN.scale((10.0, theme::grid(2.0)));
     
     let disabled = Empty.boxed()
         .padding(theme::grid(1.0));
