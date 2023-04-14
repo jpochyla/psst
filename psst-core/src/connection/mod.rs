@@ -234,9 +234,9 @@ impl Transport {
         // check for empty username & password:
         if credentials.username.is_empty() && credentials.auth_data.is_empty() {
             return Err(Error::AuthFailed {
-                // code 12 = bad redentials
-                code: 12
-            })
+                // code 12 = bad credentials
+                code: 12,
+            });
         }
 
         // Send a login request with the client credentials.
