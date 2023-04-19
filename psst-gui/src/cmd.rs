@@ -66,5 +66,4 @@ pub const SORT_BY_ALBUM: Selector = Selector::new("app.sort-by-album");
 pub const SORT_BY_DURATION: Selector = Selector::new("app.sort-by-duration");
 
 //Sort direction control
-pub const SORT_IN_ASCENDING_ORDER: Selector = Selector::new("app.sort-in-ascending-order");
-pub const SORT_IN_DESCENDING_ORDER: Selector = Selector::new("app.sort-in-descending-order");
+pub const TOGGLE_SORT_ORDER: Selector = Selector::new("app.toggle-sort-order");

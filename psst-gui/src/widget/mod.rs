@@ -126,11 +126,11 @@ pub trait MyWidgetExt<T: Data>: Widget<T> + Sized + 'static {
         })
     }
 
-    fn static_context(
+    fn static_context_menu(
         self,
         func: impl Fn() -> Menu<AppState> + 'static,
     ) -> ControllerHost<Self, ExClick<T>> {
-        self.on_right_click(move |ctx, event, data, _env| {
+        self.on_right_click(move |ctx, event, _data, _env| {
             ctx.show_context_menu(func(), event.window_pos);
         })
     }

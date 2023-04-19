@@ -1,4 +1,4 @@
-use std::{time::Duration};
+use std::{time::Duration, future};
 
 use druid::{
     im::Vector,
@@ -9,8 +9,8 @@ use druid::{
 
 use crate::{
     cmd,
-    controller::{AfterDelay, NavController, SessionController},
-    data::{Alert, AlertStyle, AppState, Config, Nav, Playable, Playback, Route},
+    controller::{AfterDelay, NavController, SessionController, SortController},
+    data::{Alert, AlertStyle, AppState, Config, Nav, Playable, Playback, Route, config::SortOrder},
     widget::{
         icons, icons::SvgIcon, Border, Empty, MyWidgetExt, Overlay, ThemeScope, ViewDispatcher,
     },
@@ -148,6 +148,7 @@ fn root_widget() -> impl Widget<AppState> {
     ThemeScope::new(split)
         .controller(SessionController)
         .controller(NavController)
+        .controller(SortController)
     // .debug_invalidation()
     // .debug_widget_id()
     // .debug_paint_layout()
@@ -341,35 +342,77 @@ fn volume_slider() -> impl Widget<AppState> {
 }
 
 fn topbar_sort_widget() -> impl Widget<AppState> {
+    let mut sort_order = SortOrder::Ascending;
 
     
-    let icon = icons::DOWN.scale((10.0, theme::grid(2.0)));
-    
-    let disabled = Empty.boxed()
-        .padding(theme::grid(1.0));
+    |data: &AppState, _: &()| {
+            sort_order = data.config.sort_order;
+    };
 
-    let enabled = icon
+
+    let up_icon = icons::UP.scale((10.0, theme::grid(2.0)));
+    let down_icon = icons::DOWN.scale((10.0, theme::grid(2.0)));
+
+    
+
+   
+    
+    let ascendingIcon = up_icon
         .padding(theme::grid(1.0))
         .link()
         .rounded(theme::BUTTON_BORDER_RADIUS)
-        //the sorting menu should appear when left clicking the button
-        .static_context(sorting_menu);
+        .on_click(|ctx, _, _| {
+            ctx.submit_command(cmd::TOGGLE_SORT_ORDER);
+        })
+        .static_context_menu(sorting_menu);
     
+    
+    let descendingIcon = down_icon
+        .padding(theme::grid(1.0))
+        .link()
+        .rounded(theme::BUTTON_BORDER_RADIUS)
+        .on_click(|ctx, _, _| {
+            ctx.submit_command(cmd::TOGGLE_SORT_ORDER);
+        })
+        .static_context_menu(sorting_menu);
+    let enabled = Either::new(
+        |data: &AppState, _| {
+       
+       // check if the current nav is PlaylistDetail
+       if data.config.sort_order == SortOrder::Ascending {
+           true
+       }
+       else {
+           false
+       }
+
+       
+   }, ascendingIcon, descendingIcon);
+
+    
+    //a "dynamic" widget that is always disabled.
+    let disabled = Either::new(
+         |_, _| true, Empty.boxed(), Empty.boxed());
+        
     
     Either::new(
-         |nav: &Nav, _| {
-        // check if the last nav is PlaylistDetail
-        if let Nav::PlaylistDetail(_) = nav {
+         |nav: &AppState, _| {
+        
+        // check if the current nav is PlaylistDetail
+        if let Nav::PlaylistDetail(_) = nav.nav {
             true
         }
         else {
             false
         }
+
+        
     },
         enabled,
         disabled,
     )
-    .padding(theme::grid(1.0)).lens(AppState::nav)
+    
+    .padding(theme::grid(1.0))//.lens(AppState::nav)
     
 
 
@@ -421,21 +464,25 @@ fn sorting_menu() -> Menu<AppState> {
 
 
     // Create menu items for sorting options
-    let sort_by_name = MenuItem::new("Title")
-    .command(cmd::SORT_BY_TITLE);
+    let sort_by_title = MenuItem::new("Title")
+        .command(cmd::SORT_BY_TITLE);
     let sort_by_date = MenuItem::new("Date Added")
         .command(cmd::SORT_BY_DATE_ADDED);
     let sort_by_duration = MenuItem::new("Duration")
         .command(cmd::SORT_BY_DURATION);
 
+    let sort_by_album = MenuItem::new("Album")
+        .command(cmd::SORT_BY_ALBUM);
+
+    let sort_by_artist = MenuItem::new("Artist")
+        .command(cmd::SORT_BY_ARTIST);
  
     // Add the items and checkboxes to the menu
-    menu = menu.entry(sort_by_name);
+    menu = menu.entry(sort_by_title);
     menu = menu.entry(sort_by_date);
     menu = menu.entry(sort_by_duration);
-
-  
-
+    menu = menu.entry(sort_by_album);
+    menu  = menu.entry(sort_by_artist);
 
     menu
 }
