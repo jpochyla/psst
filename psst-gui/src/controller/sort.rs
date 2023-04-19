@@ -23,9 +23,12 @@ where
             Event::Command(cmd) if cmd.is(cmd::TOGGLE_SORT_ORDER) => {
                 if data.config.sort_order == SortOrder::Ascending {
                     data.config.sort_order = SortOrder::Descending;
+
                 } else {
                     data.config.sort_order = SortOrder::Ascending;
                 }
+                data.config.save();
+                ctx.set_handled();
             }
             _ => {
                 child.event(ctx, event, data, env);

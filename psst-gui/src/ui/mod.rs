@@ -1,4 +1,4 @@
-use std::{time::Duration, future};
+use std::time::Duration;
 
 use druid::{
     im::Vector,
@@ -342,22 +342,13 @@ fn volume_slider() -> impl Widget<AppState> {
 }
 
 fn topbar_sort_widget() -> impl Widget<AppState> {
-    let mut sort_order = SortOrder::Ascending;
-
-    
-    |data: &AppState, _: &()| {
-            sort_order = data.config.sort_order;
-    };
 
 
     let up_icon = icons::UP.scale((10.0, theme::grid(2.0)));
     let down_icon = icons::DOWN.scale((10.0, theme::grid(2.0)));
 
     
-
-   
-    
-    let ascendingIcon = up_icon
+    let ascending_icon = up_icon
         .padding(theme::grid(1.0))
         .link()
         .rounded(theme::BUTTON_BORDER_RADIUS)
@@ -367,7 +358,7 @@ fn topbar_sort_widget() -> impl Widget<AppState> {
         .static_context_menu(sorting_menu);
     
     
-    let descendingIcon = down_icon
+    let descending_icon = down_icon
         .padding(theme::grid(1.0))
         .link()
         .rounded(theme::BUTTON_BORDER_RADIUS)
@@ -387,7 +378,7 @@ fn topbar_sort_widget() -> impl Widget<AppState> {
        }
 
        
-   }, ascendingIcon, descendingIcon);
+   }, ascending_icon, descending_icon);
 
     
     //a "dynamic" widget that is always disabled.
