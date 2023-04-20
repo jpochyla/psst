@@ -35,6 +35,7 @@ pub const LOG_OUT: Selector = Selector::new("app.log-out");
 
 pub const NAVIGATE: Selector<Nav> = Selector::new("app.navigates");
 pub const NAVIGATE_BACK: Selector<usize> = Selector::new("app.navigate-back");
+pub const NAVIGATE_REFRESH: Selector = Selector::new("app.navigate-refresh");
 
 // Playback state
 

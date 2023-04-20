@@ -1,6 +1,7 @@
 use druid::widget::{prelude::*, Controller};
 use druid::{EventCtx, Widget, Event};
 
+use crate::data::config::SortCriteria;
 use crate::data::{config::SortOrder, AppState};
 use crate::cmd;
 
@@ -29,6 +30,15 @@ where
                 }
                 data.config.save();
                 ctx.set_handled();
+            }
+            Event::Command(cmd) if cmd.is(cmd::SORT_BY_TITLE) => {
+                if data.config.sort_criteria != SortCriteria::Title || true{
+                    data.config.sort_criteria = SortCriteria::Title;
+                    data.playlist_detail.tracks
+                    ctx.submit_command(cmd::NAVIGATE_REFRESH); 
+                    data.config.save();
+                    ctx.set_handled();
+                } 
             }
             _ => {
                 child.event(ctx, event, data, env);

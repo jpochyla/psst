@@ -90,6 +90,11 @@ where
                 ctx.set_handled();
                 self.load_route_data(ctx, data);
             }
+            Event::Command(cmd) if cmd.is(cmd::NAVIGATE_REFRESH) => {
+                data.refresh();
+                ctx.set_handled();
+                self.load_route_data(ctx, data);
+            }
             Event::MouseDown(cmd) if cmd.button.is_x1() => {
                 data.navigate_back();
                 ctx.set_handled();
