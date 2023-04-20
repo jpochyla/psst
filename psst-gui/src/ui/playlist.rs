@@ -9,7 +9,7 @@ use crate::{
     cmd,
     data::{
         AppState, Config, Ctx, Library, Nav, Playlist, PlaylistAddTrack, PlaylistDetail, PlaylistLink,
-        PlaylistRemoveTrack, PlaylistTracks, Track, app_state_derived_lenses::config, config::SortCriteria,
+        PlaylistRemoveTrack, PlaylistTracks, Track, app_state_derived_lenses::config, config::{SortCriteria, SortOrder},
     },
     error::Error,
     webapi::WebApi,
@@ -176,10 +176,10 @@ pub fn detail_widget() -> impl Widget<AppState> {
     )
     .on_command_async(
         LOAD_DETAIL,
-        |d| WebApi::global().get_playlist_tracks(&d.id),
+        |(d, data): (PlaylistLink, &AppState)| sort_playlist(data, WebApi::global().get_playlist_tracks(&d.id)),
         |_, data, d| data.playlist_detail.tracks.defer(d),
         |_, data, (d, r)| {
-            let r = r.map(|tracks| PlaylistTracks {
+            let r = r.map(|tracks | PlaylistTracks {
                 id: d.id.clone(),
                 name: d.name.clone(),
                 tracks,
@@ -189,29 +189,34 @@ pub fn detail_widget() -> impl Widget<AppState> {
     )
 }
 
-fn sort_playlist(playlist: &mut Vector<Arc<Track>>){
-    
-    //get sort_criteria and sort_order from config
 
-     //How do I dot this here?
-
-    //criteria can be [SortCriteria::Name, SortCriteria::Artist, SortCriteria::Album, SortCriteria::Duration]
-    //order can be [SortOrder::Ascending, SortOrder::Descending]
+fn sort_playlist(data: &AppState, result: Result<Vector<Arc<Track>>, Error>) {
+    //get sort_criteria from config
+    let sort_criteria = data.config.sort_criteria;
+    let sort_order = data.config.sort_order;
     //sort_by is a function that takes a playlist via a vector of track objects and returns sorted playlist
+    
+    let mut playlist = result.unwrap_or_else(|_| Vector::new());
+
 
     playlist.sort_by(|a, b| {
+        let mut method = 
         match sort_criteria {
-            SortCriteria::Title => a.name.cmp(&b.name),
+            SortCriteria::Title => a.name.cmp(&b.name).reverse(),
             SortCriteria::Artist => a.artist_name().cmp(&b.artist_name()),
             SortCriteria::Album => a.album_name().cmp(&b.album_name()),
             SortCriteria::Duration => a.duration.cmp(&b.duration),
             _ => Ordering::Equal
-        }
+        };
+        method = if sort_order == SortOrder::Descending {method.reverse()} else {method};
+        method
     });
 
-    
+    Ok(playlist);
+
 
 }
+
 
 fn playlist_menu(playlist: &Playlist) -> Menu<AppState> {
     let mut menu = Menu::empty();
