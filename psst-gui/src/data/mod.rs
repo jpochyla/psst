@@ -64,7 +64,6 @@ pub use crate::data::{
 pub struct AppState {
     #[data(ignore)]
     pub session: SessionService,
-
     pub nav: Nav,
     pub history: Vector<Nav>,
     pub config: Config,

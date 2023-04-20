@@ -34,7 +34,6 @@ where
             Event::Command(cmd) if cmd.is(cmd::SORT_BY_TITLE) => {
                 if data.config.sort_criteria != SortCriteria::Title || true{
                     data.config.sort_criteria = SortCriteria::Title;
-                    data.playlist_detail.tracks
                     ctx.submit_command(cmd::NAVIGATE_REFRESH); 
                     data.config.save();
                     ctx.set_handled();

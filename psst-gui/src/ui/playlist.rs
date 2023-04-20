@@ -1,13 +1,15 @@
+use std::{sync::Arc, cmp::Ordering};
+
 use druid::{
     widget::{CrossAxisAlignment, Flex, Label, LineBreaking, List},
-    Insets, LensExt, LocalizedString, Menu, MenuItem, Selector, Size, Widget, WidgetExt,
+    Insets, LensExt, LocalizedString, Menu, MenuItem, Selector, Size, Widget, WidgetExt, im::Vector,
 };
 
 use crate::{
     cmd,
     data::{
-        AppState, Ctx, Library, Nav, Playlist, PlaylistAddTrack, PlaylistDetail, PlaylistLink,
-        PlaylistRemoveTrack, PlaylistTracks,
+        AppState, Config, Ctx, Library, Nav, Playlist, PlaylistAddTrack, PlaylistDetail, PlaylistLink,
+        PlaylistRemoveTrack, PlaylistTracks, Track, app_state_derived_lenses::config, config::SortCriteria,
     },
     error::Error,
     webapi::WebApi,
@@ -185,6 +187,30 @@ pub fn detail_widget() -> impl Widget<AppState> {
             data.playlist_detail.tracks.update((d, r))
         },
     )
+}
+
+fn sort_playlist(playlist: &mut Vector<Arc<Track>>){
+    
+    //get sort_criteria and sort_order from config
+
+     //How do I dot this here?
+
+    //criteria can be [SortCriteria::Name, SortCriteria::Artist, SortCriteria::Album, SortCriteria::Duration]
+    //order can be [SortOrder::Ascending, SortOrder::Descending]
+    //sort_by is a function that takes a playlist via a vector of track objects and returns sorted playlist
+
+    playlist.sort_by(|a, b| {
+        match sort_criteria {
+            SortCriteria::Title => a.name.cmp(&b.name),
+            SortCriteria::Artist => a.artist_name().cmp(&b.artist_name()),
+            SortCriteria::Album => a.album_name().cmp(&b.album_name()),
+            SortCriteria::Duration => a.duration.cmp(&b.duration),
+            _ => Ordering::Equal
+        }
+    });
+
+    
+
 }
 
 fn playlist_menu(playlist: &Playlist) -> Menu<AppState> {
