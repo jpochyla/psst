@@ -197,7 +197,7 @@ fn alert_widget() -> impl Widget<AppState> {
 fn route_widget() -> impl Widget<AppState> {
     ViewDispatcher::new(
         |state: &AppState, _| state.nav.route(),
-        |route: &Route, data, _| match route {
+        |route: &Route, _, _| match route {
             Route::Home => Scroll::new(home::home_widget().padding(theme::grid(1.0)))
                 .vertical()
                 .boxed(),
@@ -237,7 +237,7 @@ fn route_widget() -> impl Widget<AppState> {
                         .lens(AppState::finder),
                 )
                 .with_flex_child(
-                    Scroll::new(playlist::detail_widget(data.clone()).padding(theme::grid(1.0))).vertical(),
+                    Scroll::new(playlist::detail_widget().padding(theme::grid(1.0))).vertical(),
                     1.0,
                 )
                 .boxed(), 
@@ -469,12 +469,11 @@ fn sorting_menu() -> Menu<AppState> {
         .command(cmd::SORT_BY_ARTIST);
  
     // Add the items and checkboxes to the menu
-    menu = menu.entry(sort_by_title);
-    menu = menu.entry(sort_by_date);
-    menu = menu.entry(sort_by_duration);
     menu = menu.entry(sort_by_album);
     menu  = menu.entry(sort_by_artist);
-
+    menu = menu.entry(sort_by_date);
+    menu = menu.entry(sort_by_duration);
+    menu = menu.entry(sort_by_title);
     menu
 }
 

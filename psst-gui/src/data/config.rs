@@ -17,7 +17,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::ui::theme;
 
-use self::config_derived_lenses::sort_criteria;
 
 use super::{Nav, Promise, QueueBehavior, SliderScrollScale};
 
@@ -149,13 +148,6 @@ impl Config {
         } else {
             None
         }
-    }
-
-    pub fn get_sort_criteria(self) -> SortCriteria {
-        return self.sort_criteria;
-    }
-    pub fn get_sort_order(self) -> SortOrder {
-        return self.sort_order;
     }
 
     pub fn save(&self) {

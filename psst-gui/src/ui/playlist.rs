@@ -9,8 +9,8 @@ use itertools::Itertools;
 use crate::{
     cmd,
     data::{
-        AppState, Config, Ctx, Library, Nav, Playlist, PlaylistAddTrack, PlaylistDetail, PlaylistLink,
-        PlaylistRemoveTrack, PlaylistTracks, Track, app_state_derived_lenses::config, config::{SortCriteria, SortOrder},
+        AppState, Ctx, Library, Nav, Playlist, PlaylistAddTrack, PlaylistDetail, PlaylistLink,
+        PlaylistRemoveTrack, PlaylistTracks, Track, config::{SortCriteria, SortOrder},
     },
     error::Error,
     webapi::WebApi,
@@ -20,7 +20,7 @@ use crate::{
 use super::{playable, theme, track, utils};
 
 pub const LOAD_LIST: Selector = Selector::new("app.playlist.load-list");
-pub const LOAD_DETAIL: Selector<PlaylistLink> = Selector::new("app.playlist.load-detail");
+pub const LOAD_DETAIL: Selector<(PlaylistLink, AppState)> = Selector::new("app.playlist.load-detail");
 pub const ADD_TRACK: Selector<PlaylistAddTrack> = Selector::new("app.playlist.add-track");
 pub const REMOVE_TRACK: Selector<PlaylistRemoveTrack> = Selector::new("app.playlist.remove-track");
 
@@ -96,7 +96,7 @@ pub fn list_widget() -> impl Widget<AppState> {
                 data.info_alert("Removed from playlist.");
             }
             // Re-submit the `LOAD_DETAIL` command to reload the playlist data.
-            e.submit_command(LOAD_DETAIL.with(p.link))
+            e.submit_command(LOAD_DETAIL.with((p.link, data.clone())))
         },
     )
 }
@@ -149,8 +149,7 @@ fn rounded_cover_widget(size: f64) -> impl Widget<Playlist> {
     cover_widget(size).clip(Size::new(size, size).to_rounded_rect(4.0))
 }
 
-pub fn detail_widget(state: AppState) -> impl Widget<AppState> {
-    let data = state.clone();
+pub fn detail_widget() -> impl Widget<AppState> {
     Async::new(
         utils::spinner_widget,
         || {
@@ -178,33 +177,34 @@ pub fn detail_widget(state: AppState) -> impl Widget<AppState> {
     )
     .on_command_async(
         LOAD_DETAIL,
-        move |d: PlaylistLink| sort_playlist(&data, WebApi::global().get_playlist_tracks(&d.id)),
-        |_, data, d| data.playlist_detail.tracks.defer(d),
+         |arg: (PlaylistLink, AppState)| {
+            let d = arg.0; 
+            let data = arg.1;
+            sort_playlist(&data, WebApi::global().get_playlist_tracks(&d.id)) },
+        |_, data, d| data.playlist_detail.tracks.defer(d.0),
         |_, data, (d, r)| {
             let r = r.map(|tracks | PlaylistTracks {
-                id: d.id.clone(),
-                name: d.name.clone(),
+                id: d.0.id.clone(),
+                name: d.0.name.clone(),
                 tracks,
             });
-            data.playlist_detail.tracks.update((d, r))
+            data.playlist_detail.tracks.update((d.0, r))
         },
     )
 }
 
 
 fn sort_playlist(data: &AppState, result: Result<Vector<Arc<Track>>, Error>) -> Result<Vector<Arc<Track>>, Error> {
-    //get sort_criteria from config
     let sort_criteria = data.config.sort_criteria;
     let sort_order = data.config.sort_order;
-    //sort_by is a function that takes a playlist via a vector of track objects and returns sorted playlist
     
-    let mut playlist = result.unwrap_or_else(|_| Vector::new());
+    let playlist = result.unwrap_or_else(|_| Vector::new());
 
 
-    let sorted_playlist : Vector<Arc<Track>> = playlist.into_iter().sorted_by(|a, b| {
+    let mut sorted_playlist : Vector<Arc<Track>> = playlist.into_iter().sorted_by(|a, b| {
         let mut method = 
         match sort_criteria {
-            SortCriteria::Title => a.name.cmp(&b.name).reverse(),
+            SortCriteria::Title => a.name.cmp(&b.name),
             SortCriteria::Artist => a.artist_name().cmp(&b.artist_name()),
             SortCriteria::Album => a.album_name().cmp(&b.album_name()),
             SortCriteria::Duration => a.duration.cmp(&b.duration),
@@ -214,7 +214,14 @@ fn sort_playlist(data: &AppState, result: Result<Vector<Arc<Track>>, Error>) -> 
         method
     }).collect();
 
-    Ok(sorted_playlist)
+    sorted_playlist = if sort_criteria ==  SortCriteria::DateAdded && sort_order == SortOrder::Descending {
+        sorted_playlist.into_iter().rev().collect()
+    }
+    else{
+        sorted_playlist
+    };
+
+    Ok(sorted_playlist) 
 
 
 }
