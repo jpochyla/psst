@@ -197,7 +197,7 @@ fn alert_widget() -> impl Widget<AppState> {
 fn route_widget() -> impl Widget<AppState> {
     ViewDispatcher::new(
         |state: &AppState, _| state.nav.route(),
-        |route: &Route, _, _| match route {
+        |route: &Route, data, _| match route {
             Route::Home => Scroll::new(home::home_widget().padding(theme::grid(1.0)))
                 .vertical()
                 .boxed(),
@@ -237,10 +237,10 @@ fn route_widget() -> impl Widget<AppState> {
                         .lens(AppState::finder),
                 )
                 .with_flex_child(
-                    Scroll::new(playlist::detail_widget().padding(theme::grid(1.0))).vertical(),
+                    Scroll::new(playlist::detail_widget(data.clone()).padding(theme::grid(1.0))).vertical(),
                     1.0,
                 )
-                .boxed(),
+                .boxed(), 
             Route::ShowDetail => Scroll::new(show::detail_widget().padding(theme::grid(1.0)))
                 .vertical()
                 .boxed(),

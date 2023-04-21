@@ -4,6 +4,7 @@ use druid::{
     widget::{CrossAxisAlignment, Flex, Label, LineBreaking, List},
     Insets, LensExt, LocalizedString, Menu, MenuItem, Selector, Size, Widget, WidgetExt, im::Vector,
 };
+use itertools::Itertools;
 
 use crate::{
     cmd,
@@ -148,7 +149,8 @@ fn rounded_cover_widget(size: f64) -> impl Widget<Playlist> {
     cover_widget(size).clip(Size::new(size, size).to_rounded_rect(4.0))
 }
 
-pub fn detail_widget() -> impl Widget<AppState> {
+pub fn detail_widget(state: AppState) -> impl Widget<AppState> {
+    let data = state.clone();
     Async::new(
         utils::spinner_widget,
         || {
@@ -176,7 +178,7 @@ pub fn detail_widget() -> impl Widget<AppState> {
     )
     .on_command_async(
         LOAD_DETAIL,
-        |(d, data): (PlaylistLink, &AppState)| sort_playlist(data, WebApi::global().get_playlist_tracks(&d.id)),
+        move |d: PlaylistLink| sort_playlist(&data, WebApi::global().get_playlist_tracks(&d.id)),
         |_, data, d| data.playlist_detail.tracks.defer(d),
         |_, data, (d, r)| {
             let r = r.map(|tracks | PlaylistTracks {
@@ -190,7 +192,7 @@ pub fn detail_widget() -> impl Widget<AppState> {
 }
 
 
-fn sort_playlist(data: &AppState, result: Result<Vector<Arc<Track>>, Error>) {
+fn sort_playlist(data: &AppState, result: Result<Vector<Arc<Track>>, Error>) -> Result<Vector<Arc<Track>>, Error> {
     //get sort_criteria from config
     let sort_criteria = data.config.sort_criteria;
     let sort_order = data.config.sort_order;
@@ -199,7 +201,7 @@ fn sort_playlist(data: &AppState, result: Result<Vector<Arc<Track>>, Error>) {
     let mut playlist = result.unwrap_or_else(|_| Vector::new());
 
 
-    playlist.sort_by(|a, b| {
+    let sorted_playlist : Vector<Arc<Track>> = playlist.into_iter().sorted_by(|a, b| {
         let mut method = 
         match sort_criteria {
             SortCriteria::Title => a.name.cmp(&b.name).reverse(),
@@ -210,9 +212,9 @@ fn sort_playlist(data: &AppState, result: Result<Vector<Arc<Track>>, Error>) {
         };
         method = if sort_order == SortOrder::Descending {method.reverse()} else {method};
         method
-    });
+    }).collect();
 
-    Ok(playlist);
+    Ok(sorted_playlist)
 
 
 }
