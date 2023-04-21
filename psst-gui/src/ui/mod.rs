@@ -457,7 +457,7 @@ fn sorting_menu() -> Menu<AppState> {
     // Create menu items for sorting options
     let sort_by_title = MenuItem::new("Title")
         .command(cmd::SORT_BY_TITLE);
-    let sort_by_date = MenuItem::new("Date Added")
+    let sort_by_date = MenuItem::new("Date added")
         .command(cmd::SORT_BY_DATE_ADDED);
     let sort_by_duration = MenuItem::new("Duration")
         .command(cmd::SORT_BY_DURATION);
