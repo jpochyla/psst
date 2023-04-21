@@ -17,7 +17,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::ui::theme;
 
-
 use super::{Nav, Promise, QueueBehavior, SliderScrollScale};
 
 #[derive(Clone, Debug, Data, Lens)]
@@ -92,7 +91,7 @@ pub struct Config {
     pub window_size: Size,
     pub slider_scroll_scale: SliderScrollScale,
     pub sort_order: SortOrder,
-    pub sort_criteria: SortCriteria
+    pub sort_criteria: SortCriteria,
 }
 
 impl Default for Config {
@@ -246,11 +245,10 @@ impl Default for Theme {
     }
 }
 
-
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Data, Serialize, Deserialize)]
 pub enum SortOrder {
     Ascending,
-    Descending
+    Descending,
 }
 impl Default for SortOrder {
     fn default() -> Self {
@@ -259,12 +257,12 @@ impl Default for SortOrder {
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Data, Serialize, Deserialize)]
-pub enum SortCriteria{
+pub enum SortCriteria {
     Title,
     Artist,
     Album,
     Duration,
-    DateAdded
+    DateAdded,
 }
 impl Default for SortCriteria {
     fn default() -> Self {

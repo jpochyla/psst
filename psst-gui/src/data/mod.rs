@@ -176,10 +176,6 @@ impl AppState {
         let current: Nav = mem::replace(&mut self.nav, Nav::Home);
         self.nav = current;
     }
-    
-   
-
-    
 }
 
 impl AppState {

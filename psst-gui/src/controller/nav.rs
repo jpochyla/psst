@@ -46,7 +46,9 @@ impl NavController {
             }
             Nav::PlaylistDetail(link) => {
                 if !data.playlist_detail.playlist.contains(link) {
-                    ctx.submit_command(playlist::LOAD_DETAIL.with((link.to_owned(), data.to_owned())));
+                    ctx.submit_command(
+                        playlist::LOAD_DETAIL.with((link.to_owned(), data.to_owned())),
+                    );
                 }
             }
             Nav::ShowDetail(link) => {
