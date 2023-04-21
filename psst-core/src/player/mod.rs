@@ -29,6 +29,7 @@ const STOP_AFTER_CONSECUTIVE_LOADING_FAILURES: usize = 3;
 #[derive(Clone)]
 pub struct PlaybackConfig {
     pub bitrate: usize,
+    pub crossfade: usize,
     pub pregain: f32,
 }
 
@@ -36,6 +37,7 @@ impl Default for PlaybackConfig {
     fn default() -> Self {
         Self {
             bitrate: 320,
+            crossfade: 0,
             pregain: 3.0,
         }
     }

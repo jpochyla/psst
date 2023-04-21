@@ -84,6 +84,7 @@ pub struct Config {
     credentials: Option<Credentials>,
     pub audio_quality: AudioQuality,
     pub theme: Theme,
+    pub crossfade: Crossfade,
     pub volume: f64,
     pub last_route: Option<Nav>,
     pub queue_behavior: QueueBehavior,
@@ -98,6 +99,7 @@ impl Default for Config {
             credentials: Default::default(),
             audio_quality: Default::default(),
             theme: Default::default(),
+            crossfade: Default::default(),
             volume: 1.0,
             last_route: Default::default(),
             queue_behavior: Default::default(),
@@ -188,6 +190,7 @@ impl Config {
     pub fn playback(&self) -> PlaybackConfig {
         PlaybackConfig {
             bitrate: self.audio_quality.as_bitrate(),
+            crossfade: self.crossfade.as_crossfade_length(),
             ..PlaybackConfig::default()
         }
     }
@@ -238,5 +241,28 @@ pub enum Theme {
 impl Default for Theme {
     fn default() -> Self {
         Self::Light
+    }
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Data, Serialize, Deserialize)]
+pub enum Crossfade {
+    Off,
+    Three,
+    Five,
+}
+
+impl Crossfade {
+    fn as_crossfade_length(self) -> usize {
+        match self {
+            Crossfade::Off => 0,
+            Crossfade::Three => 3,
+            Crossfade::Five => 5,
+        }
+    }
+}
+
+impl Default for Crossfade {
+    fn default() -> Self {
+        Self::Off
     }
 }

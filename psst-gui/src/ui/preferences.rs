@@ -15,7 +15,7 @@ use crate::{
     controller::InputController,
     data::{
         AppState, AudioQuality, Authentication, Config, Preferences, PreferencesTab, Promise,
-        SliderScrollScale, Theme,
+        SliderScrollScale, Theme, config::Crossfade,
     },
     webapi::WebApi,
     widget::{icons, Async, Border, Checkbox, MyWidgetExt},
@@ -174,6 +174,22 @@ fn general_tab_widget() -> impl Widget<AppState> {
             ])
             .lens(AppState::config.then(Config::audio_quality)),
         );
+
+    col = col.with_spacer(theme::grid(3.0));
+
+    // Crossfade Length
+    /* col = col
+        .with_child(Label::new("Crossfade").with_font(theme::UI_FONT_MEDIUM))
+        .with_spacer(theme::grid(2.0))
+        .with_child(
+            RadioGroup::column(vec![
+                ("Off", Crossfade::Off),
+                ("3 seconds", Crossfade::Three),
+                ("5 seconds", Crossfade::Five),
+            ])
+            .lens(AppState::config.then(Config::crossfade)),
+        );
+    */
 
     col = col.with_spacer(theme::grid(3.0));
 
