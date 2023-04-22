@@ -90,6 +90,8 @@ pub struct Config {
     pub show_track_cover: bool,
     pub window_size: Size,
     pub slider_scroll_scale: SliderScrollScale,
+    pub sort_order: SortOrder,
+    pub sort_criteria: SortCriteria,
 }
 
 impl Default for Config {
@@ -104,6 +106,8 @@ impl Default for Config {
             show_track_cover: Default::default(),
             window_size: Size::new(theme::grid(80.0), theme::grid(100.0)),
             slider_scroll_scale: Default::default(),
+            sort_order: Default::default(),
+            sort_criteria: Default::default(),
         }
     }
 }
@@ -238,5 +242,30 @@ pub enum Theme {
 impl Default for Theme {
     fn default() -> Self {
         Self::Light
+    }
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Data, Serialize, Deserialize)]
+pub enum SortOrder {
+    Ascending,
+    Descending,
+}
+impl Default for SortOrder {
+    fn default() -> Self {
+        Self::Ascending
+    }
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Data, Serialize, Deserialize)]
+pub enum SortCriteria {
+    Title,
+    Artist,
+    Album,
+    Duration,
+    DateAdded,
+}
+impl Default for SortCriteria {
+    fn default() -> Self {
+        Self::DateAdded
     }
 }

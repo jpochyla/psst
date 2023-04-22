@@ -9,8 +9,10 @@ use druid::{
 
 use crate::{
     cmd,
-    controller::{AfterDelay, NavController, SessionController},
-    data::{Alert, AlertStyle, AppState, Config, Nav, Playable, Playback, Route},
+    controller::{AfterDelay, NavController, SessionController, SortController},
+    data::{
+        config::SortOrder, Alert, AlertStyle, AppState, Config, Nav, Playable, Playback, Route,
+    },
     widget::{
         icons, icons::SvgIcon, Border, Empty, MyWidgetExt, Overlay, ThemeScope, ViewDispatcher,
     },
@@ -128,6 +130,7 @@ fn root_widget() -> impl Widget<AppState> {
         .must_fill_main_axis(true)
         .with_child(topbar_back_button_widget())
         .with_child(topbar_title_widget())
+        .with_child(topbar_sort_widget())
         .background(Border::Bottom.with_color(theme::BACKGROUND_DARK));
 
     let main = Flex::column()
@@ -147,6 +150,7 @@ fn root_widget() -> impl Widget<AppState> {
     ThemeScope::new(split)
         .controller(SessionController)
         .controller(NavController)
+        .controller(SortController)
     // .debug_invalidation()
     // .debug_widget_id()
     // .debug_paint_layout()
@@ -339,6 +343,58 @@ fn volume_slider() -> impl Widget<AppState> {
         })
 }
 
+fn topbar_sort_widget() -> impl Widget<AppState> {
+    let up_icon = icons::UP.scale((10.0, theme::grid(2.0)));
+    let down_icon = icons::DOWN.scale((10.0, theme::grid(2.0)));
+
+    let ascending_icon = up_icon
+        .padding(theme::grid(1.0))
+        .link()
+        .rounded(theme::BUTTON_BORDER_RADIUS)
+        .on_click(|ctx, _, _| {
+            ctx.submit_command(cmd::TOGGLE_SORT_ORDER);
+        })
+        .static_context_menu(sorting_menu);
+
+    let descending_icon = down_icon
+        .padding(theme::grid(1.0))
+        .link()
+        .rounded(theme::BUTTON_BORDER_RADIUS)
+        .on_click(|ctx, _, _| {
+            ctx.submit_command(cmd::TOGGLE_SORT_ORDER);
+        })
+        .static_context_menu(sorting_menu);
+    let enabled = Either::new(
+        |data: &AppState, _| {
+            // check if the current nav is PlaylistDetail
+            if data.config.sort_order == SortOrder::Ascending {
+                true
+            } else {
+                false
+            }
+        },
+        ascending_icon,
+        descending_icon,
+    );
+
+    //a "dynamic" widget that is always disabled.
+    let disabled = Either::new(|_, _| true, Empty.boxed(), Empty.boxed());
+
+    Either::new(
+        |nav: &AppState, _| {
+            // check if the current nav is PlaylistDetail
+            if let Nav::PlaylistDetail(_) = nav.nav {
+                true
+            } else {
+                false
+            }
+        },
+        enabled,
+        disabled,
+    )
+    .padding(theme::grid(1.0)) //.lens(AppState::nav)
+}
+
 fn topbar_back_button_widget() -> impl Widget<AppState> {
     let icon = icons::BACK.scale((10.0, theme::grid(2.0)));
     let disabled = icon
@@ -373,6 +429,27 @@ fn history_menu(history: &Vector<Nav>) -> Menu<AppState> {
         );
     }
 
+    menu
+}
+
+fn sorting_menu() -> Menu<AppState> {
+    let mut menu = Menu::new("Sort by");
+
+    // Create menu items for sorting options
+    let sort_by_title = MenuItem::new("Title").command(cmd::SORT_BY_TITLE);
+    let sort_by_date = MenuItem::new("Date added").command(cmd::SORT_BY_DATE_ADDED);
+    let sort_by_duration = MenuItem::new("Duration").command(cmd::SORT_BY_DURATION);
+
+    let sort_by_album = MenuItem::new("Album").command(cmd::SORT_BY_ALBUM);
+
+    let sort_by_artist = MenuItem::new("Artist").command(cmd::SORT_BY_ARTIST);
+
+    // Add the items and checkboxes to the menu
+    menu = menu.entry(sort_by_album);
+    menu = menu.entry(sort_by_artist);
+    menu = menu.entry(sort_by_date);
+    menu = menu.entry(sort_by_duration);
+    menu = menu.entry(sort_by_title);
     menu
 }
 

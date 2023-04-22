@@ -35,6 +35,7 @@ pub const LOG_OUT: Selector = Selector::new("app.log-out");
 
 pub const NAVIGATE: Selector<Nav> = Selector::new("app.navigates");
 pub const NAVIGATE_BACK: Selector<usize> = Selector::new("app.navigate-back");
+pub const NAVIGATE_REFRESH: Selector = Selector::new("app.navigate-refresh");
 
 // Playback state
 
@@ -57,3 +58,13 @@ pub const PLAY_NEXT: Selector = Selector::new("app.play-next");
 pub const PLAY_STOP: Selector = Selector::new("app.play-stop");
 pub const PLAY_QUEUE_BEHAVIOR: Selector<QueueBehavior> = Selector::new("app.play-queue-behavior");
 pub const PLAY_SEEK: Selector<f64> = Selector::new("app.play-seek");
+
+// Sorting control
+pub const SORT_BY_DATE_ADDED: Selector = Selector::new("app.sort-by-date-added");
+pub const SORT_BY_TITLE: Selector = Selector::new("app.sort-by-title");
+pub const SORT_BY_ARTIST: Selector = Selector::new("app.sort-by-artist");
+pub const SORT_BY_ALBUM: Selector = Selector::new("app.sort-by-album");
+pub const SORT_BY_DURATION: Selector = Selector::new("app.sort-by-duration");
+
+//Sort direction control
+pub const TOGGLE_SORT_ORDER: Selector = Selector::new("app.toggle-sort-order");
