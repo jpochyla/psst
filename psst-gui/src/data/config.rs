@@ -92,6 +92,7 @@ pub struct Config {
     pub slider_scroll_scale: SliderScrollScale,
     pub sort_order: SortOrder,
     pub sort_criteria: SortCriteria,
+    pub paginated_limit: usize,
 }
 
 impl Default for Config {
@@ -108,6 +109,7 @@ impl Default for Config {
             slider_scroll_scale: Default::default(),
             sort_order: Default::default(),
             sort_criteria: Default::default(),
+            paginated_limit: 500,
         }
     }
 }
