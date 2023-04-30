@@ -380,11 +380,7 @@ fn topbar_sort_widget() -> impl Widget<AppState> {
     Either::new(
         |nav: &AppState, _| {
             // check if the current nav is PlaylistDetail
-            if let Nav::PlaylistDetail(_) = nav.nav {
-                true
-            } else {
-                false
-            }
+            matches!(nav.nav, Nav::PlaylistDetail(_))
         },
         enabled,
         disabled,

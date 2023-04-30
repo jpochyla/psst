@@ -33,7 +33,7 @@ impl Preferences {
     }
 
     pub fn measure_cache_usage() -> Option<u64> {
-        Config::cache_dir().and_then(|path| fs_extra::dir::get_size(&path).ok())
+        Config::cache_dir().and_then(|path| fs_extra::dir::get_size(path).ok())
     }
 }
 

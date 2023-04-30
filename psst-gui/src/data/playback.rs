@@ -62,18 +62,13 @@ impl Playable {
     }
 }
 
-#[derive(Copy, Clone, Debug, Data, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Copy, Clone, Debug, Data, Eq, PartialEq, Serialize, Deserialize)]
 pub enum QueueBehavior {
+    #[default]
     Sequential,
     Random,
     LoopTrack,
     LoopAll,
-}
-
-impl Default for QueueBehavior {
-    fn default() -> Self {
-        QueueBehavior::Sequential
-    }
 }
 
 #[derive(Copy, Clone, Debug, Data, Eq, PartialEq)]
