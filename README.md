@@ -12,6 +12,13 @@ Fast Spotify client with native GUI, without Electron, built in Rust. Very early
 
 GitHub Actions automatically runs when new commits are pushed to `master`. To download prebuilt binaries for x86_64 macOS, Windows or Ubuntu, [go to the newest successfully built action](https://nightly.link/jpochyla/psst/workflows/build/master).
 
+| Platform |
+|----------|
+| [Windows](https://nightly.link/jpochyla/psst/workflows/build/master/Psst.exe.zip) |
+| [Linux (Ubuntu)](https://nightly.link/jpochyla/psst/workflows/build/master/psst-gui.zip) |
+| [MacOS](https://nightly.link/jpochyla/psst/workflows/build/master/Psst-x64.dmg.zip) |
+| [Debian Package](https://nightly.link/jpochyla/psst/workflows/build/master/psst-deb.zip) |
+
 ##### Linux
 
 Our user-interface library, Druid, has two possible backends to choose from on Linux: GTK and pure X11, with Wayland backend in the works. The default linux backend is GTK. Before building on Linux, make sure the required dependencies are installed. 
