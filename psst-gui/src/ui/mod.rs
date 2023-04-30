@@ -7,6 +7,7 @@ use druid::{
     Color, Env, Insets, Key, LensExt, Menu, MenuItem, Selector, Widget, WidgetExt, WindowDesc,
 };
 
+use crate::data::config::SortCriteria;
 use crate::{
     cmd,
     controller::{AfterDelay, NavController, SessionController, SortController},
@@ -354,7 +355,7 @@ fn topbar_sort_widget() -> impl Widget<AppState> {
         .on_click(|ctx, _, _| {
             ctx.submit_command(cmd::TOGGLE_SORT_ORDER);
         })
-        .static_context_menu(sorting_menu);
+        .context_menu(sorting_menu);
 
     let descending_icon = down_icon
         .padding(theme::grid(1.0))
@@ -363,15 +364,11 @@ fn topbar_sort_widget() -> impl Widget<AppState> {
         .on_click(|ctx, _, _| {
             ctx.submit_command(cmd::TOGGLE_SORT_ORDER);
         })
-        .static_context_menu(sorting_menu);
+        .context_menu(sorting_menu);
     let enabled = Either::new(
         |data: &AppState, _| {
             // check if the current nav is PlaylistDetail
-            if data.config.sort_order == SortOrder::Ascending {
-                true
-            } else {
-                false
-            }
+            data.config.sort_order == SortOrder::Ascending
         },
         ascending_icon,
         descending_icon,
@@ -432,24 +429,31 @@ fn history_menu(history: &Vector<Nav>) -> Menu<AppState> {
     menu
 }
 
-fn sorting_menu() -> Menu<AppState> {
+fn sorting_menu(app_state: &AppState) -> Menu<AppState> {
     let mut menu = Menu::new("Sort by");
 
     // Create menu items for sorting options
-    let sort_by_title = MenuItem::new("Title").command(cmd::SORT_BY_TITLE);
-    let sort_by_date = MenuItem::new("Date added").command(cmd::SORT_BY_DATE_ADDED);
-    let sort_by_duration = MenuItem::new("Duration").command(cmd::SORT_BY_DURATION);
+    let mut sort_by_title = MenuItem::new("Title").command(cmd::SORT_BY_TITLE);
+    let mut sort_by_album = MenuItem::new("Album").command(cmd::SORT_BY_ALBUM);
+    let mut sort_by_date_added = MenuItem::new("Date Added").command(cmd::SORT_BY_DATE_ADDED);
+    let mut sort_by_duration = MenuItem::new("Duration").command(cmd::SORT_BY_DURATION);
+    let mut sort_by_artist = MenuItem::new("Artist").command(cmd::SORT_BY_ARTIST);
 
-    let sort_by_album = MenuItem::new("Album").command(cmd::SORT_BY_ALBUM);
-
-    let sort_by_artist = MenuItem::new("Artist").command(cmd::SORT_BY_ARTIST);
+    match app_state.config.sort_criteria {
+        SortCriteria::Title => sort_by_title = sort_by_title.selected(true),
+        SortCriteria::Album => sort_by_album = sort_by_album.selected(true),
+        SortCriteria::DateAdded => sort_by_date_added = sort_by_date_added.selected(true),
+        SortCriteria::Duration => sort_by_duration = sort_by_duration.selected(true),
+        SortCriteria::Artist => sort_by_artist = sort_by_artist.selected(true),
+    };
 
     // Add the items and checkboxes to the menu
     menu = menu.entry(sort_by_album);
     menu = menu.entry(sort_by_artist);
-    menu = menu.entry(sort_by_date);
+    menu = menu.entry(sort_by_date_added);
     menu = menu.entry(sort_by_duration);
     menu = menu.entry(sort_by_title);
+
     menu
 }
 
