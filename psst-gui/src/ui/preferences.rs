@@ -2,6 +2,7 @@ use std::thread::{self, JoinHandle};
 
 use druid::{
     commands,
+    text::ParseFormatter,
     widget::{
         Button, Controller, CrossAxisAlignment, Flex, Label, LineBreaking, MainAxisAlignment,
         RadioGroup, SizedBox, Slider, TextBox, ViewSwitcher,
@@ -198,6 +199,24 @@ fn general_tab_widget() -> impl Widget<AppState> {
                 )
                 .with_spacer(theme::grid(0.5))
                 .with_child(Label::new("Sensitivity")),
+        );
+
+    col = col.with_spacer(theme::grid(3.0));
+
+    col = col
+        .with_child(
+            Label::new("Max Loaded Tracks (requires restart)").with_font(theme::UI_FONT_MEDIUM),
+        )
+        .with_spacer(theme::grid(2.0))
+        .with_child(
+            Flex::row()
+                .with_child(
+                    TextBox::new().with_formatter(ParseFormatter::with_format_fn(
+                        |usize: &usize| usize.to_string(),
+                    )),
+                )
+                .padding((theme::grid(1.5), 0.0))
+                .lens(AppState::config.then(Config::paginated_limit)),
         );
 
     col

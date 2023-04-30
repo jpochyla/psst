@@ -39,6 +39,7 @@ pub struct WebApi {
     cache: WebApiCache,
     token_provider: TokenProvider,
     local_track_manager: Mutex<LocalTrackManager>,
+    paginated_limit: usize,
 }
 
 impl WebApi {
@@ -46,6 +47,7 @@ impl WebApi {
         session: SessionService,
         proxy_url: Option<&str>,
         cache_base: Option<PathBuf>,
+        paginated_limit: usize,
     ) -> Self {
         let agent = default_ureq_agent_builder(proxy_url).unwrap().build();
         Self {
@@ -54,6 +56,7 @@ impl WebApi {
             cache: WebApiCache::new(cache_base),
             token_provider: TokenProvider::new(),
             local_track_manager: Mutex::new(LocalTrackManager::new()),
+            paginated_limit,
         }
     }
 
@@ -158,8 +161,6 @@ impl WebApi {
     ) -> Result<(), Error> {
         // TODO: Some result sets, like very long playlists and saved tracks/albums can
         // be very big.  Implement virtualized scrolling and lazy-loading of results.
-        const PAGED_ITEMS_LIMIT: usize = 500;
-
         let mut limit = 50;
         let mut offset = 0;
         loop {
@@ -174,7 +175,7 @@ impl WebApi {
             let page_limit = page.limit;
             func(page)?;
 
-            if page_total > offset && offset < PAGED_ITEMS_LIMIT {
+            if page_total > offset && offset < self.paginated_limit {
                 limit = page_limit;
                 offset = page_offset + page_limit;
             } else {
