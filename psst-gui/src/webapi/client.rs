@@ -565,7 +565,7 @@ impl WebApi {
         playlist_id: &str,
         track_uri: &str,
     ) -> Result<(), Error> {
-        self.delete(&format!("v1/playlists/{}/tracks", playlist_id))?
+        self.delete(format!("v1/playlists/{}/tracks", playlist_id))?
             .send_json(ureq::json!({
                 "tracks": [{
                     "uri": track_uri
