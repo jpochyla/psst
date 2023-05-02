@@ -375,7 +375,7 @@ impl Library {
 
     pub fn add_playlist(&mut self, playlist: Playlist) {
         if let Some(playlists) = self.playlists.resolved_mut() {
-            playlists.push_back(playlist.clone());
+            playlists.push_back(playlist);
         }
     }
 

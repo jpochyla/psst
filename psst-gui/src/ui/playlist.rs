@@ -282,7 +282,7 @@ fn playlist_menu_ctx(playlist: &WithCtx<Playlist>) -> Menu<AppState> {
         .command(cmd::COPY.with(playlist.url())),
     );
 
-    if library.contains_playlist(&playlist) {
+    if library.contains_playlist(playlist) {
         menu = menu.entry(
             MenuItem::new(
                 LocalizedString::new("menu-unfollow-playlist")

@@ -508,7 +508,7 @@ impl WebApi {
 
     pub fn follow_playlist(&self, id: &str) -> Result<(), Error> {
         let request = self.put(format!("v1/playlists/{}/followers", id))?;
-        request.send_json(&json!({"public": false,}))?;
+        request.send_json(json!({"public": false,}))?;
         Ok(())
     }
 
