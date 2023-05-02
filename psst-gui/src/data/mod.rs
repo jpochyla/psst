@@ -373,6 +373,26 @@ impl Library {
         }
     }
 
+    pub fn add_playlist(&mut self, playlist: Playlist) {
+        if let Some(playlists) = self.playlists.resolved_mut() {
+            playlists.push_back(playlist.clone());
+        }
+    }
+
+    pub fn remove_from_playlist(&mut self, id: &str) {
+        if let Some(playlists) = self.playlists.resolved_mut() {
+            playlists.retain(|p| p.id.as_ref() != id);
+        }
+    }
+
+    pub fn contains_playlist(&self, playlist: &Playlist) -> bool {
+        if let Some(playlists) = self.playlists.resolved() {
+            playlists.iter().any(|p| p.id == playlist.id)
+        } else {
+            false
+        }
+    }
+
     pub fn increment_playlist_track_count(&mut self, link: &PlaylistLink) {
         if let Some(saved) = self.playlists.resolved_mut() {
             for playlist in saved.iter_mut() {
