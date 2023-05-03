@@ -131,17 +131,17 @@ impl<D: Data, T: Data, E: Data> Widget<Promise<T, D, E>> for Async<T, D, E> {
             Promise::Empty => None,
             Promise::Deferred { def } => self.widget.with_deferred(|w| {
                 let size = w.layout(ctx, bc, def, env);
-                w.set_origin(ctx, def, env, Point::ORIGIN);
+                w.set_origin(ctx, Point::ORIGIN);
                 size
             }),
             Promise::Resolved { val, .. } => self.widget.with_resolved(|w| {
                 let size = w.layout(ctx, bc, val, env);
-                w.set_origin(ctx, val, env, Point::ORIGIN);
+                w.set_origin(ctx, Point::ORIGIN);
                 size
             }),
             Promise::Rejected { err, .. } => self.widget.with_rejected(|w| {
                 let size = w.layout(ctx, bc, err, env);
-                w.set_origin(ctx, err, env, Point::ORIGIN);
+                w.set_origin(ctx, Point::ORIGIN);
                 size
             }),
         }

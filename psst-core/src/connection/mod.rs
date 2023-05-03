@@ -231,6 +231,14 @@ impl Transport {
     pub fn authenticate(&mut self, credentials: Credentials) -> Result<Credentials, Error> {
         use crate::protocol::{authentication::APWelcome, keyexchange::APLoginFailed};
 
+        // Having an empty username or auth_data causes an unclear error message, so replace it with invalid credentials.
+        if credentials.username.is_empty() || credentials.auth_data.is_empty() {
+            return Err(Error::AuthFailed {
+                // code 12 = bad credentials
+                code: 12,
+            });
+        }
+
         // Send a login request with the client credentials.
         let request = client_response_encrypted(credentials);
         self.encoder.encode(request)?;
@@ -343,9 +351,9 @@ fn compute_keys(
     let digest = mac.finalize().into_bytes();
 
     (
-        (&*digest).to_vec(),
-        (&data[20..52]).to_vec(),
-        (&data[52..84]).to_vec(),
+        (*digest).to_vec(),
+        data[20..52].to_vec(),
+        data[52..84].to_vec(),
     )
 }
 

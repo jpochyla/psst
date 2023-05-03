@@ -43,7 +43,7 @@ impl Cache {
 
     pub fn save_track(&self, item_id: ItemId, track: &Track) -> Result<(), Error> {
         log::debug!("saving track to cache: {:?}", item_id);
-        fs::write(self.track_path(item_id), &serialize_protobuf(track)?)?;
+        fs::write(self.track_path(item_id), serialize_protobuf(track)?)?;
         Ok(())
     }
 
@@ -61,7 +61,7 @@ impl Cache {
 
     pub fn save_episode(&self, item_id: ItemId, episode: &Episode) -> Result<(), Error> {
         log::debug!("saving episode to cache: {:?}", item_id);
-        fs::write(self.episode_path(item_id), &serialize_protobuf(episode)?)?;
+        fs::write(self.episode_path(item_id), serialize_protobuf(episode)?)?;
         Ok(())
     }
 
@@ -84,7 +84,7 @@ impl Cache {
         key: &AudioKey,
     ) -> Result<(), Error> {
         log::debug!("saving audio key to cache: {:?}:{:?}", item_id, file_id);
-        fs::write(self.audio_key_path(item_id, file_id), &key.0)?;
+        fs::write(self.audio_key_path(item_id, file_id), key.0)?;
         Ok(())
     }
 

@@ -64,7 +64,7 @@ impl<T: Data> Widget<T> for Link<T> {
 
     fn layout(&mut self, ctx: &mut LayoutCtx, bc: &BoxConstraints, data: &T, env: &Env) -> Size {
         let size = self.inner.layout(ctx, bc, data, env);
-        self.inner.set_origin(ctx, data, env, Point::ORIGIN);
+        self.inner.set_origin(ctx, Point::ORIGIN);
         size
     }
 

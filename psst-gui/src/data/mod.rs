@@ -11,6 +11,7 @@ mod promise;
 mod recommend;
 mod search;
 mod show;
+mod slider_scroll_scale;
 mod track;
 mod user;
 pub mod utils;
@@ -53,6 +54,7 @@ pub use crate::data::{
     },
     search::{Search, SearchResults, SearchTopic},
     show::{Episode, EpisodeId, EpisodeLink, Show, ShowDetail, ShowEpisodes, ShowLink},
+    slider_scroll_scale::SliderScrollScale,
     track::{AudioAnalysis, AudioSegment, TimeInterval, Track, TrackId},
     user::UserProfile,
     utils::{Cached, Float64, Image, Page},
@@ -62,7 +64,6 @@ pub use crate::data::{
 pub struct AppState {
     #[data(ignore)]
     pub session: SessionService,
-
     pub nav: Nav,
     pub history: Vector<Nav>,
     pub config: Config,
@@ -156,7 +157,7 @@ impl AppState {
 impl AppState {
     pub fn navigate(&mut self, nav: &Nav) {
         if &self.nav != nav {
-            let previous = mem::replace(&mut self.nav, nav.to_owned());
+            let previous: Nav = mem::replace(&mut self.nav, nav.to_owned());
             self.history.push_back(previous);
             self.config.last_route.replace(nav.to_owned());
             self.config.save();
@@ -169,6 +170,11 @@ impl AppState {
             self.config.save();
             self.nav = nav;
         }
+    }
+
+    pub fn refresh(&mut self) {
+        let current: Nav = mem::replace(&mut self.nav, Nav::Home);
+        self.nav = current;
     }
 }
 

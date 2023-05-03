@@ -33,21 +33,17 @@ impl LocalItemRegistry {
 
     pub fn get_or_insert(path: PathBuf) -> u128 {
         let mut registry = LOCAL_REGISTRY.lock().unwrap();
-        registry
-            .path_to_id
-            .get(&path)
-            .map(|id| *id)
-            .unwrap_or_else(|| {
-                let id = registry.next_id;
-                registry.next_id += 1;
-                registry.id_to_path.insert(id, path.clone());
-                id
-            })
+        registry.path_to_id.get(&path).copied().unwrap_or_else(|| {
+            let id = registry.next_id;
+            registry.next_id += 1;
+            registry.id_to_path.insert(id, path.clone());
+            id
+        })
     }
 
     pub fn get(id: u128) -> Option<PathBuf> {
         let registry = LOCAL_REGISTRY.lock().unwrap();
-        registry.id_to_path.get(&id).map(|path| path.clone())
+        registry.id_to_path.get(&id).cloned()
     }
 }
 

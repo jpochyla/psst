@@ -2,7 +2,9 @@ use std::time::Duration;
 
 use druid::{
     kurbo::{Affine, BezPath},
-    widget::{CrossAxisAlignment, Either, Flex, Label, LineBreaking, Spinner, ViewSwitcher},
+    widget::{
+        Button, CrossAxisAlignment, Either, Flex, Label, LineBreaking, Spinner, ViewSwitcher,
+    },
     BoxConstraints, Cursor, Data, Env, Event, EventCtx, LayoutCtx, LensExt, LifeCycle,
     LifeCycleCtx, MouseButton, PaintCtx, Point, Rect, RenderContext, Size, UpdateCtx, Widget,
     WidgetExt, WidgetPod,
@@ -19,7 +21,7 @@ use crate::{
     widget::{icons, icons::SvgIcon, Empty, Maybe, MyWidgetExt, RemoteImage},
 };
 
-use super::{episode, theme, track, utils};
+use super::{episode, library, theme, track, utils};
 
 pub fn panel_widget() -> impl Widget<AppState> {
     let seek_bar = Maybe::or_empty(SeekBar::new).lens(Playback::now_playing);
@@ -99,6 +101,29 @@ fn playing_item_widget() -> impl Widget<NowPlaying> {
                 .with_spacer(2.0)
                 .with_child(origin),
             1.0,
+        )
+        .with_child(
+            Button::<NowPlaying>::dynamic(|now_playing, _| {
+                let track = now_playing.item.track();
+                if track.is_none() {
+                    // TODO: The disabled_if widget doesn't seem to be working.
+                    return String::new();
+                }
+                if now_playing.library.contains_track(track.unwrap()) {
+                    "♥".to_string()
+                } else {
+                    "♡".to_string()
+                }
+            })
+            .on_click(|ctx, now_playing, _| {
+                let track = now_playing.item.track().unwrap();
+                if now_playing.library.contains_track(track) {
+                    ctx.submit_command(library::UNSAVE_TRACK.with(track.id))
+                } else {
+                    ctx.submit_command(library::SAVE_TRACK.with(track.clone()))
+                }
+            })
+            .disabled_if(|now_playing, _| now_playing.item.track().is_none()),
         )
         .padding(theme::grid(1.0))
         .link()
@@ -311,7 +336,7 @@ where
         let total = Size::new(max.width, player.height.max(item.height));
 
         // Put the item to the top left.
-        self.item.set_origin(ctx, data, env, Point::ORIGIN);
+        self.item.set_origin(ctx, Point::ORIGIN);
 
         // Put the player either to the center or to the right.
         let player_pos = if player_centered {
@@ -325,7 +350,7 @@ where
                 total.height * 0.5 - player.height * 0.5,
             )
         };
-        self.player.set_origin(ctx, data, env, player_pos);
+        self.player.set_origin(ctx, player_pos);
 
         total
     }
@@ -498,9 +523,9 @@ fn paint_audio_analysis(ctx: &mut PaintCtx, data: &NowPlaying, path: &BezPath, e
     };
 
     ctx.with_save(|ctx| {
-        ctx.fill(&path, &remaining_color);
-        ctx.clip(&elapsed);
-        ctx.fill(&path, &elapsed_color);
+        ctx.fill(path, &remaining_color);
+        ctx.clip(elapsed);
+        ctx.fill(path, &elapsed_color);
     });
 }
 
@@ -522,11 +547,11 @@ fn paint_progress_bar(ctx: &mut PaintCtx, data: &NowPlaying, env: &Env) {
     let remaining = Size::new(remaining_width, bounds.height).round();
 
     ctx.fill(
-        &Rect::from_origin_size(Point::ORIGIN, elapsed),
+        Rect::from_origin_size(Point::ORIGIN, elapsed),
         &elapsed_color,
     );
     ctx.fill(
-        &Rect::from_origin_size(Point::new(elapsed.width, 0.0), remaining),
+        Rect::from_origin_size(Point::new(elapsed.width, 0.0), remaining),
         &remaining_color,
     );
 }

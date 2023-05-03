@@ -39,6 +39,7 @@ pub struct WebApi {
     cache: WebApiCache,
     token_provider: TokenProvider,
     local_track_manager: Mutex<LocalTrackManager>,
+    paginated_limit: usize,
 }
 
 impl WebApi {
@@ -46,6 +47,7 @@ impl WebApi {
         session: SessionService,
         proxy_url: Option<&str>,
         cache_base: Option<PathBuf>,
+        paginated_limit: usize,
     ) -> Self {
         let agent = default_ureq_agent_builder(proxy_url).unwrap().build();
         Self {
@@ -54,6 +56,7 @@ impl WebApi {
             cache: WebApiCache::new(cache_base),
             token_provider: TokenProvider::new(),
             local_track_manager: Mutex::new(LocalTrackManager::new()),
+            paginated_limit,
         }
     }
 
@@ -158,8 +161,6 @@ impl WebApi {
     ) -> Result<(), Error> {
         // TODO: Some result sets, like very long playlists and saved tracks/albums can
         // be very big.  Implement virtualized scrolling and lazy-loading of results.
-        const PAGED_ITEMS_LIMIT: usize = 500;
-
         let mut limit = 50;
         let mut offset = 0;
         loop {
@@ -174,7 +175,7 @@ impl WebApi {
             let page_limit = page.limit;
             func(page)?;
 
-            if page_total > offset && offset < PAGED_ITEMS_LIMIT {
+            if page_total > offset && offset < self.paginated_limit {
                 limit = page_limit;
                 offset = page_offset + page_limit;
             } else {
@@ -259,10 +260,32 @@ impl WebApi {
             compilations: Vector::new(),
             appears_on: Vector::new(),
         };
+
+        let mut last_album_release_year = std::usize::MAX;
+        let mut last_single_release_year = std::usize::MAX;
+
         for album in result {
             match album.album_type {
-                AlbumType::Album => artist_albums.albums.push_back(album),
-                AlbumType::Single => artist_albums.singles.push_back(album),
+                // Spotify is labeling albums and singles that should be labeled `appears_on` as `album` or `single`.
+                // They are still ordered properly though, with the most recent first, then 'appears_on'.
+                // So we just wait until they are no longer descending, then start putting them in the 'appears_on' Vec.
+                // NOTE: This will break if an artist has released 'appears_on' albums/singles before their first actual album/single.
+                AlbumType::Album => {
+                    if album.release_year_int() > last_album_release_year {
+                        artist_albums.appears_on.push_back(album)
+                    } else {
+                        last_album_release_year = album.release_year_int();
+                        artist_albums.albums.push_back(album)
+                    }
+                }
+                AlbumType::Single => {
+                    if album.release_year_int() > last_single_release_year {
+                        artist_albums.appears_on.push_back(album);
+                    } else {
+                        last_single_release_year = album.release_year_int();
+                        artist_albums.singles.push_back(album);
+                    }
+                }
                 AlbumType::Compilation => artist_albums.compilations.push_back(album),
                 AlbumType::AppearsOn => artist_albums.appears_on.push_back(album),
             }
@@ -311,15 +334,6 @@ impl WebApi {
 
 /// Show endpoints. (Podcasts)
 impl WebApi {
-    // https://developer.spotify.com/documentation/web-api/reference/#/operations/get-a-show
-    pub fn get_show(&self, id: &str) -> Result<Arc<Show>, Error> {
-        let request = self
-            .get(format!("v1/shows/{}", id))?
-            .query("market", "from_token");
-        let result = self.load(request)?;
-        Ok(result)
-    }
-
     // https://developer.spotify.com/documentation/web-api/reference/#/operations/get-multiple-episodes
     pub fn get_episodes(
         &self,
@@ -501,7 +515,6 @@ impl WebApi {
     pub fn get_playlist_tracks(&self, id: &str) -> Result<Vector<Arc<Track>>, Error> {
         #[derive(Clone, Deserialize)]
         struct PlaylistItem {
-            is_local: bool,
             track: OptionalTrack,
         }
 
@@ -543,8 +556,7 @@ impl WebApi {
         let request = self
             .post(format!("v1/playlists/{}/tracks", playlist_id))?
             .query("uris", track_uri);
-        let result = self.send_empty_json(request)?;
-        Ok(result)
+        self.send_empty_json(request)
     }
 
     // https://developer.spotify.com/documentation/web-api/reference/#/operations/remove-tracks-playlist
@@ -553,7 +565,7 @@ impl WebApi {
         playlist_id: &str,
         track_uri: &str,
     ) -> Result<(), Error> {
-        self.delete(&format!("v1/playlists/{}/tracks", playlist_id))?
+        self.delete(format!("v1/playlists/{}/tracks", playlist_id))?
             .send_json(ureq::json!({
                 "tracks": [{
                     "uri": track_uri

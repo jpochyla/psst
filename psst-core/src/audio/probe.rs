@@ -7,7 +7,7 @@ use symphonia::core::formats::FormatOptions;
 use symphonia::core::io::{MediaSourceStream, MediaSourceStreamOptions};
 use symphonia::core::meta::MetadataOptions;
 use symphonia::core::probe::{Hint, Probe};
-use symphonia::default::formats::{Mp3Reader, OggReader};
+use symphonia::default::formats::{MpaReader, OggReader};
 
 use crate::error::Error;
 
@@ -33,7 +33,7 @@ impl TrackProbe {
     pub fn new(path: &PathBuf) -> Result<Self, Error> {
         // Register all supported file formats for detection.
         let mut probe = Probe::default();
-        probe.register_all::<Mp3Reader>();
+        probe.register_all::<MpaReader>();
         probe.register_all::<OggReader>();
 
         let mut hint = Hint::new();
@@ -53,7 +53,7 @@ impl TrackProbe {
         let track = probe_result
             .format
             .default_track()
-            .ok_or(probe_err!("file contained no tracks"))?;
+            .ok_or_else(|| probe_err!("file contained no tracks"))?;
         let params = &track.codec_params;
 
         let duration =
