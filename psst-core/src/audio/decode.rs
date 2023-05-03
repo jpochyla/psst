@@ -11,8 +11,8 @@ use symphonia::{
         units::TimeStamp,
     },
     default::{
-        codecs::{Mp3Decoder, VorbisDecoder},
-        formats::{Mp3Reader, OggReader},
+        codecs::{MpaDecoder, VorbisDecoder},
+        formats::{MpaReader, OggReader},
     },
 };
 
@@ -29,7 +29,7 @@ impl AudioCodecFormat {
         mss: MediaSourceStream,
     ) -> Result<Box<dyn FormatReader>, SymphoniaError> {
         match self {
-            Self::Mp3 => Ok(Box::new(Mp3Reader::try_new(
+            Self::Mp3 => Ok(Box::new(MpaReader::try_new(
                 mss,
                 &FormatOptions::default(),
             )?)),
@@ -42,7 +42,7 @@ impl AudioCodecFormat {
 
     fn decoder(&self, codec_params: &CodecParameters) -> Result<Box<dyn Decoder>, SymphoniaError> {
         match self {
-            Self::Mp3 => Ok(Box::new(Mp3Decoder::try_new(
+            Self::Mp3 => Ok(Box::new(MpaDecoder::try_new(
                 codec_params,
                 &DecoderOptions::default(),
             )?)),

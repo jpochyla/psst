@@ -9,6 +9,7 @@ mod on_debounce;
 mod on_update;
 mod playback;
 mod session;
+mod sort;
 
 pub use after_delay::AfterDelay;
 pub use ex_click::ExClick;
@@ -21,3 +22,4 @@ pub use on_debounce::OnDebounce;
 pub use on_update::OnUpdate;
 pub use playback::PlaybackController;
 pub use session::SessionController;
+pub use sort::SortController;

@@ -46,7 +46,9 @@ impl NavController {
             }
             Nav::PlaylistDetail(link) => {
                 if !data.playlist_detail.playlist.contains(link) {
-                    ctx.submit_command(playlist::LOAD_DETAIL.with(link.to_owned()));
+                    ctx.submit_command(
+                        playlist::LOAD_DETAIL.with((link.to_owned(), data.to_owned())),
+                    );
                 }
             }
             Nav::ShowDetail(link) => {
@@ -87,6 +89,11 @@ where
                 for _ in 0..*count {
                     data.navigate_back();
                 }
+                ctx.set_handled();
+                self.load_route_data(ctx, data);
+            }
+            Event::Command(cmd) if cmd.is(cmd::NAVIGATE_REFRESH) => {
+                data.refresh();
                 ctx.set_handled();
                 self.load_route_data(ctx, data);
             }
