@@ -3,6 +3,7 @@ use druid::{
 };
 use threadpool::ThreadPool;
 
+use crate::ui::playlist::{UNFOLLOW_PLAYLIST, UNFOLLOW_PLAYLIST_CONFIRM};
 use crate::{
     cmd,
     data::{AppState, Config},
@@ -106,6 +107,9 @@ impl AppDelegate<AppState> for Delegate {
             Handled::Yes
         } else if cmd.is(cmd::CLOSE_ALL_WINDOWS) {
             self.close_all_windows(ctx);
+            Handled::Yes
+        } else if let Some(link) = cmd.get(UNFOLLOW_PLAYLIST_CONFIRM) {
+            ctx.submit_command(UNFOLLOW_PLAYLIST.with(link.clone()));
             Handled::Yes
         } else if let Some(text) = cmd.get(cmd::COPY) {
             Application::global().clipboard().put_string(text);

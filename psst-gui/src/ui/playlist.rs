@@ -1,13 +1,17 @@
 use std::{cmp::Ordering, sync::Arc};
 
+use druid::widget::Button;
 use druid::{
     im::Vector,
     widget::{CrossAxisAlignment, Flex, Label, LineBreaking, List},
     Insets, LensExt, LocalizedString, Menu, MenuItem, Selector, Size, Widget, WidgetExt,
+    WindowDesc,
 };
 use itertools::Itertools;
 
 use crate::data::WithCtx;
+use crate::ui::menu;
+use crate::widget::ThemeScope;
 use crate::{
     cmd,
     data::{
@@ -30,6 +34,10 @@ pub const REMOVE_TRACK: Selector<PlaylistRemoveTrack> = Selector::new("app.playl
 
 pub const FOLLOW_PLAYLIST: Selector<Playlist> = Selector::new("app.playlist.follow");
 pub const UNFOLLOW_PLAYLIST: Selector<PlaylistLink> = Selector::new("app.playlist.unfollow");
+const SHOW_UNFOLLOW_PLAYLIST_CONFIRMATION: Selector<UnfollowPlaylist> =
+    Selector::new("app.show-unfollow-playlist");
+pub const UNFOLLOW_PLAYLIST_CONFIRM: Selector<PlaylistLink> =
+    Selector::new("app.playlist.unfollow-confirm");
 
 pub fn list_widget() -> impl Widget<AppState> {
     Async::new(
@@ -112,6 +120,10 @@ pub fn list_widget() -> impl Widget<AppState> {
             }
         },
     )
+    .on_command(SHOW_UNFOLLOW_PLAYLIST_CONFIRMATION, |ctx, msg, _| {
+        let window = confirmation_window(msg.clone());
+        ctx.new_window(window);
+    })
     .on_command_async(
         REMOVE_TRACK,
         |d| {
@@ -135,6 +147,74 @@ pub fn list_widget() -> impl Widget<AppState> {
             // Re-submit the `LOAD_DETAIL` command to reload the playlist data.
             e.submit_command(LOAD_DETAIL.with((p.link, data.clone())))
         },
+    )
+}
+
+fn confirmation_window(msg: UnfollowPlaylist) -> WindowDesc<AppState> {
+    let win = WindowDesc::new(confirmation_widget(msg))
+        .window_size((theme::grid(45.), theme::grid(20.)))
+        .title("Rename playlist")
+        .resizable(false)
+        .show_title(false)
+        .transparent_titlebar(true);
+    if cfg!(target_os = "macos") {
+        win.menu(menu::main_menu)
+    } else {
+        win
+    }
+}
+
+fn confirmation_widget(msg: UnfollowPlaylist) -> impl Widget<AppState> {
+    let link = msg.link;
+
+    let (title_msg, description_msg) = if msg.created_by_user {
+        (
+            "Delete from Library?",
+            "This will delete this playlist from Your Library",
+        )
+    } else {
+        (
+            "Remove from Library?",
+            "We'll remove this playlist from Your Library, but you'll still be able to search for it on Spotify"
+        )
+    };
+
+    let title_label = Label::new(title_msg)
+        .with_text_size(theme::TEXT_SIZE_LARGE)
+        .align_left()
+        .padding((theme::grid(2.0), theme::grid(2.0)));
+    let description_label = Label::new(description_msg.to_string())
+        .with_line_break_mode(LineBreaking::WordWrap)
+        .with_text_size(theme::TEXT_SIZE_NORMAL)
+        .align_left()
+        .padding((theme::grid(2.5), theme::grid(2.0)));
+
+    let msg = Flex::column()
+        .with_child(title_label)
+        .with_child(description_label);
+
+    let delete_button = Button::new("Delete")
+        .fix_height(theme::grid(5.0))
+        .padding(theme::grid(1.5))
+        .on_click(move |ctx, _, _| {
+            ctx.submit_command(UNFOLLOW_PLAYLIST_CONFIRM.with(link.clone()));
+            ctx.window().close();
+        });
+    let cancel_button = Button::new("Cancel")
+        .fix_height(theme::grid(5.0))
+        .padding(theme::grid(1.5))
+        .on_click(|ctx, _, _| ctx.window().close());
+
+    let button_row = Flex::row()
+        .with_child(cancel_button)
+        .with_child(delete_button)
+        .align_right();
+
+    ThemeScope::new(
+        Flex::column()
+            .with_child(msg)
+            .with_child(button_row)
+            .background(theme::BACKGROUND_DARK),
     )
 }
 
@@ -283,13 +363,31 @@ fn playlist_menu_ctx(playlist: &WithCtx<Playlist>) -> Menu<AppState> {
     );
 
     if library.contains_playlist(playlist) {
-        menu = menu.entry(
-            MenuItem::new(
-                LocalizedString::new("menu-unfollow-playlist")
-                    .with_placeholder("Unfollow Playlist"),
-            )
-            .command(UNFOLLOW_PLAYLIST.with(playlist.link())),
-        );
+        if library.is_owner(playlist) {
+            let unfollow_msg = UnfollowPlaylist {
+                link: playlist.link(),
+                created_by_user: true,
+            };
+            menu = menu.entry(
+                MenuItem::new(
+                    LocalizedString::new("menu-unfollow-playlist")
+                        .with_placeholder("Delete playlist"),
+                )
+                .command(SHOW_UNFOLLOW_PLAYLIST_CONFIRMATION.with(unfollow_msg)),
+            );
+        } else {
+            let unfollow_msg = UnfollowPlaylist {
+                link: playlist.link(),
+                created_by_user: false,
+            };
+            menu = menu.entry(
+                MenuItem::new(
+                    LocalizedString::new("menu-unfollow-playlist")
+                        .with_placeholder("Remove playlist from Your Library"),
+                )
+                .command(SHOW_UNFOLLOW_PLAYLIST_CONFIRMATION.with(unfollow_msg)),
+            );
+        }
     } else {
         menu = menu.entry(
             MenuItem::new(
@@ -300,4 +398,10 @@ fn playlist_menu_ctx(playlist: &WithCtx<Playlist>) -> Menu<AppState> {
     }
 
     menu
+}
+
+#[derive(Clone)]
+struct UnfollowPlaylist {
+    link: PlaylistLink,
+    created_by_user: bool,
 }

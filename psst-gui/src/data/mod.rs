@@ -385,6 +385,14 @@ impl Library {
         }
     }
 
+    pub fn is_owner(&self, playlist: &Playlist) -> bool {
+        if let Some(profile) = self.user_profile.resolved() {
+            profile.id == playlist.owner.id
+        } else {
+            false
+        }
+    }
+
     pub fn contains_playlist(&self, playlist: &Playlist) -> bool {
         if let Some(playlists) = self.playlists.resolved() {
             playlists.iter().any(|p| p.id == playlist.id)
