@@ -231,8 +231,8 @@ impl Transport {
     pub fn authenticate(&mut self, credentials: Credentials) -> Result<Credentials, Error> {
         use crate::protocol::{authentication::APWelcome, keyexchange::APLoginFailed};
 
-        // check for empty username & password:
-        if credentials.username.is_empty() && credentials.auth_data.is_empty() {
+        // Having an empty username or auth_data causes an unclear error message, so replace it with invalid credentials.
+        if credentials.username.is_empty() || credentials.auth_data.is_empty() {
             return Err(Error::AuthFailed {
                 // code 12 = bad credentials
                 code: 12,
