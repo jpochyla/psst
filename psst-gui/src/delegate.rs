@@ -139,13 +139,15 @@ impl AppDelegate<AppState> for Delegate {
     fn event(
         &mut self,
         _ctx: &mut DelegateCtx,
-        _window_id: WindowId,
+        window_id: WindowId,
         event: Event,
         data: &mut AppState,
         _env: &Env,
     ) -> Option<Event> {
-        if let Event::WindowSize(size) = event {
-            data.config.window_size = size;
+        if self.main_window == Some(window_id) {
+            if let Event::WindowSize(size) = event {
+                data.config.window_size = size;
+            }
         }
         Some(event)
     }
