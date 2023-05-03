@@ -385,7 +385,7 @@ impl Library {
         }
     }
 
-    pub fn is_owner(&self, playlist: &Playlist) -> bool {
+    pub fn is_created_by_user(&self, playlist: &Playlist) -> bool {
         if let Some(profile) = self.user_profile.resolved() {
             profile.id == playlist.owner.id
         } else {
