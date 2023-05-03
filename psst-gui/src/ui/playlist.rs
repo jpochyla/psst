@@ -362,8 +362,8 @@ fn playlist_menu_ctx(playlist: &WithCtx<Playlist>) -> Menu<AppState> {
         .command(cmd::COPY.with(playlist.url())),
     );
 
-    if library.is_created_by_user(playlist) {
-        if library.is_owner(playlist) {
+    if library.contains_playlist(playlist) {
+        if library.is_created_by_user(playlist) {
             let unfollow_msg = UnfollowPlaylist {
                 link: playlist.link(),
                 created_by_user: true,
