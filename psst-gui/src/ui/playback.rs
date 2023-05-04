@@ -113,29 +113,32 @@ fn playing_item_widget() -> impl Widget<NowPlaying> {
                 }),
             1.0,
         )
-        .with_child(
-            Button::<NowPlaying>::dynamic(|now_playing, _| {
-                let track = now_playing.item.track();
-                if track.is_none() {
-                    // TODO: The disabled_if widget doesn't seem to be working.
-                    return String::new();
+        .with_child(ViewSwitcher::new(
+            |now_playing: &NowPlaying, _| now_playing.item.track().is_none(),
+            |selector, _data, _env| match selector {
+                false => {
+                    Button::<NowPlaying>::dynamic(|now_playing, _| {
+                        let track = now_playing.item.track();
+                        // View is only show if track isn't none
+                        if now_playing.library.contains_track(track.unwrap()) {
+                            "♥".to_string()
+                        } else {
+                            "♡".to_string()
+                        }
+                    })
+                    .on_click(|ctx, now_playing, _| {
+                        let track = now_playing.item.track().unwrap();
+                        if now_playing.library.contains_track(track) {
+                            ctx.submit_command(library::UNSAVE_TRACK.with(track.id))
+                        } else {
+                            ctx.submit_command(library::SAVE_TRACK.with(track.clone()))
+                        }
+                    })
+                    .boxed()
                 }
-                if now_playing.library.contains_track(track.unwrap()) {
-                    "♥".to_string()
-                } else {
-                    "♡".to_string()
-                }
-            })
-            .on_click(|ctx, now_playing, _| {
-                let track = now_playing.item.track().unwrap();
-                if now_playing.library.contains_track(track) {
-                    ctx.submit_command(library::UNSAVE_TRACK.with(track.id))
-                } else {
-                    ctx.submit_command(library::SAVE_TRACK.with(track.clone()))
-                }
-            })
-            .disabled_if(|now_playing, _| now_playing.item.track().is_none()),
-        )
+                true => Box::new(Flex::column()),
+            },
+        ))
         .padding(theme::grid(1.0))
         .link()
 }
