@@ -34,10 +34,11 @@ pub const REMOVE_TRACK: Selector<PlaylistRemoveTrack> = Selector::new("app.playl
 
 pub const FOLLOW_PLAYLIST: Selector<Playlist> = Selector::new("app.playlist.follow");
 pub const UNFOLLOW_PLAYLIST: Selector<PlaylistLink> = Selector::new("app.playlist.unfollow");
-const SHOW_UNFOLLOW_PLAYLIST_CONFIRMATION: Selector<UnfollowPlaylist> =
-    Selector::new("app.show-unfollow-playlist");
 pub const UNFOLLOW_PLAYLIST_CONFIRM: Selector<PlaylistLink> =
     Selector::new("app.playlist.unfollow-confirm");
+
+const SHOW_UNFOLLOW_PLAYLIST_CONFIRM: Selector<UnfollowPlaylist> =
+    Selector::new("app.playlist.show-unfollow-confirm");
 
 pub fn list_widget() -> impl Widget<AppState> {
     Async::new(
@@ -120,8 +121,8 @@ pub fn list_widget() -> impl Widget<AppState> {
             }
         },
     )
-    .on_command(SHOW_UNFOLLOW_PLAYLIST_CONFIRMATION, |ctx, msg, _| {
-        let window = confirmation_window(msg.clone());
+    .on_command(SHOW_UNFOLLOW_PLAYLIST_CONFIRM, |ctx, msg, _| {
+        let window = unfollow_confirm_window(msg.clone());
         ctx.new_window(window);
     })
     .on_command_async(
@@ -150,10 +151,10 @@ pub fn list_widget() -> impl Widget<AppState> {
     )
 }
 
-fn confirmation_window(msg: UnfollowPlaylist) -> WindowDesc<AppState> {
-    let win = WindowDesc::new(confirmation_widget(msg))
-        .window_size((theme::grid(45.), theme::grid(20.)))
-        .title("Rename playlist")
+fn unfollow_confirm_window(msg: UnfollowPlaylist) -> WindowDesc<AppState> {
+    let win = WindowDesc::new(unfollow_playlist_confirm_widget(msg))
+        .window_size((theme::grid(45.), theme::grid(25.)))
+        .title("Unfollow")
         .resizable(false)
         .show_title(false)
         .transparent_titlebar(true);
@@ -164,7 +165,7 @@ fn confirmation_window(msg: UnfollowPlaylist) -> WindowDesc<AppState> {
     }
 }
 
-fn confirmation_widget(msg: UnfollowPlaylist) -> impl Widget<AppState> {
+fn unfollow_playlist_confirm_widget(msg: UnfollowPlaylist) -> impl Widget<AppState> {
     let link = msg.link;
 
     let (title_msg, description_msg) = if msg.created_by_user {
@@ -189,7 +190,7 @@ fn confirmation_widget(msg: UnfollowPlaylist) -> impl Widget<AppState> {
         .align_left()
         .padding((theme::grid(2.5), theme::grid(2.0)));
 
-    let msg = Flex::column()
+    let information_section = Flex::column()
         .with_child(title_label)
         .with_child(description_label);
 
@@ -205,15 +206,15 @@ fn confirmation_widget(msg: UnfollowPlaylist) -> impl Widget<AppState> {
         .padding(theme::grid(1.5))
         .on_click(|ctx, _, _| ctx.window().close());
 
-    let button_row = Flex::row()
-        .with_child(cancel_button)
+    let button_section = Flex::row()
         .with_child(delete_button)
+        .with_child(cancel_button)
         .align_right();
 
     ThemeScope::new(
         Flex::column()
-            .with_child(msg)
-            .with_child(button_row)
+            .with_child(information_section)
+            .with_child(button_section)
             .background(theme::BACKGROUND_DARK),
     )
 }
@@ -363,29 +364,31 @@ fn playlist_menu_ctx(playlist: &WithCtx<Playlist>) -> Menu<AppState> {
     );
 
     if library.contains_playlist(playlist) {
-        if library.is_created_by_user(playlist) {
+        let created_by_user = library.is_created_by_user(playlist);
+
+        if created_by_user {
             let unfollow_msg = UnfollowPlaylist {
                 link: playlist.link(),
-                created_by_user: true,
+                created_by_user,
             };
             menu = menu.entry(
                 MenuItem::new(
                     LocalizedString::new("menu-unfollow-playlist")
                         .with_placeholder("Delete playlist"),
                 )
-                .command(SHOW_UNFOLLOW_PLAYLIST_CONFIRMATION.with(unfollow_msg)),
+                .command(SHOW_UNFOLLOW_PLAYLIST_CONFIRM.with(unfollow_msg)),
             );
         } else {
             let unfollow_msg = UnfollowPlaylist {
                 link: playlist.link(),
-                created_by_user: false,
+                created_by_user,
             };
             menu = menu.entry(
                 MenuItem::new(
                     LocalizedString::new("menu-unfollow-playlist")
                         .with_placeholder("Remove playlist from Your Library"),
                 )
-                .command(SHOW_UNFOLLOW_PLAYLIST_CONFIRMATION.with(unfollow_msg)),
+                .command(SHOW_UNFOLLOW_PLAYLIST_CONFIRM.with(unfollow_msg)),
             );
         }
     } else {
