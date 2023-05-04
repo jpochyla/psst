@@ -122,6 +122,14 @@ pub fn playable_widget(display: Display) -> impl Widget<PlayRow<Arc<Track>>> {
         major.add_child(track_popularity);
     }
 
+    let track_duration =
+        Label::<Arc<Track>>::dynamic(|track, _| utils::as_minutes_and_seconds(track.duration))
+            .with_text_size(theme::TEXT_SIZE_SMALL)
+            .with_text_color(theme::PLACEHOLDER_COLOR)
+            .lens(PlayRow::item);
+    major.add_default_spacer();
+    major.add_child(track_duration);
+
     let saved = Button::<PlayRow<Arc<Track>>>::dynamic(|row, _| {
         if row.ctx.library.contains_track(&row.item) {
             "♥".to_string()
@@ -138,31 +146,22 @@ pub fn playable_widget(display: Display) -> impl Widget<PlayRow<Arc<Track>>> {
         }
     });
 
-    major.add_default_spacer();
-    major.add_child(saved);
-
-    let track_duration =
-        Label::<Arc<Track>>::dynamic(|track, _| utils::as_minutes_and_seconds(track.duration))
-            .with_text_size(theme::TEXT_SIZE_SMALL)
-            .with_text_color(theme::PLACEHOLDER_COLOR)
-            .lens(PlayRow::item);
-    major.add_default_spacer();
-    major.add_child(track_duration);
-
     main_row
         .with_flex_child(
             Flex::column()
                 .cross_axis_alignment(CrossAxisAlignment::Start)
                 .with_child(major)
                 .with_spacer(2.0)
-                .with_child(minor),
+                .with_child(minor)
+                .on_click(|ctx, row, _| ctx.submit_notification(cmd::PLAY.with(row.position))),
             1.0,
         )
+        .with_default_spacer()
+        .with_child(saved)
         .padding(theme::grid(1.0))
         .link()
         .active(|row, _| row.is_playing)
         .rounded(theme::BUTTON_BORDER_RADIUS)
-        .on_click(|ctx, row, _| ctx.submit_notification(cmd::PLAY.with(row.position)))
         .context_menu(track_row_menu)
 }
 
