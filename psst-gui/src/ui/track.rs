@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use druid::{
-    widget::{Button, CrossAxisAlignment, Either, Flex, Label},
+    widget::{CrossAxisAlignment, Either, Flex, Label, ViewSwitcher},
     LensExt, LocalizedString, Menu, MenuItem, Size, TextAlignment, Widget, WidgetExt,
 };
 
@@ -130,14 +130,18 @@ pub fn playable_widget(track: &Track, display: Display) -> impl Widget<PlayRow<A
     major.add_default_spacer();
     major.add_child(track_duration);
 
-    let saved = Button::<PlayRow<Arc<Track>>>::dynamic(|row, _| {
-        if row.ctx.library.contains_track(&row.item) {
-            "♥".to_string()
-        } else {
-            "♡".to_string()
-        }
-    })
-    .on_click(|ctx, row, _| {
+    let saved = ViewSwitcher::new(
+        |row: &PlayRow<Arc<Track>>, _| row.ctx.library.contains_track(&row.item),
+        |selector: &bool, _, _| {
+            match selector {
+                true => &icons::HEART_SOLID,
+                false => &icons::HEART_OUTLINE,
+            }
+            .scale(theme::ICON_SIZE_MEDIUM)
+            .boxed()
+        },
+    )
+    .on_left_click(|ctx, _, row, _| {
         let track = &row.item;
         if row.ctx.library.contains_track(track) {
             ctx.submit_command(library::UNSAVE_TRACK.with(track.id))

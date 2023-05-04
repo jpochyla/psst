@@ -2,9 +2,7 @@ use std::time::Duration;
 
 use druid::{
     kurbo::{Affine, BezPath},
-    widget::{
-        Button, CrossAxisAlignment, Either, Flex, Label, LineBreaking, Spinner, ViewSwitcher,
-    },
+    widget::{CrossAxisAlignment, Either, Flex, Label, LineBreaking, Spinner, ViewSwitcher},
     BoxConstraints, Cursor, Data, Env, Event, EventCtx, LayoutCtx, LensExt, LifeCycle,
     LifeCycleCtx, MouseButton, PaintCtx, Point, Rect, RenderContext, Size, UpdateCtx, Widget,
     WidgetExt, WidgetPod,
@@ -114,18 +112,25 @@ fn playing_item_widget() -> impl Widget<NowPlaying> {
             1.0,
         )
         .with_child(ViewSwitcher::new(
-            |now_playing: &NowPlaying, _| now_playing.item.track().is_none(),
+            |now_playing: &NowPlaying, _| now_playing.item.track().is_some(),
             |selector, _data, _env| match selector {
-                false => {
-                    Button::<NowPlaying>::dynamic(|now_playing, _| {
-                        let track = now_playing.item.track();
-                        // View is only show if track isn't none
-                        if now_playing.library.contains_track(track.unwrap()) {
-                            "♥".to_string()
-                        } else {
-                            "♡".to_string()
-                        }
-                    })
+                true => {
+                    // View is only show if now_playing's track isn't none
+                    ViewSwitcher::new(
+                        |now_playing: &NowPlaying, _| {
+                            now_playing
+                                .library
+                                .contains_track(now_playing.item.track().unwrap())
+                        },
+                        |selector: &bool, _, _| {
+                            match selector {
+                                true => &icons::HEART_SOLID,
+                                false => &icons::HEART_OUTLINE,
+                            }
+                            .scale(theme::ICON_SIZE_MEDIUM)
+                            .boxed()
+                        },
+                    )
                     .on_left_click(|ctx, _, now_playing, _| {
                         let track = now_playing.item.track().unwrap();
                         if now_playing.library.contains_track(track) {
@@ -134,9 +139,10 @@ fn playing_item_widget() -> impl Widget<NowPlaying> {
                             ctx.submit_command(library::SAVE_TRACK.with(track.clone()))
                         }
                     })
+                    .padding(theme::grid(1.0))
                     .boxed()
                 }
-                true => Box::new(Flex::column()),
+                false => Box::new(Flex::column()),
             },
         ))
         .padding(theme::grid(1.0))
