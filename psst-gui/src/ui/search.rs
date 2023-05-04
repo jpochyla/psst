@@ -10,8 +10,8 @@ use crate::{
     cmd,
     controller::InputController,
     data::{
-        Album, AppState, Artist, Ctx, Nav, Playlist, Search, SearchResults, SearchTopic, Show,
-        SpotifyUrl, WithCtx,
+        Album, AppState, Artist, Ctx, Nav, Search, SearchResults, SearchTopic, Show, SpotifyUrl,
+        WithCtx,
     },
     ui::show,
     webapi::WebApi,
@@ -137,13 +137,14 @@ fn track_results_widget() -> impl Widget<WithCtx<SearchResults>> {
 
 fn playlist_results_widget() -> impl Widget<WithCtx<SearchResults>> {
     Either::new(
-        |playlists: &Vector<Playlist>, _| playlists.is_empty(),
+        |playlists: &WithCtx<SearchResults>, _| playlists.data.playlists.is_empty(),
         Empty,
         Flex::column()
             .with_child(header_widget("Playlists"))
-            .with_child(List::new(playlist::playlist_widget)),
+            .with_child(
+                List::new(playlist::playlist_widget).lens(Ctx::map(SearchResults::playlists)),
+            ),
     )
-    .lens(Ctx::data().then(SearchResults::playlists))
 }
 
 fn show_results_widget() -> impl Widget<WithCtx<SearchResults>> {
