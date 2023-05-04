@@ -1,14 +1,14 @@
 use std::sync::Arc;
 
 use druid::{
-    widget::{CrossAxisAlignment, Either, Flex, Label, List},
+    widget::{CrossAxisAlignment, Either, Flex, Label},
     LensExt, LocalizedString, Menu, MenuItem, Size, TextAlignment, Widget, WidgetExt,
 };
 
 use crate::{
     cmd,
     data::{
-        AppState, ArtistLink, Library, Nav, PlaybackOrigin, PlaylistAddTrack, PlaylistRemoveTrack,
+        AppState, Library, Nav, PlaybackOrigin, PlaylistAddTrack, PlaylistRemoveTrack,
         RecommendationsRequest, Track,
     },
     ui::playlist,
@@ -85,14 +85,8 @@ pub fn playable_widget(display: Display) -> impl Widget<PlayRow<Arc<Track>>> {
     }
 
     if display.artist {
-        let track_artists = List::new(|| {
-            Label::raw()
-                .with_text_size(theme::TEXT_SIZE_SMALL)
-                .lens(ArtistLink::name)
-        })
-        .horizontal()
-        .with_spacing(theme::grid(0.5))
-        .lens(PlayRow::item.then(Track::artists.in_arc()));
+        let track_artists = Label::dynamic(|row: &PlayRow<Arc<Track>>, _| row.item.artist_names())
+            .with_text_size(theme::TEXT_SIZE_SMALL);
         minor.add_child(track_artists);
     }
 
