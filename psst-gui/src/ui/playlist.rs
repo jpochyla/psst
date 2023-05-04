@@ -39,7 +39,7 @@ pub fn list_widget() -> impl Widget<AppState> {
                     .expand_width()
                     .padding(Insets::uniform_xy(theme::grid(2.0), theme::grid(0.6)))
                     .link()
-                    .on_click(|ctx, playlist, _| {
+                    .on_left_click(|ctx, _, playlist, _| {
                         ctx.submit_command(
                             cmd::NAVIGATE.with(Nav::PlaylistDetail(playlist.link())),
                         );
@@ -133,7 +133,7 @@ pub fn playlist_widget() -> impl Widget<Playlist> {
     playlist
         .link()
         .rounded(theme::BUTTON_BORDER_RADIUS)
-        .on_click(|ctx, playlist, _| {
+        .on_left_click(|ctx, _, playlist, _| {
             ctx.submit_command(cmd::NAVIGATE.with(Nav::PlaylistDetail(playlist.link())));
         })
         .context_menu(playlist_menu)

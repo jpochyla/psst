@@ -6,6 +6,7 @@ use druid::{
     widget::{CrossAxisAlignment, Either, Flex, Label, List, Scroll, Slider, Split, ViewSwitcher},
     Color, Env, Insets, Key, LensExt, Menu, MenuItem, Selector, Widget, WidgetExt, WindowDesc,
 };
+use druid_shell::Cursor;
 
 use crate::data::config::SortCriteria;
 use crate::{
@@ -302,7 +303,7 @@ fn sidebar_link_widget(title: &str, link_nav: Nav) -> impl Widget<AppState> {
                 );
             }
         })
-        .on_click(move |ctx, _, _| {
+        .on_left_click(move |ctx, _, _, _| {
             ctx.submit_command(cmd::NAVIGATE.with(link_nav.clone()));
         })
         .lens(AppState::nav)
@@ -327,7 +328,8 @@ fn volume_slider() -> impl Widget<AppState> {
                     env.set(theme::BASIC_WIDGET_HEIGHT, theme::grid(1.5));
                     env.set(theme::FOREGROUND_LIGHT, env.get(theme::GREY_400));
                     env.set(theme::FOREGROUND_DARK, env.get(theme::GREY_400));
-                }),
+                })
+                .with_cursor(Cursor::Pointer),
         )
         .padding((theme::grid(1.5), 0.0))
         .on_debounce(SAVE_DELAY, |ctx, _, _| ctx.submit_command(SAVE_TO_CONFIG))
@@ -352,7 +354,7 @@ fn topbar_sort_widget() -> impl Widget<AppState> {
         .padding(theme::grid(1.0))
         .link()
         .rounded(theme::BUTTON_BORDER_RADIUS)
-        .on_click(|ctx, _, _| {
+        .on_left_click(|ctx, _, _, _| {
             ctx.submit_command(cmd::TOGGLE_SORT_ORDER);
         })
         .context_menu(sorting_menu);
@@ -361,7 +363,7 @@ fn topbar_sort_widget() -> impl Widget<AppState> {
         .padding(theme::grid(1.0))
         .link()
         .rounded(theme::BUTTON_BORDER_RADIUS)
-        .on_click(|ctx, _, _| {
+        .on_left_click(|ctx, _, _, _| {
             ctx.submit_command(cmd::TOGGLE_SORT_ORDER);
         })
         .context_menu(sorting_menu);
@@ -398,7 +400,7 @@ fn topbar_back_button_widget() -> impl Widget<AppState> {
         .padding(theme::grid(1.0))
         .link()
         .rounded(theme::BUTTON_BORDER_RADIUS)
-        .on_click(|ctx, _, _| {
+        .on_left_click(|ctx, _, _, _| {
             ctx.submit_command(cmd::NAVIGATE_BACK.with(1));
         })
         .context_menu(history_menu);
