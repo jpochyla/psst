@@ -12,7 +12,7 @@ use crate::{
         RecommendationsRequest, Track,
     },
     ui::playlist,
-    widget::{Empty, MyWidgetExt, RemoteImage},
+    widget::{icons, Empty, MyWidgetExt, RemoteImage},
 };
 
 use super::{
@@ -45,7 +45,7 @@ impl Display {
     }
 }
 
-pub fn playable_widget(display: Display) -> impl Widget<PlayRow<Arc<Track>>> {
+pub fn playable_widget(track: &Track, display: Display) -> impl Widget<PlayRow<Arc<Track>>> {
     let mut main_row = Flex::row();
     let mut major = Flex::row();
     let mut minor = Flex::row();
@@ -82,6 +82,12 @@ pub fn playable_widget(display: Display) -> impl Widget<PlayRow<Arc<Track>>> {
             .with_font(theme::UI_FONT_MEDIUM)
             .lens(PlayRow::item.then(Track::name.in_arc()));
         major.add_child(track_name);
+    }
+
+    if track.explicit && (display.artist || display.album) {
+        let icon = icons::EXPLICIT.scale(theme::ICON_SIZE_TINY);
+        minor.add_child(icon);
+        minor.add_spacer(theme::grid(0.5));
     }
 
     if display.artist {

@@ -136,6 +136,12 @@ pub static PODCAST: SvgIcon = SvgIcon {
     svg_size: Size::new(22.0, 22.0),
     op: PaintOp::Fill,
 };
+// Bootstrap - explicit-fill
+pub static EXPLICIT: SvgIcon = SvgIcon {
+    svg_path: "M3.75 0A3.75 3.75 0 0 0 0 3.75v16.5A3.75 3.75 0 0 0 3.75 24h16.5A3.75 3.75 0 0 0 24 20.25V3.75A3.75 3.75 0 0 0 20.25 0Zm6.49 16.32h5.51V18h-7.5V6h7.5v1.68h-5.51v3.42h5.18v1.6h-5.18v3.62z",
+    svg_size: Size::new(24.0, 24.0),
+    op: PaintOp::Fill,
+};
 
 #[derive(Copy, Clone)]
 pub enum PaintOp {

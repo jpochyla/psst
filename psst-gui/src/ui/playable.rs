@@ -55,7 +55,7 @@ fn playable_widget(display: Display) -> impl Widget<PlayRow<Playable>> {
         |row: &PlayRow<Playable>, _| mem::discriminant(&row.item),
         move |_, row: &PlayRow<Playable>, _| match row.item.clone() {
             // TODO: Do the lenses some other way.
-            Playable::Track(track) => track::playable_widget(display.track)
+            Playable::Track(track) => track::playable_widget(&track, display.track)
                 .lens(Map::new(
                     move |pb: &PlayRow<Playable>| pb.with(track.clone()),
                     |_, _| {
