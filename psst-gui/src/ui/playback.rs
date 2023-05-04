@@ -112,7 +112,9 @@ fn playing_item_widget() -> impl Widget<NowPlaying> {
             1.0,
         )
         .with_child(ViewSwitcher::new(
-            |now_playing: &NowPlaying, _| now_playing.item.track().is_some(),
+            |now_playing: &NowPlaying, _| {
+                now_playing.item.track().is_some() && now_playing.library.saved_tracks.is_resolved()
+            },
             |selector, _data, _env| match selector {
                 true => {
                     // View is only show if now_playing's track isn't none

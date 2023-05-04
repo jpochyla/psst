@@ -131,24 +131,31 @@ pub fn playable_widget(track: &Track, display: Display) -> impl Widget<PlayRow<A
     major.add_child(track_duration);
 
     let saved = ViewSwitcher::new(
-        |row: &PlayRow<Arc<Track>>, _| row.ctx.library.contains_track(&row.item),
-        |selector: &bool, _, _| {
-            match selector {
-                true => &icons::HEART_SOLID,
-                false => &icons::HEART_OUTLINE,
-            }
-            .scale(theme::ICON_SIZE_SMALL)
-            .boxed()
+        |row: &PlayRow<Arc<Track>>, _| row.ctx.library.saved_tracks.is_resolved(),
+        |selector: &bool, _, _| match selector {
+            true => ViewSwitcher::new(
+                |row: &PlayRow<Arc<Track>>, _| row.ctx.library.contains_track(&row.item),
+                |selector: &bool, _, _| {
+                    match selector {
+                        true => &icons::HEART_SOLID,
+                        false => &icons::HEART_OUTLINE,
+                    }
+                    .scale(theme::ICON_SIZE_SMALL)
+                    .boxed()
+                },
+            )
+            .on_left_click(|ctx, _, row, _| {
+                let track = &row.item;
+                if row.ctx.library.contains_track(track) {
+                    ctx.submit_command(library::UNSAVE_TRACK.with(track.id))
+                } else {
+                    ctx.submit_command(library::SAVE_TRACK.with(track.clone()))
+                }
+            })
+            .boxed(),
+            false => Box::new(Flex::column()),
         },
-    )
-    .on_left_click(|ctx, _, row, _| {
-        let track = &row.item;
-        if row.ctx.library.contains_track(track) {
-            ctx.submit_command(library::UNSAVE_TRACK.with(track.id))
-        } else {
-            ctx.submit_command(library::SAVE_TRACK.with(track.clone()))
-        }
-    });
+    );
 
     main_row
         .with_flex_child(
