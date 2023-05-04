@@ -170,12 +170,12 @@ fn unfollow_playlist_confirm_widget(msg: UnfollowPlaylist) -> impl Widget<AppSta
 
     let (title_msg, description_msg) = if msg.created_by_user {
         (
-            "Delete from Library?",
-            "This will delete this playlist from Your Library",
+            format!("Delete {} from Library?", link.name),
+            "This will delete the playlist from Your Library",
         )
     } else {
         (
-            "Remove from Library?",
+            format!("Remove {} from Library?", link.name),
             "We'll remove this playlist from Your Library, but you'll still be able to search for it on Spotify"
         )
     };
