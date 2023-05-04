@@ -127,7 +127,7 @@ fn playing_item_widget() -> impl Widget<NowPlaying> {
                                 true => &icons::HEART_SOLID,
                                 false => &icons::HEART_OUTLINE,
                             }
-                            .scale(theme::ICON_SIZE_MEDIUM)
+                            .scale(theme::ICON_SIZE_SMALL)
                             .boxed()
                         },
                     )

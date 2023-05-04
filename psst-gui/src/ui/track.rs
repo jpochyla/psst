@@ -137,7 +137,7 @@ pub fn playable_widget(track: &Track, display: Display) -> impl Widget<PlayRow<A
                 true => &icons::HEART_SOLID,
                 false => &icons::HEART_OUTLINE,
             }
-            .scale(theme::ICON_SIZE_MEDIUM)
+            .scale(theme::ICON_SIZE_SMALL)
             .boxed()
         },
     )
