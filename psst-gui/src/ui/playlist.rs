@@ -154,7 +154,7 @@ pub fn list_widget() -> impl Widget<AppState> {
 fn unfollow_confirm_window(msg: UnfollowPlaylist) -> WindowDesc<AppState> {
     let win = WindowDesc::new(unfollow_playlist_confirm_widget(msg))
         .window_size((theme::grid(45.), theme::grid(25.)))
-        .title("Unfollow")
+        .title("Unfollow playlist")
         .resizable(false)
         .show_title(false)
         .transparent_titlebar(true);
