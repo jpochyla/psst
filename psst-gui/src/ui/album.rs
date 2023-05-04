@@ -139,7 +139,7 @@ pub fn album_widget() -> impl Widget<WithCtx<Arc<Album>>> {
     album
         .link()
         .rounded(theme::BUTTON_BORDER_RADIUS)
-        .on_click(|ctx, album, _| {
+        .on_left_click(|ctx, _, album, _| {
             ctx.submit_command(cmd::NAVIGATE.with(Nav::AlbumDetail(album.data.link())));
         })
         .context_menu(album_ctx_menu)

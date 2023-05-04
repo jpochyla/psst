@@ -143,7 +143,7 @@ pub fn playable_widget(display: Display) -> impl Widget<PlayRow<Arc<Track>>> {
         .link()
         .active(|row, _| row.is_playing)
         .rounded(theme::BUTTON_BORDER_RADIUS)
-        .on_click(|ctx, row, _| ctx.submit_notification(cmd::PLAY.with(row.position)))
+        .on_left_click(|ctx, _, row, _| ctx.submit_notification(cmd::PLAY.with(row.position)))
         .context_menu(track_row_menu)
 }
 

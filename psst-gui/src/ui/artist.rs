@@ -94,7 +94,7 @@ pub fn artist_widget() -> impl Widget<Artist> {
     artist
         .padding(theme::grid(0.5))
         .link()
-        .on_click(|ctx, artist, _| {
+        .on_left_click(|ctx, _, artist, _| {
             ctx.submit_command(cmd::NAVIGATE.with(Nav::ArtistDetail(artist.link())));
         })
         .context_menu(|artist| artist_menu(&artist.link()))
@@ -106,7 +106,7 @@ pub fn link_widget() -> impl Widget<ArtistLink> {
         .with_font(theme::UI_FONT_MEDIUM)
         .link()
         .lens(ArtistLink::name)
-        .on_click(|ctx, link, _| {
+        .on_left_click(|ctx, _, link, _| {
             ctx.submit_command(cmd::NAVIGATE.with(Nav::ArtistDetail(link.to_owned())));
         })
         .context_menu(artist_menu)
