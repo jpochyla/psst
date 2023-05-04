@@ -19,6 +19,7 @@ use druid::{
 
 pub use checkbox::Checkbox;
 pub use dispatcher::ViewDispatcher;
+use druid_shell::Cursor;
 pub use empty::Empty;
 pub use icons::Icon;
 pub use link::Link;
@@ -30,7 +31,7 @@ pub use theme::ThemeScope;
 pub use utils::{Border, Clip, FadeOut, Logger};
 
 use crate::{
-    controller::{ExClick, ExScroll, OnCommand, OnCommandAsync, OnDebounce, OnUpdate},
+    controller::{ExClick, ExCursor, ExScroll, OnCommand, OnCommandAsync, OnDebounce, OnUpdate},
     data::{AppState, SliderScrollScale},
 };
 
@@ -74,11 +75,27 @@ pub trait MyWidgetExt<T: Data>: Widget<T> + Sized + 'static {
         ControllerHost::new(self, OnUpdate::new(handler))
     }
 
+    fn on_left_click(
+        self,
+        func: impl Fn(&mut EventCtx, &MouseEvent, &mut T, &Env) + 'static,
+    ) -> ControllerHost<ControllerHost<Self, ExCursor<T>>, ExClick<T>> {
+        self.with_cursor(Cursor::Pointer)
+            .on_mouse_click(MouseButton::Left, func)
+    }
+
     fn on_right_click(
         self,
         func: impl Fn(&mut EventCtx, &MouseEvent, &mut T, &Env) + 'static,
     ) -> ControllerHost<Self, ExClick<T>> {
-        ControllerHost::new(self, ExClick::new(Some(MouseButton::Right), func))
+        self.on_mouse_click(MouseButton::Right, func)
+    }
+
+    fn on_mouse_click(
+        self,
+        button: MouseButton,
+        func: impl Fn(&mut EventCtx, &MouseEvent, &mut T, &Env) + 'static,
+    ) -> ControllerHost<Self, ExClick<T>> {
+        ControllerHost::new(self, ExClick::new(Some(button), func))
     }
 
     fn on_scroll(
@@ -87,6 +104,10 @@ pub trait MyWidgetExt<T: Data>: Widget<T> + Sized + 'static {
         action: impl Fn(&mut EventCtx, &mut T, &Env, f64) + 'static,
     ) -> ControllerHost<Self, ExScroll<T>> {
         ControllerHost::new(self, ExScroll::new(scale_picker, action))
+    }
+
+    fn with_cursor(self, cursor: Cursor) -> ControllerHost<Self, ExCursor<T>> {
+        ControllerHost::new(self, ExCursor::new(cursor))
     }
 
     fn on_command<U, F>(

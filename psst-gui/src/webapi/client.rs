@@ -15,12 +15,14 @@ use druid::{
 use itertools::Itertools;
 use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
+use serde::{de::DeserializeOwned, Deserialize};
+use serde_json::json;
+use ureq::{Agent, Request, Response};
+
 use psst_core::{
     session::{access_token::TokenProvider, SessionService},
     util::default_ureq_agent_builder,
 };
-use serde::{de::DeserializeOwned, Deserialize};
-use ureq::{Agent, Request, Response};
 
 use crate::{
     data::{
@@ -502,6 +504,18 @@ impl WebApi {
         let request = self.get("v1/me/playlists")?;
         let result = self.load_all_pages(request)?;
         Ok(result)
+    }
+
+    pub fn follow_playlist(&self, id: &str) -> Result<(), Error> {
+        let request = self.put(format!("v1/playlists/{}/followers", id))?;
+        request.send_json(json!({"public": false,}))?;
+        Ok(())
+    }
+
+    pub fn unfollow_playlist(&self, id: &str) -> Result<(), Error> {
+        let request = self.delete(format!("v1/playlists/{}/followers", id))?;
+        self.send_empty_json(request)?;
+        Ok(())
     }
 
     // https://developer.spotify.com/documentation/web-api/reference/#endpoint-get-playlist

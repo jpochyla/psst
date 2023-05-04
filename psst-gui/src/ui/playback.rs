@@ -126,7 +126,7 @@ fn playing_item_widget() -> impl Widget<NowPlaying> {
                             "♡".to_string()
                         }
                     })
-                    .on_click(|ctx, now_playing, _| {
+                    .on_left_click(|ctx, _, now_playing, _| {
                         let track = now_playing.item.track().unwrap();
                         if now_playing.library.contains_track(track) {
                             ctx.submit_command(library::UNSAVE_TRACK.with(track.id))
@@ -167,14 +167,14 @@ fn player_widget() -> impl Widget<Playback> {
     Flex::row()
         .with_child(
             small_button_widget(&icons::SKIP_BACK)
-                .on_click(|ctx, _, _| ctx.submit_command(cmd::PLAY_PREVIOUS)),
+                .on_left_click(|ctx, _, _, _| ctx.submit_command(cmd::PLAY_PREVIOUS)),
         )
         .with_default_spacer()
         .with_child(player_play_pause_widget())
         .with_default_spacer()
         .with_child(
             small_button_widget(&icons::SKIP_FORWARD)
-                .on_click(|ctx, _, _| ctx.submit_command(cmd::PLAY_NEXT)),
+                .on_left_click(|ctx, _, _, _| ctx.submit_command(cmd::PLAY_NEXT)),
         )
         .with_default_spacer()
         .with_child(queue_behavior_widget())
@@ -194,7 +194,7 @@ fn player_play_pause_widget() -> impl Widget<Playback> {
                 .link()
                 .circle()
                 .border(theme::GREY_600, 1.0)
-                .on_click(|ctx, _, _| ctx.submit_command(cmd::PLAY_STOP))
+                .on_left_click(|ctx, _, _, _| ctx.submit_command(cmd::PLAY_STOP))
                 .boxed(),
             PlaybackState::Playing => icons::PAUSE
                 .scale((theme::grid(3.0), theme::grid(3.0)))
@@ -202,7 +202,7 @@ fn player_play_pause_widget() -> impl Widget<Playback> {
                 .link()
                 .circle()
                 .border(theme::GREY_500, 1.0)
-                .on_click(|ctx, _, _| ctx.submit_command(cmd::PLAY_PAUSE))
+                .on_left_click(|ctx, _, _, _| ctx.submit_command(cmd::PLAY_PAUSE))
                 .boxed(),
             PlaybackState::Paused => icons::PLAY
                 .scale((theme::grid(3.0), theme::grid(3.0)))
@@ -210,7 +210,7 @@ fn player_play_pause_widget() -> impl Widget<Playback> {
                 .link()
                 .circle()
                 .border(theme::GREY_500, 1.0)
-                .on_click(|ctx, _, _| ctx.submit_command(cmd::PLAY_RESUME))
+                .on_left_click(|ctx, _, _, _| ctx.submit_command(cmd::PLAY_RESUME))
                 .boxed(),
             PlaybackState::Stopped => Empty.boxed(),
         },
@@ -222,7 +222,7 @@ fn queue_behavior_widget() -> impl Widget<Playback> {
         |playback: &Playback, _| playback.queue_behavior,
         |behavior, _, _| {
             faded_button_widget(queue_behavior_icon(behavior))
-                .on_click(|ctx, playback: &mut Playback, _| {
+                .on_left_click(|ctx, _, playback: &mut Playback, _| {
                     ctx.submit_command(
                         cmd::PLAY_QUEUE_BEHAVIOR
                             .with(cycle_queue_behavior(&playback.queue_behavior)),

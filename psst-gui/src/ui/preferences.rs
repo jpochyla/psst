@@ -131,7 +131,7 @@ fn tab_link_widget(
         .link()
         .rounded(theme::BUTTON_BORDER_RADIUS)
         .active(move |state: &AppState, _| tab == state.preferences.active)
-        .on_click(move |_, state: &mut AppState, _| {
+        .on_left_click(move |_, _, state: &mut AppState, _| {
             state.preferences.active = tab;
         })
         .env_scope(|env, _| {
@@ -274,7 +274,7 @@ fn account_tab_widget(tab: AccountTab) -> impl Widget<AppState> {
                 AccountTab::FirstSetup => "Log In & Continue",
                 AccountTab::InPreferences => "Change Account",
             })
-            .on_click(|ctx, _, _| {
+            .on_left_click(|ctx, _, _, _| {
                 ctx.submit_command(Authenticate::REQUEST);
             }),
         )
@@ -299,7 +299,7 @@ fn account_tab_widget(tab: AccountTab) -> impl Widget<AppState> {
     col = col.with_spacer(theme::grid(3.0));
 
     if matches!(tab, AccountTab::InPreferences) {
-        col = col.with_child(Button::new("Log Out").on_click(|ctx, _, _| {
+        col = col.with_child(Button::new("Log Out").on_left_click(|ctx, _, _, _| {
             ctx.submit_command(cmd::LOG_OUT);
         }))
     }

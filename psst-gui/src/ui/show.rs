@@ -103,7 +103,7 @@ pub fn show_widget() -> impl Widget<WithCtx<Arc<Show>>> {
 
     show.padding(theme::grid(1.0))
         .link()
-        .on_click(|ctx, show, _| {
+        .on_left_click(|ctx, _, show, _| {
             ctx.submit_command(cmd::NAVIGATE.with(Nav::ShowDetail(show.data.link())));
         })
         .context_menu(show_ctx_menu)

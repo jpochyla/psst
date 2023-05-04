@@ -1,18 +1,18 @@
 use std::sync::Arc;
 
 use druid::{
-    widget::{Button, CrossAxisAlignment, Either, Flex, Label, List},
+    widget::{Button, CrossAxisAlignment, Either, Flex, Label},
     LensExt, LocalizedString, Menu, MenuItem, Size, TextAlignment, Widget, WidgetExt,
 };
 
 use crate::{
     cmd,
     data::{
-        AppState, ArtistLink, Library, Nav, PlaybackOrigin, PlaylistAddTrack, PlaylistRemoveTrack,
+        AppState, Library, Nav, PlaybackOrigin, PlaylistAddTrack, PlaylistRemoveTrack,
         RecommendationsRequest, Track,
     },
     ui::playlist,
-    widget::{Empty, MyWidgetExt, RemoteImage},
+    widget::{icons, Empty, MyWidgetExt, RemoteImage},
 };
 
 use super::{
@@ -45,7 +45,7 @@ impl Display {
     }
 }
 
-pub fn playable_widget(display: Display) -> impl Widget<PlayRow<Arc<Track>>> {
+pub fn playable_widget(track: &Track, display: Display) -> impl Widget<PlayRow<Arc<Track>>> {
     let mut main_row = Flex::row();
     let mut major = Flex::row();
     let mut minor = Flex::row();
@@ -84,15 +84,15 @@ pub fn playable_widget(display: Display) -> impl Widget<PlayRow<Arc<Track>>> {
         major.add_child(track_name);
     }
 
+    if track.explicit && (display.artist || display.album) {
+        let icon = icons::EXPLICIT.scale(theme::ICON_SIZE_TINY);
+        minor.add_child(icon);
+        minor.add_spacer(theme::grid(0.5));
+    }
+
     if display.artist {
-        let track_artists = List::new(|| {
-            Label::raw()
-                .with_text_size(theme::TEXT_SIZE_SMALL)
-                .lens(ArtistLink::name)
-        })
-        .horizontal()
-        .with_spacing(theme::grid(0.5))
-        .lens(PlayRow::item.then(Track::artists.in_arc()));
+        let track_artists = Label::dynamic(|row: &PlayRow<Arc<Track>>, _| row.item.artist_names())
+            .with_text_size(theme::TEXT_SIZE_SMALL);
         minor.add_child(track_artists);
     }
 
@@ -153,7 +153,9 @@ pub fn playable_widget(display: Display) -> impl Widget<PlayRow<Arc<Track>>> {
                 .with_child(major)
                 .with_spacer(2.0)
                 .with_child(minor)
-                .on_click(|ctx, row, _| ctx.submit_notification(cmd::PLAY.with(row.position))),
+                .on_left_click(|ctx, _, row, _| {
+                    ctx.submit_notification(cmd::PLAY.with(row.position))
+                }),
             1.0,
         )
         .with_default_spacer()
