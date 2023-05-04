@@ -117,9 +117,17 @@ where
         env: &Env,
     ) {
         if let LifeCycle::WidgetAdded = event {
-            if let Some(route) = &data.config.last_route {
-                ctx.submit_command(cmd::NAVIGATE.with(route.to_owned()));
-            }
+            // Loads the library's saved tracks without the user needing to click on the tab.
+            ctx.submit_command(cmd::NAVIGATE.with(Nav::SavedTracks));
+            // Load the last route, or the default.
+            ctx.submit_command(
+                cmd::NAVIGATE.with(
+                    data.config
+                        .last_route
+                        .to_owned()
+                        .unwrap_or(Default::default()),
+                ),
+            );
         }
         child.lifecycle(ctx, event, data, env)
     }
