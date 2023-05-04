@@ -77,6 +77,10 @@ impl Album {
             images: self.images.clone(),
         }
     }
+
+    pub fn has_explicit(&self) -> bool {
+        self.tracks.iter().any(|t| t.explicit)
+    }
 }
 
 #[derive(Clone, Debug, Data, Lens, Eq, PartialEq, Hash, Deserialize, Serialize)]
