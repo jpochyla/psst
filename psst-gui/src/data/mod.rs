@@ -389,7 +389,7 @@ impl Library {
         if let Some(saved) = self.playlists.resolved_mut() {
             for playlist in saved.iter_mut() {
                 if playlist.id == link.id {
-                    playlist.name = link.name.clone();
+                    playlist.name = link.name;
                     break;
                 }
             }
