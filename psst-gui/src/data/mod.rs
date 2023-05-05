@@ -385,6 +385,17 @@ impl Library {
         }
     }
 
+    pub fn rename_playlist(&mut self, link: PlaylistLink) {
+        if let Some(saved) = self.playlists.resolved_mut() {
+            for playlist in saved.iter_mut() {
+                if playlist.id == link.id {
+                    playlist.name = link.name;
+                    break;
+                }
+            }
+        }
+    }
+
     pub fn is_created_by_user(&self, playlist: &Playlist) -> bool {
         if let Some(profile) = self.user_profile.resolved() {
             profile.id == playlist.owner.id
@@ -406,6 +417,7 @@ impl Library {
             for playlist in saved.iter_mut() {
                 if playlist.id == link.id {
                     playlist.track_count += 1;
+                    break;
                 }
             }
         }
@@ -416,6 +428,7 @@ impl Library {
             for playlist in saved.iter_mut() {
                 if playlist.id == link.id {
                     playlist.track_count -= 1;
+                    break;
                 }
             }
         }

@@ -565,6 +565,12 @@ impl WebApi {
             .collect())
     }
 
+    pub fn change_playlist_details(&self, id: &str, name: &str) -> Result<(), Error> {
+        let request = self.put(format!("v1/playlists/{}", id))?;
+        request.send_json(json!({ "name": name }))?;
+        Ok(())
+    }
+
     // https://developer.spotify.com/documentation/web-api/reference/#endpoint-add-tracks-to-playlist
     pub fn add_track_to_playlist(&self, playlist_id: &str, track_uri: &str) -> Result<(), Error> {
         let request = self
