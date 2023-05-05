@@ -27,7 +27,7 @@ parking_lot = { version = "0.12.1" }
 platform-dirs = { version = "0.3.0" }
 rand = { version = "0.8.5" }
 regex = { version = "1.8.1" }
-serde = { version = "1.0.160", features = ["derive", "rc"] }
+serde = { version = "1.0.162", features = ["derive", "rc"] }
 serde_json = { version = "1.0.96" }
 threadpool = { version = "1.8.1" }
 time = { version = "0.3.20", features = ["macros", "formatting"] }
