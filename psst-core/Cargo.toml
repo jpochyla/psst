@@ -18,7 +18,7 @@ parking_lot = { version = "0.12.1" }
 quick-protobuf = { version = "0.8.1" }
 rand = { version = "0.8.5" }
 rangemap = { version = "1.3.0" }
-serde = { version = "1.0.160", features = ["derive"] }
+serde = { version = "1.0.162", features = ["derive"] }
 serde_json = { version = "1.0.96" }
 socks = { version = "0.3.4" }
 tempfile = { version = "3.5.0" }
