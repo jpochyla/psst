@@ -131,7 +131,7 @@ pub fn list_widget() -> impl Widget<AppState> {
     )
     .on_command_async(
         RENAME_PLAYLIST,
-        |link| WebApi::global().change_playlist_details((&*link.id).clone(), (&*link.name).clone()),
+        |link| WebApi::global().change_playlist_details(link.id.as_ref(), link.name.as_ref()),
         |ctx, _, _| ctx.submit_command(LOAD_LIST),
         |_, data: &mut AppState, (_, r)| {
             if let Err(err) = r {
@@ -251,7 +251,7 @@ impl Lens<AppState, String> for TextInput {
 
 fn rename_playlist_widget(link: PlaylistLink) -> impl Widget<AppState> {
     let text_input = TextInput {
-        input: Rc::new(RefCell::new(String::from(link.name.to_string()))),
+        input: Rc::new(RefCell::new(link.name.to_string())),
     };
 
     let information_section = information_section(
