@@ -390,6 +390,7 @@ impl Library {
             for playlist in saved.iter_mut() {
                 if playlist.id == link.id {
                     playlist.name = link.name.clone();
+                    break;
                 }
             }
         }
@@ -416,6 +417,7 @@ impl Library {
             for playlist in saved.iter_mut() {
                 if playlist.id == link.id {
                     playlist.track_count += 1;
+                    break;
                 }
             }
         }
@@ -426,6 +428,7 @@ impl Library {
             for playlist in saved.iter_mut() {
                 if playlist.id == link.id {
                     playlist.track_count -= 1;
+                    break;
                 }
             }
         }
