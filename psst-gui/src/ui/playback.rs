@@ -19,7 +19,7 @@ use crate::{
     widget::{icons, icons::SvgIcon, Empty, Maybe, MyWidgetExt, RemoteImage},
 };
 
-use super::{episode, theme, track, utils};
+use super::{episode, library, theme, track, utils};
 
 pub fn panel_widget() -> impl Widget<AppState> {
     let seek_bar = Maybe::or_empty(SeekBar::new).lens(Playback::now_playing);
@@ -97,20 +97,58 @@ fn playing_item_widget() -> impl Widget<NowPlaying> {
                 .with_spacer(2.0)
                 .with_child(detail)
                 .with_spacer(2.0)
-                .with_child(origin),
+                .with_child(origin)
+                .on_click(|ctx, now_playing, _| {
+                    ctx.submit_command(cmd::NAVIGATE.with(now_playing.origin.to_nav()));
+                })
+                .context_menu(|now_playing| match &now_playing.item {
+                    Playable::Track(track) => {
+                        track::track_menu(track, &now_playing.library, &now_playing.origin)
+                    }
+                    Playable::Episode(episode) => {
+                        episode::episode_menu(episode, &now_playing.library)
+                    }
+                }),
             1.0,
         )
+        .with_child(ViewSwitcher::new(
+            |now_playing: &NowPlaying, _| {
+                now_playing.item.track().is_some() && now_playing.library.saved_tracks.is_resolved()
+            },
+            |selector, _data, _env| match selector {
+                true => {
+                    // View is only show if now_playing's track isn't none
+                    ViewSwitcher::new(
+                        |now_playing: &NowPlaying, _| {
+                            now_playing
+                                .library
+                                .contains_track(now_playing.item.track().unwrap())
+                        },
+                        |selector: &bool, _, _| {
+                            match selector {
+                                true => &icons::HEART_SOLID,
+                                false => &icons::HEART_OUTLINE,
+                            }
+                            .scale(theme::ICON_SIZE_SMALL)
+                            .boxed()
+                        },
+                    )
+                    .on_left_click(|ctx, _, now_playing, _| {
+                        let track = now_playing.item.track().unwrap();
+                        if now_playing.library.contains_track(track) {
+                            ctx.submit_command(library::UNSAVE_TRACK.with(track.id))
+                        } else {
+                            ctx.submit_command(library::SAVE_TRACK.with(track.clone()))
+                        }
+                    })
+                    .padding(theme::grid(1.0))
+                    .boxed()
+                }
+                false => Box::new(Flex::column()),
+            },
+        ))
         .padding(theme::grid(1.0))
         .link()
-        .on_left_click(|ctx, _, now_playing, _| {
-            ctx.submit_command(cmd::NAVIGATE.with(now_playing.origin.to_nav()));
-        })
-        .context_menu(|now_playing| match &now_playing.item {
-            Playable::Track(track) => {
-                track::track_menu(track, &now_playing.library, &now_playing.origin)
-            }
-            Playable::Episode(episode) => episode::episode_menu(episode, &now_playing.library),
-        })
 }
 
 fn cover_widget(size: f64) -> impl Widget<NowPlaying> {

@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use druid::{
-    widget::{CrossAxisAlignment, Either, Flex, Label},
+    widget::{CrossAxisAlignment, Either, Flex, Label, ViewSwitcher},
     LensExt, LocalizedString, Menu, MenuItem, Size, TextAlignment, Widget, WidgetExt,
 };
 
@@ -130,20 +130,51 @@ pub fn playable_widget(track: &Track, display: Display) -> impl Widget<PlayRow<A
     major.add_default_spacer();
     major.add_child(track_duration);
 
+    let saved = ViewSwitcher::new(
+        |row: &PlayRow<Arc<Track>>, _| row.ctx.library.saved_tracks.is_resolved(),
+        |selector: &bool, _, _| match selector {
+            true => ViewSwitcher::new(
+                |row: &PlayRow<Arc<Track>>, _| row.ctx.library.contains_track(&row.item),
+                |selector: &bool, _, _| {
+                    match selector {
+                        true => &icons::HEART_SOLID,
+                        false => &icons::HEART_OUTLINE,
+                    }
+                    .scale(theme::ICON_SIZE_SMALL)
+                    .boxed()
+                },
+            )
+            .on_left_click(|ctx, _, row, _| {
+                let track = &row.item;
+                if row.ctx.library.contains_track(track) {
+                    ctx.submit_command(library::UNSAVE_TRACK.with(track.id))
+                } else {
+                    ctx.submit_command(library::SAVE_TRACK.with(track.clone()))
+                }
+            })
+            .boxed(),
+            false => Box::new(Flex::column()),
+        },
+    );
+
     main_row
         .with_flex_child(
             Flex::column()
                 .cross_axis_alignment(CrossAxisAlignment::Start)
                 .with_child(major)
                 .with_spacer(2.0)
-                .with_child(minor),
+                .with_child(minor)
+                .on_left_click(|ctx, _, row, _| {
+                    ctx.submit_notification(cmd::PLAY.with(row.position))
+                }),
             1.0,
         )
+        .with_default_spacer()
+        .with_child(saved)
         .padding(theme::grid(1.0))
         .link()
         .active(|row, _| row.is_playing)
         .rounded(theme::BUTTON_BORDER_RADIUS)
-        .on_left_click(|ctx, _, row, _| ctx.submit_notification(cmd::PLAY.with(row.position)))
         .context_menu(track_row_menu)
 }
 
