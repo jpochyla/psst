@@ -132,7 +132,7 @@ pub fn list_widget() -> impl Widget<AppState> {
     .on_command_async(
         RENAME_PLAYLIST,
         |link| WebApi::global().change_playlist_details(link.id.as_ref(), link.name.as_ref()),
-        |ctx, _, _| ctx.submit_command(LOAD_LIST),
+        |_, data: &mut AppState, link| data.with_library_mut(|l| l.rename_playlist(link)),
         |_, data: &mut AppState, (_, r)| {
             if let Err(err) = r {
                 data.error_alert(err);
