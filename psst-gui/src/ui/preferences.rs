@@ -7,7 +7,8 @@ use druid::{
         Button, Controller, CrossAxisAlignment, Flex, Label, LineBreaking, MainAxisAlignment,
         RadioGroup, SizedBox, Slider, TextBox, ViewSwitcher,
     },
-    Data, Env, Event, EventCtx, LensExt, LifeCycle, LifeCycleCtx, Selector, Widget, WidgetExt,
+    Color, Data, Env, Event, EventCtx, LensExt, LifeCycle, LifeCycleCtx, Selector, Widget,
+    WidgetExt,
 };
 use psst_core::connection::Credentials;
 
@@ -67,6 +68,7 @@ pub fn preferences_widget() -> impl Widget<AppState> {
                         account_tab_widget(AccountTab::InPreferences).boxed()
                     }
                     PreferencesTab::Cache => cache_tab_widget().boxed(),
+                    PreferencesTab::About => about_tab_widget().boxed(),
                 },
             )
             .padding(theme::grid(4.0))
@@ -115,6 +117,12 @@ fn tabs_widget() -> impl Widget<AppState> {
             "Cache",
             &icons::STORAGE,
             PreferencesTab::Cache,
+        ))
+        .with_default_spacer()
+        .with_child(tab_link_widget(
+            "About",
+            &icons::HEART,
+            PreferencesTab::About,
         ))
 }
 
@@ -178,6 +186,7 @@ fn general_tab_widget() -> impl Widget<AppState> {
 
     col = col.with_spacer(theme::grid(3.0));
 
+    // Sliders
     col = col
         .with_child(Label::new("Slider Scrolling").with_font(theme::UI_FONT_MEDIUM))
         .with_spacer(theme::grid(2.0))
@@ -500,4 +509,32 @@ impl<W: Widget<Preferences>> Controller<Preferences, W> for MeasureCacheSize {
         }
         child.lifecycle(ctx, event, data, env);
     }
+}
+
+fn about_tab_widget() -> impl Widget<AppState> {
+    // Build Info
+    let commit_hash = Flex::row()
+        .with_child(Label::new("Commit Hash:   "))
+        .with_child(Label::new(psst_core::GIT_VERSION).with_text_color(theme::DISABLED_TEXT_COLOR));
+
+    let build_time = Flex::row()
+        .with_child(Label::new("Build time:   "))
+        .with_child(Label::new(psst_core::BUILD_TIME).with_text_color(theme::DISABLED_TEXT_COLOR));
+
+    let remote_url = Flex::row().with_child(Label::new("Source:   ")).with_child(
+        Label::new(psst_core::REMOTE_URL)
+            .with_text_color(Color::rgb8(138, 180, 248))
+            .on_left_click(|_, _, _, _| {
+                webbrowser::open(psst_core::REMOTE_URL).ok();
+            }),
+    );
+
+    Flex::column()
+        .cross_axis_alignment(CrossAxisAlignment::Start)
+        .must_fill_main_axis(true)
+        .with_child(Label::new("Build Info").with_font(theme::UI_FONT_MEDIUM))
+        .with_spacer(theme::grid(2.0))
+        .with_child(commit_hash)
+        .with_child(build_time)
+        .with_child(remote_url)
 }

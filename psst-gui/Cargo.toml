@@ -42,6 +42,7 @@ druid-shell = { git = "https://github.com/jpochyla/druid", branch = "psst", feat
 open = { version = "4.1.0" }
 raw-window-handle = { version = "0.5.2" }
 souvlaki = { version = "0.6.0" }
+webbrowser = {version = "0.8.9"}
 
 [target.'cfg(windows)'.build-dependencies]
 winres = { version = "0.1.12" }
