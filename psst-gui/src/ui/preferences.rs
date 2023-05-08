@@ -512,27 +512,17 @@ impl<W: Widget<Preferences>> Controller<Preferences, W> for MeasureCacheSize {
 }
 
 fn about_tab_widget() -> impl Widget<AppState> {
-    let mut col = Flex::column()
-        .cross_axis_alignment(CrossAxisAlignment::Start)
-        .must_fill_main_axis(true);
-
-    col = col.with_spacer(theme::grid(3.0));
-
     // Build Info
-    let mut commit_hash = Flex::row();
-    commit_hash.add_child(Label::new("Commit Hash:   "));
-    commit_hash
-        .add_child(Label::new(psst_core::GIT_VERSION).with_text_color(theme::DISABLED_TEXT_COLOR));
+    let commit_hash = Flex::row()
+        .with_child(Label::new("Commit Hash:   "))
+        .with_child(Label::new(psst_core::GIT_VERSION).with_text_color(theme::DISABLED_TEXT_COLOR));
 
-    let mut build_time = Flex::row();
-    build_time.add_child(Label::new("Build time:   "));
-    build_time
-        .add_child(Label::new(psst_core::BUILD_TIME).with_text_color(theme::DISABLED_TEXT_COLOR));
+    let build_time = Flex::row()
+        .with_child(Label::new("Build time:   "))
+        .with_child(Label::new(psst_core::BUILD_TIME).with_text_color(theme::DISABLED_TEXT_COLOR));
 
-    let mut remote_url = Flex::row().main_axis_alignment(MainAxisAlignment::SpaceEvenly);
-    remote_url.add_child(Label::new("Source:  "));
     #[allow(unused_must_use)]
-    remote_url.add_child(
+    let remote_url = Flex::row().with_child(Label::new("Source:   ")).with_child(
         Label::new(psst_core::REMOTE_URL)
             .with_text_color(Color::rgb8(138, 180, 248))
             .on_left_click(|_, _, _, _| {
@@ -540,12 +530,12 @@ fn about_tab_widget() -> impl Widget<AppState> {
             }),
     );
 
-    col = col
+    Flex::column()
+        .cross_axis_alignment(CrossAxisAlignment::Start)
+        .must_fill_main_axis(true)
         .with_child(Label::new("Build Info").with_font(theme::UI_FONT_MEDIUM))
-        .with_spacer(theme::grid(1.0))
+        .with_spacer(theme::grid(2.0))
         .with_child(commit_hash)
         .with_child(build_time)
-        .with_child(remote_url);
-
-    col
+        .with_child(remote_url)
 }
