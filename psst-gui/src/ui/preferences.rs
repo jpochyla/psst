@@ -68,7 +68,7 @@ pub fn preferences_widget() -> impl Widget<AppState> {
                         account_tab_widget(AccountTab::InPreferences).boxed()
                     }
                     PreferencesTab::Cache => cache_tab_widget().boxed(),
-                    PreferencesTab::About => stats_tab_widget().boxed(),
+                    PreferencesTab::About => about_tab_widget().boxed(),
                 },
             )
             .padding(theme::grid(4.0))
@@ -511,7 +511,7 @@ impl<W: Widget<Preferences>> Controller<Preferences, W> for MeasureCacheSize {
     }
 }
 
-fn stats_tab_widget() -> impl Widget<AppState> {
+fn about_tab_widget() -> impl Widget<AppState> {
     let mut col = Flex::column()
         .cross_axis_alignment(CrossAxisAlignment::Start)
         .must_fill_main_axis(true);
@@ -535,7 +535,7 @@ fn stats_tab_widget() -> impl Widget<AppState> {
     remote_url.add_child(
         Label::new(psst_core::REMOTE_URL)
             .with_text_color(Color::rgb8(138, 180, 248))
-            .on_click(|_ctx, _t, _env| {
+            .on_left_click(|_, _, _, _| {
                 webbrowser::open(psst_core::REMOTE_URL);
             }),
     );
