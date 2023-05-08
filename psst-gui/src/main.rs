@@ -1,5 +1,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
-#![allow(clippy::new_without_default)]
+#![allow(clippy::new_without_default, clippy::type_complexity)]
 
 mod cmd;
 mod controller;
@@ -32,11 +32,13 @@ fn main() {
     .init();
 
     let config = Config::load().unwrap_or_default();
+    let paginated_limit = config.paginated_limit;
     let state = AppState::default_with_config(config);
     WebApi::new(
         state.session.clone(),
         Config::proxy().as_deref(),
         Config::cache_dir(),
+        paginated_limit,
     )
     .install_as_global();
 

@@ -1,3 +1,4 @@
+use std::io::{BufReader, BufWriter};
 use std::{env, env::VarError, fs::File, path::PathBuf};
 
 use std::fs::OpenOptions;
@@ -32,7 +33,7 @@ impl Preferences {
     }
 
     pub fn measure_cache_usage() -> Option<u64> {
-        Config::cache_dir().and_then(|path| fs_extra::dir::get_size(&path).ok())
+        Config::cache_dir().and_then(|path| fs_extra::dir::get_size(path).ok())
     }
 }
 
@@ -41,6 +42,7 @@ pub enum PreferencesTab {
     General,
     Account,
     Cache,
+    About,
 }
 
 #[derive(Clone, Debug, Data, Lens)]
@@ -89,6 +91,9 @@ pub struct Config {
     pub show_track_cover: bool,
     pub window_size: Size,
     pub slider_scroll_scale: SliderScrollScale,
+    pub sort_order: SortOrder,
+    pub sort_criteria: SortCriteria,
+    pub paginated_limit: usize,
 }
 
 impl Default for Config {
@@ -103,6 +108,9 @@ impl Default for Config {
             show_track_cover: Default::default(),
             window_size: Size::new(theme::grid(80.0), theme::grid(100.0)),
             slider_scroll_scale: Default::default(),
+            sort_order: Default::default(),
+            sort_criteria: Default::default(),
+            paginated_limit: 500,
         }
     }
 }
@@ -137,7 +145,8 @@ impl Config {
         let path = Self::config_path().expect("Failed to get config path");
         if let Ok(file) = File::open(&path) {
             log::info!("loading config: {:?}", &path);
-            Some(serde_json::from_reader(file).expect("Failed to read config"))
+            let reader = BufReader::new(file);
+            Some(serde_json::from_reader(reader).expect("Failed to read config"))
         } else {
             None
         }
@@ -154,8 +163,9 @@ impl Config {
         options.mode(0o600);
 
         let file = options.open(&path).expect("Failed to create config");
+        let writer = BufWriter::new(file);
 
-        serde_json::to_writer_pretty(file, self).expect("Failed to write config");
+        serde_json::to_writer_pretty(writer, self).expect("Failed to write config");
         log::info!("saved config: {:?}", &path);
     }
 
@@ -235,5 +245,30 @@ pub enum Theme {
 impl Default for Theme {
     fn default() -> Self {
         Self::Light
+    }
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Data, Serialize, Deserialize)]
+pub enum SortOrder {
+    Ascending,
+    Descending,
+}
+impl Default for SortOrder {
+    fn default() -> Self {
+        Self::Ascending
+    }
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Data, Serialize, Deserialize)]
+pub enum SortCriteria {
+    Title,
+    Artist,
+    Album,
+    Duration,
+    DateAdded,
+}
+impl Default for SortCriteria {
+    fn default() -> Self {
+        Self::DateAdded
     }
 }

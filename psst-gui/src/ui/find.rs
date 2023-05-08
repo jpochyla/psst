@@ -131,13 +131,13 @@ pub fn finder_widget(selector: Selector<Find>, label: &'static str) -> impl Widg
         .padding(theme::grid(0.5))
         .link()
         .rounded(theme::BUTTON_BORDER_RADIUS)
-        .on_click(|_, data: &mut Finder, _| data.focus_previous());
+        .on_left_click(|_, _, data: &mut Finder, _| data.focus_previous());
 
     let next = Label::new("›")
         .padding(theme::grid(0.5))
         .link()
         .rounded(theme::BUTTON_BORDER_RADIUS)
-        .on_click(|_, data: &mut Finder, _| data.focus_next());
+        .on_left_click(|_, _, data: &mut Finder, _| data.focus_next());
 
     let results_with_controls = Either::new(
         |data, _| data.results > 0,

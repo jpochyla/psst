@@ -1,18 +1,18 @@
 use std::sync::Arc;
 
 use druid::{
-    widget::{CrossAxisAlignment, Either, Flex, Label, List},
+    widget::{CrossAxisAlignment, Either, Flex, Label, ViewSwitcher},
     LensExt, LocalizedString, Menu, MenuItem, Size, TextAlignment, Widget, WidgetExt,
 };
 
 use crate::{
     cmd,
     data::{
-        AppState, ArtistLink, Library, Nav, PlaybackOrigin, PlaylistAddTrack, PlaylistRemoveTrack,
+        AppState, Library, Nav, PlaybackOrigin, PlaylistAddTrack, PlaylistRemoveTrack,
         RecommendationsRequest, Track,
     },
     ui::playlist,
-    widget::{Empty, MyWidgetExt, RemoteImage},
+    widget::{icons, Empty, MyWidgetExt, RemoteImage},
 };
 
 use super::{
@@ -45,7 +45,7 @@ impl Display {
     }
 }
 
-pub fn playable_widget(display: Display) -> impl Widget<PlayRow<Arc<Track>>> {
+pub fn playable_widget(track: &Track, display: Display) -> impl Widget<PlayRow<Arc<Track>>> {
     let mut main_row = Flex::row();
     let mut major = Flex::row();
     let mut minor = Flex::row();
@@ -84,15 +84,15 @@ pub fn playable_widget(display: Display) -> impl Widget<PlayRow<Arc<Track>>> {
         major.add_child(track_name);
     }
 
+    if track.explicit && (display.artist || display.album) {
+        let icon = icons::EXPLICIT.scale(theme::ICON_SIZE_TINY);
+        minor.add_child(icon);
+        minor.add_spacer(theme::grid(0.5));
+    }
+
     if display.artist {
-        let track_artists = List::new(|| {
-            Label::raw()
-                .with_text_size(theme::TEXT_SIZE_SMALL)
-                .lens(ArtistLink::name)
-        })
-        .horizontal()
-        .with_spacing(theme::grid(0.5))
-        .lens(PlayRow::item.then(Track::artists.in_arc()));
+        let track_artists = Label::dynamic(|row: &PlayRow<Arc<Track>>, _| row.item.artist_names())
+            .with_text_size(theme::TEXT_SIZE_SMALL);
         minor.add_child(track_artists);
     }
 
@@ -130,20 +130,51 @@ pub fn playable_widget(display: Display) -> impl Widget<PlayRow<Arc<Track>>> {
     major.add_default_spacer();
     major.add_child(track_duration);
 
+    let saved = ViewSwitcher::new(
+        |row: &PlayRow<Arc<Track>>, _| row.ctx.library.saved_tracks.is_resolved(),
+        |selector: &bool, _, _| match selector {
+            true => ViewSwitcher::new(
+                |row: &PlayRow<Arc<Track>>, _| row.ctx.library.contains_track(&row.item),
+                |selector: &bool, _, _| {
+                    match selector {
+                        true => &icons::HEART_SOLID,
+                        false => &icons::HEART_OUTLINE,
+                    }
+                    .scale(theme::ICON_SIZE_SMALL)
+                    .boxed()
+                },
+            )
+            .on_left_click(|ctx, _, row, _| {
+                let track = &row.item;
+                if row.ctx.library.contains_track(track) {
+                    ctx.submit_command(library::UNSAVE_TRACK.with(track.id))
+                } else {
+                    ctx.submit_command(library::SAVE_TRACK.with(track.clone()))
+                }
+            })
+            .boxed(),
+            false => Box::new(Flex::column()),
+        },
+    );
+
     main_row
         .with_flex_child(
             Flex::column()
                 .cross_axis_alignment(CrossAxisAlignment::Start)
                 .with_child(major)
                 .with_spacer(2.0)
-                .with_child(minor),
+                .with_child(minor)
+                .on_left_click(|ctx, _, row, _| {
+                    ctx.submit_notification(cmd::PLAY.with(row.position))
+                }),
             1.0,
         )
+        .with_default_spacer()
+        .with_child(saved)
         .padding(theme::grid(1.0))
         .link()
         .active(|row, _| row.is_playing)
         .rounded(theme::BUTTON_BORDER_RADIUS)
-        .on_click(|ctx, row, _| ctx.submit_notification(cmd::PLAY.with(row.position)))
         .context_menu(track_row_menu)
 }
 

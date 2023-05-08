@@ -216,22 +216,32 @@ impl PlaybackController {
     }
 
     fn send(&mut self, event: PlayerEvent) {
-        self.sender.as_mut().unwrap().send(event).unwrap();
+        if let Some(s) = &self.sender {
+            s.send(event)
+                .map_err(|e| log::error!("Error sending message: {:?}", e))
+                .ok();
+        }
     }
 
     fn play(&mut self, items: &Vector<QueueEntry>, position: usize) {
-        let items = items
-            .iter()
-            .map(|queued| PlaybackItem {
-                item_id: queued.item.id(),
-                norm_level: match queued.origin {
-                    PlaybackOrigin::Album(_) => NormalizationLevel::Album,
-                    _ => NormalizationLevel::Track,
-                },
-            })
-            .collect();
+        let playback_items = items.iter().map(|queued| PlaybackItem {
+            item_id: queued.item.id(),
+            norm_level: match queued.origin {
+                PlaybackOrigin::Album(_) => NormalizationLevel::Album,
+                _ => NormalizationLevel::Track,
+            },
+        });
+        let playback_items_vec: Vec<PlaybackItem> = playback_items.collect();
+
+        // Make sure position is within bounds
+        let position = if position >= playback_items_vec.len() {
+            0
+        } else {
+            position
+        };
+
         self.send(PlayerEvent::Command(PlayerCommand::LoadQueue {
-            items,
+            items: playback_items_vec,
             position,
         }));
     }

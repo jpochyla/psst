@@ -1,6 +1,7 @@
 use std::{convert::TryFrom, sync::Arc, time::Duration};
 
 use druid::{im::Vector, lens::Map, Data, Lens};
+use itertools::Itertools;
 use psst_core::item_id::{ItemId, ItemIdType};
 use serde::{Deserialize, Serialize};
 
@@ -50,6 +51,13 @@ impl Track {
             .front()
             .map(|artist| artist.name.clone())
             .unwrap_or_else(|| "Unknown".into())
+    }
+
+    pub fn artist_names(&self) -> String {
+        self.artists
+            .iter()
+            .map(|artist| artist.name.clone())
+            .join(", ")
     }
 
     pub fn album_name(&self) -> Arc<str> {

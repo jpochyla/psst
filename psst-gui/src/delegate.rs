@@ -3,6 +3,9 @@ use druid::{
 };
 use threadpool::ThreadPool;
 
+use crate::ui::playlist::{
+    RENAME_PLAYLIST, RENAME_PLAYLIST_CONFIRM, UNFOLLOW_PLAYLIST, UNFOLLOW_PLAYLIST_CONFIRM,
+};
 use crate::{
     cmd,
     data::{AppState, Config},
@@ -112,6 +115,12 @@ impl AppDelegate<AppState> for Delegate {
             Handled::Yes
         } else if let Handled::Yes = self.command_image(ctx, target, cmd, data) {
             Handled::Yes
+        } else if let Some(link) = cmd.get(UNFOLLOW_PLAYLIST_CONFIRM) {
+            ctx.submit_command(UNFOLLOW_PLAYLIST.with(link.clone()));
+            Handled::Yes
+        } else if let Some(link) = cmd.get(RENAME_PLAYLIST_CONFIRM) {
+            ctx.submit_command(RENAME_PLAYLIST.with(link.clone()));
+            Handled::Yes
         } else {
             Handled::No
         }
@@ -139,13 +148,15 @@ impl AppDelegate<AppState> for Delegate {
     fn event(
         &mut self,
         _ctx: &mut DelegateCtx,
-        _window_id: WindowId,
+        window_id: WindowId,
         event: Event,
         data: &mut AppState,
         _env: &Env,
     ) -> Option<Event> {
-        if let Event::WindowSize(size) = event {
-            data.config.window_size = size;
+        if self.main_window == Some(window_id) {
+            if let Event::WindowSize(size) = event {
+                data.config.window_size = size;
+            }
         }
         Some(event)
     }
@@ -170,13 +181,20 @@ impl Delegate {
                     .unwrap();
             } else {
                 self.image_pool.execute(move || {
-                    let image_buf = WebApi::global().get_image(location.clone()).unwrap();
-                    let payload = remote_image::ImagePayload {
-                        location,
-                        image_buf,
-                    };
-                    sink.submit_command(remote_image::PROVIDE_DATA, payload, target)
-                        .unwrap();
+                    let result = WebApi::global().get_image(location.clone());
+                    match result {
+                        Ok(image_buf) => {
+                            let payload = remote_image::ImagePayload {
+                                location,
+                                image_buf,
+                            };
+                            sink.submit_command(remote_image::PROVIDE_DATA, payload, target)
+                                .unwrap();
+                        }
+                        Err(err) => {
+                            log::warn!("failed to fetch image: {}", err)
+                        }
+                    }
                 });
             }
             Handled::Yes

@@ -41,5 +41,5 @@ fn load_images() -> Vec<IcoFrame<'static>> {
 fn save_ico(images: &[IcoFrame<'_>], ico_path: &str) {
     let file = std::fs::File::create(ico_path).unwrap();
     let encoder = IcoEncoder::new(file);
-    encoder.encode_images(&images).unwrap();
+    encoder.encode_images(images).unwrap();
 }
