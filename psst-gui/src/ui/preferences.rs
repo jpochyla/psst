@@ -521,12 +521,11 @@ fn about_tab_widget() -> impl Widget<AppState> {
         .with_child(Label::new("Build time:   "))
         .with_child(Label::new(psst_core::BUILD_TIME).with_text_color(theme::DISABLED_TEXT_COLOR));
 
-    #[allow(unused_must_use)]
     let remote_url = Flex::row().with_child(Label::new("Source:   ")).with_child(
         Label::new(psst_core::REMOTE_URL)
             .with_text_color(Color::rgb8(138, 180, 248))
             .on_left_click(|_, _, _, _| {
-                webbrowser::open(psst_core::REMOTE_URL);
+                webbrowser::open(psst_core::REMOTE_URL).ok();
             }),
     );
 
