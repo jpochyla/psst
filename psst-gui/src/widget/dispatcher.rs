@@ -95,7 +95,7 @@ impl<T: Data, U: Data + Eq + Hash> Widget<T> for ViewDispatcher<T, U> {
         match self.active_child() {
             Some(child) => {
                 let size = child.layout(ctx, bc, data, env);
-                child.set_origin(ctx, data, env, Point::ORIGIN);
+                child.set_origin(ctx, Point::ORIGIN);
                 size
             }
             None => bc.max(),

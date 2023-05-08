@@ -52,7 +52,7 @@ where
                 Point::ORIGIN + Vec2::new(0.0, inner_size.height - over_size.height)
             }
         };
-        self.overlay.set_origin(ctx, data, env, pos);
+        self.overlay.set_origin(ctx, pos);
         inner_size
     }
 

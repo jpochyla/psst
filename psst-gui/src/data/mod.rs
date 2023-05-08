@@ -64,7 +64,6 @@ pub use crate::data::{
 pub struct AppState {
     #[data(ignore)]
     pub session: SessionService,
-
     pub nav: Nav,
     pub history: Vector<Nav>,
     pub config: Config,
@@ -158,7 +157,7 @@ impl AppState {
 impl AppState {
     pub fn navigate(&mut self, nav: &Nav) {
         if &self.nav != nav {
-            let previous = mem::replace(&mut self.nav, nav.to_owned());
+            let previous: Nav = mem::replace(&mut self.nav, nav.to_owned());
             self.history.push_back(previous);
             self.config.last_route.replace(nav.to_owned());
             self.config.save();
@@ -171,6 +170,11 @@ impl AppState {
             self.config.save();
             self.nav = nav;
         }
+    }
+
+    pub fn refresh(&mut self) {
+        let current: Nav = mem::replace(&mut self.nav, Nav::Home);
+        self.nav = current;
     }
 }
 
@@ -369,11 +373,51 @@ impl Library {
         }
     }
 
+    pub fn add_playlist(&mut self, playlist: Playlist) {
+        if let Some(playlists) = self.playlists.resolved_mut() {
+            playlists.push_back(playlist);
+        }
+    }
+
+    pub fn remove_from_playlist(&mut self, id: &str) {
+        if let Some(playlists) = self.playlists.resolved_mut() {
+            playlists.retain(|p| p.id.as_ref() != id);
+        }
+    }
+
+    pub fn rename_playlist(&mut self, link: PlaylistLink) {
+        if let Some(saved) = self.playlists.resolved_mut() {
+            for playlist in saved.iter_mut() {
+                if playlist.id == link.id {
+                    playlist.name = link.name;
+                    break;
+                }
+            }
+        }
+    }
+
+    pub fn is_created_by_user(&self, playlist: &Playlist) -> bool {
+        if let Some(profile) = self.user_profile.resolved() {
+            profile.id == playlist.owner.id
+        } else {
+            false
+        }
+    }
+
+    pub fn contains_playlist(&self, playlist: &Playlist) -> bool {
+        if let Some(playlists) = self.playlists.resolved() {
+            playlists.iter().any(|p| p.id == playlist.id)
+        } else {
+            false
+        }
+    }
+
     pub fn increment_playlist_track_count(&mut self, link: &PlaylistLink) {
         if let Some(saved) = self.playlists.resolved_mut() {
             for playlist in saved.iter_mut() {
                 if playlist.id == link.id {
                     playlist.track_count += 1;
+                    break;
                 }
             }
         }
@@ -384,6 +428,7 @@ impl Library {
             for playlist in saved.iter_mut() {
                 if playlist.id == link.id {
                     playlist.track_count -= 1;
+                    break;
                 }
             }
         }

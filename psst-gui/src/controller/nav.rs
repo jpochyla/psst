@@ -46,7 +46,9 @@ impl NavController {
             }
             Nav::PlaylistDetail(link) => {
                 if !data.playlist_detail.playlist.contains(link) {
-                    ctx.submit_command(playlist::LOAD_DETAIL.with(link.to_owned()));
+                    ctx.submit_command(
+                        playlist::LOAD_DETAIL.with((link.to_owned(), data.to_owned())),
+                    );
                 }
             }
             Nav::ShowDetail(link) => {
@@ -90,6 +92,11 @@ where
                 ctx.set_handled();
                 self.load_route_data(ctx, data);
             }
+            Event::Command(cmd) if cmd.is(cmd::NAVIGATE_REFRESH) => {
+                data.refresh();
+                ctx.set_handled();
+                self.load_route_data(ctx, data);
+            }
             Event::MouseDown(cmd) if cmd.button.is_x1() => {
                 data.navigate_back();
                 ctx.set_handled();
@@ -110,9 +117,17 @@ where
         env: &Env,
     ) {
         if let LifeCycle::WidgetAdded = event {
-            if let Some(route) = &data.config.last_route {
-                ctx.submit_command(cmd::NAVIGATE.with(route.to_owned()));
-            }
+            // Loads the library's saved tracks without the user needing to click on the tab.
+            ctx.submit_command(cmd::NAVIGATE.with(Nav::SavedTracks));
+            // Load the last route, or the default.
+            ctx.submit_command(
+                cmd::NAVIGATE.with(
+                    data.config
+                        .last_route
+                        .to_owned()
+                        .unwrap_or(Default::default()),
+                ),
+            );
         }
         child.lifecycle(ctx, event, data, env)
     }

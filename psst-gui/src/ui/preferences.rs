@@ -2,6 +2,7 @@ use std::thread::{self, JoinHandle};
 
 use druid::{
     commands,
+    text::ParseFormatter,
     widget::{
         Button, Controller, CrossAxisAlignment, Flex, Label, LineBreaking, MainAxisAlignment,
         RadioGroup, SizedBox, Slider, TextBox, ViewSwitcher,
@@ -138,7 +139,7 @@ fn tab_link_widget(
         .link()
         .rounded(theme::BUTTON_BORDER_RADIUS)
         .active(move |state: &AppState, _| tab == state.preferences.active)
-        .on_click(move |_, state: &mut AppState, _| {
+        .on_left_click(move |_, _, state: &mut AppState, _| {
             state.preferences.active = tab;
         })
         .env_scope(|env, _| {
@@ -209,6 +210,24 @@ fn general_tab_widget() -> impl Widget<AppState> {
                 .with_child(Label::new("Sensitivity")),
         );
 
+    col = col.with_spacer(theme::grid(3.0));
+
+    col = col
+        .with_child(
+            Label::new("Max Loaded Tracks (requires restart)").with_font(theme::UI_FONT_MEDIUM),
+        )
+        .with_spacer(theme::grid(2.0))
+        .with_child(
+            Flex::row()
+                .with_child(
+                    TextBox::new().with_formatter(ParseFormatter::with_format_fn(
+                        |usize: &usize| usize.to_string(),
+                    )),
+                )
+                .padding((theme::grid(1.5), 0.0))
+                .lens(AppState::config.then(Config::paginated_limit)),
+        );
+
     col
 }
 
@@ -264,7 +283,7 @@ fn account_tab_widget(tab: AccountTab) -> impl Widget<AppState> {
                 AccountTab::FirstSetup => "Log In & Continue",
                 AccountTab::InPreferences => "Change Account",
             })
-            .on_click(|ctx, _, _| {
+            .on_left_click(|ctx, _, _, _| {
                 ctx.submit_command(Authenticate::REQUEST);
             }),
         )
@@ -289,7 +308,7 @@ fn account_tab_widget(tab: AccountTab) -> impl Widget<AppState> {
     col = col.with_spacer(theme::grid(3.0));
 
     if matches!(tab, AccountTab::InPreferences) {
-        col = col.with_child(Button::new("Log Out").on_click(|ctx, _, _| {
+        col = col.with_child(Button::new("Log Out").on_left_click(|ctx, _, _, _| {
             ctx.submit_command(cmd::LOG_OUT);
         }))
     }

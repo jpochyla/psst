@@ -230,7 +230,6 @@ impl StreamDataMap {
         self.requested
             .lock()
             .gaps(&(offset..offset + length))
-            .into_iter()
             .map(|r| range_to_offset_and_length(&r))
             .collect()
     }

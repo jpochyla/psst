@@ -74,7 +74,7 @@ pub fn playable_widget() -> impl Widget<PlayRow<Arc<Episode>>> {
         .padding(theme::grid(1.0))
         .link()
         .rounded(theme::BUTTON_BORDER_RADIUS)
-        .on_click(|ctx, row, _| ctx.submit_notification(cmd::PLAY.with(row.position)))
+        .on_left_click(|ctx, _, row, _| ctx.submit_notification(cmd::PLAY.with(row.position)))
         .context_menu(episode_row_menu)
 }
 

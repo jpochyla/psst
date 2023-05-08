@@ -50,5 +50,5 @@ pub fn user_widget() -> impl Widget<AppState> {
         .padding((theme::grid(2.0), theme::grid(1.5)))
         .expand_width()
         .link()
-        .on_click(|ctx, _, _| ctx.submit_command(commands::SHOW_PREFERENCES))
+        .on_left_click(|ctx, _, _, _| ctx.submit_command(commands::SHOW_PREFERENCES))
 }

@@ -22,8 +22,9 @@ pub enum Route {
     Recommendations,
 }
 
-#[derive(Clone, Debug, Data, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Default, Clone, Debug, Data, PartialEq, Eq, Deserialize, Serialize)]
 pub enum Nav {
+    #[default]
     Home,
     SavedTracks,
     SavedAlbums,

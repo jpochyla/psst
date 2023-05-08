@@ -168,6 +168,7 @@ impl Stream {
             |err| {
                 log::error!("audio output error: {}", err);
             },
+            None,
         )?;
 
         Ok(Self {

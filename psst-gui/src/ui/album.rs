@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use druid::{
-    widget::{CrossAxisAlignment, Flex, Label, LineBreaking, List},
+    widget::{CrossAxisAlignment, Flex, Label, LineBreaking, List, ViewSwitcher},
     LensExt, LocalizedString, Menu, MenuItem, Selector, Size, Widget, WidgetExt,
 };
 
@@ -11,7 +11,7 @@ use crate::{
         Album, AlbumDetail, AlbumLink, AppState, ArtistLink, Cached, Ctx, Library, Nav, WithCtx,
     },
     webapi::WebApi,
-    widget::{Async, MyWidgetExt, RemoteImage},
+    widget::{icons, Async, MyWidgetExt, RemoteImage},
 };
 
 use super::{artist, library, playable, theme, track, utils};
@@ -102,10 +102,21 @@ fn rounded_cover_widget(size: f64) -> impl Widget<Arc<Album>> {
 pub fn album_widget() -> impl Widget<WithCtx<Arc<Album>>> {
     let album_cover = rounded_cover_widget(theme::grid(6.0));
 
-    let album_name = Label::raw()
-        .with_font(theme::UI_FONT_MEDIUM)
-        .with_line_break_mode(LineBreaking::Clip)
-        .lens(Album::name.in_arc());
+    let album_name = Flex::row()
+        .with_child(
+            Label::raw()
+                .with_font(theme::UI_FONT_MEDIUM)
+                .with_line_break_mode(LineBreaking::Clip)
+                .lens(Album::name.in_arc()),
+        )
+        .with_spacer(theme::grid(0.5))
+        .with_child(ViewSwitcher::new(
+            |album: &Arc<Album>, _| album.has_explicit(),
+            |selector: &bool, _, _| match selector {
+                true => icons::EXPLICIT.scale(theme::ICON_SIZE_TINY).boxed(),
+                false => Box::new(Flex::column()),
+            },
+        ));
 
     let album_artists = List::new(|| {
         Label::raw()
@@ -139,7 +150,7 @@ pub fn album_widget() -> impl Widget<WithCtx<Arc<Album>>> {
     album
         .link()
         .rounded(theme::BUTTON_BORDER_RADIUS)
-        .on_click(|ctx, album, _| {
+        .on_left_click(|ctx, _, album, _| {
             ctx.submit_command(cmd::NAVIGATE.with(Nav::AlbumDetail(album.data.link())));
         })
         .context_menu(album_ctx_menu)

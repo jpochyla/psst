@@ -1,5 +1,6 @@
 use druid::{widget::List, LensExt, Selector, Widget, WidgetExt};
 
+use crate::data::Ctx;
 use crate::{
     data::{AppState, Personalized},
     webapi::WebApi,
@@ -19,7 +20,13 @@ pub fn home_widget() -> impl Widget<AppState> {
         || List::new(playlist::playlist_widget),
         error_widget,
     )
-    .lens(AppState::personalized.then(Personalized::made_for_you))
+    .lens(
+        Ctx::make(
+            AppState::common_ctx,
+            AppState::personalized.then(Personalized::made_for_you),
+        )
+        .then(Ctx::in_promise()),
+    )
     .on_command_async(
         LOAD_MADE_FOR_YOU,
         |_| WebApi::global().get_made_for_you(),
