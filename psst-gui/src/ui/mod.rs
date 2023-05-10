@@ -42,7 +42,7 @@ pub mod utils;
 pub fn main_window(config: &Config) -> WindowDesc<AppState> {
     let win = WindowDesc::new(root_widget())
         .title(compute_main_window_title)
-        .with_min_size((theme::grid(65.0), theme::grid(50.0)))
+        .with_min_size((theme::grid(65.0), theme::grid(65.0)))
         .window_size(config.window_size)
         .show_title(false)
         .transparent_titlebar(true);
@@ -130,13 +130,13 @@ fn root_widget() -> impl Widget<AppState> {
         .with_child(volume_slider())
         .with_default_spacer()
         .with_child(user::user_widget())
-        .center();
+        .center()
+        .fix_height(100.0)
+        .background(Border::Top.with_color(theme::GREY_500));
 
-    let sidebar = Split::rows(playlists, controls)
-        .split_point(0.85)
-        .bar_size(1.0)
-        .min_bar_area(1.0)
-        .solid_bar(true)
+    let sidebar = Flex::column()
+        .with_flex_child(playlists, 1.0)
+        .with_child(controls)
         .background(theme::BACKGROUND_DARK);
 
     let topbar = Flex::row()
