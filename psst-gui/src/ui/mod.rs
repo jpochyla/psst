@@ -129,10 +129,11 @@ fn root_widget() -> impl Widget<AppState> {
         .with_default_spacer()
         .with_child(volume_slider())
         .with_default_spacer()
-        .with_child(user::user_widget());
+        .with_child(user::user_widget())
+        .center();
 
     let sidebar = Split::rows(playlists, controls)
-        .split_point(0.9)
+        .split_point(0.85)
         .bar_size(1.0)
         .min_bar_area(1.0)
         .solid_bar(true)
