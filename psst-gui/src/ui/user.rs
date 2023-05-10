@@ -48,14 +48,14 @@ pub fn user_widget() -> impl Widget<AppState> {
             Flex::column()
                 .with_child(is_connected)
                 .with_child(user_profile)
-                .padding((theme::grid(2.0), theme::grid(2.0))),
+                .padding((theme::grid(2.0), theme::grid(1.5))),
         )
         .with_child(preferences_widget(&icons::PREFERENCES))
 }
 
 fn preferences_widget<T: Data>(svg: &SvgIcon) -> impl Widget<T> {
     svg.scale((theme::grid(3.0), theme::grid(3.0)))
-        .padding(theme::grid(2.0))
+        .padding(theme::grid(1.0))
         .link()
         .rounded(theme::BUTTON_BORDER_RADIUS)
         .on_left_click(|ctx, _, _, _| ctx.submit_command(commands::SHOW_PREFERENCES))
