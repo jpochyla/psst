@@ -111,21 +111,31 @@ fn root_widget() -> impl Widget<AppState> {
     let playlists = Scroll::new(playlist::list_widget())
         .vertical()
         .expand_height();
-    let sidebar = Flex::column()
+
+    let playlists = Flex::column()
         .must_fill_main_axis(true)
         .with_child(sidebar_logo_widget())
         .with_child(sidebar_menu_widget())
         .with_default_spacer()
         .with_flex_child(playlists, 1.0)
-        .with_child(volume_slider())
-        .with_default_spacer()
-        .with_child(user::user_widget())
         .padding(if cfg!(target_os = "macos") {
             // Accommodate the window controls on Mac.
             Insets::new(0.0, 24.0, 0.0, 0.0)
         } else {
             Insets::ZERO
-        })
+        });
+
+    let controls = Flex::column()
+        .with_default_spacer()
+        .with_child(volume_slider())
+        .with_default_spacer()
+        .with_child(user::user_widget());
+
+    let sidebar = Split::rows(playlists, controls)
+        .split_point(0.9)
+        .bar_size(1.0)
+        .min_bar_area(1.0)
+        .solid_bar(true)
         .background(theme::BACKGROUND_DARK);
 
     let topbar = Flex::row()
