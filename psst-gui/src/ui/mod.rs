@@ -42,7 +42,7 @@ pub mod utils;
 pub fn main_window(config: &Config) -> WindowDesc<AppState> {
     let win = WindowDesc::new(root_widget())
         .title(compute_main_window_title)
-        .with_min_size((theme::grid(65.0), theme::grid(46.0)))
+        .with_min_size((theme::grid(65.0), theme::grid(50.0)))
         .window_size(config.window_size)
         .show_title(false)
         .transparent_titlebar(true);
