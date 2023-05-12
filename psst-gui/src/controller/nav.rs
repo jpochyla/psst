@@ -121,12 +121,7 @@ where
             ctx.submit_command(cmd::NAVIGATE.with(Nav::SavedTracks));
             // Load the last route, or the default.
             ctx.submit_command(
-                cmd::NAVIGATE.with(
-                    data.config
-                        .last_route
-                        .to_owned()
-                        .unwrap_or(Default::default()),
-                ),
+                cmd::NAVIGATE.with(data.config.last_route.to_owned().unwrap_or_default()),
             );
         }
         child.lifecycle(ctx, event, data, env)

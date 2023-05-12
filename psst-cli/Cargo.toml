@@ -2,7 +2,7 @@
 name = "psst-cli"
 version = "0.1.0"
 authors = ["Jan Pochyla <jpochyla@gmail.com>"]
-edition = "2018"
+edition = "2021"
 
 [features]
 default = ["cpal"]

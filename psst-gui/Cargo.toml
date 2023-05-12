@@ -2,7 +2,7 @@
 name = "psst-gui"
 version = "0.1.0"
 authors = ["Jan Pochyla <jpochyla@gmail.com>"]
-edition = "2018"
+edition = "2021"
 build = "build.rs"
 description = "Fast Spotify client with native GUI"
 repository = "https://github.com/jpochyla/psst"
@@ -60,7 +60,7 @@ icon = [
 ]
 version = "0.1.0"
 resources = []
-copyright = "Copyright (c) Jan Pochyla 2021. All rights reserved."
+copyright = "Copyright (c) Jan Pochyla 2023. All rights reserved."
 category = "Music"
 short_description = "Fast Spotify client with native GUI"
 long_description = """
