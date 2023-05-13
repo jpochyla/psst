@@ -18,6 +18,7 @@ pub struct Delegate {
     main_window: Option<WindowId>,
     preferences_window: Option<WindowId>,
     image_pool: ThreadPool,
+    size_updated: bool,
 }
 
 impl Delegate {
@@ -28,6 +29,7 @@ impl Delegate {
             main_window: None,
             preferences_window: None,
             image_pool: ThreadPool::with_name("image_loading".into(), MAX_IMAGE_THREADS),
+            size_updated: false,
         }
     }
 
@@ -155,7 +157,12 @@ impl AppDelegate<AppState> for Delegate {
     ) -> Option<Event> {
         if self.main_window == Some(window_id) {
             if let Event::WindowSize(size) = event {
-                data.config.window_size = size;
+                // This is a little hacky, but without it, the window will slowly get smaller each time the application is opened.
+                if !self.size_updated {
+                    self.size_updated = true;
+                } else {
+                    data.config.window_size = size;
+                }
             }
         }
         Some(event)
