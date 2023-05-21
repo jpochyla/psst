@@ -40,6 +40,7 @@ impl Queue {
     }
 
     pub fn fill(&mut self, items: Vec<PlaybackItem>, position: usize) {
+        self.positions.clear();
         self.items = items;
         self.position = position;
         self.compute_positions();
