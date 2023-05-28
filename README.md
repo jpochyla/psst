@@ -35,6 +35,32 @@ RHEL/Fedora:
 sudo dnf install openssl-devel gtk3-devel cairo-devel alsa-lib-devel
 ```
 
+##### BSD [WIP]
+
+Similar to Linux, Druid defaults to GTK while providing an X11 backend as well.
+Furthermore, bindgen must be able to find LLVM through the expected environment variable.
+Only OpenBSD/amd64 has been tested so far.
+
+OpenBSD:
+```shell
+doas pkg_add gtk+3 cairo llvm
+export LIBCLANG_PATH=/usr/local/lib
+```
+
+In case rustc(1) fails building bigger crates
+```shell
+memory allocation of 2880 bytes failed
+error: could not compile `gtk`
+
+Caused by:
+  process didn't exit successfully: `rustc --crate-name gtk [...]` (signal: 6, SIGABRT: process abort signal)
+warning: build failed, waiting for other jobs to finish...
+```
+try increasing your user's maximum heap size:
+```shell
+ulimit -d $(( 2 * `ulimit -d` ))
+```
+
 ##### Building
 
 On all platforms, the **latest Rust stable** (at least 1.54.0) is needed.
