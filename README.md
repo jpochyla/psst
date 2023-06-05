@@ -35,7 +35,9 @@ RHEL/Fedora:
 sudo dnf install openssl-devel gtk3-devel cairo-devel alsa-lib-devel
 ```
 
-##### BSD [WIP]
+##### BSD (WIP)
+
+**Note:** BSD isn't fully supported yet, and you may encounter issues.
 
 Similar to Linux, Druid defaults to GTK while providing an X11 backend as well.
 Furthermore, bindgen must be able to find LLVM through the expected environment variable.
