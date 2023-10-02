@@ -2,7 +2,6 @@ name: CI
 
 on:
   push:
-    branches: [ master ]
   pull_request:
     branches: [ master ]
 
@@ -30,7 +29,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macOS-latest, windows-latest]
+        include:
+          - target: 'x86_64-unknown-linux-gnu'
+            os: ubuntu-latest
+          - target: 'x86_64-pc-windows-msvc'
+            os: windows-latest
+          - target: 'x86_64-apple-darwin'
+            os: macos-latest
+          - target: 'aarch64-apple-darwin'
+            os: macos-latest
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout Repository
@@ -43,12 +50,15 @@ jobs:
         if: ${{ runner.os == 'Linux' }}
         run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev libssl-dev libasound2-dev
 
+      - name: Install Target
+        run: rustup target add ${{ matrix.target }}
+
       - name: Run Tests
         run: cargo test
         continue-on-error: true
 
       - name: Build Release
-        run: cargo build --release
+        run: cargo build --release --target=${{ matrix.target }}
 
       - name: Bundle macOS Release
         if: ${{ runner.os == 'macOS' }}
@@ -61,32 +71,32 @@ jobs:
         if: ${{ runner.os == 'macOS' }}
         run: |
           hdiutil create Psst-uncompressed.dmg -volname "Psst" -srcfolder target/release/bundle/osx
-          hdiutil convert Psst-uncompressed.dmg -format UDZO -o Psst-x64.dmg
+          hdiutil convert Psst-uncompressed.dmg -format UDZO -o Psst-${{ matrix.target }}.dmg
 
       - name: Make Linux Binary Executable
         if: ${{ runner.os == 'Linux' }}
-        run: chmod +x target/release/psst-gui
+        run: chmod +x target/${{ matrix.target }}/release/psst-gui
 
       - name: Upload Linux Binary
         uses: actions/upload-artifact@v3
         if: ${{ runner.os == 'Linux' }}
         with:
-          name: psst-gui
-          path: target/release/psst-gui
+          name: Psst-${{ matrix.target }}
+          path: target/${{ matrix.target}}/release/psst-gui
 
-      - name: Upload macOS Disk Image
+      - name: Upload macOS Disk Image (x86_64)
         uses: actions/upload-artifact@v3
         if: ${{ runner.os == 'macOS' }}
         with:
-          name: Psst-x64.dmg
-          path: ./Psst-x64.dmg
+          name: Psst-${{ matrix.target }}
+          path: ./Psst-${{ matrix.target }}.dmg
 
       - name: Upload Windows Executable
         uses: actions/upload-artifact@v3
         if: ${{ runner.os == 'Windows' }}
         with:
-          name: Psst.exe
-          path: target/release/psst-gui.exe
+          name: Psst-${{ matrix.target }}
+          path: target/${{ matrix.target }}/release/psst-gui.exe
 
   deb:
     runs-on: ubuntu-latest
@@ -98,7 +108,7 @@ jobs:
       - name: Download Linux Binary
         uses: actions/download-artifact@v3
         with:
-          name: psst-gui
+          name: Psst-x86_64-unknown-linux-gnu
           path: ${{runner.workspace}}
 
       - name: Move Binary
@@ -135,7 +145,7 @@ jobs:
       - name: Upload Debian Package
         uses: actions/upload-artifact@v3
         with:
-          name: psst-deb
+          name: Psst-deb
           path: "*.deb"
 
   appimage:
@@ -149,7 +159,7 @@ jobs:
       - name: Download Debian Package
         uses: actions/download-artifact@v3
         with:
-          name: psst-deb
+          name: Psst-deb
           path: ${{runner.workspace}}
 
       - name: Install Dependencies
@@ -182,5 +192,5 @@ jobs:
       - name: Upload AppImage
         uses: actions/upload-artifact@v3
         with:
-          name: psst-appimage
+          name: Psst-appimage
           path: ${{runner.workspace}}/out/*.AppImage
