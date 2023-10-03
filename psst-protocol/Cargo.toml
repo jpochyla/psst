@@ -5,4 +5,4 @@ authors = ["Jan Pochyla <jpochyla@gmail.com>"]
 edition = "2021"
 
 [dependencies]
-quick-protobuf = "0.8.0"
+quick-protobuf = "0.8.1"
