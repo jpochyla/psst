@@ -7,7 +7,7 @@ fn main() {
     let mut fh = fs::File::create(outfile).unwrap();
     write!(fh, r#""{}""#, chrono::Local::now()).ok();
 
-    let git_config = gix_config::File::from_git_dir("../.git/").expect("Git Config not found!");
+    let git_config = gix_config::File::from_git_dir("../.git/".into()).expect("Git Config not found!");
     // Get Git's 'Origin' URL
     let mut remote_url = git_config
         .raw_value("remote", Some("origin".as_ref()), "url")

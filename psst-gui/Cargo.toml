@@ -19,34 +19,34 @@ psst-core = { path = "../psst-core" }
 crossbeam-channel = { version = "0.5.8" }
 env_logger = { version = "0.10.0" }
 fs_extra = { version = "1.3.0" }
-itertools = { version = "0.10.5" }
-log = { version = "0.4.17" }
+itertools = { version = "0.11.0" }
+log = { version = "0.4.20" }
 lru-cache = { version = "0.1.2" }
-once_cell = { version = "1.17.1" }
+once_cell = { version = "1.18.0" }
 parking_lot = { version = "0.12.1" }
 platform-dirs = { version = "0.3.0" }
 rand = { version = "0.8.5" }
-regex = { version = "1.8.1" }
-serde = { version = "1.0.162", features = ["derive", "rc"] }
-serde_json = { version = "1.0.96" }
+regex = { version = "1.9.6" }
+serde = { version = "1.0.188", features = ["derive", "rc"] }
+serde_json = { version = "1.0.107" }
 threadpool = { version = "1.8.1" }
-time = { version = "0.3.20", features = ["macros", "formatting"] }
+time = { version = "0.3.29", features = ["macros", "formatting"] }
 time-humanize = { version = "0.1.3" }
-ureq = { version = "2.6.2", features = ["json", "socks-proxy"] }
-url = { version = "2.3.1" }
+ureq = { version = "2.8.0", features = ["json", "socks-proxy"] }
+url = { version = "2.4.1" }
 
 # GUI
 druid = { git = "https://github.com/jpochyla/druid", branch = "psst", features = ["im", "image", "jpeg", "png", "serde"] }
 druid-enums = { git = "https://github.com/jpochyla/druid-enums" }
 druid-shell = { git = "https://github.com/jpochyla/druid", branch = "psst", features = ["raw-win-handle"] }
-open = { version = "4.1.0" }
-raw-window-handle = { version = "0.5.2" }
-souvlaki = { version = "0.6.0" }
-webbrowser = {version = "0.8.9"}
+open = { version = "5.0.0" }
+raw-window-handle = { version = "0.5.2" } # Must stay compatible with Druid
+souvlaki = { version = "0.6.1" }
+webbrowser = {version = "0.8.11"}
 
 [target.'cfg(windows)'.build-dependencies]
 winres = { version = "0.1.12" }
-image = { version = "0.24.5" }
+image = { version = "0.24.7" }
 
 [package.metadata.bundle]
 name = "Psst"
