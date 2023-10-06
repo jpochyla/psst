@@ -58,7 +58,12 @@ jobs:
         continue-on-error: true
 
       - name: Build Release
+        if: ${{ runner.os != 'macOS' }}
         run: cargo build --release --target=${{ matrix.target }}
+
+      - name: Build macOS Release
+        if: ${{ runner.os == 'macOS' }}
+        run: SDKROOT=$(xcrun -sdk macosx --show-sdk-path) MACOSX_DEPLOYMENT_TARGET=$(xcrun -sdk macosx --show-sdk-platform-version) cargo build --release --target=${{ matrix.target }}
 
       - name: Bundle macOS Release
         if: ${{ runner.os == 'macOS' }}
