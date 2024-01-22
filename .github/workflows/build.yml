@@ -55,17 +55,17 @@ jobs:
         run: |
           rustup target add aarch64-apple-darwin
           cargo build --release --target aarch64-apple-darwin
-      
-      - name: Building universal Binay
-        if: ${{ runner.os == 'macOS' }}
-        run: lipo target/release/psst-gui target/aarch64-apple-darwin/release/psst-gui -create -output target/release/psst-gui
-    
+          
       - name: Bundle macOS Release
         if: ${{ runner.os == 'macOS' }}
         run: |
           cargo install cargo-bundle
           cargo bundle --release
         working-directory: psst-gui
+      
+      - name: replacing binary with universal binary
+        if: ${{ runner.os == 'macOS' }}
+        run: lipo target/release/psst-gui target/aarch64-apple-darwin/release/psst-gui -create -output target/release/bundle/osx/Psst.app/Contents/MacOS/psst-gui
 
       - name: Create macOS Disk Image
         if: ${{ runner.os == 'macOS' }}
