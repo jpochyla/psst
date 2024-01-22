@@ -63,7 +63,7 @@ jobs:
           cargo bundle --release
         working-directory: psst-gui
       
-      - name: replacing binary with universal binary
+      - name: Create macOS universal binary
         if: ${{ runner.os == 'macOS' }}
         run: lipo target/release/psst-gui target/aarch64-apple-darwin/release/psst-gui -create -output target/release/bundle/osx/Psst.app/Contents/MacOS/psst-gui
 
