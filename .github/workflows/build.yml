@@ -71,7 +71,7 @@ jobs:
         if: ${{ runner.os == 'macOS' }}
         run: |
           hdiutil create Psst-uncompressed.dmg -volname "Psst" -srcfolder target/release/bundle/osx
-          hdiutil convert Psst-uncompressed.dmg -format UDZO -o Psst-x64.dmg
+          hdiutil convert Psst-uncompressed.dmg -format UDZO -o Psst.dmg
 
       - name: Make Linux Binary Executable
         if: ${{ runner.os == 'Linux' }}
@@ -88,8 +88,8 @@ jobs:
         uses: actions/upload-artifact@v3
         if: ${{ runner.os == 'macOS' }}
         with:
-          name: Psst-x64.dmg
-          path: ./Psst-x64.dmg
+          name: Psst.dmg
+          path: ./Psst.dmg
 
       - name: Upload Windows Executable
         uses: actions/upload-artifact@v3
