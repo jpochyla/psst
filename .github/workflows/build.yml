@@ -49,12 +49,16 @@ jobs:
 
       - name: Build Release
         run: cargo build --release
-
-      - name: Bundle macOS Release
+      
+      - name: Build aarch64 for MacOS
         if: ${{ runner.os == 'macOS' }}
         run: |
           rustup target add aarch64-apple-darwin
           cargo build --release --target aarch64-apple-darwin
+      
+      - name: Bundle macOS Release
+        if: ${{ runner.os == 'macOS' }}
+        run: |
           lipo target/release/psst-gui target/aarch64-apple-darwin/release/psst-gui -create -output target/release/psst-gui
           cargo install cargo-bundle
           cargo bundle --release
