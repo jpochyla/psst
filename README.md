@@ -22,7 +22,7 @@ You can download the prebuilt binaries for x86_64 Windows, Linux (Ubuntu), and m
 | [Windows](https://nightly.link/jpochyla/psst/workflows/build/master/Psst.exe.zip) |
 | [Linux (Ubuntu)](https://nightly.link/jpochyla/psst/workflows/build/master/psst-gui.zip) |
 | [Debian Package](https://nightly.link/jpochyla/psst/workflows/build/master/psst-deb.zip) |
-| [MacOS](https://nightly.link/jpochyla/psst/workflows/build/master/Psst-x64.dmg.zip) |
+| [MacOS](https://nightly.link/jpochyla/psst/workflows/build/master/Psst.dmg.zip) |
 
 Unofficial builds of Psst are also available through the [AUR](https://aur.archlinux.org/packages/psst-git) and [Homebrew](https://formulae.brew.sh/cask/psst).
 
