@@ -1,6 +1,5 @@
 use std::{
     collections::HashMap,
-    convert::TryInto,
     fs::File,
     io::{self, Cursor, Read},
     path::PathBuf,
@@ -138,13 +137,11 @@ impl LocalTrackManager {
         let matching_tracks = self.tracks.get(&local_track.name)?;
 
         for parsed_track in matching_tracks {
-            let path: PathBuf = match (&*parsed_track.path).try_into() {
-                Ok(t) => t,
-                Err(e) => {
-                    log::error!("error loading local file {:?}", e);
-                    continue;
-                }
-            };
+            let path: PathBuf = (&*parsed_track.path).into();
+            if !path.exists() {
+                log::error!("error loading local file: Path does not exist");
+                continue;
+            }
 
             if Self::is_matching_in_addition_to_title(parsed_track, &local_track) {
                 return Some(Arc::new(Track {
