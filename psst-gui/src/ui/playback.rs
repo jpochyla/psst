@@ -90,29 +90,27 @@ fn playing_item_widget() -> impl Widget<NowPlaying> {
     Flex::row()
         .with_child(cover_art)
         .with_flex_child(
-            Flex::row()
-                .with_spacer(theme::grid(2.0))
-                .with_flex_child(
-                    Flex::column()
-                        .cross_axis_alignment(CrossAxisAlignment::Start)
-                        .with_child(name)
-                        .with_spacer(2.0)
-                        .with_child(detail)
-                        .with_spacer(2.0)
-                        .with_child(origin)
-                        .on_click(|ctx, now_playing, _| {
-                            ctx.submit_command(cmd::NAVIGATE.with(now_playing.origin.to_nav()));
-                        })
-                        .context_menu(|now_playing| match &now_playing.item {
-                            Playable::Track(track) => {
-                                track::track_menu(track, &now_playing.library, &now_playing.origin)
-                            }
-                            Playable::Episode(episode) => {
-                                episode::episode_menu(episode, &now_playing.library)
-                            }
-                        }),
-                        1.0
-                    ),
+            Flex::row().with_spacer(theme::grid(2.0)).with_flex_child(
+                Flex::column()
+                    .cross_axis_alignment(CrossAxisAlignment::Start)
+                    .with_child(name)
+                    .with_spacer(2.0)
+                    .with_child(detail)
+                    .with_spacer(2.0)
+                    .with_child(origin)
+                    .on_click(|ctx, now_playing, _| {
+                        ctx.submit_command(cmd::NAVIGATE.with(now_playing.origin.to_nav()));
+                    })
+                    .context_menu(|now_playing| match &now_playing.item {
+                        Playable::Track(track) => {
+                            track::track_menu(track, &now_playing.library, &now_playing.origin)
+                        }
+                        Playable::Episode(episode) => {
+                            episode::episode_menu(episode, &now_playing.library)
+                        }
+                    }),
+                1.0,
+            ),
             1.0,
         )
         .with_child(ViewSwitcher::new(
