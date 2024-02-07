@@ -414,27 +414,22 @@ where
             Event::KeyDown(key) if key.code == Code::ArrowRight => {
                 if key.mods.shift() {
                     self.next();
-                } else {
-                    if let Some(now_playing) = &data.playback.now_playing {
-                        let current_position = now_playing.progress;
-                        let max_position = now_playing.item.duration();
-                        let seek_position =
-                            (current_position + Duration::from_secs(10)).min(max_position);
-                        self.seek(seek_position);
-                    }
+                } else if let Some(now_playing) = &data.playback.now_playing {
+                    let current_position = now_playing.progress;
+                    let max_position = now_playing.item.duration();
+                    let seek_position =
+                        (current_position + Duration::from_secs(10)).min(max_position);
+                    self.seek(seek_position);
                 }
                 ctx.set_handled();
             }
             Event::KeyDown(key) if key.code == Code::ArrowLeft => {
                 if key.mods.shift() {
                     self.previous();
-                } else {
-                    if let Some(now_playing) = &data.playback.now_playing {
-                        let current_position = now_playing.progress;
-                        let seek_position =
-                            current_position.saturating_sub(Duration::from_secs(10));
-                        self.seek(seek_position);
-                    }
+                } else if let Some(now_playing) = &data.playback.now_playing {
+                    let current_position = now_playing.progress;
+                    let seek_position = current_position.saturating_sub(Duration::from_secs(10));
+                    self.seek(seek_position);
                 }
                 ctx.set_handled();
             }
