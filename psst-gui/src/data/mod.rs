@@ -33,7 +33,7 @@ use druid::{
 use psst_core::{item_id::ItemId, session::SessionService};
 
 pub use crate::data::{
-    album::{Album, AlbumDetail, AlbumLink, AlbumType, Copyright, CopyrightType},
+    album::{Album, AlbumDetail, AlbumLink, AlbumType},
     artist::{Artist, ArtistAlbums, ArtistDetail, ArtistLink, ArtistTracks},
     config::{AudioQuality, Authentication, Config, Preferences, PreferencesTab, Theme},
     ctx::Ctx,
@@ -55,7 +55,7 @@ pub use crate::data::{
     search::{Search, SearchResults, SearchTopic},
     show::{Episode, EpisodeId, EpisodeLink, Show, ShowDetail, ShowEpisodes, ShowLink},
     slider_scroll_scale::SliderScrollScale,
-    track::{AudioAnalysis, AudioSegment, TimeInterval, Track, TrackId},
+    track::{AudioAnalysis, Track, TrackId},
     user::UserProfile,
     utils::{Cached, Float64, Image, Page},
 };
