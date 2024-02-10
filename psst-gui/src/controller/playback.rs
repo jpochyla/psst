@@ -274,6 +274,22 @@ impl PlaybackController {
         self.send(PlayerEvent::Command(PlayerCommand::Seek { position }));
     }
 
+    fn seek_relative(&mut self, data: &AppState, forward: bool) {
+        if let Some(now_playing) = &data.playback.now_playing {
+            let seek_duration = Duration::from_secs(data.config.step_duration as u64);
+
+            // Calculate new position, ensuring it does not exceed duration for forward seeks.
+            let seek_position = if forward {
+                now_playing.progress + seek_duration
+            } else {
+                now_playing.progress.saturating_sub(seek_duration)
+            }
+            .min(now_playing.item.duration()); // Safeguard to not exceed the track duration.
+
+            self.seek(seek_position);
+        }
+    }
+
     fn set_volume(&mut self, volume: f64) {
         self.send(PlayerEvent::Command(PlayerCommand::SetVolume { volume }));
     }
@@ -414,22 +430,16 @@ where
             Event::KeyDown(key) if key.code == Code::ArrowRight => {
                 if key.mods.shift() {
                     self.next();
-                } else if let Some(now_playing) = &data.playback.now_playing {
-                    let current_position = now_playing.progress;
-                    let max_position = now_playing.item.duration();
-                    let seek_position =
-                        (current_position + Duration::from_secs(10)).min(max_position);
-                    self.seek(seek_position);
+                } else {
+                    self.seek_relative(data, true);
                 }
                 ctx.set_handled();
             }
             Event::KeyDown(key) if key.code == Code::ArrowLeft => {
                 if key.mods.shift() {
                     self.previous();
-                } else if let Some(now_playing) = &data.playback.now_playing {
-                    let current_position = now_playing.progress;
-                    let seek_position = current_position.saturating_sub(Duration::from_secs(10));
-                    self.seek(seek_position);
+                } else {
+                    self.seek_relative(data, false);
                 }
                 ctx.set_handled();
             }

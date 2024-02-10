@@ -23,7 +23,7 @@ use druid_shell::Cursor;
 pub use empty::Empty;
 pub use link::Link;
 pub use maybe::Maybe;
-pub use overlay::{Overlay};
+pub use overlay::Overlay;
 pub use promise::Async;
 pub use remote_image::RemoteImage;
 pub use theme::ThemeScope;
