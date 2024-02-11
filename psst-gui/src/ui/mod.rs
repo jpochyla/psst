@@ -158,7 +158,8 @@ fn root_widget() -> impl Widget<AppState> {
         .bar_size(1.0)
         .min_size(150.0, 300.0)
         .min_bar_area(1.0)
-        .solid_bar(true);
+        .solid_bar(true)
+        .draggable(true);
 
     ThemeScope::new(split)
         .controller(SessionController)
