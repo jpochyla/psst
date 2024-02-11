@@ -276,7 +276,7 @@ impl PlaybackController {
 
     fn seek_relative(&mut self, data: &AppState, forward: bool) {
         if let Some(now_playing) = &data.playback.now_playing {
-            let seek_duration = Duration::from_secs(data.config.step_duration as u64);
+            let seek_duration = Duration::from_secs(data.config.seek_duration as u64);
 
             // Calculate new position, ensuring it does not exceed duration for forward seeks.
             let seek_position = if forward {
