@@ -53,7 +53,6 @@ impl<T: Data> Widget<T> for Link<T> {
 
     fn lifecycle(&mut self, ctx: &mut LifeCycleCtx, event: &LifeCycle, data: &T, env: &Env) {
         if let LifeCycle::HotChanged(_) = event {
-            ctx.request_anim_frame();
             ctx.request_paint();
         }
         self.inner.lifecycle(ctx, event, data, env)
@@ -86,8 +85,8 @@ impl<T: Data> Widget<T> for Link<T> {
         };
         let border_color = self.border_color.resolve(env);
         let border_width = self.border_width.resolve(env);
-        let visible_background = background.as_rgba_u32() & 0x00000FF > 0;
-        let visible_border = border_color.as_rgba_u32() & 0x000000FF > 0 && border_width > 0.0;
+        let visible_background = background.as_rgba_u32() >> 24 > 0;
+        let visible_border = border_color.as_rgba_u32() >> 24 > 0 && border_width > 0.0;
         if visible_background || visible_border {
             let corner_radius = self.corner_radius.resolve(env);
             let rounded_rect = ctx
