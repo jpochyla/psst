@@ -53,6 +53,7 @@ impl<T: Data> Widget<T> for Link<T> {
 
     fn lifecycle(&mut self, ctx: &mut LifeCycleCtx, event: &LifeCycle, data: &T, env: &Env) {
         if let LifeCycle::HotChanged(_) = event {
+            ctx.request_anim_frame();
             ctx.request_paint();
         }
         self.inner.lifecycle(ctx, event, data, env)
