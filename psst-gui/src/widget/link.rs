@@ -53,6 +53,7 @@ impl<T: Data> Widget<T> for Link<T> {
 
     fn lifecycle(&mut self, ctx: &mut LifeCycleCtx, event: &LifeCycle, data: &T, env: &Env) {
         if let LifeCycle::HotChanged(_) = event {
+            ctx.request_anim_frame();
             ctx.request_paint();
         }
         self.inner.lifecycle(ctx, event, data, env)
@@ -69,36 +70,40 @@ impl<T: Data> Widget<T> for Link<T> {
     }
 
     fn paint(&mut self, ctx: &mut PaintCtx, data: &T, env: &Env) {
-        let background = if ctx.is_hot() {
-            env.get(theme::LINK_HOT_COLOR)
-        } else {
-            let is_active = self
+        let visible_background = (env.get(theme::LINK_HOT_COLOR).as_rgba_u32() >> 24) > 0;
+        let visible_border = self.border_color.resolve(env).as_rgba_u32() >> 24 > 0
+            && self.border_width.resolve(env) > 0.0;
+
+        if visible_background || visible_border {
+            let background = if ctx.is_hot() {
+                env.get(theme::LINK_HOT_COLOR)
+            } else if self
                 .is_active
                 .as_ref()
-                .map(|predicate| predicate(data, env))
-                .unwrap_or(false);
-            if is_active {
+                .map(|f| f(data, env))
+                .unwrap_or(false)
+            {
                 env.get(theme::LINK_ACTIVE_COLOR)
             } else {
                 env.get(theme::LINK_COLD_COLOR)
-            }
-        };
-        let border_color = self.border_color.resolve(env);
-        let border_width = self.border_width.resolve(env);
-        let visible_background = background.as_rgba_u32() >> 24 > 0;
-        let visible_border = border_color.as_rgba_u32() >> 24 > 0 && border_width > 0.0;
-        if visible_background || visible_border {
+            };
+
+            let border_color = self.border_color.resolve(env);
+            let border_width = self.border_width.resolve(env);
             let corner_radius = self.corner_radius.resolve(env);
+
             let rounded_rect = ctx
                 .size()
                 .to_rect()
                 .inset(-border_width / 2.0)
                 .to_rounded_rect(corner_radius);
+
+            if (background.as_rgba_u32() >> 24) > 0 {
+                ctx.fill(rounded_rect, &background);
+            }
+
             if visible_border {
                 ctx.stroke(rounded_rect, &border_color, border_width);
-            }
-            if visible_background {
-                ctx.fill(rounded_rect, &background);
             }
         }
         self.inner.paint(ctx, data, env);
