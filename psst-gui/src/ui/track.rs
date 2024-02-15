@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use druid::{
-    widget::{CrossAxisAlignment, Either, Flex, Label, ViewSwitcher},
+    widget::{CrossAxisAlignment, Either, Flex, Label, LineBreaking, ViewSwitcher},
     LensExt, LocalizedString, Menu, MenuItem, Size, TextAlignment, Widget, WidgetExt,
 };
 use psst_core::{
@@ -85,6 +85,7 @@ pub fn playable_widget(track: &Track, display: Display) -> impl Widget<PlayRow<A
     if display.title {
         let track_name = Label::raw()
             .with_font(theme::UI_FONT_MEDIUM)
+            .with_line_break_mode(LineBreaking::Clip)
             .lens(PlayRow::item.then(Track::name.in_arc()));
         major.add_child(track_name);
     }
@@ -105,6 +106,7 @@ pub fn playable_widget(track: &Track, display: Display) -> impl Widget<PlayRow<A
         let track_album = Label::raw()
             .with_text_size(theme::TEXT_SIZE_SMALL)
             .with_text_color(theme::PLACEHOLDER_COLOR)
+            .with_line_break_mode(LineBreaking::Clip)
             .lens(PlayRow::item.then(Track::lens_album_name().in_arc()));
         if display.artist {
             minor.add_default_spacer();
@@ -142,13 +144,14 @@ pub fn playable_widget(track: &Track, display: Display) -> impl Widget<PlayRow<A
                 |row: &PlayRow<Arc<Track>>, _| row.ctx.library.contains_track(&row.item),
                 |selector: &bool, _, _| {
                     match selector {
-                        true => &icons::HEART_SOLID,
-                        false => &icons::HEART_OUTLINE,
+                        true => &icons::CIRCLE_CHECK,
+                        false => &icons::CIRCLE_PLUS,
                     }
                     .scale(theme::ICON_SIZE_SMALL)
                     .boxed()
                 },
             )
+            .padding((0.0, 0.0, theme::grid(1.0), 0.0))
             .on_left_click(|ctx, _, row, _| {
                 let track = &row.item;
                 if row.ctx.library.contains_track(track) {
@@ -161,6 +164,8 @@ pub fn playable_widget(track: &Track, display: Display) -> impl Widget<PlayRow<A
             false => Box::new(Flex::column()),
         },
     );
+    minor.add_flex_spacer(1.0);
+    minor.add_child(saved);
 
     main_row
         .with_flex_child(
@@ -175,7 +180,6 @@ pub fn playable_widget(track: &Track, display: Display) -> impl Widget<PlayRow<A
             1.0,
         )
         .with_default_spacer()
-        .with_child(saved)
         .padding(theme::grid(1.0))
         .link()
         .active(|row, _| row.is_playing)
