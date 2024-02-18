@@ -173,14 +173,16 @@ pub fn playable_widget(track: &Track, display: Display) -> impl Widget<PlayRow<A
                 .cross_axis_alignment(CrossAxisAlignment::Start)
                 .with_child(major)
                 .with_spacer(2.0)
-                .with_child(minor)
-                .on_left_click(|ctx, _, row, _| {
-                    ctx.submit_notification(cmd::PLAY.with(row.position))
-                }),
+                .with_child(minor),
             1.0,
         )
         .with_default_spacer()
         .padding(theme::grid(1.0))
+        .on_left_click(move |ctx, _, row, _| {
+            if !ctx.is_handled() {
+                ctx.submit_notification(cmd::PLAY.with(row.position));
+            }
+        })
         .link()
         .active(|row, _| row.is_playing)
         .rounded(theme::BUTTON_BORDER_RADIUS)
