@@ -46,6 +46,21 @@ impl Queue {
         self.compute_positions();
     }
 
+    pub fn add(&mut self, item: PlaybackItem) {
+        match self.behavior {
+            QueueBehavior::Random => {
+                self.compute_positions();
+                self.items.insert(0, item);
+                self.positions.insert(self.position + 1, 0);
+            }
+            _ => {
+                // For other modes, insert the item at the current position + 1
+                self.items.insert(self.position + 1, item);
+            }
+        }
+    }
+    
+
     pub fn set_behaviour(&mut self, behavior: QueueBehavior) {
         self.behavior = behavior;
         self.compute_positions();

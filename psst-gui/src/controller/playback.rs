@@ -294,6 +294,12 @@ impl PlaybackController {
         self.send(PlayerEvent::Command(PlayerCommand::SetVolume { volume }));
     }
 
+    fn add_to_queue(&mut self, item: &PlaybackItem) {
+        self.send(PlayerEvent::Command(PlayerCommand::AddToQueue {
+                item: item.clone(),
+            }));
+    }
+
     fn set_queue_behavior(&mut self, behavior: QueueBehavior) {
         self.send(PlayerEvent::Command(PlayerCommand::SetQueueBehavior {
             behavior: match behavior {
@@ -310,7 +316,7 @@ impl<W> Controller<AppState, W> for PlaybackController
 where
     W: Widget<AppState>,
 {
-    fn event(
+fn event(
         &mut self,
         child: &mut W,
         ctx: &mut EventCtx,
@@ -404,6 +410,12 @@ where
             }
             Event::Command(cmd) if cmd.is(cmd::PLAY_STOP) => {
                 self.stop();
+                ctx.set_handled();
+            }
+            Event::Command(cmd) if cmd.is(cmd::ADD_TO_QUEUE) => {
+                log::info!("adding to queue");
+                let item = cmd.get_unchecked(cmd::ADD_TO_QUEUE);
+                self.add_to_queue(&item.to_owned());
                 ctx.set_handled();
             }
             Event::Command(cmd) if cmd.is(cmd::PLAY_QUEUE_BEHAVIOR) => {
