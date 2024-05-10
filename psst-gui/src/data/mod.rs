@@ -101,6 +101,7 @@ impl AppState {
             now_playing: None,
             queue_behavior: config.queue_behavior,
             queue: Vector::new(),
+            added_queue: Vector::new(),
             volume: config.volume,
         };
         Self {
@@ -180,6 +181,14 @@ impl AppState {
 
 impl AppState {
     pub fn queued_entry(&self, item_id: ItemId) -> Option<QueueEntry> {
+        self.playback
+            .queue
+            .iter()
+            .find(|queued| queued.item.id() == item_id)
+            .cloned()
+    }
+
+    pub fn added_queued_entry(&self, item_id: ItemId) -> Option<QueueEntry> {
         self.playback
             .queue
             .iter()

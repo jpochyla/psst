@@ -18,7 +18,9 @@ impl Default for QueueBehavior {
 
 pub struct Queue {
     items: Vec<PlaybackItem>,
+    added_items: Vec<PlaybackItem>,
     position: usize,
+    added_items_position: usize,
     positions: Vec<usize>,
     behavior: QueueBehavior,
 }
@@ -27,7 +29,9 @@ impl Queue {
     pub fn new() -> Self {
         Self {
             items: Vec::new(),
+            added_items: Vec::new(),
             position: 0,
+            added_items_position: 0,
             positions: Vec::new(),
             behavior: QueueBehavior::default(),
         }
@@ -47,19 +51,22 @@ impl Queue {
     }
 
     pub fn add(&mut self, item: PlaybackItem) {
-        match self.behavior {
-            QueueBehavior::Random => {
-                self.compute_positions();
-                self.items.insert(0, item);
-                self.positions.insert(self.position + 1, 0);
-            }
-            _ => {
-                // For other modes, insert the item at the current position + 1
-                self.items.insert(self.position + 1, item);
+        self.added_items.push(item);
+    }
+
+    fn handle_added_queue(&mut self){
+        if self.added_items.len() > self.added_items_position {
+            self.compute_positions();
+            self.items.insert(0, self.added_items[self.added_items_position]);
+            self.positions.insert(self.position + 1, 0);
+            self.added_items_position += 1;
+            
+            // Remove the past song from the queue as otherwise the queue will just go on for ever.
+            if self.added_items_position > 2 {
+                self.added_items.remove(0);
             }
         }
     }
-    
 
     pub fn set_behaviour(&mut self, behavior: QueueBehavior) {
         self.behavior = behavior;
@@ -96,10 +103,12 @@ impl Queue {
     }
 
     pub fn skip_to_next(&mut self) {
+        self.handle_added_queue();
         self.position = self.next_position();
     }
 
     pub fn skip_to_following(&mut self) {
+        self.handle_added_queue();
         self.position = self.following_position();
     }
 
@@ -109,8 +118,14 @@ impl Queue {
     }
 
     pub fn get_following(&self) -> Option<&PlaybackItem> {
-        let position = self.positions.get(self.following_position()).copied()?;
-        self.items.get(position)
+        if let Some(position) = self.positions.get(self.position).copied() {
+            if let Some(item) = self.items.get(position) {
+                return Some(item);
+            }
+        } else {
+            return self.added_items.get(0);
+        }
+        None
     }
 
     fn previous_position(&self) -> usize {

@@ -348,7 +348,13 @@ fn event(
                     data.start_playback(queued.item, queued.origin, progress.to_owned());
                     self.update_media_control_playback(&data.playback);
                     self.update_media_control_metadata(&data.playback);
-                } else {
+                } else if let Some(queued) = data.queued_entry(*item) {
+                    data.start_playback(queued.item, queued.origin, progress.to_owned());
+                    self.update_media_control_playback(&data.playback);
+                    self.update_media_control_metadata(&data.playback);
+                }
+                
+                else {
                     log::warn!("played item not found in playback queue");
                 }
                 ctx.set_handled();
@@ -414,8 +420,12 @@ fn event(
             }
             Event::Command(cmd) if cmd.is(cmd::ADD_TO_QUEUE) => {
                 log::info!("adding to queue");
-                let item = cmd.get_unchecked(cmd::ADD_TO_QUEUE);
+                let (entry, item) = cmd.get_unchecked(cmd::ADD_TO_QUEUE);
                 self.add_to_queue(&item.to_owned());
+                data.playback.added_queue.push_back(QueueEntry {
+                    item: entry.item.to_owned(),
+                    origin: entry.origin.to_owned(),
+                });
                 ctx.set_handled();
             }
             Event::Command(cmd) if cmd.is(cmd::PLAY_QUEUE_BEHAVIOR) => {
