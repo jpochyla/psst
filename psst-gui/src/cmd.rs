@@ -4,7 +4,7 @@ use druid::{Selector, WidgetId};
 use psst_core::{item_id::ItemId, player::item::PlaybackItem};
 
 use crate::{
-    data::{Nav, PlaybackPayload, PlaylistTracks, QueueBehavior, QueueEntry},
+    data::{Nav, PlaybackPayload, QueueBehavior, QueueEntry},
     ui::find::Find,
 };
 

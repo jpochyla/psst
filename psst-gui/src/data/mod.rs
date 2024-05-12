@@ -181,19 +181,19 @@ impl AppState {
 
 impl AppState {
     pub fn queued_entry(&self, item_id: ItemId) -> Option<QueueEntry> {
-        self.playback
-            .queue
-            .iter()
-            .find(|queued| queued.item.id() == item_id)
-            .cloned()
+        if let Some(queued) = self.playback.queue.iter().find(|queued| queued.item.id() == item_id).cloned() {
+            return Some(queued);
+        } else if let Some(queued) = self.playback.added_queue.iter().find(|queued| queued.item.id() == item_id).cloned() {
+            return Some(queued);
+        } else {
+            None
+        }
     }
 
-    pub fn added_queued_entry(&self, item_id: ItemId) -> Option<QueueEntry> {
-        self.playback
-            .queue
-            .iter()
-            .find(|queued| queued.item.id() == item_id)
-            .cloned()
+    pub fn add_queued_entry(&mut self, queue_entry: QueueEntry) {
+        // it still gets updated and wiped when playlsit changes
+        self.playback.added_queue.push_back(queue_entry);
+
     }
 
     pub fn loading_playback(&mut self, item: Playable, origin: PlaybackOrigin) {

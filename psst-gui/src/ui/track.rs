@@ -9,7 +9,7 @@ use psst_core::{audio::normalize::NormalizationLevel, item_id::{ItemId, ItemIdTy
 use crate::{
     cmd,
     data::{
-        self, AppState, Library, Nav, PlaybackOrigin, PlaylistAddTrack, PlaylistRemoveTrack, QueueEntry, RecommendationsRequest, Track
+        AppState, Library, Nav, PlaybackOrigin, PlaylistAddTrack, PlaylistRemoveTrack, QueueEntry, RecommendationsRequest, Track
     },
     ui::playlist,
     widget::{icons, Empty, MyWidgetExt, RemoteImage},
