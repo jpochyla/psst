@@ -126,6 +126,8 @@ jobs:
             mkdir -p "${{runner.workspace}}/pkg/usr/share/icons/hicolor/${LOGO_SIZE}x${LOGO_SIZE}/"
             cp "./psst-gui/assets/${LOGO}" "$_/psst.png"
           done
+          mkdir -p "${{runner.workspace}}/pkg/usr/share/icons/hicolor/scalable/apps/"
+          cp "./psst-gui/assets/psst.svg" $_
 
       - name: Set Permissions
         run: chmod 755 ${{runner.workspace}}/pkg/usr/bin/psst-gui
