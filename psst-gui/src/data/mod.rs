@@ -80,6 +80,7 @@ pub struct AppState {
     pub personalized: Personalized,
     pub alerts: Vector<Alert>,
     pub finder: Finder,
+    pub added_queue: Vector<QueueEntry>,
 }
 
 impl AppState {
@@ -101,7 +102,6 @@ impl AppState {
             now_playing: None,
             queue_behavior: config.queue_behavior,
             queue: Vector::new(),
-            added_queue: Vector::new(),
             volume: config.volume,
         };
         Self {
@@ -119,6 +119,7 @@ impl AppState {
                 cache_size: Promise::Empty,
             },
             playback,
+            added_queue: Vector::new(),
             search: Search {
                 input: "".into(),
                 results: Promise::Empty,
@@ -183,7 +184,7 @@ impl AppState {
     pub fn queued_entry(&self, item_id: ItemId) -> Option<QueueEntry> {
         if let Some(queued) = self.playback.queue.iter().find(|queued| queued.item.id() == item_id).cloned() {
             return Some(queued);
-        } else if let Some(queued) = self.playback.added_queue.iter().find(|queued| queued.item.id() == item_id).cloned() {
+        } else if let Some(queued) = self.added_queue.iter().find(|queued| queued.item.id() == item_id).cloned() {
             return Some(queued);
         } else {
             None
@@ -192,7 +193,7 @@ impl AppState {
 
     pub fn add_queued_entry(&mut self, queue_entry: QueueEntry) {
         // it still gets updated and wiped when playlsit changes
-        self.playback.added_queue.push_back(queue_entry);
+        self.added_queue.push_back(queue_entry);
 
     }
 

@@ -16,7 +16,6 @@ pub struct Playback {
     pub now_playing: Option<NowPlaying>,
     pub queue_behavior: QueueBehavior,
     pub queue: Vector<QueueEntry>,
-    pub added_queue: Vector<QueueEntry>,
     pub volume: f64,
 }
 

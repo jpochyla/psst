@@ -56,15 +56,14 @@ impl Queue {
 
     fn handle_added_queue(&mut self){
         if self.added_items.len() > self.added_items_position {
-            self.compute_positions();
-            self.items.insert(0, self.added_items[self.added_items_position]);
-            self.positions.insert(self.position + 1, 0);
+            self.items.insert(self.positions.len(), self.added_items[self.added_items_position]);
+            self.positions.insert(self.position + 1, self.positions.len());
             self.added_items_position += 1;
             
-            // Remove the past song from the queue as otherwise the queue will just go on for ever.
             if self.added_items_position > 2 {
                 self.added_items.remove(0);
-            }
+                self.added_items_position -= 1;
+        }
         }
     }
 
