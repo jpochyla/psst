@@ -184,6 +184,14 @@ fn alert_widget() -> impl Widget<AppState> {
                 .with_font(theme::UI_FONT_MEDIUM),
             )
             .with_default_spacer()
+            .with_child(icons::CLOSE_CIRCLE
+                .scale((24.0, 24.0))
+                .padding(theme::grid(0.25))
+                .link()
+                .rounded(100.0)
+                .on_click(|ctx, alert: &mut Alert, _| {
+                    ctx.submit_command(DISMISS_ALERT.with(alert.id))}))
+            .with_default_spacer()
             .with_flex_child(Label::raw().lens(Alert::message), 1.0)
             .padding(theme::grid(2.0))
             .background(BG)
@@ -191,8 +199,8 @@ fn alert_widget() -> impl Widget<AppState> {
                 env.set(
                     BG,
                     match alert.style {
-                        AlertStyle::Error => env.get(theme::RED),
-                        AlertStyle::Info => env.get(theme::GREY_600),
+                        AlertStyle::Error => env.get(theme::RED).with_alpha(0.85),
+                        AlertStyle::Info => env.get(theme::GREY_600).with_alpha(0.85),
                     },
                 )
             })
