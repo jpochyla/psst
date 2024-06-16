@@ -76,10 +76,6 @@ jobs:
             target/x86_64-apple-darwin/release/psst-gui \
             target/aarch64-apple-darwin/release/psst-gui
 
-      - name: Create macOS universal binary
-        if: runner.os == 'macOS'
-        run: lipo target/release/psst-gui target/aarch64-apple-darwin/release/psst-gui -create -output target/release/bundle/osx/Psst.app/Contents/MacOS/psst-gui
-
       - name: Create macOS Disk Image
         if: runner.os == 'macOS'
         run: |
