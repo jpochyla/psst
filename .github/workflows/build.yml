@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [ master ]
+    branches: [master]
   pull_request:
-    branches: [ master ]
+    branches: [master]
 
 env:
   CARGO_TERM_COLOR: always
@@ -20,7 +20,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Install Linux Dependencies
-        if: ${{ runner.os == 'Linux' }}
+        if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev libssl-dev libasound2-dev
 
       - name: Check Formatting
@@ -40,7 +40,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Install Linux Dependencies
-        if: ${{ runner.os == 'Linux' }}
+        if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev libssl-dev libasound2-dev
 
       - name: Run Tests
@@ -49,51 +49,64 @@ jobs:
 
       - name: Build Release
         run: cargo build --release
-      
+
+      - name: Build x86_64 for MacOS
+        if: runner.os == 'macOS'
+        run: |
+          rustup target add x86_64-apple-darwin
+          cargo build --release --target x86_64-apple-darwin
+
       - name: Build aarch64 for MacOS
-        if: ${{ runner.os == 'macOS' }}
+        if: runner.os == 'macOS'
         run: |
           rustup target add aarch64-apple-darwin
           cargo build --release --target aarch64-apple-darwin
-          
+
       - name: Bundle macOS Release
-        if: ${{ runner.os == 'macOS' }}
+        if: runner.os == 'macOS'
         run: |
           cargo install cargo-bundle
           cargo bundle --release
         working-directory: psst-gui
-      
+
       - name: Create macOS universal binary
-        if: ${{ runner.os == 'macOS' }}
+        if: runner.os == 'macOS'
+        run: |
+          lipo -create -output target/release/bundle/osx/Psst.app/Contents/MacOS/psst-gui \
+            target/x86_64-apple-darwin/release/psst-gui \
+            target/aarch64-apple-darwin/release/psst-gui
+
+      - name: Create macOS universal binary
+        if: runner.os == 'macOS'
         run: lipo target/release/psst-gui target/aarch64-apple-darwin/release/psst-gui -create -output target/release/bundle/osx/Psst.app/Contents/MacOS/psst-gui
 
       - name: Create macOS Disk Image
-        if: ${{ runner.os == 'macOS' }}
+        if: runner.os == 'macOS'
         run: |
           hdiutil create Psst-uncompressed.dmg -volname "Psst" -srcfolder target/release/bundle/osx
           hdiutil convert Psst-uncompressed.dmg -format UDZO -o Psst.dmg
 
       - name: Make Linux Binary Executable
-        if: ${{ runner.os == 'Linux' }}
+        if: runner.os == 'Linux'
         run: chmod +x target/release/psst-gui
 
       - name: Upload Linux Binary
         uses: actions/upload-artifact@v3
-        if: ${{ runner.os == 'Linux' }}
+        if: runner.os == 'Linux'
         with:
           name: psst-gui
           path: target/release/psst-gui
 
       - name: Upload macOS Disk Image
         uses: actions/upload-artifact@v3
-        if: ${{ runner.os == 'macOS' }}
+        if: runner.os == 'macOS'
         with:
           name: Psst.dmg
           path: ./Psst.dmg
 
       - name: Upload Windows Executable
         uses: actions/upload-artifact@v3
-        if: ${{ runner.os == 'Windows' }}
+        if: runner.os == 'Windows'
         with:
           name: Psst.exe
           path: target/release/psst-gui.exe
