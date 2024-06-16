@@ -203,7 +203,6 @@ impl AppState {
     }
 
     pub fn add_queued_entry(&mut self, queue_entry: QueueEntry) {
-        // it still gets updated and wiped when playlsit changes
         self.added_queue.push_back(queue_entry);
     }
 
