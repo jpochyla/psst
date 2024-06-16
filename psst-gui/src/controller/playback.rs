@@ -296,7 +296,7 @@ impl PlaybackController {
 
     fn add_to_queue(&mut self, item: &PlaybackItem) {
         self.send(PlayerEvent::Command(PlayerCommand::AddToQueue {
-                item: item.clone(),
+                item: *item,
             }));
     }
 

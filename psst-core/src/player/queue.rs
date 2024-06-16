@@ -18,9 +18,9 @@ impl Default for QueueBehavior {
 
 pub struct Queue {
     items: Vec<PlaybackItem>,
-    added_items: Vec<PlaybackItem>,
+    user_added_items: Vec<PlaybackItem>,
     position: usize,
-    added_items_position: usize,
+    user_added_items_position: usize,
     positions: Vec<usize>,
     behavior: QueueBehavior,
 }
@@ -29,9 +29,9 @@ impl Queue {
     pub fn new() -> Self {
         Self {
             items: Vec::new(),
-            added_items: Vec::new(),
+            user_added_items: Vec::new(),
             position: 0,
-            added_items_position: 0,
+            user_added_items_position: 0,
             positions: Vec::new(),
             behavior: QueueBehavior::default(),
         }
@@ -51,19 +51,14 @@ impl Queue {
     }
 
     pub fn add(&mut self, item: PlaybackItem) {
-        self.added_items.push(item);
+        self.user_added_items.push(item);
     }
 
     fn handle_added_queue(&mut self){
-        if self.added_items.len() > self.added_items_position {
-            self.items.insert(self.positions.len(), self.added_items[self.added_items_position]);
+        if self.user_added_items.len() > self.user_added_items_position {
+            self.items.insert(self.positions.len(), self.user_added_items[self.user_added_items_position]);
             self.positions.insert(self.position + 1, self.positions.len());
-            self.added_items_position += 1;
-            
-            if self.added_items_position > 2 {
-                self.added_items.remove(0);
-                self.added_items_position -= 1;
-        }
+            self.user_added_items_position += 1;
         }
     }
 
@@ -122,7 +117,7 @@ impl Queue {
                 return Some(item);
             }
         } else {
-            return self.added_items.get(0);
+            return self.user_added_items.first();
         }
         None
     }

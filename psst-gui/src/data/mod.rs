@@ -183,7 +183,7 @@ impl AppState {
 impl AppState {
     pub fn queued_entry(&self, item_id: ItemId) -> Option<QueueEntry> {
         if let Some(queued) = self.playback.queue.iter().find(|queued| queued.item.id() == item_id).cloned() {
-            return Some(queued);
+            Some(queued)
         } else if let Some(queued) = self.added_queue.iter().find(|queued| queued.item.id() == item_id).cloned() {
             return Some(queued);
         } else {
