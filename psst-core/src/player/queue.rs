@@ -54,10 +54,14 @@ impl Queue {
         self.user_added_items.push(item);
     }
 
-    fn handle_added_queue(&mut self){
+    fn handle_added_queue(&mut self) {
         if self.user_added_items.len() > self.user_added_items_position {
-            self.items.insert(self.positions.len(), self.user_added_items[self.user_added_items_position]);
-            self.positions.insert(self.position + 1, self.positions.len());
+            self.items.insert(
+                self.positions.len(),
+                self.user_added_items[self.user_added_items_position],
+            );
+            self.positions
+                .insert(self.position + 1, self.positions.len());
             self.user_added_items_position += 1;
         }
     }

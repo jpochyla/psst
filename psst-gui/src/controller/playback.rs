@@ -296,8 +296,8 @@ impl PlaybackController {
 
     fn add_to_queue(&mut self, item: &PlaybackItem) {
         self.send(PlayerEvent::Command(PlayerCommand::AddToQueue {
-                item: *item,
-            }));
+            item: *item,
+        }));
     }
 
     fn set_queue_behavior(&mut self, behavior: QueueBehavior) {
@@ -316,7 +316,7 @@ impl<W> Controller<AppState, W> for PlaybackController
 where
     W: Widget<AppState>,
 {
-fn event(
+    fn event(
         &mut self,
         child: &mut W,
         ctx: &mut EventCtx,
@@ -348,8 +348,7 @@ fn event(
                     data.start_playback(queued.item, queued.origin, progress.to_owned());
                     self.update_media_control_playback(&data.playback);
                     self.update_media_control_metadata(&data.playback);
-                }
-                else {
+                } else {
                     log::warn!("played item not found in playback queue");
                 }
                 ctx.set_handled();
@@ -417,7 +416,7 @@ fn event(
                 log::info!("adding to queue");
                 let (entry, item) = cmd.get_unchecked(cmd::ADD_TO_QUEUE);
 
-                self.add_to_queue(&item.to_owned());
+                self.add_to_queue(item);
                 data.add_queued_entry(entry.clone());
                 ctx.set_handled();
             }

@@ -283,7 +283,7 @@ impl Player {
             loading_handle,
         };
     }
-    
+
     fn set_volume(&mut self, volume: f64) {
         self.audio_output_sink.set_volume(volume as f32);
     }
@@ -423,7 +423,7 @@ pub enum PlayerCommand {
     SetQueueBehavior {
         behavior: QueueBehavior,
     },
-    AddToQueue{
+    AddToQueue {
         item: PlaybackItem,
     },
     /// Change playback volume to a value in 0.0..=1.0 range.
