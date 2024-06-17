@@ -7,7 +7,7 @@ use druid::{
         Button, Controller, CrossAxisAlignment, Flex, Label, LineBreaking, MainAxisAlignment,
         RadioGroup, SizedBox, Slider, TextBox, ViewSwitcher,
     },
-    Color, Data, Env, Event, EventCtx, LensExt, LifeCycle, LifeCycleCtx, Selector, Widget,
+    Color, Data, Env, Event, EventCtx, Insets, LensExt, LifeCycle, LifeCycleCtx, Selector, Widget,
     WidgetExt,
 };
 use psst_core::connection::Credentials;
@@ -95,6 +95,12 @@ pub fn preferences_widget() -> impl Widget<AppState> {
         .scroll()
         .vertical()
         .content_must_fill(true)
+        .padding(if cfg!(target_os = "macos") {
+            // Accommodate the window controls on Mac.
+            Insets::new(0.0, 24.0, 0.0, 0.0)
+        } else {
+            Insets::ZERO
+        })
 }
 
 fn tabs_widget() -> impl Widget<AppState> {
