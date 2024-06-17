@@ -122,7 +122,7 @@ cargo bundle --release
     - Reorder tracks
     - Rename playlist
     - Playlist folders
-- [ ] Playback queue
+- [x] Playback queue
 - [ ] React to audio output device events
     - Pause after disconnecting headphones
     - Transfer playback after connecting headphones
