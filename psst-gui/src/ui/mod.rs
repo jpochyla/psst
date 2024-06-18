@@ -2,7 +2,6 @@ use std::time::Duration;
 
 use druid::{
     im::Vector,
-    lens::Unit,
     widget::{CrossAxisAlignment, Either, Flex, Label, List, Scroll, Slider, Split, ViewSwitcher},
     Color, Env, Insets, Key, LensExt, Menu, MenuItem, Selector, Widget, WidgetExt, WindowDesc,
 };

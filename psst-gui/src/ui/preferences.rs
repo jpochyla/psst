@@ -228,7 +228,6 @@ fn general_tab_widget() -> impl Widget<AppState> {
                         |usize: &usize| usize.to_string(),
                     )),
                 )
-                .padding((theme::grid(1.5), 0.0))
                 .lens(AppState::config.then(Config::seek_duration)),
         );
 
@@ -246,7 +245,6 @@ fn general_tab_widget() -> impl Widget<AppState> {
                         |usize: &usize| usize.to_string(),
                     )),
                 )
-                .padding((theme::grid(1.5), 0.0))
                 .lens(AppState::config.then(Config::paginated_limit)),
         );
 
