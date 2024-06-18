@@ -35,6 +35,7 @@ use crate::{
 };
 
 pub trait MyWidgetExt<T: Data>: Widget<T> + Sized + 'static {
+    #[allow(dead_code)]
     fn log(self, label: &'static str) -> Logger<Self> {
         Logger::new(self).with_label(label)
     }
