@@ -30,7 +30,9 @@ fn main() {
         // And construct the http-style url
         remote_url = format!("https://{domain}/{path}");
     }
-    remote_url = remote_url.trim_end_matches(".git").to_owned();
+    let trimmed_url = remote_url.trim_end_matches(".git");
+    remote_url.clone_from(&String::from(trimmed_url));
+
     let outfile = format!("{}/remote-url.txt", outdir);
     let mut file = fs::File::create(outfile).unwrap();
     write!(file, r#""{}""#, remote_url).ok();
