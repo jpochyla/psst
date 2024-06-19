@@ -1,4 +1,4 @@
-Package: psst
+Package: psst-gui
 Architecture: amd64
 Maintainer: Jan Pochyla <jpochyla@gmail.com>
 Section: sound

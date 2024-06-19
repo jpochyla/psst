@@ -1,7 +1,9 @@
 use std::time::Duration;
 
 use druid::{
-    im::Vector, lens::Unit, theme::{BACKGROUND_DARK, BUTTON_DARK, PRIMARY_LIGHT}, widget::{CrossAxisAlignment, Either, Flex, Label, LabelText, LineBreaking, List, Padding, Scroll, Slider, Split, ViewSwitcher}, Color, Env, Insets, Key, LensExt, Menu, MenuItem, Selector, Widget, WidgetExt, WindowDesc
+    im::Vector,
+    widget::{CrossAxisAlignment, Either, Flex, Label, List, Scroll, Slider, Split, ViewSwitcher},
+    Color, Env, Insets, Key, LensExt, Menu, MenuItem, Selector, Widget, WidgetExt, WindowDesc,
 };
 use druid_shell::Cursor;
 use psst_core::player::queue;
@@ -112,7 +114,6 @@ fn root_widget() -> impl Widget<AppState> {
 
     let playlists = Flex::column()
         .must_fill_main_axis(true)
-        .with_child(sidebar_logo_widget())
         .with_child(sidebar_menu_widget())
         .with_default_spacer()
         .with_flex_child(playlists, 1.0)
@@ -298,15 +299,6 @@ fn route_widget() -> impl Widget<AppState> {
         },
     )
     .expand()
-}
-
-fn sidebar_logo_widget() -> impl Widget<AppState> {
-    icons::LOGO
-        .scale((29.0, 32.0))
-        .with_color(theme::GREY_500)
-        .padding((0.0, theme::grid(2.0), 0.0, theme::grid(1.0)))
-        .center()
-        .lens(Unit)
 }
 
 fn sidebar_menu_widget() -> impl Widget<AppState> {
