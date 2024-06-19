@@ -58,7 +58,7 @@ impl<T: Data> Widget<T> for RemoteImage<T> {
         if let LifeCycle::WidgetAdded = event {
             let location = (self.locator)(data, env);
             self.image = None;
-            self.location = location.clone();
+            self.location.clone_from(&location);
             if let Some(location) = location {
                 ctx.submit_command(REQUEST_DATA.with(location).to(ctx.widget_id()));
             }
@@ -74,7 +74,7 @@ impl<T: Data> Widget<T> for RemoteImage<T> {
         let location = (self.locator)(data, env);
         if location != self.location {
             self.image = None;
-            self.location = location.clone();
+            self.location.clone_from(&location);
             if let Some(location) = location {
                 ctx.submit_command(REQUEST_DATA.with(location).to(ctx.widget_id()));
             }

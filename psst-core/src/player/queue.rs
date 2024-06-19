@@ -18,7 +18,9 @@ impl Default for QueueBehavior {
 
 pub struct Queue {
     items: Vec<PlaybackItem>,
+    user_items: Vec<PlaybackItem>,
     position: usize,
+    user_items_position: usize,
     positions: Vec<usize>,
     behavior: QueueBehavior,
 }
@@ -27,7 +29,9 @@ impl Queue {
     pub fn new() -> Self {
         Self {
             items: Vec::new(),
+            user_items: Vec::new(),
             position: 0,
+            user_items_position: 0,
             positions: Vec::new(),
             behavior: QueueBehavior::default(),
         }
@@ -44,6 +48,22 @@ impl Queue {
         self.items = items;
         self.position = position;
         self.compute_positions();
+    }
+
+    pub fn add(&mut self, item: PlaybackItem) {
+        self.user_items.push(item);
+    }
+
+    fn handle_added_queue(&mut self) {
+        if self.user_items.len() > self.user_items_position {
+            self.items.insert(
+                self.positions.len(),
+                self.user_items[self.user_items_position],
+            );
+            self.positions
+                .insert(self.position + 1, self.positions.len());
+            self.user_items_position += 1;
+        }
     }
 
     pub fn set_behaviour(&mut self, behavior: QueueBehavior) {
@@ -81,10 +101,12 @@ impl Queue {
     }
 
     pub fn skip_to_next(&mut self) {
+        self.handle_added_queue();
         self.position = self.next_position();
     }
 
     pub fn skip_to_following(&mut self) {
+        self.handle_added_queue();
         self.position = self.following_position();
     }
 
@@ -94,8 +116,14 @@ impl Queue {
     }
 
     pub fn get_following(&self) -> Option<&PlaybackItem> {
-        let position = self.positions.get(self.following_position()).copied()?;
-        self.items.get(position)
+        if let Some(position) = self.positions.get(self.position).copied() {
+            if let Some(item) = self.items.get(position) {
+                return Some(item);
+            }
+        } else {
+            return self.user_items.first();
+        }
+        None
     }
 
     fn previous_position(&self) -> usize {

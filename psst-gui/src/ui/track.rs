@@ -4,11 +4,16 @@ use druid::{
     widget::{CrossAxisAlignment, Either, Flex, Label, ViewSwitcher},
     LensExt, LocalizedString, Menu, MenuItem, Size, TextAlignment, Widget, WidgetExt,
 };
+use psst_core::{
+    audio::normalize::NormalizationLevel,
+    item_id::{ItemId, ItemIdType},
+    player::item::PlaybackItem,
+};
 
 use crate::{
     cmd,
     data::{
-        AppState, Library, Nav, PlaybackOrigin, PlaylistAddTrack, PlaylistRemoveTrack,
+        AppState, Library, Nav, PlaybackOrigin, PlaylistAddTrack, PlaylistRemoveTrack, QueueEntry,
         RecommendationsRequest, Track,
     },
     ui::playlist,
@@ -322,6 +327,23 @@ pub fn track_menu(
             );
         }
     }
+
+    menu = menu.entry(
+        MenuItem::new(
+            LocalizedString::new("menu-item-add-to-queue").with_placeholder("Add Track To Queue"),
+        )
+        //PlayerCommand
+        .command(cmd::ADD_TO_QUEUE.with((
+            QueueEntry {
+                item: crate::ui::Playable::Track(track.clone()),
+                origin: origin.clone(),
+            },
+            PlaybackItem {
+                item_id: ItemId::from_base62(&String::from(track.id), ItemIdType::Track).unwrap(),
+                norm_level: NormalizationLevel::Track,
+            },
+        ))),
+    );
 
     let mut playlist_menu = Menu::new(
         LocalizedString::new("menu-item-add-to-playlist").with_placeholder("Add to Playlist"),
