@@ -13,7 +13,7 @@ use psst_core::{
     audio::{normalize::NormalizationLevel, output::DefaultAudioOutput},
     cache::Cache,
     cdn::Cdn,
-    player::{item::PlaybackItem, PlaybackConfig, Player, PlayerCommand, PlayerEvent},
+    player::{item::PlaybackItem, queue, PlaybackConfig, Player, PlayerCommand, PlayerEvent},
     session::SessionService,
 };
 use souvlaki::{

@@ -53,6 +53,10 @@ impl Queue {
     pub fn add(&mut self, item: PlaybackItem) {
         self.user_items.push(item);
     }
+    
+    pub fn get_user_queue(&mut self) -> &[PlaybackItem]{
+        &self.user_items    
+    }
 
     fn handle_added_queue(&mut self) {
         if self.user_items.len() > self.user_items_position {

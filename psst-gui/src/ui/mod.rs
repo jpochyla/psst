@@ -1,14 +1,12 @@
 use std::time::Duration;
 
 use druid::{
-    im::Vector,
-    lens::Unit,
-    widget::{CrossAxisAlignment, Either, Flex, Label, List, Scroll, Slider, Split, ViewSwitcher},
-    Color, Env, Insets, Key, LensExt, Menu, MenuItem, Selector, Widget, WidgetExt, WindowDesc,
+    im::Vector, lens::Unit, theme::{BACKGROUND_DARK, BUTTON_DARK, PRIMARY_LIGHT}, widget::{CrossAxisAlignment, Either, Flex, Label, LabelText, LineBreaking, List, Padding, Scroll, Slider, Split, ViewSwitcher}, Color, Env, Insets, Key, LensExt, Menu, MenuItem, Selector, Widget, WidgetExt, WindowDesc
 };
 use druid_shell::Cursor;
+use psst_core::player::queue;
 
-use crate::data::config::SortCriteria;
+use crate::data::{app_state_derived_lenses::added_queue, config::SortCriteria, QueueEntry};
 use crate::{
     cmd,
     controller::{AfterDelay, NavController, SessionController, SortController},
@@ -152,13 +150,23 @@ fn root_widget() -> impl Widget<AppState> {
         .with_flex_child(Overlay::bottom(route_widget(), alert_widget()), 1.0)
         .with_child(playback::panel_widget())
         .background(theme::BACKGROUND_LIGHT);
+    
+    let queues = Flex::column()
+        .cross_axis_alignment(CrossAxisAlignment::Start)
+        .with_flex_child(queue_widget(), 1.0)
+        .background(theme::BACKGROUND_LIGHT);
 
-    let split = Split::columns(sidebar, main)
-        .split_point(0.2)
+    let split = Split::columns(sidebar, Split::columns(main, queues)
+        .split_point(0.85)
         .bar_size(1.0)
-        .min_size(150.0, 300.0)
+        .min_size(300.0, 150.0)
         .min_bar_area(1.0)
-        .solid_bar(true);
+        .solid_bar(true))
+            .split_point(0.2)
+            .bar_size(1.0)
+            .min_size(150.0, 300.0)
+            .min_bar_area(1.0)
+            .solid_bar(true);
 
     ThemeScope::new(split)
         .controller(SessionController)
@@ -167,6 +175,29 @@ fn root_widget() -> impl Widget<AppState> {
     // .debug_invalidation()
     // .debug_widget_id()
     // .debug_paint_layout()
+}
+
+
+
+fn queue_list_widget() -> impl Widget<Vector<QueueEntry>> {
+    List::new(|| {
+        Flex::row()
+            .with_child(Label::new(|item: &QueueEntry, _env: &Env| item.item.name().to_string())            
+            .with_line_break_mode(LineBreaking::Clip)
+            .with_font(theme::UI_FONT_MEDIUM)
+            .padding(theme::grid(1.0))
+            .link()
+            .rounded(10.0)
+            )
+    })
+}
+
+fn queue_widget() -> impl Widget<AppState> {
+    Scroll::new(Padding::new(7.5, queue_list_widget()))
+        .vertical()
+        .lens(AppState::added_queue)
+        .background(BACKGROUND_DARK)
+        .rounded(10.0)
 }
 
 fn alert_widget() -> impl Widget<AppState> {
