@@ -66,9 +66,8 @@ jobs:
         run: |
           cargo install cargo-bundle
           cargo bundle --release
-          mkdir -p target/release/bundle/osx/Psst.app/Contents/MacOS
-          cp target/release/psst-gui target/release/bundle/osx/Psst.app/Contents/MacOS/psst-gui
-        working-directory: psst-gui
+          mkdir -p psst-gui/target/release/bundle/osx/Psst.app/Contents/MacOS
+          cp target/release/psst-gui psst-gui/target/release/bundle/osx/Psst.app/Contents/MacOS/psst-gui
 
       - name: Create macOS Disk Image
         if: runner.os == 'macOS'
