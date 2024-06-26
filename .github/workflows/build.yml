@@ -48,6 +48,7 @@ jobs:
         continue-on-error: true
 
       - name: Build Release
+        if: runner.os != 'macOS'
         run: cargo build --release
 
       - name: Build for macOS (x86_64 and aarch64)
@@ -63,19 +64,24 @@ jobs:
           lipo -create -output target/release/psst-gui-universal \
             target/x86_64-apple-darwin/release/psst-gui \
             target/aarch64-apple-darwin/release/psst-gui
+          if [ ! -f target/release/psst-gui-universal ]; then
+            echo "Failed to create universal binary"
+            exit 1
+          fi
 
       - name: Bundle macOS Release
         if: runner.os == 'macOS'
         run: |
           cargo install cargo-bundle
           cargo bundle --release
-          cp target/release/psst-gui-universal target/release/bundle/osx/Psst.app/Contents/MacOS/psst-gui
+          mkdir -p target/release/bundle/osx/Psst.app/Contents/MacOS
+          cp ../target/release/psst-gui-universal target/release/bundle/osx/Psst.app/Contents/MacOS/psst-gui
         working-directory: psst-gui
 
       - name: Create macOS Disk Image
         if: runner.os == 'macOS'
         run: |
-          hdiutil create Psst-uncompressed.dmg -volname "Psst" -srcfolder target/release/bundle/osx
+          hdiutil create Psst-uncompressed.dmg -volname "Psst" -srcfolder psst-gui/target/release/bundle/osx
           hdiutil convert Psst-uncompressed.dmg -format UDZO -o Psst.dmg
 
       - name: Make Linux Binary Executable
