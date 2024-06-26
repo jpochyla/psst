@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup Cache
         uses: Swatinem/rust-cache@v2
@@ -34,7 +34,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup Cache
         uses: Swatinem/rust-cache@v2
@@ -46,6 +46,9 @@ jobs:
       - name: Run Tests
         run: cargo test
         continue-on-error: true
+
+      - name: Build Release
+        run: cargo build --release
 
       - name: Build for macOS (x86_64 and aarch64)
         if: runner.os == 'macOS'
@@ -80,21 +83,21 @@ jobs:
         run: chmod +x target/release/psst-gui
 
       - name: Upload Linux Binary
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: runner.os == 'Linux'
         with:
           name: psst-gui
           path: target/release/psst-gui
 
       - name: Upload macOS Disk Image
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: runner.os == 'macOS'
         with:
           name: Psst.dmg
           path: ./Psst.dmg
 
       - name: Upload Windows Executable
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: runner.os == 'Windows'
         with:
           name: Psst.exe
@@ -105,10 +108,10 @@ jobs:
     needs: build
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Download Linux Binary
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: psst-gui
           path: ${{runner.workspace}}
@@ -147,7 +150,7 @@ jobs:
         run: cat ${{runner.workspace}}/pkg/DEBIAN/control && dpkg-deb -b ${{runner.workspace}}/pkg/ psst_$(git rev-list --count HEAD)_amd64.deb
 
       - name: Upload Debian Package
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: psst-deb
           path: "*.deb"
@@ -158,10 +161,10 @@ jobs:
     needs: deb
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Download Debian Package
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: psst-deb
           path: ${{runner.workspace}}
@@ -194,7 +197,7 @@ jobs:
           ${{env.app_path}} ${{env.recipe_path}}
 
       - name: Upload AppImage
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: psst-appimage
           path: ${{runner.workspace}}/out/*.AppImage
