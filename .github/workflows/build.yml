@@ -51,23 +51,15 @@ jobs:
         if: runner.os != 'macOS'
         run: cargo build --release
 
-      - name: Build for macOS (x86_64 and aarch64)
+      - name: Build for macOS (Universal Binary)
         if: runner.os == 'macOS'
         run: |
           rustup target add x86_64-apple-darwin aarch64-apple-darwin
           cargo build --release --target x86_64-apple-darwin
           cargo build --release --target aarch64-apple-darwin
-
-      - name: Create Universal Binary
-        if: runner.os == 'macOS'
-        run: |
-          lipo -create -output target/release/psst-gui-universal \
+          lipo -create -output target/release/psst-gui \
             target/x86_64-apple-darwin/release/psst-gui \
             target/aarch64-apple-darwin/release/psst-gui
-          if [ ! -f target/release/psst-gui-universal ]; then
-            echo "Failed to create universal binary"
-            exit 1
-          fi
 
       - name: Bundle macOS Release
         if: runner.os == 'macOS'
@@ -75,7 +67,7 @@ jobs:
           cargo install cargo-bundle
           cargo bundle --release
           mkdir -p target/release/bundle/osx/Psst.app/Contents/MacOS
-          cp ../target/release/psst-gui-universal target/release/bundle/osx/Psst.app/Contents/MacOS/psst-gui
+          cp target/release/psst-gui target/release/bundle/osx/Psst.app/Contents/MacOS/psst-gui
         working-directory: psst-gui
 
       - name: Create macOS Disk Image
