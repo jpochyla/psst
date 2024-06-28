@@ -51,28 +51,39 @@ jobs:
         if: runner.os != 'macOS'
         run: cargo build --release
 
-      - name: Build for macOS (Universal Binary)
+      - name: Build x86_64 and aarch64 for macOS
         if: runner.os == 'macOS'
         run: |
           rustup target add x86_64-apple-darwin aarch64-apple-darwin
-          cargo build --release --target x86_64-apple-darwin
-          cargo build --release --target aarch64-apple-darwin
-          lipo -create -output target/release/psst-gui \
-            target/x86_64-apple-darwin/release/psst-gui \
-            target/aarch64-apple-darwin/release/psst-gui
+          cargo build --release --target x86_64-apple-darwin --target aarch64-apple-darwin
+
+      - name: Cache cargo-bundle
+        id: cache-cargo-bundle
+        uses: actions/cache@v3
+        with:
+          path: ~/.cargo/bin/cargo-bundle
+          key: ${{ runner.os }}-cargo-bundle-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Install cargo-bundle
+        if: steps.cache-cargo-bundle.outputs.cache-hit != 'true'
+        run: cargo install cargo-bundle
+        working-directory: psst-gui
 
       - name: Bundle macOS Release
         if: runner.os == 'macOS'
+        run: cargo bundle --release
+        working-directory: psst-gui
+
+      - name: Create macOS universal binary
+        if: runner.os == 'macOS'
         run: |
-          cargo install cargo-bundle
-          cargo bundle --release
-          mkdir -p target/release/bundle/osx/Psst.app/Contents/MacOS
-          cp target/release/psst-gui target/release/bundle/osx/Psst.app/Contents/MacOS/psst-gui
+          lipo -create -output target/release/bundle/osx/Psst.app/Contents/MacOS/psst-gui \
+            target/x86_64-apple-darwin/release/psst-gui \
+            target/aarch64-apple-darwin/release/psst-gui
 
       - name: Create macOS Disk Image
         if: runner.os == 'macOS'
-        run: |
-          hdiutil create -volname "Psst" -srcfolder target/release/bundle/osx -ov -format UDZO Psst.dmg
+        run: hdiutil create -volname "Psst" -srcfolder target/release/bundle/osx -ov -format UDZO Psst.dmg
 
       - name: Upload macOS Disk Image
         uses: actions/upload-artifact@v4
