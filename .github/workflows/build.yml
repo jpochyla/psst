@@ -58,16 +58,16 @@ jobs:
           cargo build --release --target x86_64-apple-darwin --target aarch64-apple-darwin
 
       - name: Cache cargo-bundle
+        if: runner.os == 'macOS'
         id: cache-cargo-bundle
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ~/.cargo/bin/cargo-bundle
           key: ${{ runner.os }}-cargo-bundle-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Install cargo-bundle
-        if: steps.cache-cargo-bundle.outputs.cache-hit != 'true'
+        if: runner.os == 'macOS' && steps.cache-cargo-bundle.outputs.cache-hit != 'true'
         run: cargo install cargo-bundle
-        working-directory: psst-gui
 
       - name: Bundle macOS Release
         if: runner.os == 'macOS'
