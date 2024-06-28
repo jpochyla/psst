@@ -67,14 +67,19 @@ jobs:
           cargo install cargo-bundle
           cargo bundle --release
           mkdir -p target/release/bundle/osx/Psst.app/Contents/MacOS
-          cp ../target/release/psst-gui target/release/bundle/osx/Psst.app/Contents/MacOS/psst-gui
-        working-directory: psst-gui
+          cp target/release/psst-gui target/release/bundle/osx/Psst.app/Contents/MacOS/psst-gui
 
       - name: Create macOS Disk Image
         if: runner.os == 'macOS'
         run: |
-          hdiutil create Psst-uncompressed.dmg -volname "Psst" -srcfolder psst-gui/target/release/bundle/osx
-          hdiutil convert Psst-uncompressed.dmg -format UDZO -o Psst.dmg
+          hdiutil create -volname "Psst" -srcfolder target/release/bundle/osx -ov -format UDZO Psst.dmg
+
+      - name: Upload macOS Disk Image
+        uses: actions/upload-artifact@v4
+        if: runner.os == 'macOS'
+        with:
+          name: Psst.dmg
+          path: ./Psst.dmg
 
       - name: Make Linux Binary Executable
         if: runner.os == 'Linux'
@@ -86,13 +91,6 @@ jobs:
         with:
           name: psst-gui
           path: target/release/psst-gui
-
-      - name: Upload macOS Disk Image
-        uses: actions/upload-artifact@v4
-        if: runner.os == 'macOS'
-        with:
-          name: Psst.dmg
-          path: ./Psst.dmg
 
       - name: Upload Windows Executable
         uses: actions/upload-artifact@v4
