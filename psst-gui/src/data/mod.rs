@@ -65,6 +65,7 @@ pub struct AppState {
     #[data(ignore)]
     pub session: SessionService,
     pub nav: Nav,
+    pub show_queue: bool,
     pub history: Vector<Nav>,
     pub config: Config,
     pub preferences: Preferences,
@@ -108,6 +109,7 @@ impl AppState {
             session: SessionService::empty(),
             nav: Nav::Home,
             history: Vector::new(),
+            show_queue: false,
             config,
             preferences: Preferences {
                 active: PreferencesTab::General,

@@ -135,3 +135,4 @@ fn track_results_widget() -> impl Widget<WithCtx<Recommendations>> {
         },
     })
 }
+

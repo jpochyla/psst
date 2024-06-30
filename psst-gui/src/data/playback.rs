@@ -54,6 +54,13 @@ impl Playable {
         }
     }
 
+    pub fn artist(&self) -> Arc<String> {
+        match self {
+            Playable::Track(track) => Arc::new(track.artist_names()),
+            Playable::Episode(episode) => Arc::new(episode.show.name.to_string()),
+        }
+    }
+
     pub fn duration(&self) -> Duration {
         match self {
             Playable::Track(track) => track.duration,

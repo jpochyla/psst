@@ -13,7 +13,7 @@ use psst_core::{
     audio::{normalize::NormalizationLevel, output::DefaultAudioOutput},
     cache::Cache,
     cdn::Cdn,
-    player::{item::PlaybackItem, queue, PlaybackConfig, Player, PlayerCommand, PlayerEvent},
+    player::{item::PlaybackItem, PlaybackConfig, Player, PlayerCommand, PlayerEvent},
     session::SessionService,
 };
 use souvlaki::{
@@ -265,6 +265,10 @@ impl PlaybackController {
     fn next(&mut self) {
         self.send(PlayerEvent::Command(PlayerCommand::Next));
     }
+    // Implemet properly, this will only skip by one, we need to use the inc val
+    fn skip_by(&mut self, inc: i32) {
+        self.send(PlayerEvent::Command(PlayerCommand::Next));
+    }
 
     fn stop(&mut self) {
         self.send(PlayerEvent::Command(PlayerCommand::Stop));
@@ -407,6 +411,10 @@ where
             Event::Command(cmd) if cmd.is(cmd::PLAY_NEXT) => {
                 self.next();
                 ctx.set_handled();
+            }
+            Event::Command(cmd) if cmd.is(cmd::SKIP_BY) => {
+              //  self.
+              //  ctx.set_handled();
             }
             Event::Command(cmd) if cmd.is(cmd::PLAY_STOP) => {
                 self.stop();
