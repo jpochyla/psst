@@ -7,7 +7,7 @@ use crate::{
     data::{
         AppState, QueueEntry
     },
-    widget::{Border, MyWidgetExt},
+    widget::{icons, Border, MyWidgetExt},
 };
 
 use super::theme;
@@ -66,36 +66,23 @@ fn queue_list_widget() -> impl Widget<Vector<QueueEntry>> {
                     // We need to make a function which takes the song index when clicked on then we need to skip by that amount.
                     ctx.submit_notification(TODO)
                 })*/
-                //.context_menu(queue_menu_widget()),
+                //.context_menu(queue_menu_widget(|item: &Vec<QueueEntry>, _env: &Env| item.len()),
             1.0,
         )
-        .with_default_spacer()
+        .with_flex_spacer(3.0)
+        .with_child(icons::CLOSE_CIRCLE
+            .scale((24.0, 24.0))
+            .padding(theme::grid(0.25))
+            .link()
+            .rounded(100.0)
+            .on_click(move |ctx, _, _| {
+                
+                ctx.submit_command(cmd::REMOVE_FROM_QUEUE.with(0/* Add song index here */));
+            })        
+        )
         .padding(theme::grid(1.0))
         .link()
-        
         .rounded(theme::BUTTON_BORDER_RADIUS)
         .padding(theme::grid(1.0))
     })
-}
-fn queue_menu_widget() -> Menu<AppState> {
-    //.with_child(queue_menu_item_widget("Clear Queue", Command::ClearQueue))
-    //.with_child(queue_menu_item_widget("Remove from queue", Command::RemoveFromQueue))
-    let mut menu = Menu::new("Queue");
-
-    // Create menu items for sorting options
-    let sort_by_title = MenuItem::new("Title").command(cmd::SORT_BY_TITLE);
-    let sort_by_album = MenuItem::new("Album").command(cmd::SORT_BY_ALBUM);
-    let sort_by_date_added = MenuItem::new("Date Added").command(cmd::SORT_BY_DATE_ADDED);
-    let sort_by_duration = MenuItem::new("Duration").command(cmd::SORT_BY_DURATION);
-    let sort_by_artist = MenuItem::new("Artist").command(cmd::SORT_BY_ARTIST);
-
-
-    // Add the items and checkboxes to the menu
-    menu = menu.entry(sort_by_album);
-    menu = menu.entry(sort_by_artist);
-    menu = menu.entry(sort_by_date_added);
-    menu = menu.entry(sort_by_duration);
-    menu = menu.entry(sort_by_title);
-
-    menu
 }

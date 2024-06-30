@@ -55,12 +55,15 @@ pub const PLAY_PREVIOUS: Selector = Selector::new("app.play-previous");
 pub const PLAY_PAUSE: Selector = Selector::new("app.play-pause");
 pub const PLAY_RESUME: Selector = Selector::new("app.play-resume");
 pub const PLAY_NEXT: Selector = Selector::new("app.play-next");
-// Todo Skip by
-pub const SKIP_BY: Selector = Selector::new("app.skip-by");
 pub const PLAY_STOP: Selector = Selector::new("app.play-stop");
 pub const ADD_TO_QUEUE: Selector<(QueueEntry, PlaybackItem)> = Selector::new("app.add-to-queue");
 pub const PLAY_QUEUE_BEHAVIOR: Selector<QueueBehavior> = Selector::new("app.play-queue-behavior");
 pub const PLAY_SEEK: Selector<f64> = Selector::new("app.play-seek");
+
+// Queue control
+// Todo Skip by
+pub const SKIP_BY: Selector = Selector::new("app.skip-by");
+pub const REMOVE_FROM_QUEUE: Selector<usize> = Selector::new("app.remove-from-queue");
 
 // Sorting control
 pub const SORT_BY_DATE_ADDED: Selector = Selector::new("app.sort-by-date-added");
