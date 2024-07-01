@@ -263,8 +263,8 @@ impl WebApi {
             appears_on: Vector::new(),
         };
 
-        let mut last_album_release_year = std::usize::MAX;
-        let mut last_single_release_year = std::usize::MAX;
+        let mut last_album_release_year = usize::MAX;
+        let mut last_single_release_year = usize::MAX;
 
         for album in result {
             match album.album_type {

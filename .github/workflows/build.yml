@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup Cache
         uses: Swatinem/rust-cache@v2
@@ -32,9 +32,11 @@ jobs:
       matrix:
         os: [ubuntu-latest, macOS-latest, windows-latest]
     runs-on: ${{ matrix.os }}
+    env:
+      MACOSX_DEPLOYMENT_TARGET: 11.0
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup Cache
         uses: Swatinem/rust-cache@v2
@@ -48,25 +50,30 @@ jobs:
         continue-on-error: true
 
       - name: Build Release
+        if: runner.os != 'macOS'
         run: cargo build --release
 
-      - name: Build x86_64 for MacOS
+      - name: Build x86_64 and aarch64 for macOS
         if: runner.os == 'macOS'
         run: |
-          rustup target add x86_64-apple-darwin
-          cargo build --release --target x86_64-apple-darwin
+          rustup target add x86_64-apple-darwin aarch64-apple-darwin
+          cargo build --release --target x86_64-apple-darwin --target aarch64-apple-darwin
 
-      - name: Build aarch64 for MacOS
+      - name: Cache cargo-bundle
         if: runner.os == 'macOS'
-        run: |
-          rustup target add aarch64-apple-darwin
-          cargo build --release --target aarch64-apple-darwin
+        id: cache-cargo-bundle
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/cargo-bundle
+          key: ${{ runner.os }}-cargo-bundle-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Install cargo-bundle
+        if: runner.os == 'macOS' && steps.cache-cargo-bundle.outputs.cache-hit != 'true'
+        run: cargo install cargo-bundle
 
       - name: Bundle macOS Release
         if: runner.os == 'macOS'
-        run: |
-          cargo install cargo-bundle
-          cargo bundle --release
+        run: cargo bundle --release
         working-directory: psst-gui
 
       - name: Create macOS universal binary
@@ -78,30 +85,28 @@ jobs:
 
       - name: Create macOS Disk Image
         if: runner.os == 'macOS'
-        run: |
-          hdiutil create Psst-uncompressed.dmg -volname "Psst" -srcfolder target/release/bundle/osx
-          hdiutil convert Psst-uncompressed.dmg -format UDZO -o Psst.dmg
+        run: hdiutil create -volname "Psst" -srcfolder target/release/bundle/osx -ov -format UDZO Psst.dmg
+
+      - name: Upload macOS Disk Image
+        uses: actions/upload-artifact@v4
+        if: runner.os == 'macOS'
+        with:
+          name: Psst.dmg
+          path: ./Psst.dmg
 
       - name: Make Linux Binary Executable
         if: runner.os == 'Linux'
         run: chmod +x target/release/psst-gui
 
       - name: Upload Linux Binary
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: runner.os == 'Linux'
         with:
           name: psst-gui
           path: target/release/psst-gui
 
-      - name: Upload macOS Disk Image
-        uses: actions/upload-artifact@v3
-        if: runner.os == 'macOS'
-        with:
-          name: Psst.dmg
-          path: ./Psst.dmg
-
       - name: Upload Windows Executable
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: runner.os == 'Windows'
         with:
           name: Psst.exe
@@ -112,10 +117,10 @@ jobs:
     needs: build
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Download Linux Binary
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: psst-gui
           path: ${{runner.workspace}}
@@ -154,7 +159,7 @@ jobs:
         run: cat ${{runner.workspace}}/pkg/DEBIAN/control && dpkg-deb -b ${{runner.workspace}}/pkg/ psst_$(git rev-list --count HEAD)_amd64.deb
 
       - name: Upload Debian Package
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: psst-deb
           path: "*.deb"
@@ -165,10 +170,10 @@ jobs:
     needs: deb
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Download Debian Package
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: psst-deb
           path: ${{runner.workspace}}
@@ -201,7 +206,7 @@ jobs:
           ${{env.app_path}} ${{env.recipe_path}}
 
       - name: Upload AppImage
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: psst-appimage
           path: ${{runner.workspace}}/out/*.AppImage
