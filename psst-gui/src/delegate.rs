@@ -89,6 +89,12 @@ impl Delegate {
         self.main_window = None;
         self.preferences_window = None;
     }
+
+    fn close_preferences(&mut self, ctx: &mut DelegateCtx) {
+        if let Some(id) = self.preferences_window.take() {
+            ctx.submit_command(commands::CLOSE_WINDOW.to(id));
+        }
+    }
 }
 
 impl AppDelegate<AppState> for Delegate {
@@ -112,6 +118,14 @@ impl AppDelegate<AppState> for Delegate {
         } else if cmd.is(cmd::CLOSE_ALL_WINDOWS) {
             self.close_all_windows(ctx);
             Handled::Yes
+        } else if cmd.is(commands::CLOSE_WINDOW) {
+            if let Some(window_id) = self.preferences_window {
+                if target == Target::Window(window_id) {
+                    self.close_preferences(ctx);
+                    return Handled::Yes;
+                }
+            }
+            Handled::No
         } else if let Some(text) = cmd.get(cmd::COPY) {
             Application::global().clipboard().put_string(text);
             Handled::Yes
@@ -149,7 +163,7 @@ impl AppDelegate<AppState> for Delegate {
 
     fn event(
         &mut self,
-        _ctx: &mut DelegateCtx,
+        ctx: &mut DelegateCtx,
         window_id: WindowId,
         event: Event,
         data: &mut AppState,
@@ -162,6 +176,13 @@ impl AppDelegate<AppState> for Delegate {
                     self.size_updated = true;
                 } else {
                     data.config.window_size = size;
+                }
+            }
+        } else if self.preferences_window == Some(window_id) {
+            if let Event::KeyDown(key_event) = &event {
+                if key_event.key == druid::KbKey::Escape {
+                    ctx.submit_command(commands::CLOSE_WINDOW.to(window_id));
+                    return None;
                 }
             }
         }
