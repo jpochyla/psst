@@ -1,9 +1,7 @@
 use std::time::Duration;
 
 use druid::{
-    im::Vector,
-    widget::{CrossAxisAlignment, Either, Flex, Label, List, Scroll, Slider, Split, ViewSwitcher},
-    Color, Env, Insets, Key, LensExt, Menu, MenuItem, Selector, Widget, WidgetExt, WindowDesc,
+    im::Vector, widget::{CrossAxisAlignment, Either, Flex, Label, List, Scroll, Slider, ViewSwitcher}, Color, Env, Insets, Key, LensExt, Menu, MenuItem, Selector, Widget, WidgetExt, WindowDesc
 };
 use druid_shell::Cursor;
 
@@ -37,6 +35,7 @@ pub mod theme;
 pub mod track;
 pub mod user;
 pub mod utils;
+pub mod queued;
 
 pub fn main_window(config: &Config) -> WindowDesc<AppState> {
     let win = WindowDesc::new(root_widget())
@@ -135,7 +134,10 @@ fn root_widget() -> impl Widget<AppState> {
     let sidebar = Flex::column()
         .with_flex_child(playlists, 1.0)
         .with_child(controls)
-        .background(theme::BACKGROUND_DARK);
+        .background(theme::BACKGROUND_DARK)
+        // Contraint needed to prevent the sidebar from expanding to fill the entire window.
+        // Should it be wider? It is currently the same size as the queue view.
+        .fix_width(185.0);
 
     let topbar = Flex::row()
         .must_fill_main_axis(true)
@@ -150,18 +152,18 @@ fn root_widget() -> impl Widget<AppState> {
         .with_flex_child(Overlay::bottom(route_widget(), alert_widget()), 1.0)
         .with_child(playback::panel_widget())
         .background(theme::BACKGROUND_LIGHT);
-
-    let split = Split::columns(sidebar, main)
-        .split_point(0.2)
-        .bar_size(1.0)
-        .min_size(150.0, 300.0)
-        .min_bar_area(1.0)
-        .solid_bar(true);
+        
+    let split = Flex::row()
+        .with_child(sidebar)
+        .with_flex_child(main, 1.0)
+        .with_child(queued::queue_widget())
+        .background(Border::Left.with_color(theme::BACKGROUND_DARK));
 
     ThemeScope::new(split)
         .controller(SessionController)
         .controller(NavController)
         .controller(SortController)
+    
     // .debug_invalidation()
     // .debug_widget_id()
     // .debug_paint_layout()

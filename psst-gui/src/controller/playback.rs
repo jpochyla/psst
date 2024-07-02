@@ -10,7 +10,7 @@ use druid::{
     Code, ExtEventSink, InternalLifeCycle, KbKey, WindowHandle,
 };
 use psst_core::{
-    audio::{normalize::NormalizationLevel, output::DefaultAudioOutput},
+    audio::{normalize::{self, NormalizationLevel}, output::DefaultAudioOutput},
     cache::Cache,
     cdn::Cdn,
     player::{item::PlaybackItem, PlaybackConfig, Player, PlayerCommand, PlayerEvent},
@@ -265,6 +265,10 @@ impl PlaybackController {
     fn next(&mut self) {
         self.send(PlayerEvent::Command(PlayerCommand::Next));
     }
+    // Implemet properly, this will only skip by one, we need to use the inc val
+    fn skip_by(&mut self, inc: i32) {
+        self.send(PlayerEvent::Command(PlayerCommand::Next));
+    }
 
     fn stop(&mut self) {
         self.send(PlayerEvent::Command(PlayerCommand::Stop));
@@ -434,6 +438,17 @@ where
                     );
                     self.seek(position);
                 }
+                ctx.set_handled();
+            }
+            Event::Command(cmd) if cmd.is(cmd::SKIP_BY) => {
+                let no = cmd.get_unchecked(cmd::SKIP_BY);
+
+                ctx.set_handled();
+            }
+            Event::Command(cmd) if cmd.is(cmd::REMOVE_FROM_QUEUE) => {
+                let item = cmd.get_unchecked(cmd::REMOVE_FROM_QUEUE);
+                // We must also remove from the other queue
+                data.added_queue.remove(item.clone());
                 ctx.set_handled();
             }
             // Keyboard shortcuts.
