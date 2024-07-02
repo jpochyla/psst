@@ -31,7 +31,7 @@ fn add_windows_icon() {
                         .as_bytes(),
                     *s,
                     *s,
-                    ColorType::Rgba8::into(),
+                    ColorType::Rgba8.into(),
                 )
                 .unwrap()
             })
