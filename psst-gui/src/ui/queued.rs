@@ -7,7 +7,7 @@ use crate::{
 
 use druid::{
     widget::{CrossAxisAlignment, Flex, Label, List, Scroll, ViewSwitcher},
-    Data, Env, Widget, WidgetExt,
+    Data, Env, TextAlignment, Widget, WidgetExt,
 };
 use druid_shell::Cursor;
 
@@ -40,10 +40,15 @@ pub fn queue_widget() -> impl Widget<AppState> {
 }
 
 fn queue_header_widget() -> impl Widget<AppState> {
-    Label::new("Queue")
-        .with_font(theme::UI_FONT_MEDIUM)
-        .with_text_size(theme::TEXT_SIZE_LARGE)
-        .padding((theme::grid(2.0), theme::grid(2.0)))
+    Flex::row()
+        .with_flex_child(
+            Label::new("Queue")
+                .with_font(theme::UI_FONT_MEDIUM)
+                .with_text_size(theme::TEXT_SIZE_LARGE)
+                .center(),
+            1.0,
+        )
+        .padding(theme::grid(2.0))
         .expand_width()
         .background(Border::Bottom.with_color(theme::GREY_500))
 }
