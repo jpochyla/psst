@@ -162,14 +162,12 @@ impl AppState {
             let previous: Nav = mem::replace(&mut self.nav, nav.to_owned());
             self.history.push_back(previous);
             self.config.last_route.replace(nav.to_owned());
-            self.config.save();
         }
     }
 
     pub fn navigate_back(&mut self) {
         if let Some(nav) = self.history.pop_back() {
             self.config.last_route.replace(nav.clone());
-            self.config.save();
             self.nav = nav;
         }
     }
