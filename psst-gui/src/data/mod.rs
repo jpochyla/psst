@@ -81,6 +81,7 @@ pub struct AppState {
     pub alerts: Vector<Alert>,
     pub finder: Finder,
     pub added_queue: Vector<QueueEntry>,
+    pub home_feed: Promise<HomeFeed, ()>,
 }
 
 impl AppState {
@@ -152,6 +153,7 @@ impl AppState {
             },
             alerts: Vector::new(),
             finder: Finder::new(),
+            home_feed: Promise::Empty,
         }
     }
 }
@@ -532,4 +534,48 @@ impl Alert {
 pub enum AlertStyle {
     Error,
     Info,
+}
+
+// Home feed
+
+#[derive(Clone, Lens)]
+pub struct HomeFeed {
+    pub sections: Vector<HomeFeedSection>,
+}
+
+impl Data for HomeFeed {
+    fn same(&self, other: &Self) -> bool {
+        self.sections.same(&other.sections)
+    }
+}
+
+#[derive(Clone, Data, Lens)]
+pub struct HomeFeedSection {
+    pub uri: Arc<str>,
+    pub title: Arc<str>,
+    pub subtitle: Option<Arc<str>>,
+    pub items: Vector<HomeFeedItem>,
+}
+
+#[derive(Clone)]
+pub enum HomeFeedItem {
+    Playlist(Arc<Playlist>),
+    Album(Arc<Album>),
+    Artist(Arc<Artist>),
+    Show(Arc<Show>),
+    Unknown,
+}
+
+impl Data for HomeFeedItem {
+    fn same(&self, other: &Self) -> bool {
+        use HomeFeedItem::*;
+        match (self, other) {
+            (Playlist(a), Playlist(b)) => Arc::ptr_eq(a, b),
+            (Album(a), Album(b)) => Arc::ptr_eq(a, b),
+            (Artist(a), Artist(b)) => Arc::ptr_eq(a, b),
+            (Show(a), Show(b)) => Arc::ptr_eq(a, b),
+            (Unknown, Unknown) => true,
+            _ => false,
+        }
+    }
 }

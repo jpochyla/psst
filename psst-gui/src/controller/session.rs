@@ -15,7 +15,8 @@ impl SessionController {
 
         // Reload the global, usually visible data.
         ctx.submit_command(playlist::LOAD_LIST);
-        ctx.submit_command(home::LOAD_MADE_FOR_YOU);
+        // ctx.submit_command(home::LOAD_MADE_FOR_YOU);
+        ctx.submit_command(home::LOAD_HOME_FEED);
         ctx.submit_command(user::LOAD_PROFILE);
     }
 }

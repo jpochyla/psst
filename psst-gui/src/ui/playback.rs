@@ -16,7 +16,10 @@ use crate::{
         AppState, AudioAnalysis, Episode, NowPlaying, Playable, PlayableMatcher, Playback,
         PlaybackOrigin, PlaybackState, QueueBehavior, ShowLink, Track,
     },
-    widget::{icons::{self, SvgIcon}, Empty, Maybe, MyWidgetExt, RemoteImage},
+    widget::{
+        icons::{self, SvgIcon},
+        Empty, Maybe, MyWidgetExt, RemoteImage,
+    },
 };
 
 use super::{episode, library, theme, track, utils};

@@ -1,5 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 #![allow(clippy::new_without_default, clippy::type_complexity)]
+#![recursion_limit="256"]
 
 mod cmd;
 mod controller;

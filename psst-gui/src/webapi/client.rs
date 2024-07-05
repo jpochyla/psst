@@ -1,3 +1,16 @@
+use chrono::Utc;
+use druid::{
+    im::Vector,
+    image::{self, ImageFormat},
+    Data, ImageBuf,
+};
+use itertools::Itertools;
+use log::{debug, error, info};
+use once_cell::sync::OnceCell;
+use parking_lot::Mutex;
+use serde::{de::DeserializeOwned, Deserialize};
+use serde_json::json;
+use std::collections::HashMap;
 use std::{
     fmt::Display,
     io::{self, Read},
@@ -6,17 +19,6 @@ use std::{
     thread,
     time::Duration,
 };
-
-use druid::{
-    im::Vector,
-    image::{self, ImageFormat},
-    Data, ImageBuf,
-};
-use itertools::Itertools;
-use once_cell::sync::OnceCell;
-use parking_lot::Mutex;
-use serde::{de::DeserializeOwned, Deserialize};
-use serde_json::json;
 use ureq::{Agent, Request, Response};
 
 use psst_core::{
@@ -27,13 +29,17 @@ use psst_core::{
 use crate::{
     data::{
         Album, AlbumType, Artist, ArtistAlbums, AudioAnalysis, Cached, Episode, EpisodeId,
-        EpisodeLink, Nav, Page, Playlist, Range, Recommendations, RecommendationsRequest,
-        SearchResults, SearchTopic, Show, SpotifyUrl, Track, UserProfile,
+        EpisodeLink, HomeFeed, HomeFeedItem, HomeFeedSection, Nav, Page, Playlist, Range,
+        Recommendations, RecommendationsRequest, SearchResults, SearchTopic, Show, SpotifyUrl,
+        Track, UserProfile,
     },
     error::Error,
 };
 
 use super::{cache::WebApiCache, local::LocalTrackManager};
+
+use std::fs::File;
+use std::io::Write;
 
 pub struct WebApi {
     session: SessionService,
@@ -494,6 +500,215 @@ impl WebApi {
             .query("offset", "0");
         let result: View = self.load(request)?;
         Ok(result.content.items)
+    }
+
+    fn get_user_country(&self) -> Result<String, Error> {
+        // Implement this method to get the user's country
+        // This might involve making a separate API call or storing it during authentication
+        // For now, we'll return a placeholder
+        Ok("US".to_string())
+    }
+
+    fn get_user_locale(&self) -> Result<String, Error> {
+        // Implement this method to get the user's locale
+        // This might involve making a separate API call or storing it during authentication
+        // For now, we'll return a placeholder
+        Ok("en-US".to_string())
+    }
+
+    pub fn get_home_feed(&self) -> Result<HomeFeed, Error> {
+        info!("Starting to fetch home feed");
+
+        let token = self.access_token()?;
+        info!("Access token obtained successfully");
+
+        let headers = {
+            let mut map = HashMap::new();
+            map.insert("app-platform".to_string(), "WebPlayer".to_string());
+            map.insert("authorization".to_string(), format!("Bearer {}", token));
+            map.insert(
+                "content-type".to_string(),
+                "application/json;charset=UTF-8".to_string(),
+            );
+            map.insert("dnt".to_string(), "1".to_string());
+            map.insert("origin".to_string(), "https://open.spotify.com".to_string());
+            map.insert(
+                "referer".to_string(),
+                "https://open.spotify.com/".to_string(),
+            );
+            map
+        };
+
+        let country = match self.get_user_country() {
+            Ok(c) => c,
+            Err(e) => {
+                error!("Failed to get user country: {:?}", e);
+                return Err(Error::WebApiError(e.to_string()));
+            }
+        };
+
+        let locale = match self.get_user_locale() {
+            Ok(l) => l,
+            Err(e) => {
+                error!("Failed to get user locale: {:?}", e);
+                return Err(Error::WebApiError(e.to_string()));
+            }
+        };
+
+        let variables = json!({
+            "timeZone": Utc::now().format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string(),
+            "sp_t": "",
+            "country": country,
+            "locale": locale,
+            "facet": null,
+            "limit": 10,
+            "sectionItemsLimit": 10
+        });
+
+        let query_params = json!({
+            "operationName": "home",
+            "variables": variables.to_string(),
+            "extensions": {
+                "persistedQuery": {
+                    "version": 1,
+                    "sha256Hash": "eb3fba2d388cf4fc4d696b1757a58584e9538a3b515ea742e9cc9465807340be"
+                }
+            }
+        });
+
+        let request = self
+            .agent
+            .get("https://api-partner.spotify.com/pathfinder/v1/query")
+            .set("app-platform", &headers["app-platform"])
+            .set("authorization", &headers["authorization"])
+            .set("content-type", &headers["content-type"])
+            .set("dnt", &headers["dnt"])
+            .set("origin", &headers["origin"])
+            .set("referer", &headers["referer"])
+            .query("operationName", "home")
+            .query("variables", &variables.to_string())
+            .query("extensions", &query_params["extensions"].to_string());
+
+        let response = Self::with_retry(|| Ok(request.clone().call()?))?;
+        info!("Received response from API");
+
+        let result: serde_json::Value = response.into_json()?;
+        info!("Parsed JSON response");
+
+        // Print the entire response
+        if let Ok(pretty_json) = serde_json::to_string_pretty(&result) {
+            match File::create("response.json") {
+                Ok(mut file) => {
+                    if let Err(e) = file.write_all(pretty_json.as_bytes()) {
+                        error!("Failed to write to response.json: {}", e);
+                    } else {
+                        info!("API response saved to response.json");
+                    }
+                }
+                Err(e) => error!("Failed to create response.json: {}", e),
+            }
+        } else {
+            error!("Failed to stringify response");
+        }
+
+        // Print the keys at the top level of the response
+        if let Some(obj) = result.as_object() {
+            info!(
+                "Top-level keys in the response: {:?}",
+                obj.keys().collect::<Vec<_>>()
+            );
+        } else {
+            error!("Response is not a JSON object");
+            return Err(Error::WebApiError(
+                "Response is not a JSON object".to_string(),
+            ));
+        }
+
+        // Check if there's an 'errors' field, which might explain why we're not getting the expected data
+        if let Some(errors) = result.get("errors") {
+            error!("API returned errors: {:?}", errors);
+            return Err(Error::WebApiError(format!(
+                "API returned errors: {:?}",
+                errors
+            )));
+        }
+
+        // Check each level of the expected structure
+        let sections: Vector<HomeFeedSection> = result["data"]["home"]["sectionContainer"]
+            ["sections"]["items"]
+            .as_array()
+            .ok_or_else(|| Error::WebApiError("Invalid response structure".to_string()))?
+            .iter()
+            .filter_map(|section| {
+                let items = section["sectionItems"]["items"]
+                    .as_array()?
+                    .iter()
+                    .filter_map(|item| {
+                        let content = &item["content"];
+                        match content["__typename"].as_str() {
+                            Some("PlaylistResponseWrapper") => {
+                                if let Ok(playlist) =
+                                    serde_json::from_value::<Playlist>(content["data"].clone())
+                                {
+                                    Some(HomeFeedItem::Playlist(Arc::new(playlist)))
+                                } else {
+                                    log::warn!("Failed to parse Playlist");
+                                    Some(HomeFeedItem::Unknown)
+                                }
+                            }
+                            Some("ShowResponseWrapper") => {
+                                if let Ok(show) =
+                                    serde_json::from_value::<Show>(content["data"].clone())
+                                {
+                                    Some(HomeFeedItem::Show(Arc::new(show)))
+                                } else {
+                                    log::warn!("Failed to parse Show");
+                                    Some(HomeFeedItem::Unknown)
+                                }
+                            }
+                            Some("AlbumResponseWrapper") => {
+                                if let Ok(album) =
+                                    serde_json::from_value::<Album>(content["data"].clone())
+                                {
+                                    Some(HomeFeedItem::Album(Arc::new(album)))
+                                } else {
+                                    log::warn!("Failed to parse Album");
+                                    Some(HomeFeedItem::Unknown)
+                                }
+                            }
+                            Some("ArtistResponseWrapper") => {
+                                if let Ok(artist) =
+                                    serde_json::from_value::<Artist>(content["data"].clone())
+                                {
+                                    Some(HomeFeedItem::Artist(Arc::new(artist)))
+                                } else {
+                                    log::warn!("Failed to parse Artist");
+                                    Some(HomeFeedItem::Unknown)
+                                }
+                            }
+                            Some(unknown_type) => {
+                                log::info!("Ignoring unknown item type: {}", unknown_type);
+                                Some(HomeFeedItem::Unknown)
+                            }
+                            None => {
+                                log::warn!("Item type not found");
+                                Some(HomeFeedItem::Unknown)
+                            }
+                        }
+                    })
+                    .collect();
+
+                Some(HomeFeedSection {
+                    uri: Arc::from(section["uri"].as_str()?),
+                    title: Arc::from(section["data"]["title"].as_str()?),
+                    subtitle: section["data"]["subtitle"].as_str().map(Arc::from),
+                    items,
+                })
+            })
+            .collect();
+
+        info!("Processed {} sections", sections.len());
+        Ok(HomeFeed { sections })
     }
 }
 
