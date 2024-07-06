@@ -41,7 +41,6 @@ jobs:
     runs-on: ${{ matrix.os }}
     env:
       MACOSX_DEPLOYMENT_TARGET: 11.0
-      PKG_CONFIG_SYSROOT_DIR: /
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
