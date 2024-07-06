@@ -1,11 +1,6 @@
 [workspace]
 resolver = "2"
-members = [
-    "psst-protocol",
-    "psst-core",
-    "psst-cli",
-    "psst-gui",
-]
+members = ["psst-protocol", "psst-core", "psst-cli", "psst-gui"]
 
 [profile.release]
 opt-level = 3

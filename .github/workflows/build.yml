@@ -108,8 +108,7 @@ jobs:
 
       - name: Make Linux Binary Executable
         if: runner.os == 'Linux'
-        run: |
-          chmod +x target/${{ matrix.target }}/release/psst-gui
+        run: chmod +x target/${{ matrix.target }}/release/psst-gui
 
       - name: Upload Linux Binary
         uses: actions/upload-artifact@v4
@@ -130,7 +129,11 @@ jobs:
     needs: build
     strategy:
       matrix:
-        arch: [amd64, arm64]
+        include:
+          - arch: amd64
+            target: x86_64-unknown-linux-gnu
+          - arch: arm64
+            target: aarch64-unknown-linux-gnu
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -138,17 +141,13 @@ jobs:
       - name: Download Linux Binaries
         uses: actions/download-artifact@v4
         with:
-          name: psst-gui
+          name: psst-gui-${{ matrix.target }}
           path: ${{runner.workspace}}/binaries
 
       - name: Move Binary
         run: |
           mkdir -p ${{runner.workspace}}/pkg/usr/bin/
-          if [ "${{ matrix.arch }}" == "amd64" ]; then
-            mv ${{runner.workspace}}/binaries/x86_64-unknown-linux-gnu/release/psst-gui ${{runner.workspace}}/pkg/usr/bin/
-          else
-            mv ${{runner.workspace}}/binaries/aarch64-unknown-linux-gnu/release/psst-gui ${{runner.workspace}}/pkg/usr/bin/
-          fi
+          mv ${{runner.workspace}}/binaries/psst-gui ${{runner.workspace}}/pkg/usr/bin/
 
       - name: Move Desktop Entry
         run: mkdir -p ${{runner.workspace}}/pkg/usr/share/applications/; mv .pkg/psst.desktop $_
