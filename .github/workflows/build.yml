@@ -48,11 +48,8 @@ jobs:
 
       - name: Setup Rust Cache
         uses: Swatinem/rust-cache@v2
-
-      - name: Cache Docker images.
-        uses: ScribeMD/docker-cache@0.5.0
         with:
-          key: docker-${{ runner.os }}-${{ hashFiles('Cross.toml') }}
+          key: ${{ hashFiles('Cross.toml') }}
 
       - name: Install Cross
         if: runner.os == 'Linux'
