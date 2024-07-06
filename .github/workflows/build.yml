@@ -56,11 +56,7 @@ jobs:
 
       - name: Build (Linux)
         if: runner.os == 'Linux'
-        uses: clechasseur/rs-cargo@v2
-        with:
-          use-cross: true
-          command: build
-          args: --release --target ${{ matrix.target }}
+        run: cross build --release --target ${{ matrix.target }}
 
       - name: Build Release (macOS)
         if: runner.os == 'macOS'

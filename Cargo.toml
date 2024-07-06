@@ -13,13 +13,3 @@ opt-level = 2
 
 [profile.dev.package.libsamplerate]
 opt-level = 2
-
-[workspace.metadata.cross.target]
-image = "ghcr.io/cross-rs/{{TARGET}}:edge"
-pre-build = ["""
-    dpkg --add-architecture $CROSS_DEB_ARCH && \
-    apt-get update && apt-get --assume-yes install \
-    libgtk-3-dev:$CROSS_DEB_ARCH \
-    libssl-dev:$CROSS_DEB_ARCH \
-    libasound2-dev:$CROSS_DEB_ARCH
-    """]
