@@ -36,13 +36,21 @@ ureq = { version = "2.8.0", features = ["json", "socks-proxy"] }
 url = { version = "2.4.1" }
 
 # GUI
-druid = { git = "https://github.com/jpochyla/druid", branch = "psst", features = ["im", "image", "jpeg", "png", "serde"] }
+druid = { git = "https://github.com/jpochyla/druid", branch = "psst", features = [
+  "im",
+  "image",
+  "jpeg",
+  "png",
+  "serde",
+] }
 druid-enums = { git = "https://github.com/jpochyla/druid-enums" }
-druid-shell = { git = "https://github.com/jpochyla/druid", branch = "psst", features = ["raw-win-handle"] }
+druid-shell = { git = "https://github.com/jpochyla/druid", branch = "psst", features = [
+  "raw-win-handle",
+] }
 open = { version = "5.0.0" }
 raw-window-handle = { version = "0.5.2" } # Must stay compatible with Druid
 souvlaki = { version = "0.6.1" }
-webbrowser = {version = "0.8.11"}
+webbrowser = { version = "0.8.11" }
 
 [target.'cfg(windows)'.build-dependencies]
 winres = { version = "0.1.12" }
@@ -52,11 +60,11 @@ image = { version = "0.24.7" }
 name = "Psst"
 identifier = "com.jpochyla.psst"
 icon = [
-    "assets/logo_32.png",
-    "assets/logo_64.png",
-    "assets/logo_128.png",
-    "assets/logo_256.png",
-    "assets/logo_512.png",
+  "assets/logo_32.png",
+  "assets/logo_64.png",
+  "assets/logo_128.png",
+  "assets/logo_256.png",
+  "assets/logo_512.png",
 ]
 version = "0.1.0"
 resources = []
