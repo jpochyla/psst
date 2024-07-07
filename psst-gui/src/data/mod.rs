@@ -433,22 +433,16 @@ impl Library {
 
     pub fn increment_playlist_track_count(&mut self, link: &PlaylistLink) {
         if let Some(saved) = self.playlists.resolved_mut() {
-            for playlist in saved.iter_mut() {
-                if playlist.id == link.id {
-                    playlist.track_count += 1;
-                    break;
-                }
+            if let Some(playlist) = saved.iter_mut().find(|p| p.id == link.id) {
+                playlist.track_count = playlist.track_count.map(|count| count + 1);
             }
         }
     }
 
     pub fn decrement_playlist_track_count(&mut self, link: &PlaylistLink) {
         if let Some(saved) = self.playlists.resolved_mut() {
-            for playlist in saved.iter_mut() {
-                if playlist.id == link.id {
-                    playlist.track_count -= 1;
-                    break;
-                }
+            if let Some(playlist) = saved.iter_mut().find(|p| p.id == link.id) {
+                playlist.track_count = playlist.track_count.map(|count| count.saturating_sub(1));
             }
         }
     }

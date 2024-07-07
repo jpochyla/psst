@@ -32,7 +32,7 @@ pub struct Playlist {
     pub description: Arc<str>,
     #[serde(rename = "tracks")]
     #[serde(deserialize_with = "deserialize_track_count")]
-    pub track_count: usize,
+    pub track_count: Option<usize>,
     pub owner: PublicUser,
     pub collaborative: bool,
 }
@@ -78,13 +78,13 @@ pub struct PlaylistLink {
     pub name: Arc<str>,
 }
 
-fn deserialize_track_count<'de, D>(deserializer: D) -> Result<usize, D::Error>
+fn deserialize_track_count<'de, D>(deserializer: D) -> Result<Option<usize>, D::Error>
 where
     D: Deserializer<'de>,
 {
     #[derive(Deserialize)]
     struct PlaylistTracksRef {
-        total: usize,
+        total: Option<usize>,
     }
 
     Ok(PlaylistTracksRef::deserialize(deserializer)?.total)
