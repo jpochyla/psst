@@ -137,6 +137,13 @@ impl AppDelegate<AppState> for Delegate {
         } else if let Some(link) = cmd.get(RENAME_PLAYLIST_CONFIRM) {
             ctx.submit_command(RENAME_PLAYLIST.with(link.clone()));
             Handled::Yes
+        } else if cmd.is(cmd::QUIT_APP_WITH_SAVE) {
+            data.config.save();
+            ctx.submit_command(commands::QUIT_APP);
+            Handled::Yes
+        } else if cmd.is(commands::QUIT_APP) {
+            data.config.save();
+            Handled::No
         } else {
             Handled::No
         }
