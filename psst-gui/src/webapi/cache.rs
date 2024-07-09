@@ -1,9 +1,12 @@
 use std::{
+    collections::hash_map::DefaultHasher,
     fs::{self, File},
+    hash::{Hash, Hasher},
     path::PathBuf,
     sync::Arc,
 };
 
+use druid::image;
 use druid::ImageBuf;
 use lru_cache::LruCache;
 use parking_lot::Mutex;
@@ -29,6 +32,30 @@ impl WebApiCache {
 
     pub fn set_image(&self, uri: Arc<str>, image: ImageBuf) {
         self.images.lock().insert(uri, image);
+    }
+
+    pub fn get_image_from_disk(&self, uri: &Arc<str>) -> Option<ImageBuf> {
+        let hash = Self::hash_uri(uri);
+        self.key("images", &format!("{:016x}", hash))
+            .and_then(|path| std::fs::read(path).ok())
+            .and_then(|bytes| image::load_from_memory(&bytes).ok())
+            .map(|dynamic_image| ImageBuf::from_dynamic_image(dynamic_image))
+    }
+
+    pub fn save_image_to_disk(&self, uri: &Arc<str>, data: &[u8]) {
+        let hash = Self::hash_uri(uri);
+        if let Some(path) = self.key("images", &format!("{:016x}", hash)) {
+            if let Some(parent) = path.parent() {
+                let _ = std::fs::create_dir_all(parent);
+            }
+            let _ = std::fs::write(path, data);
+        }
+    }
+
+    fn hash_uri(uri: &str) -> u64 {
+        let mut hasher = DefaultHasher::new();
+        uri.hash(&mut hasher);
+        hasher.finish()
     }
 
     pub fn get(&self, bucket: &str, key: &str) -> Option<File> {
