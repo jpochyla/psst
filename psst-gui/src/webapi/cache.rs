@@ -39,7 +39,7 @@ impl WebApiCache {
         self.key("images", &format!("{:016x}", hash))
             .and_then(|path| std::fs::read(path).ok())
             .and_then(|bytes| image::load_from_memory(&bytes).ok())
-            .map(|dynamic_image| ImageBuf::from_dynamic_image(dynamic_image))
+            .map(ImageBuf::from_dynamic_image)
     }
 
     pub fn save_image_to_disk(&self, uri: &Arc<str>, data: &[u8]) {
