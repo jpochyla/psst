@@ -234,9 +234,9 @@ pub fn track_menu(
         let more_than_one_artist = track.artists.len() > 1;
         let title = if more_than_one_artist {
             LocalizedString::new("menu-item-show-artist-name")
-                .with_placeholder(format!("Go To Artist “{}”", artist_link.name))
+                .with_placeholder(format!("Go to Artist “{}”", artist_link.name))
         } else {
-            LocalizedString::new("menu-item-show-artist").with_placeholder("Go To Artist")
+            LocalizedString::new("menu-item-show-artist").with_placeholder("Go to Artist")
         };
         menu = menu.entry(
             MenuItem::new(title)
@@ -247,7 +247,7 @@ pub fn track_menu(
     if let Some(album_link) = track.album.as_ref() {
         menu = menu.entry(
             MenuItem::new(
-                LocalizedString::new("menu-item-show-album").with_placeholder("Go To Album"),
+                LocalizedString::new("menu-item-show-album").with_placeholder("Go to Album"),
             )
             .command(cmd::NAVIGATE.with(Nav::AlbumDetail(album_link.to_owned()))),
         );
@@ -323,7 +323,7 @@ pub fn track_menu(
             menu = menu.entry(
                 MenuItem::new(
                     LocalizedString::new("menu-item-remove-from-playlist")
-                        .with_placeholder("Remove from this playlist"),
+                        .with_placeholder("Remove from This Playlist"),
                 )
                 .command(playlist::REMOVE_TRACK.with(PlaylistRemoveTrack {
                     link: playlist.to_owned(),
@@ -335,7 +335,7 @@ pub fn track_menu(
 
     menu = menu.entry(
         MenuItem::new(
-            LocalizedString::new("menu-item-add-to-queue").with_placeholder("Add Track To Queue"),
+            LocalizedString::new("menu-item-add-to-queue").with_placeholder("Add Track to Queue"),
         )
         //PlayerCommand
         .command(cmd::ADD_TO_QUEUE.with((
