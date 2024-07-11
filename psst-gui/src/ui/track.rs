@@ -291,7 +291,7 @@ pub fn track_menu(
     }
 
     if let PlaybackOrigin::Playlist(playlist) = origin {
-        // do some (hopefully) quick checks to determine if we should give the
+        // Do some (hopefully) quick checks to determine if we should give the
         // option to remove items from this playlist, only allowing it if the
         // playlist is collaborative or we are the owner of it
         let should_show = {
@@ -337,7 +337,7 @@ pub fn track_menu(
         MenuItem::new(
             LocalizedString::new("menu-item-add-to-queue").with_placeholder("Add Track to Queue"),
         )
-        //PlayerCommand
+        // PlayerCommand
         .command(cmd::ADD_TO_QUEUE.with((
             QueueEntry {
                 item: crate::ui::Playable::Track(track.clone()),
