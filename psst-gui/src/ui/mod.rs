@@ -128,15 +128,13 @@ fn root_widget() -> impl Widget<AppState> {
         .with_default_spacer()
         .with_child(user::user_widget())
         .center()
-        .fix_height(100.0)
+        .fix_height(88.0)
         .background(Border::Top.with_color(theme::GREY_500));
 
     let sidebar = Flex::column()
         .with_flex_child(playlists, 1.0)
         .with_child(controls)
         .background(theme::BACKGROUND_DARK)
-        // Contraint needed to prevent the sidebar from expanding to fill the entire window.
-        // Should it be wider? It is currently the same size as the queue view.
         .fix_width(185.0);
 
     let topbar = Flex::row()

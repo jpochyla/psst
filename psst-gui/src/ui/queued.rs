@@ -48,7 +48,8 @@ fn queue_header_widget() -> impl Widget<AppState> {
                 .center(),
             1.0,
         )
-        .padding(theme::grid(2.0))
+        .fix_height(32.0)
+        .padding(theme::grid(1.0))
         .expand_width()
         .background(Border::Bottom.with_color(theme::GREY_500))
 }
