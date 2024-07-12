@@ -263,8 +263,8 @@ impl WebApi {
             appears_on: Vector::new(),
         };
 
-        let mut last_album_release_year = std::usize::MAX;
-        let mut last_single_release_year = std::usize::MAX;
+        let mut last_album_release_year = usize::MAX;
+        let mut last_single_release_year = usize::MAX;
 
         for album in result {
             match album.album_type {
@@ -726,6 +726,15 @@ impl WebApi {
     }
 
     pub fn get_image(&self, uri: Arc<str>) -> Result<ImageBuf, Error> {
+        if let Some(cached_image) = self.cache.get_image(&uri) {
+            return Ok(cached_image);
+        }
+
+        if let Some(disk_cached_image) = self.cache.get_image_from_disk(&uri) {
+            self.cache.set_image(uri.clone(), disk_cached_image.clone());
+            return Ok(disk_cached_image);
+        }
+
         let response = self.agent.get(&uri).call()?;
         let format = match response.content_type() {
             "image/jpeg" => Some(ImageFormat::Jpeg),
@@ -734,6 +743,10 @@ impl WebApi {
         };
         let mut body = Vec::new();
         response.into_reader().read_to_end(&mut body)?;
+
+        // Save raw image data to disk cache
+        self.cache.save_image_to_disk(&uri, &body);
+
         let image = if let Some(format) = format {
             image::load_from_memory_with_format(&body, format)?
         } else {

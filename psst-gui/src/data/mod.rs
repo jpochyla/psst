@@ -162,14 +162,12 @@ impl AppState {
             let previous: Nav = mem::replace(&mut self.nav, nav.to_owned());
             self.history.push_back(previous);
             self.config.last_route.replace(nav.to_owned());
-            self.config.save();
         }
     }
 
     pub fn navigate_back(&mut self) {
         if let Some(nav) = self.history.pop_back() {
             self.config.last_route.replace(nav.clone());
-            self.config.save();
             self.nav = nav;
         }
     }
@@ -433,22 +431,16 @@ impl Library {
 
     pub fn increment_playlist_track_count(&mut self, link: &PlaylistLink) {
         if let Some(saved) = self.playlists.resolved_mut() {
-            for playlist in saved.iter_mut() {
-                if playlist.id == link.id {
-                    playlist.track_count += 1;
-                    break;
-                }
+            if let Some(playlist) = saved.iter_mut().find(|p| p.id == link.id) {
+                playlist.track_count = playlist.track_count.map(|count| count + 1);
             }
         }
     }
 
     pub fn decrement_playlist_track_count(&mut self, link: &PlaylistLink) {
         if let Some(saved) = self.playlists.resolved_mut() {
-            for playlist in saved.iter_mut() {
-                if playlist.id == link.id {
-                    playlist.track_count -= 1;
-                    break;
-                }
+            if let Some(playlist) = saved.iter_mut().find(|p| p.id == link.id) {
+                playlist.track_count = playlist.track_count.map(|count| count.saturating_sub(1));
             }
         }
     }

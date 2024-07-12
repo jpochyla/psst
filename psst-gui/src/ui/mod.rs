@@ -344,7 +344,6 @@ fn volume_slider() -> impl Widget<AppState> {
         )
         .on_command(SAVE_TO_CONFIG, |_, _, data| {
             data.config.volume = data.playback.volume;
-            data.config.save();
         })
 }
 

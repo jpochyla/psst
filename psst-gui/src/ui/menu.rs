@@ -26,7 +26,7 @@ fn mac_app_menu() -> Menu<AppState> {
             //  This is just overriding `platform_menus::mac::application::quit()`
             //  because l10n is a bit stupid now.
             MenuItem::new(LocalizedString::new("macos-menu-quit").with_placeholder("Quit Psst"))
-                .command(commands::QUIT_APP)
+                .command(cmd::QUIT_APP_WITH_SAVE)
                 .hotkey(SysMods::Cmd, "q"),
         )
         .entry(

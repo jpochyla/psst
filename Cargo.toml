@@ -1,11 +1,6 @@
 [workspace]
 resolver = "2"
-members = [
-    "psst-protocol",
-    "psst-core",
-    "psst-cli",
-    "psst-gui",
-]
+members = ["psst-protocol", "psst-core", "psst-cli", "psst-gui"]
 
 [profile.release]
 opt-level = 3
@@ -15,5 +10,6 @@ codegen-units = 1
 
 [profile.dev.package.symphonia]
 opt-level = 2
+
 [profile.dev.package.libsamplerate]
 opt-level = 2
