@@ -134,7 +134,7 @@ fn root_widget() -> impl Widget<AppState> {
     let sidebar = Flex::column()
         .with_flex_child(playlists, 1.0)
         .with_child(controls)
-        .background(theme::BACKGROUND_DARK)
+        .background(Border::Right.with_color(theme::GREY_500))
         .fix_width(185.0);
 
     let topbar = Flex::row()
@@ -155,7 +155,7 @@ fn root_widget() -> impl Widget<AppState> {
         .with_child(sidebar)
         .with_flex_child(main, 1.0)
         .with_child(queued::queue_widget())
-        .background(Border::Left.with_color(theme::BACKGROUND_DARK));
+        .background(theme::BACKGROUND_DARK);
 
     ThemeScope::new(split)
         .controller(SessionController)
@@ -280,7 +280,8 @@ fn sidebar_menu_widget() -> impl Widget<AppState> {
 fn sidebar_link_widget(title: &str, link_nav: Nav) -> impl Widget<AppState> {
     Label::new(title)
         .padding((theme::grid(2.0), theme::grid(1.0)))
-        .expand_width()
+        // Not perfect, but its the only way I have found to not clip over the border
+        .fix_width(183.0)
         .link()
         .env_scope({
             let link_nav = link_nav.clone();

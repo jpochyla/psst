@@ -185,19 +185,31 @@ impl Border {
 
         Painter::new(move |ctx, _, env| {
             let h = 1.0;
-            let w = match self {
+            let w1 = match self {
+                Self::Top => 0.0,
+                Self::Bottom => 0.0,
+                Self::Left => h / 2.0,
+                Self::Right => ctx.size().width - h / 2.0,
+            };
+            let w2 = match self {
                 Self::Top => ctx.size().width,
                 Self::Bottom => ctx.size().width,
-                Self::Left => 1.0,
-                Self::Right => 1.0,
+                Self::Left => h / 2.0,
+                Self::Right => ctx.size().width - h / 2.0,
             };
-            let y = match self {
+            let y1 = match self {
                 Self::Top => h / 2.0,
                 Self::Bottom => ctx.size().height - h / 2.0,
-                Self::Left => ctx.size().height,
-                Self::Right => 1.0,
+                Self::Left => ctx.size().height - h / 2.0,
+                Self::Right => ctx.size().height - h / 2.0,
             };
-            let line = Line::new((0.0, y), (w, y));
+            let y2 = match self {
+                Self::Top => h / 2.0,
+                Self::Bottom => ctx.size().height - h / 2.0,
+                Self::Left => h / 2.0,
+                Self::Right => h / 2.0,
+            };
+            let line = Line::new((w1, y1), (w2, y2));
             ctx.stroke(line, &color.resolve(env), h);
         })
     }

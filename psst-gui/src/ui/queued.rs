@@ -7,7 +7,7 @@ use crate::{
 
 use druid::{
     widget::{CrossAxisAlignment, Flex, Label, List, Scroll, ViewSwitcher},
-    Data, Env, TextAlignment, Widget, WidgetExt,
+    Env, Widget, WidgetExt,
 };
 use druid_shell::Cursor;
 
@@ -30,7 +30,7 @@ pub fn queue_widget() -> impl Widget<AppState> {
                         1.0,
                     )
                     .fix_width(185.0)
-                    .background(theme::BACKGROUND_DARK)
+                    .background(Border::Left.with_color(theme::GREY_500))
                     .boxed()
             } else {
                 Empty.boxed()
