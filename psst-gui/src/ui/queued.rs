@@ -1,6 +1,6 @@
 use crate::{
     cmd,
-    data::{AppState, QueueEntry},
+    data::{self, AppState, QueueEntry},
     ui::Vector,
     widget::{icons, Border, Empty, MyWidgetExt},
 };
@@ -25,8 +25,7 @@ pub fn queue_widget() -> impl Widget<AppState> {
                             // The appstate added_queue automatically updates when its changed
                             // To do the handling of the queue we could just make methods directly handling this
                             // (how will we handle it after the song has been played? will it remain or disappear?)
-                            .lens(AppState::added_queue)
-                            .expand(),
+                            .lens(AppState::added_queue),
                         1.0,
                     )
                     .fix_width(185.0)
