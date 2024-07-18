@@ -6,7 +6,7 @@ use crate::{
 };
 
 use druid::{
-    widget::{CrossAxisAlignment, Flex, Label, List, Scroll, ViewSwitcher},
+    widget::{CrossAxisAlignment, Flex, Label, LineBreaking, List, Scroll, ViewSwitcher},
     Env, Widget, WidgetExt,
 };
 use druid_shell::Cursor;
@@ -61,13 +61,17 @@ fn queue_list_widget() -> impl Widget<Vector<QueueEntry>> {
                     .cross_axis_alignment(CrossAxisAlignment::Start)
                     .with_child(
                         Label::new(|item: &QueueEntry, _env: &Env| item.item.name().to_string())
-                            .with_font(theme::UI_FONT_MEDIUM),
+                            .with_font(theme::UI_FONT_MEDIUM)
+                            .with_line_break_mode(LineBreaking::Clip)
+                            .expand_width(),
                     )
                     .with_spacer(2.0)
                     .with_child(
                         Label::new(|item: &QueueEntry, _env: &Env| item.item.artist().to_string())
                             .with_text_size(theme::TEXT_SIZE_SMALL)
-                            .with_text_color(theme::PLACEHOLDER_COLOR),
+                            .with_text_color(theme::PLACEHOLDER_COLOR)
+                            .with_line_break_mode(LineBreaking::Clip)
+                            .expand_width(),
                     ),
                 /*.on_left_click(|ctx, _, row, _| {
                     // We need to make a function which takes the song index when clicked on then we need to skip by that amount.
@@ -76,7 +80,7 @@ fn queue_list_widget() -> impl Widget<Vector<QueueEntry>> {
                 //.context_menu(queue_menu_widget(|item: &Vec<QueueEntry>, _env: &Env| item.len()),
                 1.0,
             )
-            .with_flex_spacer(3.0)
+            .with_default_spacer()
             .with_child(
                 icons::CLOSE_CIRCLE
                     .scale((16.0, 16.0))
