@@ -119,7 +119,9 @@ impl Player {
             PlayerCommand::Seek { position } => self.seek(position),
             PlayerCommand::Configure { config } => self.configure(config),
             PlayerCommand::SetQueueBehavior { behavior } => self.queue.set_behaviour(behavior),
+            PlayerCommand::SkipToPlaceInQueue { item } => self.queue.skip_to_place_in_queue(item),
             PlayerCommand::AddToQueue { item } => self.queue.add(item),
+            PlayerCommand::RemoveFromQueue { item } => self.queue.remove(item),
             PlayerCommand::SetVolume { volume } => self.set_volume(volume),
         }
     }
@@ -423,8 +425,14 @@ pub enum PlayerCommand {
     SetQueueBehavior {
         behavior: QueueBehavior,
     },
+    SkipToPlaceInQueue {
+        item: usize,
+    },
     AddToQueue {
         item: PlaybackItem,
+    },
+    RemoveFromQueue {
+        item: usize,
     },
     /// Change playback volume to a value in 0.0..=1.0 range.
     SetVolume {

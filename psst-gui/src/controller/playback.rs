@@ -303,6 +303,16 @@ impl PlaybackController {
             item: *item,
         }));
     }
+    fn skip_to_place_in_queue(&mut self, item: &usize) {
+        self.send(PlayerEvent::Command(PlayerCommand::SkipToPlaceInQueue {
+            item: *item,
+        }));
+    }
+    fn remove_from_queue(&mut self, item: &usize) {
+        self.send(PlayerEvent::Command(PlayerCommand::RemoveFromQueue {
+            item: *item,
+        }));
+    }
 
     fn set_queue_behavior(&mut self, behavior: QueueBehavior) {
         self.send(PlayerEvent::Command(PlayerCommand::SetQueueBehavior {
@@ -440,15 +450,34 @@ where
                 }
                 ctx.set_handled();
             }
-            Event::Command(cmd) if cmd.is(cmd::SKIP_BY) => {
-                let no = cmd.get_unchecked(cmd::SKIP_BY);
+            Event::Command(cmd) if cmd.is(cmd::SKIP_TO_PLACE_IN_QUEUE) => {
+                let item = cmd.get_unchecked(cmd::SKIP_TO_PLACE_IN_QUEUE);
 
+                // We need a way so it starts playing even if theres no playlist being played from!
+                // We also need a block to stop it from erroring if they click one back.
+                for i in 0..data.added_queue.len() {
+                    if data.added_queue[i].item.id() == item.item.id() {
+                        self.skip_to_place_in_queue(&i);
+                        break;
+                    }
+                }
+
+                self.next();
                 ctx.set_handled();
             }
             Event::Command(cmd) if cmd.is(cmd::REMOVE_FROM_QUEUE) => {
                 let item = cmd.get_unchecked(cmd::REMOVE_FROM_QUEUE);
-                // We must also remove from the other queue
-                data.added_queue.remove(item.clone());
+
+                // This is the best i could figure out, But this currently just removes the first item that matches the id
+                // I think its the same issue as with the removal of a song from a playlist
+                // TODO: Change this to retain
+                for i in 0..data.added_queue.len() {
+                    if data.added_queue[i].item.id() == item.item.id() {
+                        data.added_queue.remove(i);
+                        self.remove_from_queue(&i);
+                        break;
+                    }
+                }
                 ctx.set_handled();
             }
             // Keyboard shortcuts.

@@ -49,9 +49,17 @@ impl Queue {
         self.position = position;
         self.compute_positions();
     }
+    
+    pub fn skip_to_place_in_queue(&mut self, index: usize) {
+        self.user_items_position = self.user_items_position + (index - self.user_items_position);
+    }
 
     pub fn add(&mut self, item: PlaybackItem) {
         self.user_items.push(item);
+    }
+
+    pub fn remove(&mut self, index: usize) {
+        self.user_items.remove(index);
     }
 
     fn handle_added_queue(&mut self) {

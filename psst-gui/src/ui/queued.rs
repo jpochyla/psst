@@ -20,8 +20,6 @@ pub fn queue_widget() -> impl Widget<AppState> {
                 .with_flex_child(
                     Scroll::new(queue_list_widget())
                         .vertical()
-                        // The appstate added_queue automatically updates when its changed
-                        // To do the handling of the queue we could just make methods directly handling this
                         // (how will we handle it after the song has been played? will it remain or disappear?)
                         .lens(AppState::added_queue),
                     1.0,
@@ -66,12 +64,12 @@ fn queue_list_widget() -> impl Widget<Vector<QueueEntry>> {
                             .with_text_color(theme::PLACEHOLDER_COLOR)
                             .with_line_break_mode(LineBreaking::Clip)
                             .expand_width(),
-                    ),
-               /* .on_left_click(|ctx, _, row, _| {
-                    // We need to make a function which takes the song index when clicked on then we need to skip by that amount.
-                    ctx.submit_notification(TODO)
-                }), */
-                //.context_menu(queue_menu_widget(|item: &Vec<QueueEntry>, _env: &Env| item.len()),
+                    )
+                .on_click(|ctx, data: &mut QueueEntry, _| {
+                    ctx.submit_command(
+                        cmd::SKIP_TO_PLACE_IN_QUEUE.with(data.clone())
+                    );
+                }), 
                 1.0,
             )
             .with_default_spacer()
@@ -80,9 +78,9 @@ fn queue_list_widget() -> impl Widget<Vector<QueueEntry>> {
                     .scale((16.0, 16.0))
                     .link()
                     .rounded(100.0)
-                    .on_click(move |ctx, _, _| {
+                    .on_click(|ctx, data: &mut QueueEntry, _| {
                         ctx.submit_command(
-                            cmd::REMOVE_FROM_QUEUE.with(0 /* Add song index here */),
+                            cmd::REMOVE_FROM_QUEUE.with(data.clone())
                         );
                     })
                     .with_cursor(Cursor::Pointer),

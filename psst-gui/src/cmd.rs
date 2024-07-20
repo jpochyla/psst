@@ -56,8 +56,8 @@ pub const PLAY_SEEK: Selector<f64> = Selector::new("app.play-seek");
 
 // Queue control
 // Todo Skip by
-pub const SKIP_BY: Selector = Selector::new("app.skip-by");
-pub const REMOVE_FROM_QUEUE: Selector<usize> = Selector::new("app.remove-from-queue");
+pub const REMOVE_FROM_QUEUE: Selector<QueueEntry> = Selector::new("app.remove-from-queue");
+pub const SKIP_TO_PLACE_IN_QUEUE: Selector<QueueEntry> = Selector::new("app.skip-to-place-in-queue");
 
 // Sorting control
 pub const SORT_BY_DATE_ADDED: Selector = Selector::new("app.sort-by-date-added");
