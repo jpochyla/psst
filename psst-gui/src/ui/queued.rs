@@ -1,40 +1,34 @@
 use crate::{
     cmd,
-    data::{self, AppState, QueueEntry},
+    data::{AppState, QueueEntry},
     ui::Vector,
     widget::{icons, Border, Empty, MyWidgetExt},
 };
 
 use druid::{
-    widget::{CrossAxisAlignment, Flex, Label, LineBreaking, List, Scroll, ViewSwitcher},
-    Env, Widget, WidgetExt,
+    widget::{CrossAxisAlignment, Either, Flex, Label, LineBreaking, List, Scroll}, Env, Widget, WidgetExt
 };
 use druid_shell::Cursor;
 
 use super::theme;
+
 pub fn queue_widget() -> impl Widget<AppState> {
-    ViewSwitcher::new(
+    Either::new(
         |data: &AppState, _env: &Env| data.config.window_size.width >= 700.0,
-        move |&show_widget, _data, _env| {
-            if show_widget {
-                Flex::column()
-                    .with_child(queue_header_widget())
-                    .with_flex_child(
-                        Scroll::new(queue_list_widget())
-                            .vertical()
-                            // The appstate added_queue automatically updates when its changed
-                            // To do the handling of the queue we could just make methods directly handling this
-                            // (how will we handle it after the song has been played? will it remain or disappear?)
-                            .lens(AppState::added_queue),
-                        1.0,
-                    )
-                    .fix_width(185.0)
-                    .background(Border::Left.with_color(theme::GREY_500))
-                    .boxed()
-            } else {
-                Empty.boxed()
-            }
-        },
+            Flex::column()
+                .with_child(queue_header_widget())
+                .with_flex_child(
+                    Scroll::new(queue_list_widget())
+                        .vertical()
+                        // The appstate added_queue automatically updates when its changed
+                        // To do the handling of the queue we could just make methods directly handling this
+                        // (how will we handle it after the song has been played? will it remain or disappear?)
+                        .lens(AppState::added_queue),
+                    1.0,
+                )
+                .fix_width(185.0)
+                .background(Border::Left.with_color(theme::GREY_500)),
+            Empty
     )
 }
 
@@ -73,10 +67,10 @@ fn queue_list_widget() -> impl Widget<Vector<QueueEntry>> {
                             .with_line_break_mode(LineBreaking::Clip)
                             .expand_width(),
                     ),
-                /*.on_left_click(|ctx, _, row, _| {
+               /* .on_left_click(|ctx, _, row, _| {
                     // We need to make a function which takes the song index when clicked on then we need to skip by that amount.
                     ctx.submit_notification(TODO)
-                })*/
+                }), */
                 //.context_menu(queue_menu_widget(|item: &Vec<QueueEntry>, _env: &Env| item.len()),
                 1.0,
             )
