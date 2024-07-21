@@ -10,7 +10,7 @@ use druid::{
     Code, ExtEventSink, InternalLifeCycle, KbKey, WindowHandle,
 };
 use psst_core::{
-    audio::{normalize::{self, NormalizationLevel}, output::DefaultAudioOutput},
+    audio::{normalize::NormalizationLevel, output::DefaultAudioOutput},
     cache::Cache,
     cdn::Cdn,
     player::{item::PlaybackItem, PlaybackConfig, Player, PlayerCommand, PlayerEvent},
@@ -263,10 +263,6 @@ impl PlaybackController {
     }
 
     fn next(&mut self) {
-        self.send(PlayerEvent::Command(PlayerCommand::Next));
-    }
-    // Implemet properly, this will only skip by one, we need to use the inc val
-    fn skip_by(&mut self, inc: i32) {
         self.send(PlayerEvent::Command(PlayerCommand::Next));
     }
 
