@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use druid::{
-    im::Vector, widget::{CrossAxisAlignment, Either, Flex, Label, List, Scroll, Slider, ViewSwitcher}, Color, Env, Insets, Key, LensExt, Menu, MenuItem, Selector, Widget, WidgetExt, WindowDesc
+    im::Vector, widget::{CrossAxisAlignment, Either, Flex, Label, List, Scroll, Slider, Split, ViewSwitcher}, Color, Env, Insets, Key, LensExt, Menu, MenuItem, Selector, Widget, WidgetExt, WindowDesc
 };
 use druid_shell::Cursor;
 
@@ -131,11 +131,11 @@ fn root_widget() -> impl Widget<AppState> {
         .fix_height(88.0)
         .background(Border::Top.with_color(theme::GREY_500));
 
-    let sidebar = Flex::column()
+    let left_bar = Flex::column()
         .with_flex_child(playlists, 1.0)
         .with_child(controls)
-        .background(Border::Right.with_color(theme::GREY_500));
-
+        .background(theme::BACKGROUND_DARK);
+    
     let topbar = Flex::row()
         .must_fill_main_axis(true)
         .with_child(topbar_back_button_widget())
@@ -149,12 +149,18 @@ fn root_widget() -> impl Widget<AppState> {
         .with_flex_child(Overlay::bottom(route_widget(), alert_widget()), 1.0)
         .with_child(playback::panel_widget())
         .background(theme::BACKGROUND_LIGHT);
-        
-    let split = Flex::row()
-        .with_flex_child(sidebar, 0.3)
+    
+    let right_bar = Flex::row()
         .with_flex_child(main, 1.0)
         .with_child(queued::queue_widget())
         .background(theme::BACKGROUND_DARK);
+
+    let split = Split::columns(left_bar, right_bar)
+        .split_point(0.2)
+        .bar_size(1.0)
+        .min_size(150.0, 300.0)
+        .min_bar_area(1.0)
+        .solid_bar(true);
 
     ThemeScope::new(split)
         .controller(SessionController)
