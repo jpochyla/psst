@@ -51,7 +51,7 @@ impl Queue {
     }
     
     pub fn skip_to_place_in_queue(&mut self, index: usize) {
-        self.user_items_position = self.user_items_position + (index - self.user_items_position);
+        self.user_items_position = index;
     }
 
     pub fn add(&mut self, item: PlaybackItem) {

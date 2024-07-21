@@ -14,7 +14,7 @@ use super::theme;
 
 pub fn queue_widget() -> impl Widget<AppState> {
     Either::new(
-        |data: &AppState, _env: &Env| data.config.window_size.width >= 700.0,
+        |data: &AppState, _env: &Env| data.config.window_size.width >= 700.0 && data.added_queue.len() > 0,
             Flex::column()
                 .with_child(queue_header_widget())
                 .with_flex_child(
