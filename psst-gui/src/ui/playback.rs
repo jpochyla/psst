@@ -16,7 +16,10 @@ use crate::{
         AppState, AudioAnalysis, Episode, NowPlaying, Playable, PlayableMatcher, Playback,
         PlaybackOrigin, PlaybackState, QueueBehavior, ShowLink, Track,
     },
-    widget::{icons::{self, SvgIcon}, Empty, Maybe, MyWidgetExt, RemoteImage},
+    widget::{
+        icons::{self, SvgIcon},
+        Empty, Maybe, MyWidgetExt, RemoteImage,
+    },
 };
 
 use super::{episode, library, theme, track, utils};
@@ -105,9 +108,12 @@ fn playing_item_widget() -> impl Widget<NowPlaying> {
                         ctx.submit_command(cmd::NAVIGATE.with(now_playing.origin.to_nav()));
                     })
                     .context_menu(|now_playing| match &now_playing.item {
-                        Playable::Track(track) => {
-                            track::track_menu(track, &now_playing.library, &now_playing.origin)
-                        }
+                        Playable::Track(track) => track::track_menu(
+                            track,
+                            &now_playing.library,
+                            &now_playing.origin,
+                            usize::MAX,
+                        ),
                         Playable::Episode(episode) => {
                             episode::episode_menu(episode, &now_playing.library)
                         }

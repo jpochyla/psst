@@ -583,15 +583,10 @@ impl WebApi {
     pub fn remove_track_from_playlist(
         &self,
         playlist_id: &str,
-        track_uri: &str,
+        position: usize,
     ) -> Result<(), Error> {
         self.delete(format!("v1/playlists/{}/tracks", playlist_id))?
-            .send_json(ureq::json!({
-                "tracks": [{
-                    "uri": track_uri
-                }]
-            }))?;
-
+            .send_json(ureq::json!({ "positions": [position] }))?;
         Ok(())
     }
 }
