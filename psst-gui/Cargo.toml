@@ -53,7 +53,7 @@ souvlaki = { version = "0.7.3", default-features = false, features = [
   "use_zbus",
 ] }
 webbrowser = { version = "0.8.11" }
-dark-light = "1.0.0"
+dark-light = "1.1.1"
 [target.'cfg(windows)'.build-dependencies]
 winres = { version = "0.1.12" }
 image = { version = "0.24.7" }
