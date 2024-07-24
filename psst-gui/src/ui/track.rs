@@ -215,14 +215,14 @@ fn popularity_stars(popularity: u32) -> String {
 }
 
 fn track_row_menu(row: &PlayRow<Arc<Track>>) -> Menu<AppState> {
-    track_menu(&row.item, &row.ctx.library, &row.origin, row.item.added_index)
+    track_menu(&row.item, &row.ctx.library, &row.origin, row.item.track_pos)
 }
 
 pub fn track_menu(
     track: &Arc<Track>,
     library: &Library,
     origin: &PlaybackOrigin,
-    index: usize,
+    track_pos: usize,
 ) -> Menu<AppState> {
     let mut menu = Menu::empty();
 
@@ -323,7 +323,7 @@ pub fn track_menu(
                 )
                 .command(playlist::REMOVE_TRACK.with(PlaylistRemoveTrack {
                     link: playlist.to_owned(),
-                    index
+                    track_pos,
                 })),
             );
         }

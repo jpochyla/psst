@@ -26,7 +26,7 @@ pub struct Track {
     pub is_playable: Option<bool>,
     pub popularity: Option<u32>,
     #[serde(skip)]
-    pub added_index: usize,
+    pub track_pos: usize,
 }
 
 impl Track {

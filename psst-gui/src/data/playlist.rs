@@ -20,7 +20,7 @@ pub struct PlaylistAddTrack {
 #[derive(Clone, Debug, Data, Lens, Deserialize)]
 pub struct PlaylistRemoveTrack {
     pub link: PlaylistLink,
-    pub index: usize,
+    pub track_pos: usize,
 }
 
 #[derive(Clone, Debug, Data, Lens, Deserialize)]
