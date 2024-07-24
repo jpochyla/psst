@@ -151,7 +151,7 @@ pub fn list_widget() -> impl Widget<AppState> {
     })
     .on_command_async(
         REMOVE_TRACK,
-        |d| WebApi::global().remove_track_from_playlist(&d.link.id, d.position),
+        |d| WebApi::global().remove_track_from_playlist(&d.link.id, d.index),
         |_, data, d| {
             data.with_library_mut(|library| library.decrement_playlist_track_count(&d.link))
         },

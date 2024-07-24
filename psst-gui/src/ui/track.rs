@@ -215,7 +215,7 @@ fn popularity_stars(popularity: u32) -> String {
 }
 
 fn track_row_menu(row: &PlayRow<Arc<Track>>) -> Menu<AppState> {
-    track_menu(&row.item, &row.ctx.library, &row.origin, row.position)
+    track_menu(&row.item, &row.ctx.library, &row.origin, row.item.added_index)
 }
 
 pub fn track_menu(
@@ -323,7 +323,7 @@ pub fn track_menu(
                 )
                 .command(playlist::REMOVE_TRACK.with(PlaylistRemoveTrack {
                     link: playlist.to_owned(),
-                    position,
+                    index: position,
                 })),
             );
         }

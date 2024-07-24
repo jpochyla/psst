@@ -552,15 +552,14 @@ impl WebApi {
 
         Ok(result
             .into_iter()
-            .filter_map(|item| match item {
-                PlaylistItem {
-                    track: OptionalTrack::Track(track),
-                    ..
-                } => Some(track),
-                PlaylistItem {
-                    track: OptionalTrack::Json(track),
-                    ..
-                } => local_track_manager.find_local_track(track),
+            .enumerate()
+            .filter_map(|(index, item)| {
+                let mut track = match item.track {
+                    OptionalTrack::Track(track) => track,
+                    OptionalTrack::Json(json) => local_track_manager.find_local_track(json)?,
+                };
+                Arc::make_mut(&mut track).added_index = index;
+                Some(track)
             })
             .collect())
     }
@@ -583,10 +582,10 @@ impl WebApi {
     pub fn remove_track_from_playlist(
         &self,
         playlist_id: &str,
-        position: usize,
+        index: usize,
     ) -> Result<(), Error> {
         self.delete(format!("v1/playlists/{}/tracks", playlist_id))?
-            .send_json(ureq::json!({ "positions": [position] }))?;
+            .send_json(ureq::json!({ "positions": [index] }))?;
         Ok(())
     }
 }

@@ -25,6 +25,8 @@ pub struct Track {
     pub local_path: Option<Arc<str>>,
     pub is_playable: Option<bool>,
     pub popularity: Option<u32>,
+    #[serde(skip)]
+    pub added_index: usize,
 }
 
 impl Track {
