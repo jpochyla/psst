@@ -55,7 +55,6 @@ pub const PLAY_QUEUE_BEHAVIOR: Selector<QueueBehavior> = Selector::new("app.play
 pub const PLAY_SEEK: Selector<f64> = Selector::new("app.play-seek");
 
 // Sorting control
-
 pub const SORT_BY_DATE_ADDED: Selector = Selector::new("app.sort-by-date-added");
 pub const SORT_BY_TITLE: Selector = Selector::new("app.sort-by-title");
 pub const SORT_BY_ARTIST: Selector = Selector::new("app.sort-by-artist");
