@@ -323,7 +323,7 @@ pub fn track_menu(
                 )
                 .command(playlist::REMOVE_TRACK.with(PlaylistRemoveTrack {
                     link: playlist.to_owned(),
-                    index: index,
+                    index
                 })),
             );
         }
