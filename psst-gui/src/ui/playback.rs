@@ -10,13 +10,16 @@ use druid::{
 use itertools::Itertools;
 
 use crate::{
-    cmd,
+    cmd::{self, ADD_TO_QUEUE},
     controller::PlaybackController,
     data::{
         AppState, AudioAnalysis, Episode, NowPlaying, Playable, PlayableMatcher, Playback,
         PlaybackOrigin, PlaybackState, QueueBehavior, ShowLink, Track,
     },
-    widget::{icons, icons::SvgIcon, Empty, Maybe, MyWidgetExt, RemoteImage},
+    widget::{
+        icons::{self, SvgIcon},
+        Empty, Maybe, MyWidgetExt, RemoteImage,
+    },
 };
 
 use super::{episode, library, theme, track, utils};
@@ -34,6 +37,9 @@ pub fn panel_widget() -> impl Widget<AppState> {
         .with_child(BarLayout::new(item_info, controls))
         .lens(AppState::playback)
         .controller(PlaybackController::new())
+        .on_command(ADD_TO_QUEUE, |_, _, data| {
+            data.info_alert("Track added to queue.")
+        })
 }
 
 fn playing_item_widget() -> impl Widget<NowPlaying> {
@@ -90,29 +96,27 @@ fn playing_item_widget() -> impl Widget<NowPlaying> {
     Flex::row()
         .with_child(cover_art)
         .with_flex_child(
-            Flex::row()
-                .with_spacer(theme::grid(2.0))
-                .with_flex_child(
-                    Flex::column()
-                        .cross_axis_alignment(CrossAxisAlignment::Start)
-                        .with_child(name)
-                        .with_spacer(2.0)
-                        .with_child(detail)
-                        .with_spacer(2.0)
-                        .with_child(origin)
-                        .on_click(|ctx, now_playing, _| {
-                            ctx.submit_command(cmd::NAVIGATE.with(now_playing.origin.to_nav()));
-                        })
-                        .context_menu(|now_playing| match &now_playing.item {
-                            Playable::Track(track) => {
-                                track::track_menu(track, &now_playing.library, &now_playing.origin)
-                            }
-                            Playable::Episode(episode) => {
-                                episode::episode_menu(episode, &now_playing.library)
-                            }
-                        }),
-                        1.0
-                    ),
+            Flex::row().with_spacer(theme::grid(2.0)).with_flex_child(
+                Flex::column()
+                    .cross_axis_alignment(CrossAxisAlignment::Start)
+                    .with_child(name)
+                    .with_spacer(2.0)
+                    .with_child(detail)
+                    .with_spacer(2.0)
+                    .with_child(origin)
+                    .on_click(|ctx, now_playing, _| {
+                        ctx.submit_command(cmd::NAVIGATE.with(now_playing.origin.to_nav()));
+                    })
+                    .context_menu(|now_playing| match &now_playing.item {
+                        Playable::Track(track) => {
+                            track::track_menu(track, &now_playing.library, &now_playing.origin, usize::MAX)
+                        }
+                        Playable::Episode(episode) => {
+                            episode::episode_menu(episode, &now_playing.library)
+                        }
+                    }),
+                1.0,
+            ),
             1.0,
         )
         .with_child(ViewSwitcher::new(

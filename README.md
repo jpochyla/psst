@@ -11,21 +11,21 @@ Contributions are welcome!
 
 ![Screenshot](./psst-gui/assets/screenshot.png)
 
-
 ## Download
 
 GitHub Actions automatically creates builds when new commits are pushed to the `master` branch.
 You can download the prebuilt binaries for x86_64 Windows, Linux (Ubuntu), and macOS.
 
-| Platform |
-|----------|
-| [Windows](https://nightly.link/jpochyla/psst/workflows/build/master/Psst.exe.zip) |
-| [Linux (Ubuntu)](https://nightly.link/jpochyla/psst/workflows/build/master/psst-gui.zip) |
-| [Debian Package](https://nightly.link/jpochyla/psst/workflows/build/master/psst-deb.zip) |
-| [MacOS](https://nightly.link/jpochyla/psst/workflows/build/master/Psst-x64.dmg.zip) |
+| Platform                                                                                                            |
+| ------------------------------------------------------------------------------------------------------------------- |
+| [Linux (x86_64)](https://nightly.link/jpochyla/psst/workflows/build/master/psst-gui-x86_64-unknown-linux-gnu.zip)   |
+| [Linux (aarch64)](https://nightly.link/jpochyla/psst/workflows/build/master/psst-gui-aarch64-unknown-linux-gnu.zip) |
+| [Debian Package (amd64)](https://nightly.link/jpochyla/psst/workflows/build/master/psst-deb-amd64.zip)              |
+| [Debian Package (arm64)](https://nightly.link/jpochyla/psst/workflows/build/master/psst-deb-arm64.zip)              |
+| [MacOS](https://nightly.link/jpochyla/psst/workflows/build/master/Psst.dmg.zip)                                     |
+| [Windows](https://nightly.link/jpochyla/psst/workflows/build/master/Psst.exe.zip)                                   |
 
 Unofficial builds of Psst are also available through the [AUR](https://aur.archlinux.org/packages/psst-git) and [Homebrew](https://formulae.brew.sh/cask/psst).
-
 
 ## Building
 
@@ -50,6 +50,7 @@ sudo apt-get install libssl-dev libgtk-3-dev libcairo2-dev libasound2-dev
 ```shell
 sudo dnf install openssl-devel gtk3-devel cairo-devel alsa-lib-devel
 ```
+
 </details>
 
 <details>
@@ -66,6 +67,7 @@ export LIBCLANG_PATH=/usr/local/lib
 ```
 
 In case rustc(1) fails building bigger crates
+
 ```shell
 memory allocation of xxxx bytes failed
 error: could not compile `gtk`
@@ -73,7 +75,9 @@ Caused by:
   process didn't exit successfully: `rustc --crate-name gtk [...]` (signal: 6, SIGABRT: process abort signal)
 warning: build failed, waiting for other jobs to finish...
 ```
+
 try increasing your user's maximum heap size:
+
 ```shell
 ulimit -d $(( 2 * `ulimit -d` ))
 ```
@@ -83,23 +87,25 @@ ulimit -d $(( 2 * `ulimit -d` ))
 ---
 
 #### Build from Source:
+
 ```shell
 cargo build
 # Append `--release` for a release build.
 ```
 
 #### Run from Source:
+
 ```shell
 cargo run --bin psst-gui
 # Append `--release` for a release build.
 ```
 
 #### Build Installation Bundle (i.e., macOS .app):
+
 ```shell
 cargo install cargo-bundle
 cargo bundle --release
 ```
-
 
 ## Roadmap
 
@@ -117,38 +123,37 @@ cargo bundle --release
 - [x] Dark theme
 - [ ] Resilience to network errors (automatically retry timed-out requests)
 - [ ] Managing playlists
-    - Follow/unfollow
-    - Add/remove tracks
-    - Reorder tracks
-    - Rename playlist
-    - Playlist folders
-- [ ] Playback queue
+  - Follow/unfollow
+  - Add/remove tracks
+  - Reorder tracks
+  - Rename playlist
+  - Playlist folders
+- [x] Playback queue
 - [ ] React to audio output device events
-    - Pause after disconnecting headphones
-    - Transfer playback after connecting headphones
+  - Pause after disconnecting headphones
+  - Transfer playback after connecting headphones
 - [ ] Better caching
-    - Cache as many WebAPI responses as possible
-    - Visualize cache utilization
-        - Total cache usage in the config dialog
-        - Show time origin of cached data, allow to refresh
+  - Cache as many WebAPI responses as possible
+  - Visualize cache utilization
+    - Total cache usage in the config dialog
+    - Show time origin of cached data, allow to refresh
 - [ ] Trivia on the artist page, Wikipedia links
 - [ ] Downloading encrypted tracks
 - [ ] Reporting played tracks to Spotify servers
 - [ ] OS-specific application bundles
 - UI
-    - [ ] Rethink the current design, consider a two-pane layout
-        - Left pane for browsing
-        - Right pane for current playback
-    - [ ] Detect light/dark OS theme
-    - [ ] Robust error states, ideally with a retry button
-    - [ ] Correct playback highlight
-        - Highlight now-playing track only in the correct album/playlist
-        - Keep highlighted track in viewport
-    - [ ] Paging or virtualized lists for albums and tracks
-    - [ ] Grid for albums and artists
-    - [ ] Robust active/inactive menu visualization
-    - [ ] Save playback state
-
+  - [ ] Rethink the current design, consider a two-pane layout
+    - Left pane for browsing
+    - Right pane for current playback
+  - [ ] Detect light/dark OS theme
+  - [ ] Robust error states, ideally with a retry button
+  - [ ] Correct playback highlight
+    - Highlight now-playing track only in the correct album/playlist
+    - Keep highlighted track in viewport
+  - [ ] Paging or virtualized lists for albums and tracks
+  - [ ] Grid for albums and artists
+  - [ ] Robust active/inactive menu visualization
+  - [ ] Save playback state
 
 ## Development
 
@@ -157,9 +162,8 @@ Here's the basic project structure:
 
 - `/psst-core` - Core library, takes care of Spotify TCP session, audio file retrieval, decoding, audio output, playback queue, etc.
 - `/psst-gui` - GUI application built with [Druid](https://github.com/linebender/druid)
-- `/psst-cli` - Example CLI that plays a track.  Credentials must be configured in the code.
+- `/psst-cli` - Example CLI that plays a track. Credentials must be configured in the code.
 - `/psst-protocol` - Internal Protobuf definitions used for Spotify communication.
-
 
 ## Privacy Policy
 
@@ -167,15 +171,14 @@ Psst connects only to the official Spotify servers and does not call home.
 Caches of various things are stored locally and can be deleted anytime.
 User credentials are not stored at all; instead, a re-usable authentication token from Spotify is used.
 
-
 ## Thanks
 
 This project would not exist without the following:
 
-- Big thank you to [`librespot`](https://github.com/librespot-org/librespot), the Open Source Spotify client library for Rust.  Most of `psst-core` is directly inspired by the ideas and code of `librespot`, although with a few differences:
-    - Spotify Connect (remote control) is not supported yet.
-    - Psst is completely synchronous, without `tokio` or other `async` runtime, although it will probably change in the future.
-    - Psst is using HTTPS-based CDN audio file retrieval, similar to the official Web client or [`librespot-java`](https://github.com/librespot-org/librespot-java), instead of the channel-based approach in `librespot`.
+- Big thank you to [`librespot`](https://github.com/librespot-org/librespot), the Open Source Spotify client library for Rust. Most of `psst-core` is directly inspired by the ideas and code of `librespot`, although with a few differences:
+  - Spotify Connect (remote control) is not supported yet.
+  - Psst is completely synchronous, without `tokio` or other `async` runtime, although it will probably change in the future.
+  - Psst is using HTTPS-based CDN audio file retrieval, similar to the official Web client or [`librespot-java`](https://github.com/librespot-org/librespot-java), instead of the channel-based approach in `librespot`.
 - [`druid`](https://github.com/linebender/druid) native GUI library for Rust.
 - [`ncspot`](https://github.com/hrkfdn/ncspot) cross-platform ncurses Spotify client written in Rust, using `librespot`.
 - ...and of course other libraries and projects.

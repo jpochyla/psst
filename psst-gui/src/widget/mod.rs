@@ -21,10 +21,9 @@ pub use checkbox::Checkbox;
 pub use dispatcher::ViewDispatcher;
 use druid_shell::Cursor;
 pub use empty::Empty;
-pub use icons::Icon;
 pub use link::Link;
 pub use maybe::Maybe;
-pub use overlay::{Overlay, OverlayPosition};
+pub use overlay::Overlay;
 pub use promise::Async;
 pub use remote_image::RemoteImage;
 pub use theme::ThemeScope;
@@ -36,6 +35,7 @@ use crate::{
 };
 
 pub trait MyWidgetExt<T: Data>: Widget<T> + Sized + 'static {
+    #[allow(dead_code)]
     fn log(self, label: &'static str) -> Logger<Self> {
         Logger::new(self).with_label(label)
     }

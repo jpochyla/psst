@@ -151,15 +151,7 @@ pub fn list_widget() -> impl Widget<AppState> {
     })
     .on_command_async(
         REMOVE_TRACK,
-        |d| {
-            WebApi::global().remove_track_from_playlist(
-                &d.link.id,
-                &d.track_id
-                    .0
-                    .to_uri()
-                    .ok_or_else(|| Error::WebApiError("Item doesn't have URI".to_string()))?,
-            )
-        },
+        |d| WebApi::global().remove_track_from_playlist(&d.link.id, d.track_pos),
         |_, data, d| {
             data.with_library_mut(|library| library.decrement_playlist_track_count(&d.link))
         },

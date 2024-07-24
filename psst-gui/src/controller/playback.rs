@@ -274,8 +274,30 @@ impl PlaybackController {
         self.send(PlayerEvent::Command(PlayerCommand::Seek { position }));
     }
 
+    fn seek_relative(&mut self, data: &AppState, forward: bool) {
+        if let Some(now_playing) = &data.playback.now_playing {
+            let seek_duration = Duration::from_secs(data.config.seek_duration as u64);
+
+            // Calculate new position, ensuring it does not exceed duration for forward seeks.
+            let seek_position = if forward {
+                now_playing.progress + seek_duration
+            } else {
+                now_playing.progress.saturating_sub(seek_duration)
+            }
+            .min(now_playing.item.duration()); // Safeguard to not exceed the track duration.
+
+            self.seek(seek_position);
+        }
+    }
+
     fn set_volume(&mut self, volume: f64) {
         self.send(PlayerEvent::Command(PlayerCommand::SetVolume { volume }));
+    }
+
+    fn add_to_queue(&mut self, item: &PlaybackItem) {
+        self.send(PlayerEvent::Command(PlayerCommand::AddToQueue {
+            item: *item,
+        }));
     }
 
     fn set_queue_behavior(&mut self, behavior: QueueBehavior) {
@@ -390,6 +412,14 @@ where
                 self.stop();
                 ctx.set_handled();
             }
+            Event::Command(cmd) if cmd.is(cmd::ADD_TO_QUEUE) => {
+                log::info!("adding to queue");
+                let (entry, item) = cmd.get_unchecked(cmd::ADD_TO_QUEUE);
+
+                self.add_to_queue(item);
+                data.add_queued_entry(entry.clone());
+                ctx.set_handled();
+            }
             Event::Command(cmd) if cmd.is(cmd::PLAY_QUEUE_BEHAVIOR) => {
                 let behavior = cmd.get_unchecked(cmd::PLAY_QUEUE_BEHAVIOR);
                 data.set_queue_behavior(behavior.to_owned());
@@ -412,11 +442,19 @@ where
                 ctx.set_handled();
             }
             Event::KeyDown(key) if key.code == Code::ArrowRight => {
-                self.next();
+                if key.mods.shift() {
+                    self.next();
+                } else {
+                    self.seek_relative(data, true);
+                }
                 ctx.set_handled();
             }
             Event::KeyDown(key) if key.code == Code::ArrowLeft => {
-                self.previous();
+                if key.mods.shift() {
+                    self.previous();
+                } else {
+                    self.seek_relative(data, false);
+                }
                 ctx.set_handled();
             }
             Event::KeyDown(key) if key.key == KbKey::Character("+".to_string()) => {

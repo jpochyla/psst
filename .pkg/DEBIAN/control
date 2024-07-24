@@ -1,9 +1,10 @@
-Package: psst
+Package: psst-gui
+Version: 0.1.0
 Architecture: amd64
 Maintainer: Jan Pochyla <jpochyla@gmail.com>
 Section: sound
 Priority: optional
 Homepage: https://github.com/jpochyla/psst
 Package-Type: deb
-Depends: libssl1.1, libgtk-3-0, libcairo2
+Depends: libssl3 | libssl1.1, libgtk-3-0, libcairo2
 Description: Fast and multi-platform Spotify client with native GUI

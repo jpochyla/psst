@@ -33,7 +33,7 @@ use druid::{
 use psst_core::{item_id::ItemId, session::SessionService};
 
 pub use crate::data::{
-    album::{Album, AlbumDetail, AlbumLink, AlbumType, Copyright, CopyrightType},
+    album::{Album, AlbumDetail, AlbumLink, AlbumType},
     artist::{Artist, ArtistAlbums, ArtistDetail, ArtistLink, ArtistTracks},
     config::{AudioQuality, Authentication, Config, Preferences, PreferencesTab, Theme},
     ctx::Ctx,
@@ -55,7 +55,7 @@ pub use crate::data::{
     search::{Search, SearchResults, SearchTopic},
     show::{Episode, EpisodeId, EpisodeLink, Show, ShowDetail, ShowEpisodes, ShowLink},
     slider_scroll_scale::SliderScrollScale,
-    track::{AudioAnalysis, AudioSegment, TimeInterval, Track, TrackId},
+    track::{AudioAnalysis, Track, TrackId},
     user::UserProfile,
     utils::{Cached, Float64, Image, Page},
 };
@@ -80,6 +80,7 @@ pub struct AppState {
     pub personalized: Personalized,
     pub alerts: Vector<Alert>,
     pub finder: Finder,
+    pub added_queue: Vector<QueueEntry>,
 }
 
 impl AppState {
@@ -118,6 +119,7 @@ impl AppState {
                 cache_size: Promise::Empty,
             },
             playback,
+            added_queue: Vector::new(),
             search: Search {
                 input: "".into(),
                 results: Promise::Empty,
@@ -160,14 +162,12 @@ impl AppState {
             let previous: Nav = mem::replace(&mut self.nav, nav.to_owned());
             self.history.push_back(previous);
             self.config.last_route.replace(nav.to_owned());
-            self.config.save();
         }
     }
 
     pub fn navigate_back(&mut self) {
         if let Some(nav) = self.history.pop_back() {
             self.config.last_route.replace(nav.clone());
-            self.config.save();
             self.nav = nav;
         }
     }
@@ -180,11 +180,28 @@ impl AppState {
 
 impl AppState {
     pub fn queued_entry(&self, item_id: ItemId) -> Option<QueueEntry> {
-        self.playback
+        if let Some(queued) = self
+            .playback
             .queue
             .iter()
             .find(|queued| queued.item.id() == item_id)
             .cloned()
+        {
+            Some(queued)
+        } else if let Some(queued) = self
+            .added_queue
+            .iter()
+            .find(|queued| queued.item.id() == item_id)
+            .cloned()
+        {
+            return Some(queued);
+        } else {
+            None
+        }
+    }
+
+    pub fn add_queued_entry(&mut self, queue_entry: QueueEntry) {
+        self.added_queue.push_back(queue_entry);
     }
 
     pub fn loading_playback(&mut self, item: Playable, origin: PlaybackOrigin) {
@@ -414,22 +431,16 @@ impl Library {
 
     pub fn increment_playlist_track_count(&mut self, link: &PlaylistLink) {
         if let Some(saved) = self.playlists.resolved_mut() {
-            for playlist in saved.iter_mut() {
-                if playlist.id == link.id {
-                    playlist.track_count += 1;
-                    break;
-                }
+            if let Some(playlist) = saved.iter_mut().find(|p| p.id == link.id) {
+                playlist.track_count = playlist.track_count.map(|count| count + 1);
             }
         }
     }
 
     pub fn decrement_playlist_track_count(&mut self, link: &PlaylistLink) {
         if let Some(saved) = self.playlists.resolved_mut() {
-            for playlist in saved.iter_mut() {
-                if playlist.id == link.id {
-                    playlist.track_count -= 1;
-                    break;
-                }
+            if let Some(playlist) = saved.iter_mut().find(|p| p.id == link.id) {
+                playlist.track_count = playlist.track_count.map(|count| count.saturating_sub(1));
             }
         }
     }

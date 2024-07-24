@@ -1,9 +1,12 @@
 [Desktop Entry]
-Categories=Audio;AudioVideo
-Comment=Fast and multi-platform Spotify client with native GUI
-Exec=psst-gui
-Name=Psst
-Terminal=false
 Type=Application
-Version=1.0
-Icon=psst.png
+Name=Psst
+Comment=Fast and multi-platform Spotify client with native GUI
+GenericName=Music Player
+Icon=psst
+TryExec=psst-gui
+Exec=psst-gui %U
+Terminal=false
+MimeType=x-scheme-handler/psst;
+Categories=Audio;Music;Player;AudioVideo;
+StartupWMClass=psst-gui

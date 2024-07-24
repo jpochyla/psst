@@ -4,11 +4,16 @@ use druid::{
     widget::{CrossAxisAlignment, Either, Flex, Label, ViewSwitcher},
     LensExt, LocalizedString, Menu, MenuItem, Size, TextAlignment, Widget, WidgetExt,
 };
+use psst_core::{
+    audio::normalize::NormalizationLevel,
+    item_id::{ItemId, ItemIdType},
+    player::item::PlaybackItem,
+};
 
 use crate::{
     cmd,
     data::{
-        AppState, Library, Nav, PlaybackOrigin, PlaylistAddTrack, PlaylistRemoveTrack,
+        AppState, Library, Nav, PlaybackOrigin, PlaylistAddTrack, PlaylistRemoveTrack, QueueEntry,
         RecommendationsRequest, Track,
     },
     ui::playlist,
@@ -210,13 +215,14 @@ fn popularity_stars(popularity: u32) -> String {
 }
 
 fn track_row_menu(row: &PlayRow<Arc<Track>>) -> Menu<AppState> {
-    track_menu(&row.item, &row.ctx.library, &row.origin)
+    track_menu(&row.item, &row.ctx.library, &row.origin, row.item.track_pos)
 }
 
 pub fn track_menu(
     track: &Arc<Track>,
     library: &Library,
     origin: &PlaybackOrigin,
+    track_pos: usize,
 ) -> Menu<AppState> {
     let mut menu = Menu::empty();
 
@@ -317,11 +323,28 @@ pub fn track_menu(
                 )
                 .command(playlist::REMOVE_TRACK.with(PlaylistRemoveTrack {
                     link: playlist.to_owned(),
-                    track_id: track.id,
+                    track_pos,
                 })),
             );
         }
     }
+
+    menu = menu.entry(
+        MenuItem::new(
+            LocalizedString::new("menu-item-add-to-queue").with_placeholder("Add Track To Queue"),
+        )
+        //PlayerCommand
+        .command(cmd::ADD_TO_QUEUE.with((
+            QueueEntry {
+                item: crate::ui::Playable::Track(track.clone()),
+                origin: origin.clone(),
+            },
+            PlaybackItem {
+                item_id: ItemId::from_base62(&String::from(track.id), ItemIdType::Track).unwrap(),
+                norm_level: NormalizationLevel::Track,
+            },
+        ))),
+    );
 
     let mut playlist_menu = Menu::new(
         LocalizedString::new("menu-item-add-to-playlist").with_placeholder("Add to Playlist"),

@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [ master ]
+    branches: [master]
   pull_request:
-    branches: [ master ]
+    branches: [master]
 
 env:
   CARGO_TERM_COLOR: always
@@ -14,13 +14,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup Cache
         uses: Swatinem/rust-cache@v2
 
       - name: Install Linux Dependencies
-        if: ${{ runner.os == 'Linux' }}
+        if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev libssl-dev libasound2-dev
 
       - name: Check Formatting
@@ -30,60 +30,93 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macOS-latest, windows-latest]
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+          - os: macOS-latest
+          - os: windows-latest
+
     runs-on: ${{ matrix.os }}
+    env:
+      MACOSX_DEPLOYMENT_TARGET: 11.0
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      - name: Setup Cache
+      - name: Setup Rust Cache
         uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('Cross.toml') }}
 
-      - name: Install Linux Dependencies
-        if: ${{ runner.os == 'Linux' }}
-        run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev libssl-dev libasound2-dev
+      - name: Install Cross
+        if: runner.os == 'Linux'
+        run: cargo install cross
 
-      - name: Run Tests
-        run: cargo test
-        continue-on-error: true
+      - name: Build (Linux)
+        if: runner.os == 'Linux'
+        run: cross build --release --target ${{ matrix.target }}
 
-      - name: Build Release
+      - name: Build Release (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          rustup target add x86_64-apple-darwin aarch64-apple-darwin
+          cargo build --release --target x86_64-apple-darwin --target aarch64-apple-darwin
+
+      - name: Build Release (Windows)
+        if: runner.os == 'Windows'
         run: cargo build --release
 
+      - name: Cache cargo-bundle
+        if: runner.os == 'macOS'
+        id: cache-cargo-bundle
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/cargo-bundle
+          key: ${{ runner.os }}-cargo-bundle-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Install cargo-bundle
+        if: runner.os == 'macOS' && steps.cache-cargo-bundle.outputs.cache-hit != 'true'
+        run: cargo install cargo-bundle
+
       - name: Bundle macOS Release
-        if: ${{ runner.os == 'macOS' }}
-        run: |
-          cargo install cargo-bundle
-          cargo bundle --release
+        if: runner.os == 'macOS'
+        run: cargo bundle --release
         working-directory: psst-gui
 
-      - name: Create macOS Disk Image
-        if: ${{ runner.os == 'macOS' }}
+      - name: Create macOS universal binary
+        if: runner.os == 'macOS'
         run: |
-          hdiutil create Psst-uncompressed.dmg -volname "Psst" -srcfolder target/release/bundle/osx
-          hdiutil convert Psst-uncompressed.dmg -format UDZO -o Psst-x64.dmg
+          lipo -create -output target/release/bundle/osx/Psst.app/Contents/MacOS/psst-gui \
+            target/x86_64-apple-darwin/release/psst-gui \
+            target/aarch64-apple-darwin/release/psst-gui
 
-      - name: Make Linux Binary Executable
-        if: ${{ runner.os == 'Linux' }}
-        run: chmod +x target/release/psst-gui
-
-      - name: Upload Linux Binary
-        uses: actions/upload-artifact@v3
-        if: ${{ runner.os == 'Linux' }}
-        with:
-          name: psst-gui
-          path: target/release/psst-gui
+      - name: Create macOS Disk Image
+        if: runner.os == 'macOS'
+        run: hdiutil create -volname "Psst" -srcfolder target/release/bundle/osx -ov -format UDZO Psst.dmg
 
       - name: Upload macOS Disk Image
-        uses: actions/upload-artifact@v3
-        if: ${{ runner.os == 'macOS' }}
+        uses: actions/upload-artifact@v4
+        if: runner.os == 'macOS'
         with:
-          name: Psst-x64.dmg
-          path: ./Psst-x64.dmg
+          name: Psst.dmg
+          path: ./Psst.dmg
+
+      - name: Make Linux Binary Executable
+        if: runner.os == 'Linux'
+        run: chmod +x target/${{ matrix.target }}/release/psst-gui
+
+      - name: Upload Linux Binary
+        uses: actions/upload-artifact@v4
+        if: runner.os == 'Linux'
+        with:
+          name: psst-gui-${{ matrix.target }}
+          path: target/${{ matrix.target }}/release/psst-gui
 
       - name: Upload Windows Executable
-        uses: actions/upload-artifact@v3
-        if: ${{ runner.os == 'Windows' }}
+        uses: actions/upload-artifact@v4
+        if: runner.os == 'Windows'
         with:
           name: Psst.exe
           path: target/release/psst-gui.exe
@@ -91,18 +124,27 @@ jobs:
   deb:
     runs-on: ubuntu-latest
     needs: build
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            target: x86_64-unknown-linux-gnu
+          - arch: arm64
+            target: aarch64-unknown-linux-gnu
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      - name: Download Linux Binary
-        uses: actions/download-artifact@v3
+      - name: Download Linux Binaries
+        uses: actions/download-artifact@v4
         with:
-          name: psst-gui
-          path: ${{runner.workspace}}
+          name: psst-gui-${{ matrix.target }}
+          path: ${{runner.workspace}}/binaries
 
       - name: Move Binary
-        run: mkdir -p ${{runner.workspace}}/pkg/usr/bin/; mv ${{runner.workspace}}/psst-gui $_
+        run: |
+          mkdir -p ${{runner.workspace}}/pkg/usr/bin/
+          mv ${{runner.workspace}}/binaries/psst-gui ${{runner.workspace}}/pkg/usr/bin/
 
       - name: Move Desktop Entry
         run: mkdir -p ${{runner.workspace}}/pkg/usr/share/applications/; mv .pkg/psst.desktop $_
@@ -116,6 +158,8 @@ jobs:
             mkdir -p "${{runner.workspace}}/pkg/usr/share/icons/hicolor/${LOGO_SIZE}x${LOGO_SIZE}/"
             cp "./psst-gui/assets/${LOGO}" "$_/psst.png"
           done
+          mkdir -p "${{runner.workspace}}/pkg/usr/share/icons/hicolor/scalable/apps/"
+          cp "./psst-gui/assets/logo.svg" "$_/psst.svg"
 
       - name: Set Permissions
         run: chmod 755 ${{runner.workspace}}/pkg/usr/bin/psst-gui
@@ -124,18 +168,23 @@ jobs:
         run: mkdir -p ${{runner.workspace}}/pkg/usr/share/doc/psst-gui/; mv .pkg/copyright $_
 
       - name: Move Package Config
-        run: mkdir -p ${{runner.workspace}}/pkg/; mv .pkg/DEBIAN $_/
+        run: |
+          mkdir -p ${{runner.workspace}}/pkg/
+          cp -r .pkg/DEBIAN $_/
+          sed -i 's/Architecture: amd64/Architecture: ${{ matrix.arch }}/' ${{runner.workspace}}/pkg/DEBIAN/control
 
       - name: Set Version
         run: "echo Version: $(git rev-list --count HEAD) >> ${{runner.workspace}}/pkg/DEBIAN/control"
 
       - name: Build Package
-        run: cat ${{runner.workspace}}/pkg/DEBIAN/control && dpkg-deb -b ${{runner.workspace}}/pkg/ psst_$(git rev-list --count HEAD)_amd64.deb
+        run: |
+          cat ${{runner.workspace}}/pkg/DEBIAN/control
+          dpkg-deb -b ${{runner.workspace}}/pkg/ psst_$(git rev-list --count HEAD)_${{ matrix.arch }}.deb
 
       - name: Upload Debian Package
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: psst-deb
+          name: psst-deb-${{ matrix.arch }}
           path: "*.deb"
 
   appimage:
@@ -144,10 +193,10 @@ jobs:
     needs: deb
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Download Debian Package
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: psst-deb
           path: ${{runner.workspace}}
@@ -180,7 +229,7 @@ jobs:
           ${{env.app_path}} ${{env.recipe_path}}
 
       - name: Upload AppImage
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: psst-appimage
           path: ${{runner.workspace}}/out/*.AppImage
