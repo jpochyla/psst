@@ -171,6 +171,7 @@ impl LocalTrackManager {
                     // TODO: Change this to true once playback is supported.
                     is_playable: Some(false),
                     popularity: local_track.popularity,
+                    track_pos: 0,
                 }));
             }
         }
