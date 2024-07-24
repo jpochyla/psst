@@ -16,7 +16,9 @@ impl<W: Widget<AppState>> Controller<AppState, W> for AlertCleanupController {
         env: &Env,
     ) {
         match event {
-            Event::WindowConnected => ctx.request_timer(CLEANUP_INTERVAL),
+            Event::WindowConnected => {
+                ctx.request_timer(CLEANUP_INTERVAL);
+            }
             Event::Timer(_) => {
                 data.cleanup_alerts();
                 ctx.request_timer(CLEANUP_INTERVAL);
