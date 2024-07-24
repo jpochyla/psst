@@ -222,7 +222,7 @@ pub fn track_menu(
     track: &Arc<Track>,
     library: &Library,
     origin: &PlaybackOrigin,
-    position: usize,
+    index: usize,
 ) -> Menu<AppState> {
     let mut menu = Menu::empty();
 
@@ -323,7 +323,7 @@ pub fn track_menu(
                 )
                 .command(playlist::REMOVE_TRACK.with(PlaylistRemoveTrack {
                     link: playlist.to_owned(),
-                    index: position,
+                    index: index,
                 })),
             );
         }
