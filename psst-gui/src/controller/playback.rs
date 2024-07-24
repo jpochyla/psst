@@ -428,6 +428,7 @@ where
 
                 self.add_to_queue(item);
                 data.add_queued_entry(entry.clone());
+                data.info_alert("Track added to queue.");
                 ctx.set_handled();
             }
             Event::Command(cmd) if cmd.is(cmd::PLAY_QUEUE_BEHAVIOR) => {
@@ -447,33 +448,27 @@ where
                 ctx.set_handled();
             }
             Event::Command(cmd) if cmd.is(cmd::SKIP_TO_PLACE_IN_QUEUE) => {
-                let item = cmd.get_unchecked(cmd::SKIP_TO_PLACE_IN_QUEUE);
+                let track_pos = *cmd.get_unchecked(cmd::SKIP_TO_PLACE_IN_QUEUE);
 
                 // We need a way so it starts playing even if theres no playlist being played from!
-                // We also need a block to stop it from erroring if they click one back.
-                for i in 0..data.added_queue.len() {
-                    if data.added_queue[i].item.id() == item.item.id() {
-                        self.skip_to_place_in_queue(&i);
-                        break;
+                // This is still a bit glitchy and I think thats due to the index number!
+                for _ in 0..track_pos {
+                    if !data.added_queue.is_empty() {
+                        // Probably a better way to do this, I think this is causing the issue.
+                        data.added_queue.remove(0);
                     }
                 }
-
+                self.skip_to_place_in_queue(&track_pos);
                 self.next();
                 ctx.set_handled();
             }
             Event::Command(cmd) if cmd.is(cmd::REMOVE_FROM_QUEUE) => {
                 let item = cmd.get_unchecked(cmd::REMOVE_FROM_QUEUE);
 
-                // This is the best i could figure out, But this currently just removes the first item that matches the id
-                // I think its the same issue as with the removal of a song from a playlist
-                // TODO: Change this to retain
-                for i in 0..data.added_queue.len() {
-                    if data.added_queue[i].item.id() == item.item.id() {
-                        data.added_queue.remove(i);
-                        self.remove_from_queue(&i);
-                        break;
-                    }
-                }
+                data.added_queue.remove(*item);
+                self.remove_from_queue(item);
+                data.info_alert("Track removed from queue.");
+        
                 ctx.set_handled();
             }
             // Keyboard shortcuts.

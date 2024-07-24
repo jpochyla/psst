@@ -10,7 +10,7 @@ use druid::{
 use itertools::Itertools;
 
 use crate::{
-    cmd::{self, ADD_TO_QUEUE, REMOVE_FROM_QUEUE},
+    cmd::{self},
     controller::PlaybackController,
     data::{
         AppState, AudioAnalysis, Episode, NowPlaying, Playable, PlayableMatcher, Playback,
@@ -34,12 +34,6 @@ pub fn panel_widget() -> impl Widget<AppState> {
         .with_child(BarLayout::new(item_info, controls))
         .lens(AppState::playback)
         .controller(PlaybackController::new())
-        .on_command(ADD_TO_QUEUE, |_, _, data| {
-            data.info_alert("Track added to queue.")
-        })
-        .on_command(REMOVE_FROM_QUEUE, |_, _, data| {
-            data.info_alert("Track removed from queue.")
-        })
 }
 
 fn playing_item_widget() -> impl Widget<NowPlaying> {

@@ -36,11 +36,16 @@ impl Queue {
             behavior: QueueBehavior::default(),
         }
     }
-
+    
     pub fn clear(&mut self) {
         self.items.clear();
         self.positions.clear();
         self.position = 0;
+    }
+
+    pub fn clear_user_items(&mut self) {
+        self.user_items.clear();
+        self.user_items_position = 0;
     }
 
     pub fn fill(&mut self, items: Vec<PlaybackItem>, position: usize) {
@@ -51,7 +56,14 @@ impl Queue {
     }
     
     pub fn skip_to_place_in_queue(&mut self, index: usize) {
-        self.user_items_position = index;
+        for _ in 0..index {
+            self.user_items.remove(0);
+        }
+        self.user_items_position = 0;
+    }
+
+    pub fn user_queued_position(&self) -> usize {
+        self.user_items_position
     }
 
     pub fn add(&mut self, item: PlaybackItem) {
@@ -71,6 +83,10 @@ impl Queue {
             self.positions
                 .insert(self.position + 1, self.positions.len());
             self.user_items_position += 1;
+            if self.user_items_position >= 1 {
+                self.user_items.remove(0);
+                self.user_items_position = 0;
+            }
         }
     }
 

@@ -6,30 +6,46 @@ use crate::{
 };
 
 use druid::{
-    widget::{CrossAxisAlignment, Either, Flex, Label, LineBreaking, List, Scroll}, Env, Widget, WidgetExt
+    widget::{CrossAxisAlignment, Either, Flex, Label, LineBreaking, List, Scroll}, Data, Env, Lens, LensExt, Widget, WidgetExt
 };
 use druid_shell::Cursor;
 
 use super::theme;
 
+// Define a struct that includes index for QueueEntry
+#[derive(Clone, Data, Lens)]
+struct QueueEntryWithIndex {
+    entry: QueueEntry,
+    index: usize,
+}
+
+// Convert Vector<QueueEntry> to Vector<QueueEntryWithIndex>
+fn queue_entries_with_index(entries: Vector<QueueEntry>) -> Vector<QueueEntryWithIndex> {
+    entries.into_iter().enumerate().map(|(i, entry)| QueueEntryWithIndex { entry, index: i }).collect()
+}
+
+// Widget for the queue
 pub fn queue_widget() -> impl Widget<AppState> {
     Either::new(
         |data: &AppState, _env: &Env| data.config.window_size.width >= 700.0 && !data.added_queue.is_empty(),
-            Flex::column()
-                .with_child(queue_header_widget())
-                .with_flex_child(
-                    Scroll::new(queue_list_widget())
-                        .vertical()
-                        // (how will we handle it after the song has been played? will it remain or disappear?)
-                        .lens(AppState::added_queue),
-                    1.0,
-                )
-                .fix_width(185.0)
-                .background(Border::Left.with_color(theme::GREY_500)),
-            Empty
+        Flex::column()
+            .with_child(queue_header_widget())
+            .with_flex_child(
+                Scroll::new(queue_list_widget())
+                    .vertical()
+                    .lens(AppState::added_queue.map(
+                        |entries| queue_entries_with_index(entries.clone()),
+                        |_, _| (),
+                    )),
+                1.0,
+            )
+            .fix_width(185.0)
+            .background(Border::Left.with_color(theme::GREY_500)),
+        Empty
     )
 }
 
+// Widget for the queue header
 fn queue_header_widget() -> impl Widget<AppState> {
     Flex::row()
         .with_flex_child(
@@ -45,31 +61,31 @@ fn queue_header_widget() -> impl Widget<AppState> {
         .background(Border::Bottom.with_color(theme::GREY_500))
 }
 
-fn queue_list_widget() -> impl Widget<Vector<QueueEntry>> {
+// Widget for displaying a list of queue entries with index
+fn queue_list_widget() -> impl Widget<Vector<QueueEntryWithIndex>> {
     List::new(|| {
         Flex::row()
             .with_flex_child(
                 Flex::column()
                     .cross_axis_alignment(CrossAxisAlignment::Start)
                     .with_child(
-                        Label::new(|item: &QueueEntry, _env: &Env| item.item.name().to_string())
+                        Label::new(|item: &QueueEntryWithIndex, _env: &Env| item.entry.item.name().to_string())
                             .with_font(theme::UI_FONT_MEDIUM)
                             .with_line_break_mode(LineBreaking::Clip)
                             .expand_width(),
                     )
                     .with_spacer(2.0)
                     .with_child(
-                        Label::new(|item: &QueueEntry, _env: &Env| item.item.artist().to_string())
+                        Label::new(|item: &QueueEntryWithIndex, _env: &Env| item.entry.item.artist().to_string())
                             .with_text_size(theme::TEXT_SIZE_SMALL)
                             .with_text_color(theme::PLACEHOLDER_COLOR)
                             .with_line_break_mode(LineBreaking::Clip)
                             .expand_width(),
                     )
-                .on_click(|ctx, data: &mut QueueEntry, _| {
-                    ctx.submit_command(
-                        cmd::SKIP_TO_PLACE_IN_QUEUE.with(data.clone())
-                    );
-                }), 
+                    .on_click(|ctx, data, _| {
+                        ctx.submit_command(cmd::SKIP_TO_PLACE_IN_QUEUE.with(data.index));
+                        
+                    }),
                 1.0,
             )
             .with_default_spacer()
@@ -78,10 +94,8 @@ fn queue_list_widget() -> impl Widget<Vector<QueueEntry>> {
                     .scale((16.0, 16.0))
                     .link()
                     .rounded(100.0)
-                    .on_click(|ctx, data: &mut QueueEntry, _| {
-                        ctx.submit_command(
-                            cmd::REMOVE_FROM_QUEUE.with(data.clone())
-                        );
+                    .on_click(|ctx, data: &mut QueueEntryWithIndex, _| {
+                        ctx.submit_command(cmd::REMOVE_FROM_QUEUE.with(data.index));
                     })
                     .with_cursor(Cursor::Pointer),
             )
