@@ -56,14 +56,8 @@ impl Queue {
     }
     
     pub fn skip_to_place_in_queue(&mut self, index: usize) {
-        for _ in 0..index {
-            self.user_items.remove(0);
-        }
+        self.user_items = self.user_items.split_off(index);
         self.user_items_position = 0;
-    }
-
-    pub fn user_queued_position(&self) -> usize {
-        self.user_items_position
     }
 
     pub fn add(&mut self, item: PlaybackItem) {
@@ -72,6 +66,7 @@ impl Queue {
 
     pub fn remove(&mut self, index: usize) {
         self.user_items.remove(index);
+        self.user_items_position -= 1;
     }
 
     fn handle_added_queue(&mut self) {
@@ -83,10 +78,6 @@ impl Queue {
             self.positions
                 .insert(self.position + 1, self.positions.len());
             self.user_items_position += 1;
-            if self.user_items_position >= 1 {
-                self.user_items.remove(0);
-                self.user_items_position = 0;
-            }
         }
     }
 

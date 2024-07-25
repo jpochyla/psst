@@ -451,15 +451,11 @@ where
                 let track_pos = *cmd.get_unchecked(cmd::SKIP_TO_PLACE_IN_QUEUE);
 
                 // We need a way so it starts playing even if theres no playlist being played from!
-                // This is still a bit glitchy and I think thats due to the index number!
-                for _ in 0..track_pos {
-                    if !data.added_queue.is_empty() {
-                        // Probably a better way to do this, I think this is causing the issue.
-                        data.added_queue.remove(0);
-                    }
+                if track_pos > 0{
+                    data.added_queue = data.added_queue.split_off(track_pos);
+                    self.skip_to_place_in_queue(&track_pos);
+                    self.next();
                 }
-                self.skip_to_place_in_queue(&track_pos);
-                self.next();
                 ctx.set_handled();
             }
             Event::Command(cmd) if cmd.is(cmd::REMOVE_FROM_QUEUE) => {
