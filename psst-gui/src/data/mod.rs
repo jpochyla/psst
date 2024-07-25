@@ -23,7 +23,7 @@ use std::{
         atomic::{AtomicUsize, Ordering},
         Arc,
     },
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use druid::{
@@ -59,6 +59,8 @@ pub use crate::data::{
     user::UserProfile,
     utils::{Cached, Float64, Image, Page},
 };
+
+pub const ALERT_DURATION: Duration = Duration::from_secs(5);
 
 #[derive(Clone, Data, Lens)]
 pub struct AppState {
@@ -276,24 +278,32 @@ impl AppState {
 }
 
 impl AppState {
-    pub fn info_alert(&mut self, message: impl Display) {
-        self.alerts.push_back(Alert {
+    pub fn add_alert(&mut self, message: impl Display, style: AlertStyle) {
+        let alert = Alert {
             message: message.to_string().into(),
-            style: AlertStyle::Info,
+            style,
             id: Alert::fresh_id(),
-        });
+            created_at: Instant::now(),
+        };
+        self.alerts.push_back(alert);
+    }
+
+    pub fn info_alert(&mut self, message: impl Display) {
+        self.add_alert(message, AlertStyle::Info);
     }
 
     pub fn error_alert(&mut self, message: impl Display) {
-        self.alerts.push_back(Alert {
-            message: message.to_string().into(),
-            style: AlertStyle::Error,
-            id: Alert::fresh_id(),
-        });
+        self.add_alert(message, AlertStyle::Error);
     }
 
     pub fn dismiss_alert(&mut self, id: usize) {
         self.alerts.retain(|a| a.id != id);
+    }
+
+    pub fn cleanup_alerts(&mut self) {
+        let now = Instant::now();
+        self.alerts
+            .retain(|alert| now.duration_since(alert.created_at) < ALERT_DURATION);
     }
 }
 
@@ -512,6 +522,7 @@ pub struct Alert {
     pub id: usize,
     pub message: Arc<str>,
     pub style: AlertStyle,
+    pub created_at: Instant,
 }
 
 impl Alert {
