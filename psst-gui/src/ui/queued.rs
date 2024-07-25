@@ -27,7 +27,7 @@ fn queue_entries_with_index(entries: Vector<QueueEntry>) -> Vector<QueueEntryWit
 // Widget for the queue
 pub fn queue_widget() -> impl Widget<AppState> {
     Either::new(
-        |data: &AppState, _env: &Env| data.config.window_size.width >= 700.0 && !data.added_queue.is_empty(),
+        |data: &AppState, _env: &Env| data.config.window_size.width >= 700.0 && !data.added_queue.is_empty() && data.config.show_queue_view,
         Flex::column()
             .with_child(queue_header_widget())
             .with_flex_child(
@@ -84,7 +84,6 @@ fn queue_list_widget() -> impl Widget<Vector<QueueEntryWithIndex>> {
                     )
                     .on_click(|ctx, data, _| {
                         ctx.submit_command(cmd::SKIP_TO_PLACE_IN_QUEUE.with(data.index));
-                        
                     }),
                 1.0,
             )
