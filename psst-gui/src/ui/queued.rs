@@ -53,7 +53,17 @@ fn queue_header_widget() -> impl Widget<AppState> {
                 .with_font(theme::UI_FONT_MEDIUM)
                 .with_text_size(theme::TEXT_SIZE_LARGE)
                 .center(),
-            1.0,
+            0.3,
+        )
+        .with_child(
+            icons::CLOSE_CIRCLE
+                .scale((16.0, 16.0))
+                .link()
+                .rounded(100.0)
+                .on_click(|ctx, _, _| {
+                    ctx.submit_command(cmd::CLEAR_QUEUE);
+                })
+                .with_cursor(Cursor::Pointer),
         )
         .fix_height(32.0)
         .padding(theme::grid(1.0))

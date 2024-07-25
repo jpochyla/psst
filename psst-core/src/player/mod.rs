@@ -120,6 +120,7 @@ impl Player {
             PlayerCommand::Configure { config } => self.configure(config),
             PlayerCommand::SetQueueBehavior { behavior } => self.queue.set_behaviour(behavior),
             PlayerCommand::SkipToPlaceInQueue { item } => self.queue.skip_to_place_in_queue(item),
+            PlayerCommand::ClearQueue => self.queue.clear_user_items(),
             PlayerCommand::AddToQueue { item } => self.queue.add(item),
             PlayerCommand::RemoveFromQueue { item } => self.queue.remove(item),
             PlayerCommand::SetVolume { volume } => self.set_volume(volume),
@@ -434,6 +435,7 @@ pub enum PlayerCommand {
     RemoveFromQueue {
         item: usize,
     },
+    ClearQueue,
     /// Change playback volume to a value in 0.0..=1.0 range.
     SetVolume {
         volume: f64,

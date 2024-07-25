@@ -309,6 +309,9 @@ impl PlaybackController {
             item: *item,
         }));
     }
+    fn clear_queue(&mut self) {
+        self.send(PlayerEvent::Command(PlayerCommand::ClearQueue));
+    }
 
     fn set_queue_behavior(&mut self, behavior: QueueBehavior) {
         self.send(PlayerEvent::Command(PlayerCommand::SetQueueBehavior {
@@ -465,6 +468,12 @@ where
                 self.remove_from_queue(item);
                 data.info_alert("Track removed from queue.");
         
+                ctx.set_handled();
+            }
+            Event::Command(cmd) if cmd.is(cmd::CLEAR_QUEUE) => {
+                data.added_queue.clear();
+                self.clear_queue();
+                data.info_alert("Tracks cleared from queue.");
                 ctx.set_handled();
             }
             // Keyboard shortcuts.
