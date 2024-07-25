@@ -8,9 +8,12 @@ use druid_shell::Cursor;
 use crate::data::config::SortCriteria;
 use crate::{
     cmd,
-    controller::{AfterDelay, NavController, SessionController, SortController},
+    controller::{
+        AfterDelay, AlertCleanupController, NavController, SessionController, SortController,
+    },
     data::{
         config::SortOrder, Alert, AlertStyle, AppState, Config, Nav, Playable, Playback, Route,
+        ALERT_DURATION,
     },
     widget::{
         icons, icons::SvgIcon, Border, Empty, MyWidgetExt, Overlay, ThemeScope, ViewDispatcher,
@@ -175,7 +178,6 @@ fn root_widget() -> impl Widget<AppState> {
 fn alert_widget() -> impl Widget<AppState> {
     const BG: Key<Color> = Key::new("app.alert.BG");
     const DISMISS_ALERT: Selector<usize> = Selector::new("app.alert.dismiss");
-    const ALERT_DURATION: Duration = Duration::from_secs(5);
 
     List::new(|| {
         Flex::row()
@@ -210,6 +212,7 @@ fn alert_widget() -> impl Widget<AppState> {
     .on_command(DISMISS_ALERT, |_, &id, state| {
         state.dismiss_alert(id);
     })
+    .controller(AlertCleanupController)
 }
 
 fn route_widget() -> impl Widget<AppState> {

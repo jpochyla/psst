@@ -1,4 +1,5 @@
 mod after_delay;
+mod alert_cleanup;
 mod ex_click;
 mod ex_cursor;
 mod ex_scroll;
@@ -13,6 +14,7 @@ mod session;
 mod sort;
 
 pub use after_delay::AfterDelay;
+pub use alert_cleanup::AlertCleanupController;
 pub use ex_click::ExClick;
 pub use ex_cursor::ExCursor;
 pub use ex_scroll::ExScroll;
