@@ -66,7 +66,9 @@ impl Queue {
 
     pub fn remove(&mut self, index: usize) {
         self.user_items.remove(index);
-        self.user_items_position -= 1;
+        if self.user_items_position > 0 {
+            self.user_items_position -= 1;
+        }
     }
 
     fn handle_added_queue(&mut self) {

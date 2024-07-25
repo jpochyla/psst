@@ -6,7 +6,7 @@ use crate::{
 };
 
 use druid::{
-    widget::{CrossAxisAlignment, Either, Flex, Label, LineBreaking, List, Scroll}, Data, Env, Lens, LensExt, Widget, WidgetExt
+    widget::{CrossAxisAlignment, Either, Flex, Label, LineBreaking, List, Scroll}, Data, Env, Lens, LensExt, Menu, MenuItem, Widget, WidgetExt
 };
 use druid_shell::Cursor;
 
@@ -55,16 +55,6 @@ fn queue_header_widget() -> impl Widget<AppState> {
                 .center(),
             0.3,
         )
-        .with_child(
-            icons::CLOSE_CIRCLE
-                .scale((16.0, 16.0))
-                .link()
-                .rounded(100.0)
-                .on_click(|ctx, _, _| {
-                    ctx.submit_command(cmd::CLEAR_QUEUE);
-                })
-                .with_cursor(Cursor::Pointer),
-        )
         .fix_height(32.0)
         .padding(theme::grid(1.0))
         .expand_width()
@@ -92,6 +82,7 @@ fn queue_list_widget() -> impl Widget<Vector<QueueEntryWithIndex>> {
                             .with_line_break_mode(LineBreaking::Clip)
                             .expand_width(),
                     )
+                    .context_menu(|item: &QueueEntryWithIndex| queue_entry_context_menu(item.clone()))
                     .on_click(|ctx, data, _| {
                         ctx.submit_command(cmd::SKIP_TO_PLACE_IN_QUEUE.with(data.index));
                     }),
@@ -113,4 +104,14 @@ fn queue_list_widget() -> impl Widget<Vector<QueueEntryWithIndex>> {
             .rounded(theme::BUTTON_BORDER_RADIUS)
     })
     .padding(theme::grid(1.0))
+}
+
+fn queue_entry_context_menu(item: QueueEntryWithIndex) -> Menu<AppState> {
+    Menu::new("")
+        .entry(MenuItem::new("Remove from Queue").on_activate(move |ctx, _, _| {
+            ctx.submit_command(cmd::REMOVE_FROM_QUEUE.with(item.index));
+        }))
+        .entry(MenuItem::new("Clear Queue").on_activate(move |ctx, _, _| {
+            ctx.submit_command(cmd::CLEAR_QUEUE);
+        }))
 }
