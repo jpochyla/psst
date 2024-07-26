@@ -1,7 +1,7 @@
 use druid::{
     commands,
-    widget::{Either, Flex, Label, Painter},
-    Data, Env, KeyOrValue, LensExt, RenderContext, Selector, Widget, WidgetExt,
+    widget::{Either, Flex, Label},
+    Data, LensExt, Selector, Widget, WidgetExt,
 };
 
 use crate::{
