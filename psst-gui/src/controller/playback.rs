@@ -454,7 +454,7 @@ where
                 let track_pos = *cmd.get_unchecked(cmd::SKIP_TO_PLACE_IN_QUEUE);
 
                 // We need a way so it starts playing even if theres no playlist being played from!
-                if track_pos > 0{
+                if track_pos > 0 && !data.playback.queue.is_empty() {
                     data.added_queue = data.added_queue.split_off(track_pos);
                     self.skip_to_place_in_queue(&track_pos);
                     self.next();

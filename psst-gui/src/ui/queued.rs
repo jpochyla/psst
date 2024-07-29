@@ -1,12 +1,14 @@
+use std::sync::Arc;
+
 use crate::{
     cmd,
-    data::{AppState, QueueEntry},
+    data::{self, AppState, Nav, PlaybackOrigin, QueueEntry, RecommendationsRequest},
     ui::Vector,
     widget::{icons, Border, Empty, MyWidgetExt},
 };
 
 use druid::{
-    widget::{CrossAxisAlignment, Either, Flex, Label, LineBreaking, List, Scroll}, Data, Env, Lens, LensExt, Menu, MenuItem, Widget, WidgetExt
+    widget::{CrossAxisAlignment, Either, Flex, Label, LineBreaking, List, Scroll}, Data, Env, Lens, LensExt, LocalizedString, Menu, MenuItem, Widget, WidgetExt
 };
 use druid_shell::Cursor;
 
@@ -107,11 +109,31 @@ fn queue_list_widget() -> impl Widget<Vector<QueueEntryWithIndex>> {
 }
 
 fn queue_entry_context_menu(item: QueueEntryWithIndex) -> Menu<AppState> {
-    Menu::new("")
-        .entry(MenuItem::new("Remove from Queue").on_activate(move |ctx, _, _| {
+    let mut menu = Menu::empty();
+
+    menu = menu.entry(MenuItem::new("Remove from Queue").on_activate(move |ctx, _, _| {
             ctx.submit_command(cmd::REMOVE_FROM_QUEUE.with(item.index));
-        }))
-        .entry(MenuItem::new("Clear Queue").on_activate(move |ctx, _, _| {
+        }));
+
+    menu = menu.entry(MenuItem::new("Clear Queue").on_activate(move |ctx, _, _| {
             ctx.submit_command(cmd::CLEAR_QUEUE);
-        }))
+        }));
+    
+    menu = menu.entry(
+        MenuItem::new(
+            LocalizedString::new("menu-item-show-recommended")
+                .with_placeholder("Show Similar Tracks"),
+        )
+        .command(cmd::NAVIGATE.with(Nav::Recommendations(Arc::new(
+            RecommendationsRequest::for_track(crate::data::TrackId(item.entry.item.id())),
+        )))),
+    );
+    
+    menu = menu.entry(MenuItem::new("Back to origin").on_activate(move |ctx, _, _| {
+        if let PlaybackOrigin::Playlist(playlist_link) = item.entry.origin.clone() {
+            ctx.submit_command(cmd::NAVIGATE.with(Nav::PlaylistDetail(playlist_link)));
+        }
+    }));
+
+    menu
 }

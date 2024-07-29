@@ -131,7 +131,6 @@ fn root_widget() -> impl Widget<AppState> {
         .with_default_spacer()
         .with_child(user::user_widget())
         .center()
-        .fix_height(88.0)
         .background(Border::Top.with_color(theme::GREY_500));
 
     let left_bar = Flex::column()
