@@ -322,14 +322,8 @@ fn volume_slider() -> impl Widget<AppState> {
     const SAVE_DELAY: Duration = Duration::from_millis(100);
     const SAVE_TO_CONFIG: Selector = Selector::new("app.volume.save-to-config");
 
-    Flex::column()
-        .with_child(
-            Label::dynamic(|&volume: &f64, _| format!("Volume: {}%", (volume * 100.0).floor()))
-                .with_text_color(theme::PLACEHOLDER_COLOR)
-                .with_text_size(theme::TEXT_SIZE_SMALL),
-        )
-        .with_default_spacer()
-        .with_child(
+    Flex::row()
+        .with_flex_child(
             Slider::new()
                 .with_range(0.0, 1.0)
                 .expand_width()
@@ -339,8 +333,15 @@ fn volume_slider() -> impl Widget<AppState> {
                     env.set(theme::FOREGROUND_DARK, env.get(theme::GREY_400));
                 })
                 .with_cursor(Cursor::Pointer),
+            1.0,
         )
-        .padding((theme::grid(1.5), 0.0))
+        .with_default_spacer()
+        .with_child(
+            Label::dynamic(|&volume: &f64, _| format!("{}%", (volume * 100.0).floor()))
+                .with_text_color(theme::PLACEHOLDER_COLOR)
+                .with_text_size(theme::TEXT_SIZE_SMALL),
+        )
+        .padding((theme::grid(2.0), 0.0))
         .on_debounce(SAVE_DELAY, |ctx, _, _| ctx.submit_command(SAVE_TO_CONFIG))
         .lens(AppState::playback.then(Playback::volume))
         .on_scroll(
@@ -349,9 +350,6 @@ fn volume_slider() -> impl Widget<AppState> {
                 data.playback.volume = (data.playback.volume + scaled_delta).clamp(0.0, 1.0);
             },
         )
-        .on_command(SAVE_TO_CONFIG, |_, _, data| {
-            data.config.volume = data.playback.volume;
-        })
 }
 
 fn topbar_sort_widget() -> impl Widget<AppState> {
