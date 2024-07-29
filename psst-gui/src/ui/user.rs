@@ -47,8 +47,9 @@ pub fn user_widget() -> impl Widget<AppState> {
         .with_child(
             Flex::column()
                 .with_child(is_connected)
+                .with_default_spacer()
                 .with_child(user_profile)
-                .padding((theme::grid(2.0), theme::grid(1.5))),
+                .padding(theme::grid(1.0)),
         )
         .with_child(preferences_widget(&icons::PREFERENCES))
 }
