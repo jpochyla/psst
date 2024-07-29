@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::{
     cmd,
-    data::{self, AppState, Nav, PlaybackOrigin, QueueEntry, RecommendationsRequest},
+    data::{AppState, Nav, PlaybackOrigin, QueueEntry, RecommendationsRequest},
     ui::Vector,
     widget::{icons, Border, Empty, MyWidgetExt},
 };
