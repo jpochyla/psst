@@ -60,13 +60,7 @@ image = { version = "0.25.1" }
 [package.metadata.bundle]
 name = "Psst"
 identifier = "com.jpochyla.psst"
-icon = [
-  "assets/logo_32.png",
-  "assets/logo_64.png",
-  "assets/logo_128.png",
-  "assets/logo_256.png",
-  "assets/logo_512.png",
-]
+icon = ["assets/logo.icns"]
 version = "0.1.0"
 resources = []
 copyright = "Copyright (c) Jan Pochyla 2024. All rights reserved."
