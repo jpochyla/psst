@@ -101,7 +101,7 @@ jobs:
         run: |
           create-dmg \
             --volname "Psst" \
-            --volicon "assets/logo.icns" \
+            --volicon "psst-gui/assets/logo.icns" \
             --window-pos 200 120 \
             --window-size 800 400 \
             --icon-size 100 \
