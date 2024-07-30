@@ -103,11 +103,12 @@ jobs:
             --volname "Psst" \
             --volicon "psst-gui/assets/logo.icns" \
             --window-pos 200 120 \
-            --window-size 800 400 \
+            --window-size 600 400 \
             --icon-size 100 \
-            --icon "Psst.app" 200 190 \
+            --icon "Psst.app" 150 160 \
             --hide-extension "Psst.app" \
-            --app-drop-link 600 185 \
+            --app-drop-link 450 160 \
+            --no-internet-enable \
             "Psst.dmg" \
             "target/release/bundle/osx/Psst.app"
 
