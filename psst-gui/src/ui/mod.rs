@@ -1,7 +1,9 @@
 use std::time::Duration;
 
 use druid::{
-    im::Vector, widget::{CrossAxisAlignment, Either, Flex, Label, List, Scroll, Slider, Split, ViewSwitcher}, Color, Env, Insets, Key, LensExt, Menu, MenuItem, Selector, Widget, WidgetExt, WindowDesc
+    im::Vector,
+    widget::{CrossAxisAlignment, Either, Flex, Label, List, Scroll, Slider, Split, ViewSwitcher},
+    Color, Env, Insets, Key, LensExt, Menu, MenuItem, Selector, Widget, WidgetExt, WindowDesc,
 };
 use druid_shell::Cursor;
 
@@ -31,6 +33,7 @@ pub mod playable;
 pub mod playback;
 pub mod playlist;
 pub mod preferences;
+pub mod queued;
 pub mod recommend;
 pub mod search;
 pub mod show;
@@ -38,7 +41,6 @@ pub mod theme;
 pub mod track;
 pub mod user;
 pub mod utils;
-pub mod queued;
 
 pub fn main_window(config: &Config) -> WindowDesc<AppState> {
     let win = WindowDesc::new(root_widget())
@@ -131,13 +133,14 @@ fn root_widget() -> impl Widget<AppState> {
         .with_default_spacer()
         .with_child(user::user_widget())
         .center()
+        .fix_height(88.0)
         .background(Border::Top.with_color(theme::GREY_500));
 
     let left_bar = Flex::column()
         .with_flex_child(playlists, 1.0)
         .with_child(controls)
         .background(theme::BACKGROUND_DARK);
-    
+
     let topbar = Flex::row()
         .must_fill_main_axis(true)
         .with_child(topbar_back_button_widget())
@@ -151,7 +154,7 @@ fn root_widget() -> impl Widget<AppState> {
         .with_flex_child(Overlay::bottom(route_widget(), alert_widget()), 1.0)
         .with_child(playback::panel_widget())
         .background(theme::BACKGROUND_LIGHT);
-    
+
     let right_bar = Flex::row()
         .with_flex_child(main, 1.0)
         .with_child(queued::queue_widget())
@@ -168,7 +171,7 @@ fn root_widget() -> impl Widget<AppState> {
         .controller(SessionController)
         .controller(NavController)
         .controller(SortController)
-    
+
     // .debug_invalidation()
     // .debug_widget_id()
     // .debug_paint_layout()

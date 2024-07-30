@@ -8,7 +8,8 @@ use crate::{
 };
 
 use druid::{
-    widget::{CrossAxisAlignment, Either, Flex, Label, LineBreaking, List, Scroll}, Data, Env, Lens, LensExt, LocalizedString, Menu, MenuItem, Widget, WidgetExt
+    widget::{CrossAxisAlignment, Either, Flex, Label, LineBreaking, List, Scroll},
+    Data, Env, Lens, LensExt, LocalizedString, Menu, MenuItem, Widget, WidgetExt,
 };
 use druid_shell::Cursor;
 
@@ -23,13 +24,21 @@ struct QueueEntryWithIndex {
 
 // Convert Vector<QueueEntry> to Vector<QueueEntryWithIndex>
 fn queue_entries_with_index(entries: Vector<QueueEntry>) -> Vector<QueueEntryWithIndex> {
-    entries.into_iter().enumerate().map(|(i, entry)| QueueEntryWithIndex { entry, index: i }).collect()
+    entries
+        .into_iter()
+        .enumerate()
+        .map(|(i, entry)| QueueEntryWithIndex { entry, index: i })
+        .collect()
 }
 
 // Widget for the queue
 pub fn queue_widget() -> impl Widget<AppState> {
     Either::new(
-        |data: &AppState, _env: &Env| data.config.window_size.width >= 700.0 && !data.added_queue.is_empty() && data.config.show_queue_view,
+        |data: &AppState, _env: &Env| {
+            data.config.window_size.width >= 700.0
+                && !data.added_queue.is_empty()
+                && data.config.show_queue_view
+        },
         Flex::column()
             .with_child(queue_header_widget())
             .with_flex_child(
@@ -43,7 +52,7 @@ pub fn queue_widget() -> impl Widget<AppState> {
             )
             .fix_width(185.0)
             .background(Border::Left.with_color(theme::GREY_500)),
-        Empty
+        Empty,
     )
 }
 
@@ -71,20 +80,26 @@ fn queue_list_widget() -> impl Widget<Vector<QueueEntryWithIndex>> {
                 Flex::column()
                     .cross_axis_alignment(CrossAxisAlignment::Start)
                     .with_child(
-                        Label::new(|item: &QueueEntryWithIndex, _env: &Env| item.entry.item.name().to_string())
-                            .with_font(theme::UI_FONT_MEDIUM)
-                            .with_line_break_mode(LineBreaking::Clip)
-                            .expand_width(),
+                        Label::new(|item: &QueueEntryWithIndex, _env: &Env| {
+                            item.entry.item.name().to_string()
+                        })
+                        .with_font(theme::UI_FONT_MEDIUM)
+                        .with_line_break_mode(LineBreaking::Clip)
+                        .expand_width(),
                     )
                     .with_spacer(2.0)
                     .with_child(
-                        Label::new(|item: &QueueEntryWithIndex, _env: &Env| item.entry.item.artist().to_string())
-                            .with_text_size(theme::TEXT_SIZE_SMALL)
-                            .with_text_color(theme::PLACEHOLDER_COLOR)
-                            .with_line_break_mode(LineBreaking::Clip)
-                            .expand_width(),
+                        Label::new(|item: &QueueEntryWithIndex, _env: &Env| {
+                            item.entry.item.artist().to_string()
+                        })
+                        .with_text_size(theme::TEXT_SIZE_SMALL)
+                        .with_text_color(theme::PLACEHOLDER_COLOR)
+                        .with_line_break_mode(LineBreaking::Clip)
+                        .expand_width(),
                     )
-                    .context_menu(|item: &QueueEntryWithIndex| queue_entry_context_menu(item.clone()))
+                    .context_menu(|item: &QueueEntryWithIndex| {
+                        queue_entry_context_menu(item.clone())
+                    })
                     .on_click(|ctx, data, _| {
                         ctx.submit_command(cmd::SKIP_TO_PLACE_IN_QUEUE.with(data.index));
                     }),
@@ -111,14 +126,16 @@ fn queue_list_widget() -> impl Widget<Vector<QueueEntryWithIndex>> {
 fn queue_entry_context_menu(item: QueueEntryWithIndex) -> Menu<AppState> {
     let mut menu = Menu::empty();
 
-    menu = menu.entry(MenuItem::new("Remove from Queue").on_activate(move |ctx, _, _| {
+    menu = menu.entry(
+        MenuItem::new("Remove from Queue").on_activate(move |ctx, _, _| {
             ctx.submit_command(cmd::REMOVE_FROM_QUEUE.with(item.index));
-        }));
+        }),
+    );
 
     menu = menu.entry(MenuItem::new("Clear Queue").on_activate(move |ctx, _, _| {
-            ctx.submit_command(cmd::CLEAR_QUEUE);
-        }));
-    
+        ctx.submit_command(cmd::CLEAR_QUEUE);
+    }));
+
     menu = menu.entry(
         MenuItem::new(
             LocalizedString::new("menu-item-show-recommended")
@@ -128,12 +145,14 @@ fn queue_entry_context_menu(item: QueueEntryWithIndex) -> Menu<AppState> {
             RecommendationsRequest::for_track(crate::data::TrackId(item.entry.item.id())),
         )))),
     );
-    
-    menu = menu.entry(MenuItem::new("Back to origin").on_activate(move |ctx, _, _| {
-        if let PlaybackOrigin::Playlist(playlist_link) = item.entry.origin.clone() {
-            ctx.submit_command(cmd::NAVIGATE.with(Nav::PlaylistDetail(playlist_link)));
-        }
-    }));
+
+    menu = menu.entry(
+        MenuItem::new("Back to origin").on_activate(move |ctx, _, _| {
+            if let PlaybackOrigin::Playlist(playlist_link) = item.entry.origin.clone() {
+                ctx.submit_command(cmd::NAVIGATE.with(Nav::PlaylistDetail(playlist_link)));
+            }
+        }),
+    );
 
     menu
 }
