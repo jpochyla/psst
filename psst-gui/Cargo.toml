@@ -7,6 +7,7 @@ build = "build.rs"
 description = "Fast Spotify client with native GUI"
 repository = "https://github.com/jpochyla/psst"
 
+
 [features]
 default = ["cpal"]
 cpal = ["psst-core/cpal"]
@@ -66,6 +67,8 @@ icon = [
   "assets/logo_128.png",
   "assets/logo_256.png",
   "assets/logo_512.png",
+  "assets/logo.icns",
+
 ]
 version = "0.1.0"
 resources = []
