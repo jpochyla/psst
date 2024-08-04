@@ -52,6 +52,7 @@ raw-window-handle = { version = "0.5.2" } # Must stay compatible with Druid
 souvlaki = { version = "0.7.3", default-features = false, features = [
   "use_zbus",
 ] }
+dark-light = "1.1.1"
 webbrowser = { version = "1.0.1" }
 [target.'cfg(windows)'.build-dependencies]
 winres = { version = "0.1.12" }
