@@ -137,8 +137,8 @@ fn playing_item_widget() -> impl Widget<NowPlaying> {
                         },
                         |selector: &bool, _, _| {
                             match selector {
-                                true => &icons::HEART_SOLID,
-                                false => &icons::HEART_OUTLINE,
+                                true => &icons::CIRCLE_CHECK,
+                                false => &icons::CIRCLE_PLUS,
                             }
                             .scale(theme::ICON_SIZE_SMALL)
                             .boxed()

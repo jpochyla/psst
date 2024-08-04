@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use druid::{
-    widget::{CrossAxisAlignment, Either, Flex, Label, ViewSwitcher},
+    widget::{CrossAxisAlignment, Either, Flex, Label, LineBreaking, ViewSwitcher},
     LensExt, LocalizedString, Menu, MenuItem, Size, TextAlignment, Widget, WidgetExt,
 };
 use psst_core::{
@@ -142,8 +142,8 @@ pub fn playable_widget(track: &Track, display: Display) -> impl Widget<PlayRow<A
                 |row: &PlayRow<Arc<Track>>, _| row.ctx.library.contains_track(&row.item),
                 |selector: &bool, _, _| {
                     match selector {
-                        true => &icons::HEART_SOLID,
-                        false => &icons::HEART_OUTLINE,
+                        true => &icons::CIRCLE_CHECK,
+                        false => &icons::CIRCLE_PLUS,
                     }
                     .scale(theme::ICON_SIZE_SMALL)
                     .boxed()
@@ -230,9 +230,9 @@ pub fn track_menu(
         let more_than_one_artist = track.artists.len() > 1;
         let title = if more_than_one_artist {
             LocalizedString::new("menu-item-show-artist-name")
-                .with_placeholder(format!("Go To Artist “{}”", artist_link.name))
+                .with_placeholder(format!("Go to Artist “{}”", artist_link.name))
         } else {
-            LocalizedString::new("menu-item-show-artist").with_placeholder("Go To Artist")
+            LocalizedString::new("menu-item-show-artist").with_placeholder("Go to Artist")
         };
         menu = menu.entry(
             MenuItem::new(title)
@@ -243,7 +243,7 @@ pub fn track_menu(
     if let Some(album_link) = track.album.as_ref() {
         menu = menu.entry(
             MenuItem::new(
-                LocalizedString::new("menu-item-show-album").with_placeholder("Go To Album"),
+                LocalizedString::new("menu-item-show-album").with_placeholder("Go to Album"),
             )
             .command(cmd::NAVIGATE.with(Nav::AlbumDetail(album_link.to_owned()))),
         );
@@ -287,7 +287,7 @@ pub fn track_menu(
     }
 
     if let PlaybackOrigin::Playlist(playlist) = origin {
-        // do some (hopefully) quick checks to determine if we should give the
+        // Do some (hopefully) quick checks to determine if we should give the
         // option to remove items from this playlist, only allowing it if the
         // playlist is collaborative or we are the owner of it
         let should_show = {
@@ -319,7 +319,7 @@ pub fn track_menu(
             menu = menu.entry(
                 MenuItem::new(
                     LocalizedString::new("menu-item-remove-from-playlist")
-                        .with_placeholder("Remove from this playlist"),
+                        .with_placeholder("Remove from current Playlist"),
                 )
                 .command(playlist::REMOVE_TRACK.with(PlaylistRemoveTrack {
                     link: playlist.to_owned(),
@@ -331,9 +331,9 @@ pub fn track_menu(
 
     menu = menu.entry(
         MenuItem::new(
-            LocalizedString::new("menu-item-add-to-queue").with_placeholder("Add Track To Queue"),
+            LocalizedString::new("menu-item-add-to-queue").with_placeholder("Add Track to Queue"),
         )
-        //PlayerCommand
+        // PlayerCommand
         .command(cmd::ADD_TO_QUEUE.with((
             QueueEntry {
                 item: crate::ui::Playable::Track(track.clone()),

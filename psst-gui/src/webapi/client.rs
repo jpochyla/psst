@@ -242,14 +242,14 @@ impl WebApi {
 
 /// Artist endpoints.
 impl WebApi {
-    // https://developer.spotify.com/documentation/web-api/reference/artists/get-artist/
+    // https://developer.spotify.com/documentation/web-api/reference/get-artist/
     pub fn get_artist(&self, id: &str) -> Result<Artist, Error> {
         let request = self.get(format!("v1/artists/{}", id))?;
         let result = self.load_cached(request, "artist", id)?;
         Ok(result.data)
     }
 
-    // https://developer.spotify.com/documentation/web-api/reference/artists/get-artists-albums/
+    // https://developer.spotify.com/documentation/web-api/reference/get-an-artists-albums/
     pub fn get_artist_albums(&self, id: &str) -> Result<ArtistAlbums, Error> {
         let request = self
             .get(format!("v1/artists/{}/albums", id))?
@@ -295,7 +295,7 @@ impl WebApi {
         Ok(artist_albums)
     }
 
-    // https://developer.spotify.com/documentation/web-api/reference/artists/get-artists-top-tracks/
+    // https://developer.spotify.com/documentation/web-api/reference/get-artists-top-tracks/
     pub fn get_artist_top_tracks(&self, id: &str) -> Result<Vector<Arc<Track>>, Error> {
         #[derive(Deserialize)]
         struct Tracks {
@@ -309,7 +309,7 @@ impl WebApi {
         Ok(result.tracks)
     }
 
-    // https://developer.spotify.com/documentation/web-api/reference/artists/get-related-artists/
+    // https://developer.spotify.com/documentation/web-api/reference/get-related-artists/
     pub fn get_related_artists(&self, id: &str) -> Result<Cached<Vector<Artist>>, Error> {
         #[derive(Clone, Data, Deserialize)]
         struct Artists {
@@ -324,7 +324,7 @@ impl WebApi {
 
 /// Album endpoints.
 impl WebApi {
-    // https://developer.spotify.com/documentation/web-api/reference/albums/get-album/
+    // https://developer.spotify.com/documentation/web-api/reference/get-an-album/
     pub fn get_album(&self, id: &str) -> Result<Cached<Arc<Album>>, Error> {
         let request = self
             .get(format!("v1/albums/{}", id))?
@@ -336,7 +336,7 @@ impl WebApi {
 
 /// Show endpoints. (Podcasts)
 impl WebApi {
-    // https://developer.spotify.com/documentation/web-api/reference/#/operations/get-multiple-episodes
+    // https://developer.spotify.com/documentation/web-api/reference/get-multiple-episodes
     pub fn get_episodes(
         &self,
         ids: impl IntoIterator<Item = EpisodeId>,
@@ -354,7 +354,7 @@ impl WebApi {
         Ok(result.episodes)
     }
 
-    // https://developer.spotify.com/documentation/web-api/reference/#/operations/get-a-shows-episodes
+    // https://developer.spotify.com/documentation/web-api/reference/get-a-shows-episodes
     pub fn get_show_episodes(&self, id: &str) -> Result<Vector<Arc<Episode>>, Error> {
         let request = self
             .get(format!("v1/shows/{}/episodes", id))?
@@ -376,7 +376,7 @@ impl WebApi {
 
 /// Track endpoints.
 impl WebApi {
-    // https://developer.spotify.com/documentation/web-api/reference/#endpoint-get-track
+    // https://developer.spotify.com/documentation/web-api/reference/get-track
     pub fn get_track(&self, id: &str) -> Result<Arc<Track>, Error> {
         let request = self
             .get(format!("v1/tracks/{}", id))?
@@ -388,7 +388,7 @@ impl WebApi {
 
 /// Library endpoints.
 impl WebApi {
-    // https://developer.spotify.com/documentation/web-api/reference/library/get-users-saved-albums/
+    // https://developer.spotify.com/documentation/web-api/reference/get-users-saved-albums/
     pub fn get_saved_albums(&self) -> Result<Vector<Arc<Album>>, Error> {
         #[derive(Clone, Deserialize)]
         struct SavedAlbum {
@@ -404,21 +404,21 @@ impl WebApi {
             .collect())
     }
 
-    // https://developer.spotify.com/documentation/web-api/reference/library/save-albums-user/
+    // https://developer.spotify.com/documentation/web-api/reference/save-albums-user/
     pub fn save_album(&self, id: &str) -> Result<(), Error> {
         let request = self.put("v1/me/albums")?.query("ids", id);
         self.send_empty_json(request)?;
         Ok(())
     }
 
-    // https://developer.spotify.com/documentation/web-api/reference/library/remove-albums-user/
+    // https://developer.spotify.com/documentation/web-api/reference/remove-albums-user/
     pub fn unsave_album(&self, id: &str) -> Result<(), Error> {
         let request = self.delete("v1/me/albums")?.query("ids", id);
         self.send_empty_json(request)?;
         Ok(())
     }
 
-    // https://developer.spotify.com/documentation/web-api/reference/library/get-users-saved-tracks/
+    // https://developer.spotify.com/documentation/web-api/reference/get-users-saved-tracks/
     pub fn get_saved_tracks(&self) -> Result<Vector<Arc<Track>>, Error> {
         #[derive(Clone, Deserialize)]
         struct SavedTrack {
@@ -434,7 +434,7 @@ impl WebApi {
             .collect())
     }
 
-    // https://developer.spotify.com/documentation/web-api/reference/#/operations/get-users-saved-shows
+    // https://developer.spotify.com/documentation/web-api/reference/get-users-saved-shows
     pub fn get_saved_shows(&self) -> Result<Vector<Arc<Show>>, Error> {
         #[derive(Clone, Deserialize)]
         struct SavedShow {
@@ -450,28 +450,28 @@ impl WebApi {
             .collect())
     }
 
-    // https://developer.spotify.com/documentation/web-api/reference/library/save-tracks-user/
+    // https://developer.spotify.com/documentation/web-api/reference/save-tracks-user/
     pub fn save_track(&self, id: &str) -> Result<(), Error> {
         let request = self.put("v1/me/tracks")?.query("ids", id);
         self.send_empty_json(request)?;
         Ok(())
     }
 
-    // https://developer.spotify.com/documentation/web-api/reference/library/remove-tracks-user/
+    // https://developer.spotify.com/documentation/web-api/reference/remove-tracks-user/
     pub fn unsave_track(&self, id: &str) -> Result<(), Error> {
         let request = self.delete("v1/me/tracks")?.query("ids", id);
         self.send_empty_json(request)?;
         Ok(())
     }
 
-    // https://developer.spotify.com/documentation/web-api/reference/#/operations/save-shows-user
+    // https://developer.spotify.com/documentation/web-api/reference/save-shows-user
     pub fn save_show(&self, id: &str) -> Result<(), Error> {
         let request = self.put("v1/me/shows")?.query("ids", id);
         self.send_empty_json(request)?;
         Ok(())
     }
 
-    // https://developer.spotify.com/documentation/web-api/reference/#/operations/remove-shows-user
+    // https://developer.spotify.com/documentation/web-api/reference/remove-shows-user
     pub fn unsave_show(&self, id: &str) -> Result<(), Error> {
         let request = self.delete("v1/me/shows")?.query("ids", id);
         self.send_empty_json(request)?;
@@ -499,7 +499,7 @@ impl WebApi {
 
 /// Playlist endpoints.
 impl WebApi {
-    // https://developer.spotify.com/documentation/web-api/reference/#endpoint-get-a-list-of-current-users-playlists
+    // https://developer.spotify.com/documentation/web-api/reference/get-a-list-of-current-users-playlists
     pub fn get_playlists(&self) -> Result<Vector<Playlist>, Error> {
         let request = self.get("v1/me/playlists")?;
         let result = self.load_all_pages(request)?;
@@ -518,14 +518,14 @@ impl WebApi {
         Ok(())
     }
 
-    // https://developer.spotify.com/documentation/web-api/reference/#endpoint-get-playlist
+    // https://developer.spotify.com/documentation/web-api/reference/get-playlist
     pub fn get_playlist(&self, id: &str) -> Result<Playlist, Error> {
         let request = self.get(format!("v1/me/playlists/{}", id))?;
         let result = self.load(request)?;
         Ok(result)
     }
 
-    // https://developer.spotify.com/documentation/web-api/reference/#endpoint-get-playlists-tracks
+    // https://developer.spotify.com/documentation/web-api/reference/get-playlists-tracks
     pub fn get_playlist_tracks(&self, id: &str) -> Result<Vector<Arc<Track>>, Error> {
         #[derive(Clone, Deserialize)]
         struct PlaylistItem {
@@ -570,7 +570,7 @@ impl WebApi {
         Ok(())
     }
 
-    // https://developer.spotify.com/documentation/web-api/reference/#endpoint-add-tracks-to-playlist
+    // https://developer.spotify.com/documentation/web-api/reference/add-tracks-to-playlist
     pub fn add_track_to_playlist(&self, playlist_id: &str, track_uri: &str) -> Result<(), Error> {
         let request = self
             .post(format!("v1/playlists/{}/tracks", playlist_id))?
@@ -578,7 +578,7 @@ impl WebApi {
         self.send_empty_json(request)
     }
 
-    // https://developer.spotify.com/documentation/web-api/reference/#/operations/remove-tracks-playlist
+    // https://developer.spotify.com/documentation/web-api/reference/remove-tracks-playlist
     pub fn remove_track_from_playlist(
         &self,
         playlist_id: &str,
@@ -651,7 +651,7 @@ impl WebApi {
 
 /// Recommendation endpoints.
 impl WebApi {
-    // https://developer.spotify.com/documentation/web-api/reference/#endpoint-get-recommendations
+    // https://developer.spotify.com/documentation/web-api/reference/get-recommendations
     pub fn get_recommendations(
         &self,
         data: Arc<RecommendationsRequest>,
@@ -705,7 +705,7 @@ impl WebApi {
 
 /// Track endpoints.
 impl WebApi {
-    // https://developer.spotify.com/documentation/web-api/reference/tracks/get-audio-analysis/
+    // https://developer.spotify.com/documentation/web-api/reference/get-audio-analysis/
     pub fn _get_audio_analysis(&self, track_id: &str) -> Result<AudioAnalysis, Error> {
         let request = self.get(format!("v1/audio-analysis/{}", track_id))?;
         let result = self.load_cached(request, "audio-analysis", track_id)?;

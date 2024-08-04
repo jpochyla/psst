@@ -99,7 +99,7 @@ pub fn episode_menu(episode: &Episode, _library: &Arc<Library>) -> Menu<AppState
     let mut menu = Menu::empty();
 
     menu = menu.entry(
-        MenuItem::new(LocalizedString::new("menu-item-show-show").with_placeholder("Go To Show"))
+        MenuItem::new(LocalizedString::new("menu-item-show-show").with_placeholder("Go to Show"))
             .command(cmd::NAVIGATE.with(Nav::ShowDetail(episode.show.clone()))),
     );
 
