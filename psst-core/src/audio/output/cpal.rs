@@ -1,8 +1,9 @@
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::StreamConfig;
-use crossbeam_channel::{bounded, Receiver, Sender};
-use num_traits::Pow;
-use std::time::Duration;
+use crossbeam_channel::{unbounded, Receiver, Sender};
+use std::sync::atomic::{AtomicU32, AtomicUsize, Ordering};
+
+use std::mem::transmute;
 
 use crate::{
     actor::{Act, Actor, ActorHandle},
@@ -14,37 +15,51 @@ use crate::{
 };
 
 pub struct CpalOutput {
-    _handle: ActorHandle<StreamMsg>,
+    _handle: ActorHandle<AudioMessage>,
     sink: CpalSink,
+}
+
+struct AtomicF32(AtomicU32);
+
+impl AtomicF32 {
+    fn new(value: f32) -> Self {
+        Self(AtomicU32::new(unsafe { transmute(value) }))
+    }
+
+    fn load(&self, order: Ordering) -> f32 {
+        unsafe { transmute(self.0.load(order)) }
+    }
+
+    fn store(&self, value: f32, order: Ordering) {
+        self.0.store(unsafe { transmute(value) }, order)
+    }
 }
 
 impl CpalOutput {
     pub fn open() -> Result<Self, Error> {
-        // Open the default output device.
-        let device = cpal::default_host()
-            .default_output_device()
-            .ok_or(cpal::DefaultStreamConfigError::DeviceNotAvailable)?;
+        let device =
+            cpal::default_host()
+                .default_output_device()
+                .ok_or(Error::AudioOutputError(Box::new(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    "No output device found",
+                ))))?;
 
         if let Ok(name) = device.name() {
             log::info!("using audio device: {:?}", name);
         }
 
-        // Get the default device config, so we know what sample format and sample rate
-        // the device supports.
         let supported = Self::preferred_output_config(&device)?;
-
-        let (callback_send, callback_recv) = bounded(16);
+        let (sender, receiver) = unbounded();
 
         let handle = Stream::spawn_with_default_cap("audio_output", {
             let config = supported.config();
-            // TODO: Support additional sample formats.
-            move |this| Stream::open(device, config, callback_recv, this).unwrap()
+            move |this| Stream::open(device, config, receiver, this).unwrap()
         });
         let sink = CpalSink {
             channel_count: supported.channels(),
             sample_rate: supported.sample_rate(),
-            stream_send: handle.sender(),
-            callback_send,
+            sender,
         };
 
         Ok(Self {
@@ -86,20 +101,13 @@ impl AudioOutput for CpalOutput {
 pub struct CpalSink {
     channel_count: cpal::ChannelCount,
     sample_rate: cpal::SampleRate,
-    callback_send: Sender<CallbackMsg>,
-    stream_send: Sender<StreamMsg>,
+    sender: Sender<AudioMessage>,
 }
 
 impl CpalSink {
-    fn send_to_callback(&self, msg: CallbackMsg) {
-        if self.callback_send.send(msg).is_err() {
-            log::error!("output stream actor is dead");
-        }
-    }
-
-    fn send_to_stream(&self, msg: StreamMsg) {
-        if self.stream_send.send(msg).is_err() {
-            log::error!("output stream actor is dead");
+    fn send_message(&self, msg: AudioMessage) {
+        if self.sender.send(msg).is_err() {
+            log::error!("Audio channel is closed");
         }
     }
 }
@@ -114,22 +122,20 @@ impl AudioSink for CpalSink {
     }
 
     fn set_volume(&self, volume: f32) {
-        self.send_to_callback(CallbackMsg::SetVolume(volume));
+        self.send_message(AudioMessage::SetVolume(volume));
     }
 
     fn play(&self, source: impl AudioSource) {
-        self.send_to_callback(CallbackMsg::PlayAndResume(Box::new(source)));
-        self.send_to_stream(StreamMsg::FlushAndResume);
+        self.send_message(AudioMessage::SwitchTrack(Box::new(source)));
+        self.send_message(AudioMessage::Resume);
     }
 
     fn pause(&self) {
-        self.send_to_stream(StreamMsg::Pause);
-        self.send_to_callback(CallbackMsg::Pause);
+        self.send_message(AudioMessage::Pause);
     }
 
     fn resume(&self) {
-        self.send_to_callback(CallbackMsg::Resume);
-        self.send_to_stream(StreamMsg::Resume);
+        self.send_message(AudioMessage::Resume);
     }
 
     fn stop(&self) {
@@ -138,35 +144,30 @@ impl AudioSink for CpalSink {
     }
 
     fn close(&self) {
-        self.send_to_stream(StreamMsg::Close);
+        self.send_message(AudioMessage::Close);
+    }
+
+    fn switch_track(&self, new_source: impl AudioSource) {
+        self.send_message(AudioMessage::SwitchTrack(Box::new(new_source)));
     }
 }
 
 struct Stream {
     stream: cpal::Stream,
     config: StreamConfig,
-    callback_send: Sender<CallbackMsg>,
-    stream_send: Sender<StreamMsg>,
+    sender: Sender<AudioMessage>,
 }
 
 impl Stream {
     fn open(
         device: cpal::Device,
         config: cpal::StreamConfig,
-        callback_recv: Receiver<CallbackMsg>,
-        stream_send: Sender<StreamMsg>,
+        receiver: Receiver<AudioMessage>,
+        stream_send: Sender<AudioMessage>,
     ) -> Result<Self, Error> {
-        let mut callback = StreamCallback {
-            callback_recv,
-            stream_send,
-            source: Box::new(Empty),
-            volume: 1.0, // We start with the full volume.
-            state: CallbackState::Paused,
-        };
+        let mut callback = StreamCallback::new(receiver);
 
         log::info!("opening output stream: {:?}", config);
-        let (callback_send, _callback_recv) = crossbeam_channel::unbounded();
-        let (stream_send, _stream_recv) = crossbeam_channel::unbounded();
 
         let stream = device.build_output_stream(
             &config,
@@ -182,196 +183,120 @@ impl Stream {
         Ok(Self {
             stream,
             config,
-            callback_send,
-            stream_send,
+            sender: stream_send,
         })
     }
-}
 
-impl Stream {
-    fn handle(&mut self, msg: StreamMsg) -> Result<Act<Self>, Error> {
+    fn handle(&mut self, msg: AudioMessage) -> Result<Act<Self>, Error> {
         match msg {
-            StreamMsg::Pause => {
-                log::debug!("pausing audio output stream");
-                if let Err(err) = self.stream.pause() {
-                    log::error!("failed to stop stream: {}", err);
-                }
-                Ok(Act::Continue)
-            }
-            StreamMsg::Resume => {
-                log::debug!("resuming audio output stream");
-                if let Err(err) = self.stream.play() {
-                    log::error!("failed to start stream: {}", err);
-                }
-                Ok(Act::Continue)
-            }
-            StreamMsg::Close => {
+            AudioMessage::Pause => self.pause_playback(),
+            AudioMessage::Resume => self.resume_playback(),
+            AudioMessage::Close => {
                 log::debug!("closing audio output stream");
                 let _ = self.stream.pause();
                 Ok(Act::Shutdown)
             }
-            StreamMsg::FlushAndResume => {
-                self.flush_buffer();
-                self.handle(StreamMsg::Resume)
-            }
-        }
-    }
-
-    fn flush_buffer(&mut self) {
-        // Step 1: Stop the stream
-        if let Err(err) = self.stream.pause() {
-            log::error!("Failed to pause stream for buffer flush: {}", err);
-            return;
-        }
-
-        // Step 2: Create a temporary silent buffer
-        let buffer_duration = Duration::from_millis(100); // Adjust as needed
-        let num_samples = (self.config.sample_rate.0 as f32 * buffer_duration.as_secs_f32())
-            as usize
-            * self.config.channels as usize;
-        let silent_buffer = vec![0.0f32; num_samples];
-
-        // Step 3: Write silent samples to flush any remaining audio
-        let (temp_sender, temp_receiver) = crossbeam_channel::bounded(16);
-
-        let mut temp_callback = StreamCallback {
-            callback_recv: temp_receiver,
-            stream_send: self.stream_send.clone(),
-            source: Box::new(Empty),
-            state: CallbackState::Playing,
-            volume: 1.0,
-        };
-
-        // Simulate a write operation to flush the buffer
-        let mut output_buffer = vec![0.0f32; silent_buffer.len()];
-        temp_callback.write_samples(&mut output_buffer);
-
-        // Step 4: Prepare the stream for playback again
-        if let Err(err) = self.stream.play() {
-            log::error!("Failed to resume stream after buffer flush: {}", err);
+            AudioMessage::SwitchTrack(_) | AudioMessage::SetVolume(_) => Ok(Act::Continue),
         }
     }
 
     fn resume_playback(&mut self) -> Result<Act<Self>, Error> {
         log::debug!("resuming audio output stream");
-        if let Err(err) = self.stream.play() {
-            log::error!("failed to start stream: {}", err);
-        }
+        self.stream.play()?;
         Ok(Act::Continue)
     }
 
     fn pause_playback(&mut self) -> Result<Act<Self>, Error> {
         log::debug!("pausing audio output stream");
-        if let Err(err) = self.stream.pause() {
-            log::error!("failed to pause stream: {}", err);
-        }
+        self.stream.pause()?;
         Ok(Act::Continue)
     }
 }
 
 impl Actor for Stream {
-    type Message = StreamMsg;
+    type Message = AudioMessage;
     type Error = Error;
 
     fn handle(&mut self, msg: Self::Message) -> Result<Act<Self>, Self::Error> {
-        match msg {
-            StreamMsg::Pause => {
-                log::debug!("pausing audio output stream");
-                if let Err(err) = self.stream.pause() {
-                    log::error!("failed to stop stream: {}", err);
-                }
-                Ok(Act::Continue)
-            }
-            StreamMsg::Resume => {
-                log::debug!("resuming audio output stream");
-                if let Err(err) = self.stream.play() {
-                    log::error!("failed to start stream: {}", err);
-                }
-                Ok(Act::Continue)
-            }
-            StreamMsg::Close => {
-                log::debug!("closing audio output stream");
-                let _ = self.stream.pause();
-                Ok(Act::Shutdown)
-            }
-            StreamMsg::FlushAndResume => {
-                log::debug!("flushing buffer and resuming audio output stream");
-                self.flush_buffer();
-                if let Err(err) = self.stream.play() {
-                    log::error!("failed to resume stream after flush: {}", err);
-                }
-                Ok(Act::Continue)
-            }
-        }
+        self.handle(msg)
     }
 }
 
-enum StreamMsg {
-    FlushAndResume,
-    Pause,
-    Resume,
-    Close,
-}
-
-enum CallbackMsg {
-    PlayAndResume(Box<dyn AudioSource>),
+enum AudioMessage {
+    SwitchTrack(Box<dyn AudioSource>),
     Pause,
     Resume,
     SetVolume(f32),
+    Close,
 }
 
-enum CallbackState {
+#[repr(usize)]
+enum State {
     Playing,
     Paused,
 }
 
 struct StreamCallback {
-    #[allow(unused)]
-    stream_send: Sender<StreamMsg>,
-    callback_recv: Receiver<CallbackMsg>,
-    source: Box<dyn AudioSource>,
-    state: CallbackState,
-    volume: f32,
+    receiver: Receiver<AudioMessage>,
+    current_source: Box<dyn AudioSource>,
+    state: AtomicUsize,
+    volume: AtomicF32,
 }
 
 impl StreamCallback {
+    fn new(receiver: Receiver<AudioMessage>) -> Self {
+        Self {
+            receiver,
+            current_source: Box::new(Empty),
+            state: AtomicUsize::new(State::Paused as usize),
+            volume: AtomicF32::new(1.0),
+        }
+    }
+
     fn write_samples(&mut self, output: &mut [f32]) {
-        while let Ok(msg) = self.callback_recv.try_recv() {
+        self.process_messages();
+
+        match State::from_usize(self.state.load(Ordering::Relaxed)) {
+            State::Playing => self.write_playing(output),
+            State::Paused => output.iter_mut().for_each(|s| *s = 0.0),
+        }
+    }
+
+    fn write_playing(&mut self, output: &mut [f32]) {
+        let written = self.current_source.write(output);
+        self.apply_volume(output, written);
+    }
+
+    fn apply_volume(&self, output: &mut [f32], written: usize) {
+        let volume = self.volume.load(Ordering::Relaxed);
+        output[..written].iter_mut().for_each(|s| *s *= volume);
+    }
+
+    fn process_messages(&mut self) {
+        while let Ok(msg) = self.receiver.try_recv() {
             match msg {
-                CallbackMsg::PlayAndResume(src) => {
-                    self.source = src;
-                    self.state = CallbackState::Playing;
+                AudioMessage::SwitchTrack(new_source) => {
+                    self.current_source = new_source;
+                    self.state.store(State::Playing as usize, Ordering::Relaxed);
                 }
-                CallbackMsg::Pause => {
-                    self.state = CallbackState::Paused;
+                AudioMessage::Pause => self.state.store(State::Paused as usize, Ordering::Relaxed),
+                AudioMessage::Resume => {
+                    self.state.store(State::Playing as usize, Ordering::Relaxed)
                 }
-                CallbackMsg::Resume => {
-                    self.state = CallbackState::Playing;
-                }
-                CallbackMsg::SetVolume(volume) => {
-                    self.volume = volume;
-                }
+                AudioMessage::SetVolume(volume) => self.volume.store(volume, Ordering::Relaxed),
+                AudioMessage::Close => self.state.store(State::Paused as usize, Ordering::Relaxed),
             }
         }
+    }
+}
 
-        let written = if matches!(self.state, CallbackState::Playing) {
-            // Write out as many samples as possible from the audio source to the
-            // output buffer.
-            let written = self.source.write(output);
-
-            // Apply scaled global volume level.
-            let scaled_volume = self.volume.pow(4);
-            output[..written]
-                .iter_mut()
-                .for_each(|s| *s *= scaled_volume);
-
-            written
-        } else {
-            0
-        };
-
-        // Mute any remaining samples.
-        output[written..].iter_mut().for_each(|s| *s = 0.0);
+impl State {
+    fn from_usize(value: usize) -> Self {
+        match value {
+            0 => State::Playing,
+            1 => State::Paused,
+            _ => panic!("Invalid state value"),
+        }
     }
 }
 

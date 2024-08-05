@@ -18,7 +18,7 @@ pub trait AudioOutput {
     fn sink(&self) -> Self::Sink;
 }
 
-pub trait AudioSink {
+pub trait AudioSink: Send + Sync + 'static {
     fn channel_count(&self) -> usize;
     fn sample_rate(&self) -> u32;
     fn set_volume(&self, volume: f32);
@@ -27,4 +27,5 @@ pub trait AudioSink {
     fn resume(&self);
     fn stop(&self);
     fn close(&self);
+    fn switch_track(&self, new_source: impl AudioSource);
 }
