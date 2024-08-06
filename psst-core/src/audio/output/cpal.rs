@@ -1,9 +1,8 @@
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::StreamConfig;
-use crossbeam_channel::{unbounded, Receiver, Sender};
-use std::sync::atomic::{AtomicU32, AtomicUsize, Ordering};
-
-use std::mem::transmute;
+use crossbeam_channel::{bounded, Receiver, Sender};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 
 use crate::{
     actor::{Act, Actor, ActorHandle},
@@ -14,25 +13,56 @@ use crate::{
     error::Error,
 };
 
+const DEF_BUFFER_SIZE: usize = 8096;
+struct LockFreeRingBuffer {
+    buffer: Box<[f32]>,
+    read_pos: AtomicUsize,
+    write_pos: AtomicUsize,
+}
+
+impl LockFreeRingBuffer {
+    fn new(size: usize) -> Self {
+        Self {
+            buffer: vec![0.0; size].into_boxed_slice(),
+            read_pos: AtomicUsize::new(0),
+            write_pos: AtomicUsize::new(0),
+        }
+    }
+
+    fn write(&mut self, data: &[f32]) -> usize {
+        let mut written = 0;
+        let mut write_pos = self.write_pos.load(Ordering::Relaxed) as usize;
+        for &sample in data {
+            self.buffer[write_pos] = sample;
+            write_pos = (write_pos + 1) % DEF_BUFFER_SIZE;
+            written += 1;
+            if write_pos == self.read_pos.load(Ordering::Relaxed) as usize {
+                break;
+            }
+        }
+        self.write_pos.store(write_pos, Ordering::Release);
+        written
+    }
+
+    fn read(&self, data: &mut [f32]) -> usize {
+        let mut read = 0;
+        let mut read_pos = self.read_pos.load(Ordering::Relaxed) as usize;
+        for sample in data.iter_mut() {
+            if read_pos == self.write_pos.load(Ordering::Relaxed) as usize {
+                break;
+            }
+            *sample = self.buffer[read_pos];
+            read_pos = (read_pos + 1) % DEF_BUFFER_SIZE;
+            read += 1;
+        }
+        self.read_pos.store(read_pos, Ordering::Release);
+        read
+    }
+}
+
 pub struct CpalOutput {
     _handle: ActorHandle<AudioMessage>,
     sink: CpalSink,
-}
-
-struct AtomicF32(AtomicU32);
-
-impl AtomicF32 {
-    fn new(value: f32) -> Self {
-        Self(AtomicU32::new(unsafe { transmute(value) }))
-    }
-
-    fn load(&self, order: Ordering) -> f32 {
-        unsafe { transmute(self.0.load(order)) }
-    }
-
-    fn store(&self, value: f32, order: Ordering) {
-        self.0.store(unsafe { transmute(value) }, order)
-    }
 }
 
 impl CpalOutput {
@@ -50,7 +80,7 @@ impl CpalOutput {
         }
 
         let supported = Self::preferred_output_config(&device)?;
-        let (sender, receiver) = unbounded();
+        let (sender, receiver) = bounded(100);
 
         let handle = Stream::spawn_with_default_cap("audio_output", {
             let config = supported.config();
@@ -152,9 +182,28 @@ impl AudioSink for CpalSink {
     }
 }
 
+// Implement a state machine for managing playback states
+#[derive(Clone, Copy, PartialEq)]
+enum PlaybackState {
+    Playing = 0,
+    Paused = 1,
+    Stopped = 2,
+}
+
+impl PlaybackState {
+    fn from_usize(value: usize) -> Self {
+        match value {
+            0 => PlaybackState::Playing,
+            1 => PlaybackState::Paused,
+            _ => PlaybackState::Stopped,
+        }
+    }
+}
+
 struct Stream {
     stream: cpal::Stream,
     config: StreamConfig,
+    state: Arc<AtomicUsize>,
     sender: Sender<AudioMessage>,
 }
 
@@ -165,7 +214,9 @@ impl Stream {
         receiver: Receiver<AudioMessage>,
         stream_send: Sender<AudioMessage>,
     ) -> Result<Self, Error> {
-        let mut callback = StreamCallback::new(receiver);
+        let state = Arc::new(AtomicUsize::new((PlaybackState::Stopped as u8) as usize));
+        let mut callback: StreamCallback =
+            StreamCallback::new(receiver, state.clone(), DEF_BUFFER_SIZE);
 
         log::info!("opening output stream: {:?}", config);
 
@@ -183,6 +234,7 @@ impl Stream {
         Ok(Self {
             stream,
             config,
+            state,
             sender: stream_send,
         })
     }
@@ -202,12 +254,16 @@ impl Stream {
 
     fn resume_playback(&mut self) -> Result<Act<Self>, Error> {
         log::debug!("resuming audio output stream");
+        self.state
+            .store((PlaybackState::Playing as u8) as usize, Ordering::SeqCst);
         self.stream.play()?;
         Ok(Act::Continue)
     }
 
     fn pause_playback(&mut self) -> Result<Act<Self>, Error> {
         log::debug!("pausing audio output stream");
+        self.state
+            .store((PlaybackState::Paused as u8) as usize, Ordering::SeqCst);
         self.stream.pause()?;
         Ok(Act::Continue)
     }
@@ -230,46 +286,56 @@ enum AudioMessage {
     Close,
 }
 
-#[repr(usize)]
-enum State {
-    Playing,
-    Paused,
-}
-
 struct StreamCallback {
     receiver: Receiver<AudioMessage>,
     current_source: Box<dyn AudioSource>,
-    state: AtomicUsize,
-    volume: AtomicF32,
+    state: Arc<AtomicUsize>,
+    volume: f32,
+    ring_buffer: LockFreeRingBuffer,
 }
 
 impl StreamCallback {
-    fn new(receiver: Receiver<AudioMessage>) -> Self {
+    fn new(receiver: Receiver<AudioMessage>, state: Arc<AtomicUsize>, buffer_size: usize) -> Self {
         Self {
             receiver,
             current_source: Box::new(Empty),
-            state: AtomicUsize::new(State::Paused as usize),
-            volume: AtomicF32::new(1.0),
+            state,
+            volume: 1.0,
+            ring_buffer: LockFreeRingBuffer::new(buffer_size),
         }
     }
 
     fn write_samples(&mut self, output: &mut [f32]) {
         self.process_messages();
 
-        match State::from_usize(self.state.load(Ordering::Relaxed)) {
-            State::Playing => self.write_playing(output),
-            State::Paused => output.iter_mut().for_each(|s| *s = 0.0),
+        match PlaybackState::from_usize(self.state.load(Ordering::Relaxed)) {
+            PlaybackState::Playing => self.write_playing(output),
+            PlaybackState::Paused => self.write_paused(output),
+            PlaybackState::Stopped => output.iter_mut().for_each(|s| *s = 0.0),
         }
     }
 
     fn write_playing(&mut self, output: &mut [f32]) {
-        let written = self.current_source.write(output);
-        self.apply_volume(output, written);
+        let mut temp_buffer = vec![0.0; output.len()];
+        let written = self.current_source.write(&mut temp_buffer);
+        self.ring_buffer.write(&temp_buffer[..written]);
+        let read = self.ring_buffer.read(output);
+        self.apply_volume(output, read);
+    }
+
+    fn write_paused(&mut self, output: &mut [f32]) {
+        let read = self.ring_buffer.read(output);
+        self.apply_volume(output, read);
+        output[read..].iter_mut().for_each(|s| *s = 0.0);
     }
 
     fn apply_volume(&self, output: &mut [f32], written: usize) {
-        let volume = self.volume.load(Ordering::Relaxed);
-        output[..written].iter_mut().for_each(|s| *s *= volume);
+        const VOLUME_CHUNK_SIZE: usize = 1024;
+        output[..written]
+            .chunks_mut(VOLUME_CHUNK_SIZE)
+            .for_each(|chunk| {
+                chunk.iter_mut().for_each(|sample| *sample *= self.volume);
+            });
     }
 
     fn process_messages(&mut self) {
@@ -277,25 +343,21 @@ impl StreamCallback {
             match msg {
                 AudioMessage::SwitchTrack(new_source) => {
                     self.current_source = new_source;
-                    self.state.store(State::Playing as usize, Ordering::Relaxed);
+                    self.state
+                        .store(PlaybackState::Playing as usize, Ordering::Release);
+                    self.ring_buffer = LockFreeRingBuffer::new(self.ring_buffer.buffer.len());
                 }
-                AudioMessage::Pause => self.state.store(State::Paused as usize, Ordering::Relaxed),
-                AudioMessage::Resume => {
-                    self.state.store(State::Playing as usize, Ordering::Relaxed)
-                }
-                AudioMessage::SetVolume(volume) => self.volume.store(volume, Ordering::Relaxed),
-                AudioMessage::Close => self.state.store(State::Paused as usize, Ordering::Relaxed),
+                AudioMessage::Pause => self
+                    .state
+                    .store(PlaybackState::Paused as usize, Ordering::Release),
+                AudioMessage::Resume => self
+                    .state
+                    .store(PlaybackState::Playing as usize, Ordering::Release),
+                AudioMessage::SetVolume(volume) => self.volume = volume,
+                AudioMessage::Close => self
+                    .state
+                    .store(PlaybackState::Stopped as usize, Ordering::Release),
             }
-        }
-    }
-}
-
-impl State {
-    fn from_usize(value: usize) -> Self {
-        match value {
-            0 => State::Playing,
-            1 => State::Paused,
-            _ => panic!("Invalid state value"),
         }
     }
 }
