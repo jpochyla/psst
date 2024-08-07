@@ -92,16 +92,32 @@ jobs:
             target/x86_64-apple-darwin/release/psst-gui \
             target/aarch64-apple-darwin/release/psst-gui
 
-      - name: Create macOS Disk Image
+      - name: Install create-dmg
         if: runner.os == 'macOS'
-        run: hdiutil create -volname "Psst" -srcfolder target/release/bundle/osx -ov -format UDZO Psst.dmg
+        run: brew install create-dmg
 
-      - name: Upload macOS Disk Image
+      - name: Create DMG
+        if: runner.os == 'macOS'
+        run: |
+          create-dmg \
+            --volname "Psst" \
+            --volicon "psst-gui/assets/logo.icns" \
+            --window-pos 200 120 \
+            --window-size 600 400 \
+            --icon-size 100 \
+            --icon "Psst.app" 150 160 \
+            --hide-extension "Psst.app" \
+            --app-drop-link 450 160 \
+            --no-internet-enable \
+            "Psst.dmg" \
+            "target/release/bundle/osx/Psst.app"
+
+      - name: Upload macOS DMG
         uses: actions/upload-artifact@v4
         if: runner.os == 'macOS'
         with:
           name: Psst.dmg
-          path: ./Psst.dmg
+          path: Psst.dmg
 
       - name: Make Linux Binary Executable
         if: runner.os == 'Linux'
