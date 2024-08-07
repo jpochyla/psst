@@ -58,7 +58,12 @@ impl Queue {
     }
     
     pub fn skip_to_place_in_queue(&mut self, index: usize) {
-        self.user_items = self.user_items.split_off(index);
+        if self.playing_from_user_items {
+            self.user_items = self.user_items.split_off(index + 1);
+        }
+        else {
+            self.user_items = self.user_items.split_off(index);
+        }
         self.user_items_position = 0;
     }
 
