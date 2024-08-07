@@ -73,7 +73,7 @@ impl Queue {
         else {
             self.user_items.remove(index);
         }
-        if self.user_items_position > 0 {
+        if self.user_items_position < index && self.user_items_position > 0 {
             self.user_items_position -= 1;
         }
     }
@@ -84,15 +84,10 @@ impl Queue {
                 self.positions.len(),
                 self.user_items[self.user_items_position],
             );
-            
+
             self.positions
                 .insert(self.position + 1, self.positions.len());
             self.user_items_position += 1;
-
-            if self.user_items_position > 1 {
-                self.user_items.remove(0);
-                self.user_items_position -= 1;
-            }
 
             self.playing_from_user_items = true;
         }
