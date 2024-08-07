@@ -22,7 +22,7 @@ use souvlaki::{
 
 use crate::{
     cmd,
-    data::{AppState, Config, Playback, PlaybackOrigin, PlaybackState, QueueBehavior, QueueEntry},
+    data::{AppState, Config, NowPlaying, Playback, PlaybackOrigin, PlaybackState, QueueBehavior, QueueEntry},
 };
 
 pub struct PlaybackController {
@@ -356,7 +356,11 @@ where
             }
             Event::Command(cmd) if cmd.is(cmd::PLAYBACK_PLAYING) => {
                 let (item, progress) = cmd.get_unchecked(cmd::PLAYBACK_PLAYING);
-
+                if data.added_queue.len() > 0 {
+                    if data.playback.now_playing.as_mut().is_some_and(|np| np.item.id() == data.added_queue[0].item.id()) {
+                        data.added_queue.remove(0);
+                    }
+                }
                 if let Some(queued) = data.queued_entry(*item) {
                     data.start_playback(queued.item, queued.origin, progress.to_owned());
                     self.update_media_control_playback(&data.playback);

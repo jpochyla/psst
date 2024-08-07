@@ -23,6 +23,7 @@ pub struct Queue {
     user_items_position: usize,
     positions: Vec<usize>,
     behavior: QueueBehavior,
+    playing_from_user_items: bool,
 }
 
 impl Queue {
@@ -34,6 +35,7 @@ impl Queue {
             user_items_position: 0,
             positions: Vec::new(),
             behavior: QueueBehavior::default(),
+            playing_from_user_items: false,
         }
     }
     
@@ -65,7 +67,12 @@ impl Queue {
     }
 
     pub fn remove(&mut self, index: usize) {
-        self.user_items.remove(index);
+        if self.playing_from_user_items {
+            self.user_items.remove(index+1);
+        }
+        else {
+            self.user_items.remove(index);
+        }
         if self.user_items_position > 0 {
             self.user_items_position -= 1;
         }
@@ -77,9 +84,20 @@ impl Queue {
                 self.positions.len(),
                 self.user_items[self.user_items_position],
             );
+            
             self.positions
                 .insert(self.position + 1, self.positions.len());
             self.user_items_position += 1;
+
+            if self.user_items_position > 1 {
+                self.user_items.remove(0);
+                self.user_items_position -= 1;
+            }
+
+            self.playing_from_user_items = true;
+        }
+        else {
+            self.playing_from_user_items = false;
         }
     }
 

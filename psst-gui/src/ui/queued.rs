@@ -36,7 +36,6 @@ pub fn queue_widget() -> impl Widget<AppState> {
     Either::new(
         |data: &AppState, _env: &Env| {
             data.config.window_size.width >= 700.0
-                && !data.added_queue.is_empty()
                 && data.config.show_queue_view
         },
         Flex::column()
