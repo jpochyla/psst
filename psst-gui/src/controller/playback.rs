@@ -299,6 +299,19 @@ impl PlaybackController {
             item: *item,
         }));
     }
+    fn skip_to_place_in_queue(&mut self, item: &usize) {
+        self.send(PlayerEvent::Command(PlayerCommand::SkipToPlaceInQueue {
+            item: *item,
+        }));
+    }
+    fn remove_from_queue(&mut self, item: &usize) {
+        self.send(PlayerEvent::Command(PlayerCommand::RemoveFromQueue {
+            item: *item,
+        }));
+    }
+    fn clear_queue(&mut self) {
+        self.send(PlayerEvent::Command(PlayerCommand::ClearQueue));
+    }
 
     fn set_queue_behavior(&mut self, behavior: QueueBehavior) {
         self.send(PlayerEvent::Command(PlayerCommand::SetQueueBehavior {
@@ -343,7 +356,9 @@ where
             }
             Event::Command(cmd) if cmd.is(cmd::PLAYBACK_PLAYING) => {
                 let (item, progress) = cmd.get_unchecked(cmd::PLAYBACK_PLAYING);
-
+                if !data.added_queue.is_empty() && data.playback.now_playing.as_mut().is_some_and(|np| np.item.id() == data.added_queue[0].item.id()) {
+                    data.added_queue.remove(0);
+                }
                 if let Some(queued) = data.queued_entry(*item) {
                     data.start_playback(queued.item, queued.origin, progress.to_owned());
                     self.update_media_control_playback(&data.playback);
@@ -418,6 +433,7 @@ where
 
                 self.add_to_queue(item);
                 data.add_queued_entry(entry.clone());
+                data.info_alert("Track added to queue.");
                 ctx.set_handled();
             }
             Event::Command(cmd) if cmd.is(cmd::PLAY_QUEUE_BEHAVIOR) => {
@@ -434,6 +450,32 @@ where
                     );
                     self.seek(position);
                 }
+                ctx.set_handled();
+            }
+            Event::Command(cmd) if cmd.is(cmd::SKIP_TO_PLACE_IN_QUEUE) => {
+                let track_pos = *cmd.get_unchecked(cmd::SKIP_TO_PLACE_IN_QUEUE);
+
+                // We need a way so it starts playing even if theres no playlist being played from!
+                if track_pos > 0 && !data.playback.queue.is_empty() {
+                    data.added_queue = data.added_queue.split_off(track_pos);
+                    self.skip_to_place_in_queue(&track_pos);
+                    self.next();
+                }
+                ctx.set_handled();
+            }
+            Event::Command(cmd) if cmd.is(cmd::REMOVE_FROM_QUEUE) => {
+                let item = cmd.get_unchecked(cmd::REMOVE_FROM_QUEUE);
+
+                data.added_queue.remove(*item);
+                self.remove_from_queue(item);
+                data.info_alert("Track removed from queue.");
+        
+                ctx.set_handled();
+            }
+            Event::Command(cmd) if cmd.is(cmd::CLEAR_QUEUE) => {
+                data.added_queue.clear();
+                self.clear_queue();
+                data.info_alert("Tracks cleared from queue.");
                 ctx.set_handled();
             }
             // Keyboard shortcuts.
