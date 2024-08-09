@@ -81,15 +81,15 @@ pub fn is_playing_marker_widget() -> impl Widget<bool> {
     Painter::new(|ctx, is_playing, env| {
         const STYLE: StrokeStyle = StrokeStyle::new().dash_pattern(&[1.0, 2.0]);
 
-        let line = Line::new((0.0, 0.0), (ctx.size().width, 0.0));
+        let y = ctx.size().height / 2.0;
+        let line = Line::new((0.0, y), (ctx.size().width, y));
         let color = if *is_playing {
-            env.get(theme::GREY_200)
+            env.get(theme::GREY_400)
         } else {
             env.get(theme::GREY_500)
         };
         ctx.stroke_styled(line, &color, 1.0, &STYLE);
     })
-    .fix_height(1.0)
 }
 
 #[derive(Clone, Data, Lens)]

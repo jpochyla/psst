@@ -4,7 +4,7 @@ use druid::{
     WindowDesc, WindowId,
 };
 use std::fs;
-use std::io::Read;
+use std::io::{BufReader, Read};
 use threadpool::ThreadPool;
 
 use crate::ui::playlist::{
@@ -208,11 +208,11 @@ impl AppDelegate<AppState> for Delegate {
                     match ureq::get(url)
                         .call()
                         .and_then(|response| {
-                            response
-                                .into_body()
-                                .into_reader()
-                                .bytes()
-                                .collect::<Result<Vec<_>, _>>()
+                            let mut reader = BufReader::new(response.into_reader());
+                            let mut buffer = Vec::new();
+                            reader
+                                .read_to_end(&mut buffer)
+                                .map(|_| buffer)
                                 .map_err(|e| e.into())
                         })
                         .and_then(|bytes| fs::write(&path, bytes).map_err(|e| e.into()))
