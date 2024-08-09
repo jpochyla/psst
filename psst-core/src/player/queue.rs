@@ -18,6 +18,7 @@ impl Default for QueueBehavior {
 
 pub struct Queue {
     items: Vec<PlaybackItem>,
+    added_items_in_main_queue: Vec<(usize, usize)>,
     user_items: Vec<PlaybackItem>,
     position: usize,
     user_items_position: usize,
@@ -30,6 +31,7 @@ impl Queue {
     pub fn new() -> Self {
         Self {
             items: Vec::new(),
+            added_items_in_main_queue: Vec::new(),
             user_items: Vec::new(),
             position: 0,
             user_items_position: 0,
@@ -52,6 +54,7 @@ impl Queue {
 
     pub fn fill(&mut self, items: Vec<PlaybackItem>, position: usize) {
         self.positions.clear();
+        self.added_items_in_main_queue.clear();
         self.items = items;
         self.position = position;
         self.compute_positions();
@@ -84,6 +87,20 @@ impl Queue {
     }
 
     fn handle_added_queue(&mut self) {
+        if !self.added_items_in_main_queue.is_empty() {
+            log::warn!("AH");
+            let item_index = self.added_items_in_main_queue[0].0;
+            let position_index = self.added_items_in_main_queue[0].1;
+            log::error!("{}, {}", self.items.len(), item_index);
+            self.items.remove(item_index - 1);
+            self.positions.remove(position_index);
+
+            self.added_items_in_main_queue.remove(0);
+            if self.position > 0 {
+                self.position -= 1;
+            }
+        }
+
         if self.user_items.len() > self.user_items_position {
             self.items.insert(
                 self.positions.len(),
@@ -94,6 +111,7 @@ impl Queue {
                 .insert(self.position + 1, self.positions.len());
             self.user_items_position += 1;
 
+            self.added_items_in_main_queue.push((self.positions.len(), self.position + 1).into());
             self.playing_from_user_items = true;
         }
         else {
