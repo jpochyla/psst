@@ -77,16 +77,14 @@ pub fn playable_widget(track: &Track, display: Display) -> impl Widget<PlayRow<A
     }
 
     let mut title_row = Flex::row()
-        .with_flex_child(
+        .with_child(
             Label::raw()
                 .with_font(theme::UI_FONT_MEDIUM)
                 .with_line_break_mode(LineBreaking::Clip)
                 .lens(PlayRow::item.then(Track::name.in_arc()))
-                .expand_width(),
-            1.0,
         )
         .with_default_spacer()
-        // .with_child(playable::is_playing_marker_widget().lens(PlayRow::is_playing))
+        .with_flex_child(playable::is_playing_marker_widget().lens(PlayRow::is_playing), 1.0)
         .with_default_spacer()
         .must_fill_main_axis(true);
 
