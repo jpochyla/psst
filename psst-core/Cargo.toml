@@ -30,6 +30,7 @@ socks = { version = "0.3.4" }
 tempfile = { version = "3.12.0" }
 ureq = { version = "2.10.1", features = ["json"] }
 url = { version = "2.5.2" }
+oauth2 = { version = "4.4.2" }
 
 # Cryptography
 aes = { version = "0.8.4" }

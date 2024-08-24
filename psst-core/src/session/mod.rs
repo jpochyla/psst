@@ -38,6 +38,7 @@ use self::{
 pub struct SessionConfig {
     pub login_creds: Credentials,
     pub proxy_url: Option<String>,
+    pub client_id: String,
 }
 
 /// Cheap to clone, shareable service handle that holds the active session

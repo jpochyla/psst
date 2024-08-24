@@ -49,17 +49,23 @@ pub enum PreferencesTab {
 pub struct Authentication {
     pub username: String,
     pub password: String,
+    pub access_token: String,
     pub result: Promise<(), (), String>,
 }
 
 impl Authentication {
     pub fn session_config(&self) -> SessionConfig {
         SessionConfig {
-            login_creds: Credentials::from_username_and_password(
-                self.username.to_owned(),
-                self.password.to_owned(),
-            ),
+            login_creds: if !self.access_token.is_empty() {
+                Credentials::from_access_token(self.access_token.clone())
+            } else {
+                Credentials::from_username_and_password(
+                    self.username.clone(),
+                    self.password.clone(),
+                )
+            },
             proxy_url: Config::proxy(),
+            client_id: Config::default().client_id,
         }
     }
 
@@ -95,6 +101,7 @@ pub struct Config {
     pub sort_criteria: SortCriteria,
     pub paginated_limit: usize,
     pub seek_duration: usize,
+    pub client_id: String,
 }
 
 impl Default for Config {
@@ -113,6 +120,8 @@ impl Default for Config {
             sort_criteria: Default::default(),
             paginated_limit: 500,
             seek_duration: 10,
+            // Default Spotify Desktop client ID
+            client_id: "65b708073fc0480ea92a077233ca87bd".to_string(),
         }
     }
 }
@@ -184,13 +193,16 @@ impl Config {
     }
 
     pub fn username(&self) -> Option<&str> {
-        self.credentials.as_ref().map(|c| c.username.as_str())
+        self.credentials
+            .as_ref()
+            .map_or(None, |c| c.username.as_deref())
     }
 
     pub fn session(&self) -> SessionConfig {
         SessionConfig {
             login_creds: self.credentials.clone().expect("Missing credentials"),
             proxy_url: Config::proxy(),
+            client_id: self.client_id.clone(),
         }
     }
 
