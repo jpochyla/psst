@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::{
     cmd,
-    data::{AppState, Nav, PlaybackOrigin, QueueEntry, RecommendationsRequest},
+    data::{AppState, Nav, QueueEntry, RecommendationsRequest},
     ui::Vector,
     widget::{icons, Border, Empty, MyWidgetExt},
 };
@@ -43,7 +43,7 @@ pub fn queue_widget() -> impl Widget<AppState> {
             .with_flex_child(
                 Scroll::new(queue_list_widget())
                     .vertical()
-                    .lens(AppState::added_queue.map(
+                    .lens(AppState::displayed_added_queue.map(
                         |entries| queue_entries_with_index(entries.clone()),
                         |_, _| (),
                     )),
@@ -143,14 +143,6 @@ fn queue_entry_context_menu(item: QueueEntryWithIndex) -> Menu<AppState> {
         .command(cmd::NAVIGATE.with(Nav::Recommendations(Arc::new(
             RecommendationsRequest::for_track(crate::data::TrackId(item.entry.item.id())),
         )))),
-    );
-
-    menu = menu.entry(
-        MenuItem::new("Back to origin").on_activate(move |ctx, _, _| {
-            if let PlaybackOrigin::Playlist(playlist_link) = item.entry.origin.clone() {
-                ctx.submit_command(cmd::NAVIGATE.with(Nav::PlaylistDetail(playlist_link)));
-            }
-        }),
     );
 
     menu

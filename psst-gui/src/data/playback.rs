@@ -115,6 +115,7 @@ impl NowPlaying {
 #[derive(Clone, Debug, Data)]
 pub enum PlaybackOrigin {
     Library,
+    Queue,
     Album(AlbumLink),
     Artist(ArtistLink),
     Playlist(PlaylistLink),
@@ -127,6 +128,8 @@ impl PlaybackOrigin {
     pub fn to_nav(&self) -> Nav {
         match &self {
             PlaybackOrigin::Library => Nav::SavedTracks,
+            // Change this
+            PlaybackOrigin::Queue => Nav::Home,
             PlaybackOrigin::Album(link) => Nav::AlbumDetail(link.clone()),
             PlaybackOrigin::Artist(link) => Nav::ArtistDetail(link.clone()),
             PlaybackOrigin::Playlist(link) => Nav::PlaylistDetail(link.clone()),
@@ -141,6 +144,7 @@ impl fmt::Display for PlaybackOrigin {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self {
             PlaybackOrigin::Library => f.write_str("Saved Tracks"),
+            PlaybackOrigin::Queue => f.write_str("Queue"),
             PlaybackOrigin::Album(link) => link.name.fmt(f),
             PlaybackOrigin::Artist(link) => link.name.fmt(f),
             PlaybackOrigin::Playlist(link) => link.name.fmt(f),

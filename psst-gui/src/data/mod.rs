@@ -83,6 +83,7 @@ pub struct AppState {
     pub alerts: Vector<Alert>,
     pub finder: Finder,
     pub added_queue: Vector<QueueEntry>,
+    pub displayed_added_queue: Vector<QueueEntry>,
 }
 
 impl AppState {
@@ -122,6 +123,7 @@ impl AppState {
             },
             playback,
             added_queue: Vector::new(),
+            displayed_added_queue: Vector::new(),
             search: Search {
                 input: "".into(),
                 results: Promise::Empty,
@@ -183,15 +185,15 @@ impl AppState {
 impl AppState {
     pub fn queued_entry(&self, item_id: ItemId) -> Option<QueueEntry> {
         if let Some(queued) = self
-            .playback
-            .queue
+            .added_queue
             .iter()
             .find(|queued| queued.item.id() == item_id)
             .cloned()
         {
             Some(queued)
         } else if let Some(queued) = self
-            .added_queue
+            .playback
+            .queue
             .iter()
             .find(|queued| queued.item.id() == item_id)
             .cloned()
@@ -203,7 +205,8 @@ impl AppState {
     }
 
     pub fn add_queued_entry(&mut self, queue_entry: QueueEntry) {
-        self.added_queue.push_back(queue_entry);
+        self.added_queue.push_back(queue_entry.clone());
+        self.displayed_added_queue.push_back(queue_entry);
     }
 
     pub fn loading_playback(&mut self, item: Playable, origin: PlaybackOrigin) {

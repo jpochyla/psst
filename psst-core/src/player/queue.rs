@@ -88,10 +88,8 @@ impl Queue {
 
     fn handle_added_queue(&mut self) {
         if !self.added_items_in_main_queue.is_empty() {
-            log::warn!("AH");
             let item_index = self.added_items_in_main_queue[0].0;
             let position_index = self.added_items_in_main_queue[0].1;
-            log::error!("{}, {}", self.items.len(), item_index);
             self.items.remove(item_index - 1);
             self.positions.remove(position_index);
 
