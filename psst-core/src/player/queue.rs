@@ -109,7 +109,7 @@ impl Queue {
                 .insert(self.position + 1, self.positions.len());
             self.user_items_position += 1;
 
-            self.added_items_in_main_queue.push((self.positions.len(), self.position + 1).into());
+            self.added_items_in_main_queue.push((self.positions.len(), self.position + 1));
             self.playing_from_user_items = true;
         }
         else {

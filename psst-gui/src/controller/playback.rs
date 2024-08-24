@@ -358,8 +358,8 @@ where
                 let (item, progress) = cmd.get_unchecked(cmd::PLAYBACK_PLAYING);
 
                 if !data.added_queue.is_empty() && data.playback.now_playing.as_mut().is_some_and(|np| {
-                    let origin_match = np.origin.to_string() == data.added_queue[0].origin.to_string();
-                    origin_match
+                    
+                    np.origin.to_string() == data.added_queue[0].origin.to_string()
                 }) {
                     data.displayed_added_queue.remove(0);
                 }
