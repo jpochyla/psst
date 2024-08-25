@@ -65,7 +65,6 @@ impl Authentication {
                 )
             },
             proxy_url: Config::proxy(),
-            client_id: Config::default().client_id,
         }
     }
 
@@ -101,7 +100,6 @@ pub struct Config {
     pub sort_criteria: SortCriteria,
     pub paginated_limit: usize,
     pub seek_duration: usize,
-    pub client_id: String,
 }
 
 impl Default for Config {
@@ -120,8 +118,6 @@ impl Default for Config {
             sort_criteria: Default::default(),
             paginated_limit: 500,
             seek_duration: 10,
-            // Default Spotify Desktop client ID
-            client_id: "65b708073fc0480ea92a077233ca87bd".to_string(),
         }
     }
 }
@@ -202,7 +198,6 @@ impl Config {
         SessionConfig {
             login_creds: self.credentials.clone().expect("Missing credentials"),
             proxy_url: Config::proxy(),
-            client_id: self.client_id.clone(),
         }
     }
 

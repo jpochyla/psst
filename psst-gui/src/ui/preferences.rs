@@ -1,3 +1,4 @@
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::thread::{self, JoinHandle};
 
 use crate::{
@@ -19,8 +20,7 @@ use druid::{
     Color, Data, Env, Event, EventCtx, Insets, LensExt, LifeCycle, LifeCycleCtx, Selector, Widget,
     WidgetExt,
 };
-use psst_core::connection::Credentials;
-use psst_core::oauth;
+use psst_core::{connection::Credentials, oauth, session::SessionConfig};
 
 use super::{icons::SvgIcon, theme};
 
@@ -270,17 +270,15 @@ fn account_tab_widget(tab: AccountTab) -> impl Widget<AppState> {
 
     col = col
         .with_child(
-            Button::new("Log In with Spotify").on_click(|ctx, data: &mut AppState, _| {
-                let token = oauth::get_access_token(&data.config.client_id, 8888);
-                data.preferences.auth.access_token = token;
+            Button::new("Log in with Spotify").on_click(|ctx, _data: &mut AppState, _| {
                 ctx.submit_command(Authenticate::REQUEST);
             }),
         )
         .with_spacer(theme::grid(1.0))
         .with_child(
             Async::new(
-                || Label::new("Logging In...").with_text_size(theme::TEXT_SIZE_SMALL),
-                || Label::new("Success.").with_text_size(theme::TEXT_SIZE_SMALL),
+                || Label::new("Logging in...").with_text_size(theme::TEXT_SIZE_SMALL),
+                || Label::new("").with_text_size(theme::TEXT_SIZE_SMALL),
                 || {
                     Label::dynamic(|err: &String, _| err.to_owned())
                         .with_text_size(theme::TEXT_SIZE_SMALL)
@@ -293,8 +291,6 @@ fn account_tab_widget(tab: AccountTab) -> impl Widget<AppState> {
                     .then(Authentication::result),
             ),
         );
-
-    col = col.with_spacer(theme::grid(3.0));
 
     if matches!(tab, AccountTab::InPreferences) {
         col = col.with_child(Button::new("Log Out").on_left_click(|ctx, _, _, _| {
@@ -335,17 +331,39 @@ impl<W: Widget<AppState>> Controller<AppState, W> for Authenticate {
             Event::Command(cmd) if cmd.is(Self::REQUEST) => {
                 data.preferences.auth.result.defer_default();
 
+                let (auth_url, pkce_verifier) = oauth::generate_auth_url(8888);
+                if webbrowser::open(&auth_url).is_err() {
+                    data.error_alert("Failed to open browser");
+                    return;
+                }
+
                 let config = data.preferences.auth.session_config();
                 let widget_id = ctx.widget_id();
                 let event_sink = ctx.get_external_handle();
                 let thread = thread::spawn(move || {
-                    let response = Authentication::authenticate_and_get_credentials(config);
-                    event_sink
-                        .submit_command(Self::RESPONSE, response, widget_id)
-                        .unwrap();
+                    match oauth::get_authcode_listener(
+                        SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8888),
+                        std::time::Duration::from_secs(300),
+                    ) {
+                        Ok(code) => {
+                            let token = oauth::exchange_code_for_token(8888, code, pkce_verifier);
+                            let response =
+                                Authentication::authenticate_and_get_credentials(SessionConfig {
+                                    login_creds: Credentials::from_access_token(token),
+                                    ..config
+                                });
+                            event_sink
+                                .submit_command(Self::RESPONSE, response, widget_id)
+                                .unwrap();
+                        }
+                        Err(e) => {
+                            event_sink
+                                .submit_command(Self::RESPONSE, Err(e), widget_id)
+                                .unwrap();
+                        }
+                    }
                 });
                 self.thread.replace(thread);
-
                 ctx.set_handled();
             }
             Event::Command(cmd) if cmd.is(Self::RESPONSE) => {
