@@ -191,7 +191,7 @@ impl Config {
     pub fn username(&self) -> Option<&str> {
         self.credentials
             .as_ref()
-            .map_or(None, |c| c.username.as_deref())
+            .and_then(|c| c.username.as_deref())
     }
 
     pub fn session(&self) -> SessionConfig {

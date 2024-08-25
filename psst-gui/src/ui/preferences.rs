@@ -372,12 +372,11 @@ impl<W: Widget<AppState>> Controller<AppState, W> for Authenticate {
                 let result = cmd
                     .get_unchecked(Self::RESPONSE)
                     .to_owned()
-                    .and_then(|credentials| {
+                    .map(|credentials| {
                         let username = credentials.username.clone().unwrap_or_default();
                         WebApi::global().load_local_tracks(&username);
                         data.config.store_credentials(credentials);
                         data.config.save();
-                        Ok(())
                     });
                 let is_ok = result.is_ok();
 
