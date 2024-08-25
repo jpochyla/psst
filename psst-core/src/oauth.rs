@@ -1,36 +1,15 @@
-use log::{debug, error, trace};
 use oauth2::{
     basic::BasicClient, reqwest::http_client, AuthUrl, AuthorizationCode, ClientId, CsrfToken,
     PkceCodeChallenge, PkceCodeVerifier, RedirectUrl, Scope, TokenResponse, TokenUrl,
 };
-use std::io;
 use std::{
     io::{BufRead, BufReader, Write},
     net::TcpStream,
     net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener},
-    process::exit,
     sync::mpsc,
     time::Duration,
 };
 use url::Url;
-
-fn get_code(redirect_url: &str) -> AuthorizationCode {
-    Url::parse(redirect_url)
-        .unwrap()
-        .query_pairs()
-        .find(|(key, _)| key == "code")
-        .map(|(_, code)| AuthorizationCode::new(code.into_owned()))
-        .expect("No code found in redirect URL")
-}
-
-fn get_authcode_stdin() -> AuthorizationCode {
-    println!("Provide redirect URL");
-    let mut buffer = String::new();
-    let stdin = io::stdin();
-    stdin.read_line(&mut buffer).unwrap();
-
-    get_code(buffer.trim())
-}
 
 pub fn get_authcode_listener(
     socket_address: SocketAddr,
@@ -88,63 +67,6 @@ fn send_success_response(stream: &mut TcpStream) {
     let response =
         "HTTP/1.1 200 OK\r\n\r\n<html><body>You can close this window now.</body></html>";
     let _ = stream.write_all(response.as_bytes());
-}
-
-pub fn get_access_token(redirect_port: u16) -> String {
-    let redirect_address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), redirect_port);
-    let redirect_uri = format!("http://{redirect_address}/login");
-
-    let client = BasicClient::new(
-        ClientId::new(crate::session::access_token::CLIENT_ID.to_string()),
-        None,
-        AuthUrl::new("https://accounts.spotify.com/authorize".to_string()).unwrap(),
-        Some(TokenUrl::new("https://accounts.spotify.com/api/token".to_string()).unwrap()),
-    )
-    .set_redirect_uri(RedirectUrl::new(redirect_uri).expect("Invalid redirect URL"));
-
-    let (pkce_challenge, pkce_verifier) = PkceCodeChallenge::new_random_sha256();
-
-    let scopes: Vec<oauth2::Scope> = crate::session::access_token::ACCESS_SCOPES
-        .split(',')
-        .map(|s| Scope::new(s.trim().to_string()))
-        .collect();
-    let (auth_url, _) = client
-        .authorize_url(CsrfToken::new_random)
-        .add_scopes(scopes)
-        .set_pkce_challenge(pkce_challenge)
-        .url();
-
-    println!("Browse to: {}", auth_url);
-
-    let code = if redirect_port > 0 {
-        get_authcode_listener(redirect_address, Duration::from_secs(300)).unwrap()
-    } else {
-        get_authcode_stdin()
-    };
-    debug!("Exchange {code:?} for access token");
-
-    let (tx, rx) = mpsc::channel();
-    let client_clone = client.clone();
-    std::thread::spawn(move || {
-        let resp = client_clone
-            .exchange_code(code)
-            .set_pkce_verifier(pkce_verifier)
-            .request(http_client);
-        tx.send(resp).unwrap();
-    });
-    let token_response = rx.recv().unwrap();
-    let token = match token_response {
-        Ok(tok) => {
-            trace!("Obtained new access token: {tok:?}");
-            tok
-        }
-        Err(e) => {
-            error!("Failed to exchange code for access token: {e:?}");
-            exit(1);
-        }
-    };
-
-    token.access_token().secret().to_string()
 }
 
 fn create_spotify_oauth_client(redirect_port: u16) -> BasicClient {
