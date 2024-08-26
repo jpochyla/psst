@@ -357,9 +357,10 @@ where
             Event::Command(cmd) if cmd.is(cmd::PLAYBACK_PLAYING) => {
                 let (item, progress) = cmd.get_unchecked(cmd::PLAYBACK_PLAYING);
 
+                // TODO this falsely removes the song if you click on a song from the playlist that is also in the queue
                 if !data.displayed_added_queue.is_empty() && data.playback.now_playing.as_mut().is_some_and(|np| {
-                    
-                    np.origin.to_string() == data.added_queue[0].origin.to_string()
+                    np.origin.to_string() == PlaybackOrigin::Queue.to_string()
+                    && np.item.id() == data.displayed_added_queue[0].item.id()
                 }) {
                     data.displayed_added_queue.remove(0);
                 }
