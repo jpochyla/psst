@@ -75,6 +75,7 @@ impl Queue {
     }
 
     pub fn remove(&mut self, index: usize) {
+        // I think this is causing the issue at the moment!!!
         if self.playing_from_user_items {
             self.user_items.remove(index+1);
         }

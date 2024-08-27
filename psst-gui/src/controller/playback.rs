@@ -466,12 +466,21 @@ where
                     data.displayed_added_queue = data.displayed_added_queue.split_off(track_pos);
                     self.skip_to_place_in_queue(&track_pos);
                     self.next();
+                } else if track_pos == 0 && !data.playback.queue.is_empty() {
+                    self.skip_to_place_in_queue(&track_pos);
+                    self.next();
+                } else if data.playback.queue.is_empty() {
+                    // TODO finish making it play if theres nothing there
+                    data.playback.queue.clear();
+                    data.playback.queue.push_back(data.displayed_added_queue[0].clone());
+                    self.remove_from_queue(&0);
+                    data.displayed_added_queue.remove(0);
+                    self.play(&data.playback.queue, 0);
                 }
                 ctx.set_handled();
             }
             Event::Command(cmd) if cmd.is(cmd::REMOVE_FROM_QUEUE) => {
                 let item = cmd.get_unchecked(cmd::REMOVE_FROM_QUEUE);
-
                 data.displayed_added_queue.remove(*item);
                 self.remove_from_queue(item);
                 data.info_alert("Track removed from queue.");
