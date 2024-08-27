@@ -460,22 +460,29 @@ where
             }
             Event::Command(cmd) if cmd.is(cmd::SKIP_TO_PLACE_IN_QUEUE) => {
                 let track_pos = *cmd.get_unchecked(cmd::SKIP_TO_PLACE_IN_QUEUE);
-
-                // We need a way so it starts playing even if theres no playlist being played from!
-                if track_pos > 0 && !data.playback.queue.is_empty() {
-                    data.displayed_added_queue = data.displayed_added_queue.split_off(track_pos);
-                    self.skip_to_place_in_queue(&track_pos);
-                    self.next();
-                } else if track_pos == 0 && !data.playback.queue.is_empty() {
-                    self.skip_to_place_in_queue(&track_pos);
-                    self.next();
-                } else if data.playback.queue.is_empty() {
-                    // TODO finish making it play if theres nothing there
-                    data.playback.queue.clear();
-                    data.playback.queue.push_back(data.displayed_added_queue[0].clone());
-                    self.remove_from_queue(&0);
-                    data.displayed_added_queue.remove(0);
-                    self.play(&data.playback.queue, 0);
+                if track_pos > 0 {
+                    if data.playback.queue.is_empty() || (data.playback.queue.len() <= 1 && data.playback.queue[0].origin.to_string() == PlaybackOrigin::Queue.to_string()) {
+                        data.playback.queue.clear();
+                        data.playback.queue.push_back(data.displayed_added_queue[track_pos].clone());
+                        data.displayed_added_queue = data.displayed_added_queue.split_off(track_pos);
+                        self.skip_to_place_in_queue(&(track_pos+1));
+                        self.play(&data.playback.queue, track_pos);}
+                    else if data.playback.now_playing.is_some() {
+                        data.displayed_added_queue = data.displayed_added_queue.split_off(track_pos);
+                        self.skip_to_place_in_queue(&track_pos);
+                        self.next();
+                    }
+                } else if track_pos == 0 {
+                    if data.playback.queue.is_empty() || (data.playback.queue.len() <= 1 && data.playback.queue[0].origin.to_string() == PlaybackOrigin::Queue.to_string()) {
+                        data.playback.queue.clear();
+                        data.playback.queue.push_back(data.displayed_added_queue[track_pos].clone());
+                        self.remove_from_queue(&track_pos);
+                        data.displayed_added_queue.remove(track_pos);
+                        self.play(&data.playback.queue, track_pos);
+                    }
+                    else if data.playback.now_playing.is_some() {
+                        self.next();
+                    }
                 }
                 ctx.set_handled();
             }
