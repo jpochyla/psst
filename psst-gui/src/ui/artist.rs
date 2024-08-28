@@ -127,6 +127,7 @@ fn top_tracks_widget() -> impl Widget<WithCtx<ArtistTracks>> {
             title: true,
             album: true,
             popularity: true,
+            cover: true,
             ..track::Display::empty()
         },
     })

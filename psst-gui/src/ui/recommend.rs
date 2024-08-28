@@ -131,6 +131,7 @@ fn track_results_widget() -> impl Widget<WithCtx<Recommendations>> {
             title: true,
             artist: true,
             album: true,
+            cover: true,
             ..track::Display::empty()
         },
     })
