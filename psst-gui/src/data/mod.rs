@@ -83,6 +83,7 @@ pub struct AppState {
     pub alerts: Vector<Alert>,
     pub finder: Finder,
     pub added_queue: Vector<QueueEntry>,
+    // TODO: This is a problem, due to added_queue never changing, the origin of a song, if also once added to the queue, will always be the queue.
     pub displayed_added_queue: Vector<QueueEntry>,
 }
 

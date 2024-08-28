@@ -55,7 +55,6 @@ pub const PLAY_QUEUE_BEHAVIOR: Selector<QueueBehavior> = Selector::new("app.play
 pub const PLAY_SEEK: Selector<f64> = Selector::new("app.play-seek");
 
 // Queue control
-// Todo Skip by
 pub const REMOVE_FROM_QUEUE: Selector<usize> = Selector::new("app.remove-from-queue");
 pub const CLEAR_QUEUE: Selector = Selector::new("app.clear-queue");
 pub const SKIP_TO_PLACE_IN_QUEUE: Selector<usize> = Selector::new("app.skip-to-place-in-queue");
