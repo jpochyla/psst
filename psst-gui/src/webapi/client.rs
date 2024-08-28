@@ -79,6 +79,20 @@ impl WebApi {
         Ok(request)
     }
 
+    fn request_mbi(&self, method: &str, path: impl Display) -> Result<Request, Error> {
+        // The token should be in the format 
+        let request = self
+            .agent
+            
+            .request(method, &format!("https://musicbrainz.org/{}", path));
+            //.set("Authorization", &format!("Bearer {}", &token));
+        Ok(request)
+    }
+
+    fn get_from_mbi(&self, path: impl Display) -> Result<Request, Error> {
+        self.request_mbi("GET", path)
+    }
+
     fn get(&self, path: impl Display) -> Result<Request, Error> {
         self.request("GET", path)
     }
@@ -319,6 +333,34 @@ impl WebApi {
         let request = self.get(format!("v1/artists/{}/related-artists", id))?;
         let result: Cached<Artists> = self.load_cached(request, "related-artists", id)?;
         Ok(result.map(|result| result.artists))
+    }
+    
+    // https://musicbrainz.org/ (MusicBrainz Section)
+    // https://beta.musicbrainz.org/ws/2/url/?query=url:https://open.spotify.com/artist/1WZarnZpWEv7dDtjAETt4X
+    pub fn get_musicbrainz_artist(&self, url: &str) -> Result<String, Error> {
+        let request = self.get_from_mbi(format!("ws/2/url/?query=url:{}", url))?;
+        let result: String = self.load(request)?;
+        Ok(result)
+    }
+
+    pub fn get_artist_socials(&self, url: &str) -> Result<Vector<String>, Error> {
+        let request = self.get_from_mbi(format!("ws/2/url/?query=url:{}", url))?;
+        let mbi: String = self.load(request)?;
+
+        let scnd_request = self.get_from_mbi(format!("/ws/2/artist/{}?inc=url-rels&fmt=json", mbi))?;
+        let links: Vector<String> = self.load(scnd_request)?;
+
+        Ok(links)
+    }
+
+    pub fn get_artist_wiki(&self, url: &str) -> Result<String, Error> {
+        let request = self.get_from_mbi(format!("ws/2/url/?query=url:{}", url))?;
+        let mbi: String = self.load(request)?;
+
+        let scnd_request = self.get_from_mbi(format!("/ws/2/artist/{}?inc=url-rels&fmt=json", mbi))?;
+        let links: Vector<String> = self.load(scnd_request)?;
+
+        Ok(links)
     }
 }
 

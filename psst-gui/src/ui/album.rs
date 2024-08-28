@@ -75,7 +75,6 @@ fn loaded_detail_widget() -> impl Widget<WithCtx<Cached<Arc<Album>>>> {
             number: true,
             title: true,
             artist: true,
-            cover: true,
             ..track::Display::empty()
         },
     });

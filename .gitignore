@@ -8,3 +8,6 @@ cache
 *.iml
 rust-toolchain
 *.ico
+psst-gui/src/ui/artist.rs
+psst-gui/src/ui/search.rs
+psst-gui/src/webapi/client.rs
