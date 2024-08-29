@@ -48,7 +48,7 @@ impl PlaybackController {
         config: PlaybackConfig,
         event_sink: ExtEventSink,
         widget_id: WidgetId,
-        #[allow(unused_variables)] window: &WindowHandle,
+        window: &WindowHandle,
     ) {
         let output = DefaultAudioOutput::open().unwrap();
         let cache_dir = Config::cache_dir().unwrap();
@@ -123,20 +123,22 @@ impl PlaybackController {
 
     fn create_media_controls(
         sender: Sender<PlayerEvent>,
-        #[allow(unused_variables)] window: &WindowHandle,
+        window: &druid::WindowHandle,
     ) -> Result<MediaControls, souvlaki::Error> {
         let hwnd = {
             #[cfg(target_os = "windows")]
             {
-                use raw_window_handle::{HasRawWindowHandle, RawWindowHandle};
-                let handle = match window.raw_window_handle() {
-                    RawWindowHandle::Win32(h) => h,
-                    _ => unreachable!(),
-                };
-                Some(handle.hwnd)
+                use druid_shell::raw_window_handle::RawWindowHandle;
+                match window.raw_window_handle() {
+                    RawWindowHandle::Win32(handle) => Some(handle.hwnd as *mut std::ffi::c_void),
+                    _ => None,
+                }
             }
             #[cfg(not(target_os = "windows"))]
-            None
+            {
+                let _window = window; // Silence unused variable warning
+                None
+            }
         };
 
         let mut media_controls = MediaControls::new(PlatformConfig {
