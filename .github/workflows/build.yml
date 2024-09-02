@@ -64,17 +64,6 @@ jobs:
           rustup target add x86_64-apple-darwin aarch64-apple-darwin
           cargo build --release --target x86_64-apple-darwin --target aarch64-apple-darwin
 
-      - name: List build artifacts
-        if: runner.os == 'macOS'
-        run: |
-          ls -R target
-
-      - name: Verify architecture-specific binaries
-        if: runner.os == 'macOS'
-        run: |
-          ls -l target/x86_64-apple-darwin/release/psst-gui
-          ls -l target/aarch64-apple-darwin/release/psst-gui
-
       - name: Build Release (Windows)
         if: runner.os == 'Windows'
         run: cargo build --release
