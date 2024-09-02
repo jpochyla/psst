@@ -129,6 +129,8 @@ impl PlaybackController {
             #[cfg(target_os = "windows")]
             {
                 use druid_shell::raw_window_handle::HasRawWindowHandle;
+                use raw_window_handle::RawWindowHandle;
+
                 match window.raw_window_handle() {
                     RawWindowHandle::Win32(handle) => Some(handle.hwnd as *mut std::ffi::c_void),
                     _ => None,
