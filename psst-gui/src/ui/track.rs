@@ -319,7 +319,7 @@ pub fn track_menu(
             menu = menu.entry(
                 MenuItem::new(
                     LocalizedString::new("menu-item-remove-from-playlist")
-                        .with_placeholder("Remove from current Playlist"),
+                        .with_placeholder("Remove from Current Playlist"),
                 )
                 .command(playlist::REMOVE_TRACK.with(PlaylistRemoveTrack {
                     link: playlist.to_owned(),

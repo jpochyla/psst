@@ -7,12 +7,14 @@ fn main() {
     let mut fh = fs::File::create(outfile).unwrap();
     write!(fh, r#""{}""#, chrono::Local::now()).ok();
 
-    let git_config = gix_config::File::from_git_dir("../.git/".into()).expect("Git Config not found!");
+    let git_config =
+        gix_config::File::from_git_dir("../.git/".into()).expect("Git Config not found!");
     // Get Git's 'Origin' URL
     let mut remote_url = git_config
-        .raw_value("remote", Some("origin".as_ref()), "url")
+        .raw_value("remote.origin.url")
         .expect("Couldn't extract origin url!")
         .to_string();
+
     // Check whether origin is accessed via ssh
     if remote_url.contains('@') {
         // If yes, strip the `git@` prefix and split the domain and path

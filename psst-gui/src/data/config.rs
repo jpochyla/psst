@@ -49,16 +49,21 @@ pub enum PreferencesTab {
 pub struct Authentication {
     pub username: String,
     pub password: String,
+    pub access_token: String,
     pub result: Promise<(), (), String>,
 }
 
 impl Authentication {
     pub fn session_config(&self) -> SessionConfig {
         SessionConfig {
-            login_creds: Credentials::from_username_and_password(
-                self.username.to_owned(),
-                self.password.to_owned(),
-            ),
+            login_creds: if !self.access_token.is_empty() {
+                Credentials::from_access_token(self.access_token.clone())
+            } else {
+                Credentials::from_username_and_password(
+                    self.username.clone(),
+                    self.password.clone(),
+                )
+            },
             proxy_url: Config::proxy(),
         }
     }
@@ -186,7 +191,9 @@ impl Config {
     }
 
     pub fn username(&self) -> Option<&str> {
-        self.credentials.as_ref().map(|c| c.username.as_str())
+        self.credentials
+            .as_ref()
+            .and_then(|c| c.username.as_deref())
     }
 
     pub fn session(&self) -> SessionConfig {
