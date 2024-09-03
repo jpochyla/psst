@@ -1,5 +1,15 @@
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::thread::{self, JoinHandle};
 
+use crate::{
+    cmd,
+    data::{
+        AppState, AudioQuality, Authentication, Config, Preferences, PreferencesTab, Promise,
+        SliderScrollScale, Theme,
+    },
+    webapi::WebApi,
+    widget::{icons, Async, Border, Checkbox, MyWidgetExt},
+};
 use druid::{
     commands,
     text::ParseFormatter,
@@ -10,18 +20,7 @@ use druid::{
     Color, Data, Env, Event, EventCtx, Insets, LensExt, LifeCycle, LifeCycleCtx, Selector, Widget,
     WidgetExt,
 };
-use psst_core::connection::Credentials;
-
-use crate::{
-    cmd,
-    controller::InputController,
-    data::{
-        AppState, AudioQuality, Authentication, Config, Preferences, PreferencesTab, Promise,
-        SliderScrollScale, Theme,
-    },
-    webapi::WebApi,
-    widget::{icons, Async, Border, Checkbox, MyWidgetExt},
-};
+use psst_core::{connection::Credentials, oauth, session::SessionConfig};
 
 use super::{icons::SvgIcon, theme};
 
@@ -271,47 +270,15 @@ fn account_tab_widget(tab: AccountTab) -> impl Widget<AppState> {
 
     col = col
         .with_child(
-            TextBox::new()
-                .with_placeholder("Username")
-                .controller(InputController::new())
-                .env_scope(|env, _| env.set(theme::WIDE_WIDGET_WIDTH, theme::grid(16.0)))
-                .lens(
-                    AppState::preferences
-                        .then(Preferences::auth)
-                        .then(Authentication::username),
-                ),
-        )
-        .with_spacer(theme::grid(1.0));
-
-    col = col
-        .with_child(
-            TextBox::new()
-                .with_placeholder("Password")
-                .controller(InputController::new())
-                .env_scope(|env, _| env.set(theme::WIDE_WIDGET_WIDTH, theme::grid(16.0)))
-                .lens(
-                    AppState::preferences
-                        .then(Preferences::auth)
-                        .then(Authentication::password),
-                ),
-        )
-        .with_spacer(theme::grid(1.0));
-
-    col = col
-        .with_child(
-            Button::new(match &tab {
-                AccountTab::FirstSetup => "Log In & Continue",
-                AccountTab::InPreferences => "Change Account",
-            })
-            .on_left_click(|ctx, _, _, _| {
+            Button::new("Log in with Spotify").on_click(|ctx, _data: &mut AppState, _| {
                 ctx.submit_command(Authenticate::REQUEST);
             }),
         )
         .with_spacer(theme::grid(1.0))
         .with_child(
             Async::new(
-                || Label::new("Logging In...").with_text_size(theme::TEXT_SIZE_SMALL),
-                || Label::new("Success.").with_text_size(theme::TEXT_SIZE_SMALL),
+                || Label::new("Logging in...").with_text_size(theme::TEXT_SIZE_SMALL),
+                || Label::new("").with_text_size(theme::TEXT_SIZE_SMALL),
                 || {
                     Label::dynamic(|err: &String, _| err.to_owned())
                         .with_text_size(theme::TEXT_SIZE_SMALL)
@@ -324,8 +291,6 @@ fn account_tab_widget(tab: AccountTab) -> impl Widget<AppState> {
                     .then(Authentication::result),
             ),
         );
-
-    col = col.with_spacer(theme::grid(3.0));
 
     if matches!(tab, AccountTab::InPreferences) {
         col = col.with_child(Button::new("Log Out").on_left_click(|ctx, _, _, _| {
@@ -364,59 +329,71 @@ impl<W: Widget<AppState>> Controller<AppState, W> for Authenticate {
     ) {
         match event {
             Event::Command(cmd) if cmd.is(Self::REQUEST) => {
-                // Signal that we're authenticating.
                 data.preferences.auth.result.defer_default();
 
-                // Authenticate in another thread.
+                let (auth_url, pkce_verifier) = oauth::generate_auth_url(8888);
+                if webbrowser::open(&auth_url).is_err() {
+                    data.error_alert("Failed to open browser");
+                    return;
+                }
+
                 let config = data.preferences.auth.session_config();
                 let widget_id = ctx.widget_id();
                 let event_sink = ctx.get_external_handle();
                 let thread = thread::spawn(move || {
-                    let response = Authentication::authenticate_and_get_credentials(config);
-                    event_sink
-                        .submit_command(Self::RESPONSE, response, widget_id)
-                        .unwrap();
+                    match oauth::get_authcode_listener(
+                        SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8888),
+                        std::time::Duration::from_secs(300),
+                    ) {
+                        Ok(code) => {
+                            let token = oauth::exchange_code_for_token(8888, code, pkce_verifier);
+                            let response =
+                                Authentication::authenticate_and_get_credentials(SessionConfig {
+                                    login_creds: Credentials::from_access_token(token),
+                                    ..config
+                                });
+                            event_sink
+                                .submit_command(Self::RESPONSE, response, widget_id)
+                                .unwrap();
+                        }
+                        Err(e) => {
+                            event_sink
+                                .submit_command(Self::RESPONSE, Err(e), widget_id)
+                                .unwrap();
+                        }
+                    }
                 });
                 self.thread.replace(thread);
-
                 ctx.set_handled();
             }
             Event::Command(cmd) if cmd.is(Self::RESPONSE) => {
                 self.thread.take();
 
-                // Store the retrieved credentials into the config.
-                let result = cmd.get_unchecked(Self::RESPONSE);
-                let result = result.to_owned().map(|credentials| {
-                    // Load user's local tracks for the WebApi.
-                    WebApi::global().load_local_tracks(&credentials.username);
-                    // Save the credentials into config.
-                    data.config.store_credentials(credentials);
-                    data.config.save();
-                });
+                let result = cmd
+                    .get_unchecked(Self::RESPONSE)
+                    .to_owned()
+                    .map(|credentials| {
+                        let username = credentials.username.clone().unwrap_or_default();
+                        WebApi::global().load_local_tracks(&username);
+                        data.config.store_credentials(credentials);
+                        data.config.save();
+                    });
                 let is_ok = result.is_ok();
 
-                // Signal the auth result to the preferences UI.
                 data.preferences.auth.result.resolve_or_reject((), result);
 
                 if is_ok {
                     match &self.tab {
                         AccountTab::FirstSetup => {
-                            // We let the `SessionController` pick up the credentials when the main
-                            // window gets created. Close the account setup window and open the main
-                            // one.
                             ctx.submit_command(cmd::SHOW_MAIN);
                             ctx.submit_command(commands::CLOSE_WINDOW);
                         }
                         AccountTab::InPreferences => {
-                            // Drop the old connection and connect again with the new credentials.
                             ctx.submit_command(cmd::SESSION_CONNECT);
                         }
                     }
-                    // Only clear username if login is successful.
-                    data.preferences.auth.username.clear();
                 }
-                // Always clear password after login attempt.
-                data.preferences.auth.password.clear();
+                data.preferences.auth.access_token.clear();
 
                 ctx.set_handled();
             }
