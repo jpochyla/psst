@@ -111,6 +111,23 @@ pub fn artist_widget() -> impl Widget<Artist> {
         )
         .context_menu(|artist| artist_menu(&artist.link()))
 }
+pub fn horizontal_recommended_artist_widget() -> impl Widget<Artist> {
+    let artist_image = cover_widget(theme::grid(21.0));
+    let artist_label = Label::raw()
+        .with_font(theme::UI_FONT_MEDIUM)
+        .lens(Artist::name);
+    let artist = Flex::column()
+        .with_child(artist_image)
+        .with_default_spacer()
+        .with_child(artist_label);
+    artist
+        .padding(theme::grid(0.5))
+        .link()
+        .on_left_click(|ctx, _, artist, _| {
+            ctx.submit_command(cmd::NAVIGATE.with(Nav::ArtistDetail(artist.link())));
+        })
+        .context_menu(|artist| artist_menu(&artist.link()))
+}
 pub fn recommended_artist_widget() -> impl Widget<Artist> {
     let artist_image = cover_widget(theme::grid(7.0));
     let artist_label = Label::raw()

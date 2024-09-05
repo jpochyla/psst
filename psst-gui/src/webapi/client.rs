@@ -28,7 +28,7 @@ use crate::{
     data::{
         Album, AlbumType, Artist, ArtistAlbums, AudioAnalysis, Cached, Episode, EpisodeId,
         EpisodeLink, Nav, Page, Playlist, Range, Recommendations, RecommendationsRequest,
-        SearchResults, SearchTopic, Show, SpotifyUrl, Track, UserProfile,
+        SearchResults, SearchTopic, Show, SpotifyUrl, Track, UserProfile, 
     },
     error::Error,
 };
@@ -201,6 +201,50 @@ impl WebApi {
         Ok(())
     }
 
+    /// Very similar to `for_all_pages`, but only returns a certain number of results
+    /// TODO: test properly
+    fn for_some_pages<T: DeserializeOwned + Clone>(
+        &self,
+        request: Request,
+        lim: usize,
+        mut func: impl FnMut(Page<T>) -> Result<(), Error>,
+    ) -> Result<(), Error> {
+        let mut limit = 50;
+        let mut offset = 0;
+        if lim < limit {
+            limit = lim;
+            let req = request
+                .clone()
+                .query("limit", &limit.to_string())
+                .query("offset", &offset.to_string());
+
+            let page: Page<T> = self.load(req)?;
+
+            func(page)?;
+        } else {
+            loop {
+                let req = request
+                    .clone()
+                    .query("limit", &limit.to_string())
+                    .query("offset", &offset.to_string());
+    
+                let page: Page<T> = self.load(req)?;
+                
+                let page_total = limit/lim;
+                let page_offset = page.offset;
+                let page_limit = page.limit;
+                func(page)?;
+    
+                if page_total > offset && offset < self.paginated_limit {
+                    limit = page_limit;
+                    offset = page_offset + page_limit;
+                } else {
+                    break;
+                }
+            }
+        }
+        Ok(())
+    }
     /// Load a paginated result set by sending `request` with added pagination
     /// parameters and return the aggregated results.  Use with GET requests.
     fn load_all_pages<T: DeserializeOwned + Clone>(
@@ -210,6 +254,22 @@ impl WebApi {
         let mut results = Vector::new();
 
         self.for_all_pages(request, |page| {
+            results.append(page.items);
+            Ok(())
+        })?;
+
+        Ok(results)
+    }
+
+    /// Does a similar thing as `load_all_pages`, but limiting the number of results
+    fn load_some_pages<T: DeserializeOwned + Clone>(
+        &self,
+        request: Request,
+        number: usize,
+    ) -> Result<Vector<T>, Error> {
+        let mut results = Vector::new();
+
+        self.for_some_pages(request, number, |page| {
             results.append(page.items);
             Ok(())
         })?;
@@ -245,12 +305,40 @@ impl WebApi {
     }
 }
 
-/// Other endpoints.
+/// User endpoints.
 impl WebApi {
+    // https://developer.spotify.com/documentation/web-api/reference/get-users-profile
     pub fn get_user_profile(&self) -> Result<UserProfile, Error> {
         let request = self.get("v1/me")?;
         let result = self.load(request)?;
         Ok(result)
+    }
+
+    // https://developer.spotify.com/documentation/web-api/reference/get-users-top-artists-and-tracks
+    // TODO Cache this.
+    pub fn get_user_top_tracks(&self) -> Result<Vector<Arc<Track>>, Error> {
+        let request = self.get("v1/me/top/tracks")?
+            .query("market", "from_token");
+
+        let result: Vector<Arc<Track>> = self.load_some_pages(request, 30)?;
+
+        Ok(result)
+    }
+
+    // TODO Cache this.
+    pub fn get_user_top_artist(&self) -> Result<Vector<Artist>, Error> {
+        #[derive(Clone, Data, Deserialize)]
+        struct Artists {
+            artists: Artist,
+        }
+
+        let request = self.get("v1/me/top/artists")?;
+
+        Ok(self
+            .load_some_pages(request, 10)?
+            .into_iter()
+            .map(|item: Artist| item)
+            .collect())
     }
 }
 
@@ -309,7 +397,7 @@ impl WebApi {
         Ok(artist_albums)
     }
 
-    // https://developer.spotify.com/documentation/web-api/reference/get-artists-top-tracks/
+    // https://developer.spotify.com/documentation/web-api/reference/get-an-artists-top-tracks
     pub fn get_artist_top_tracks(&self, id: &str) -> Result<Vector<Arc<Track>>, Error> {
         #[derive(Deserialize)]
         struct Tracks {
@@ -323,7 +411,7 @@ impl WebApi {
         Ok(result.tracks)
     }
 
-    // https://developer.spotify.com/documentation/web-api/reference/get-related-artists/
+    // https://developer.spotify.com/documentation/web-api/reference/get-an-artists-related-artists
     pub fn get_related_artists(&self, id: &str) -> Result<Cached<Vector<Artist>>, Error> {
         #[derive(Clone, Data, Deserialize)]
         struct Artists {
@@ -353,6 +441,7 @@ impl WebApi {
         Ok(links)
     }
 
+    /*
     pub fn get_artist_wiki(&self, url: &str) -> Result<String, Error> {
         let request = self.get_from_mbi(format!("ws/2/url/?query=url:{}", url))?;
         let mbi: String = self.load(request)?;
@@ -362,6 +451,7 @@ impl WebApi {
 
         Ok(links)
     }
+    */
 }
 
 /// Album endpoints.

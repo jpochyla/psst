@@ -79,7 +79,7 @@ pub struct AppState {
     pub show_detail: ShowDetail,
     pub library: Arc<Library>,
     pub common_ctx: Arc<CommonCtx>,
-    pub personalized: Personalized,
+    pub home_detail: HomeDetail,
     pub alerts: Vector<Alert>,
     pub finder: Finder,
     pub added_queue: Vector<QueueEntry>,
@@ -130,6 +130,11 @@ impl AppState {
                 knobs: Default::default(),
                 results: Promise::Empty,
             },
+            home_detail: HomeDetail {
+                made_for_you: Promise::Empty,
+                user_top_tracks: Promise::Empty,
+                user_top_artists: Promise::Empty,
+            },
             album_detail: AlbumDetail {
                 album: Promise::Empty,
             },
@@ -149,9 +154,6 @@ impl AppState {
             },
             library,
             common_ctx,
-            personalized: Personalized {
-                made_for_you: Promise::Empty,
-            },
             alerts: Vector::new(),
             finder: Finder::new(),
         }
@@ -511,8 +513,10 @@ impl CommonCtx {
 pub type WithCtx<T> = Ctx<Arc<CommonCtx>, T>;
 
 #[derive(Clone, Data, Lens)]
-pub struct Personalized {
+pub struct HomeDetail {
     pub made_for_you: Promise<Vector<Playlist>>,
+    pub user_top_tracks: Promise<Vector<Arc<Track>>>,
+    pub user_top_artists: Promise<Vector<Artist>>,
 }
 
 static ALERT_ID: AtomicUsize = AtomicUsize::new(0);
