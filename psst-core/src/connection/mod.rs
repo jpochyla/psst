@@ -41,7 +41,7 @@ const AP_FALLBACK: &str = "ap.spotify.com:443";
 #[serde(from = "SerializedCredentials")]
 #[serde(into = "SerializedCredentials")]
 pub struct Credentials {
-    pub username: String,
+    pub username: Option<String>,
     pub auth_data: Vec<u8>,
     pub auth_type: AuthenticationType,
 }
@@ -49,9 +49,17 @@ pub struct Credentials {
 impl Credentials {
     pub fn from_username_and_password(username: String, password: String) -> Self {
         Self {
-            username,
+            username: Some(username),
             auth_type: AuthenticationType::AUTHENTICATION_USER_PASS,
             auth_data: password.into_bytes(),
+        }
+    }
+
+    pub fn from_access_token(token: String) -> Self {
+        Self {
+            username: None,
+            auth_type: AuthenticationType::AUTHENTICATION_SPOTIFY_TOKEN,
+            auth_data: token.into_bytes(),
         }
     }
 }
@@ -66,7 +74,7 @@ struct SerializedCredentials {
 impl From<SerializedCredentials> for Credentials {
     fn from(value: SerializedCredentials) -> Self {
         Self {
-            username: value.username,
+            username: Some(value.username),
             auth_data: value.auth_data.into_bytes(),
             auth_type: value.auth_type.into(),
         }
@@ -76,7 +84,7 @@ impl From<SerializedCredentials> for Credentials {
 impl From<Credentials> for SerializedCredentials {
     fn from(value: Credentials) -> Self {
         Self {
-            username: value.username,
+            username: value.username.unwrap_or_default(),
             auth_data: String::from_utf8(value.auth_data)
                 .expect("Invalid UTF-8 in serialized credentials"),
             auth_type: value.auth_type as _,
@@ -231,14 +239,6 @@ impl Transport {
     pub fn authenticate(&mut self, credentials: Credentials) -> Result<Credentials, Error> {
         use crate::protocol::{authentication::APWelcome, keyexchange::APLoginFailed};
 
-        // Having an empty username or auth_data causes an unclear error message, so replace it with invalid credentials.
-        if credentials.username.is_empty() || credentials.auth_data.is_empty() {
-            return Err(Error::AuthFailed {
-                // code 12 = bad credentials
-                code: 12,
-            });
-        }
-
         // Send a login request with the client credentials.
         let request = client_response_encrypted(credentials);
         self.encoder.encode(request)?;
@@ -251,7 +251,7 @@ impl Transport {
                 let welcome_data: APWelcome =
                     deserialize_protobuf(&response.payload).expect("Missing data");
                 Ok(Credentials {
-                    username: welcome_data.canonical_username,
+                    username: Some(welcome_data.canonical_username),
                     auth_data: welcome_data.reusable_auth_credentials,
                     auth_type: welcome_data.reusable_auth_credentials_type,
                 })
@@ -362,7 +362,7 @@ fn client_response_encrypted(credentials: Credentials) -> ShannonMsg {
 
     let response = ClientResponseEncrypted {
         login_credentials: LoginCredentials {
-            username: Some(credentials.username),
+            username: credentials.username,
             auth_data: Some(credentials.auth_data),
             typ: credentials.auth_type,
         },

@@ -17,5 +17,6 @@ pub mod metadata;
 pub mod player;
 pub mod session;
 pub mod util;
+pub mod oauth;
 
 pub use psst_protocol as protocol;

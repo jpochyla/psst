@@ -116,6 +116,7 @@ impl AppState {
                 auth: Authentication {
                     username: String::new(),
                     password: String::new(),
+                    access_token: String::new(),
                     result: Promise::Empty,
                 },
                 cache_size: Promise::Empty,
