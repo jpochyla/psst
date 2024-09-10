@@ -349,8 +349,8 @@ fn volume_slider() -> impl Widget<AppState> {
 }
 
 fn topbar_sort_widget() -> impl Widget<AppState> {
-    let up_icon = icons::UP.scale((10.0, theme::grid(2.0)));
-    let down_icon = icons::DOWN.scale((10.0, theme::grid(2.0)));
+    let up_icon = icons::UP.scale((theme::grid(2.0), theme::grid(2.0)));
+    let down_icon = icons::DOWN.scale((theme::grid(2.0), theme::grid(2.0)));
 
     let ascending_icon = up_icon
         .padding(theme::grid(1.0))
@@ -393,7 +393,7 @@ fn topbar_sort_widget() -> impl Widget<AppState> {
 }
 
 fn topbar_back_button_widget() -> impl Widget<AppState> {
-    let icon = icons::BACK.scale((10.0, theme::grid(2.0)));
+    let icon = icons::BACK.scale((theme::grid(2.0), theme::grid(2.0)));
     let disabled = icon
         .clone()
         .with_color(theme::GREY_600)
