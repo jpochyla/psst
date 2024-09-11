@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use druid::{
     im::Vector,
-    widget::{CrossAxisAlignment, Either, Flex, Label, LabelText, List, TextBox},
+    widget::{CrossAxisAlignment, Either, Flex, Label, LabelText, List, Scroll, TextBox},
     Data, LensExt, Selector, Widget, WidgetExt,
 };
 
@@ -142,7 +142,14 @@ fn playlist_results_widget() -> impl Widget<WithCtx<SearchResults>> {
         Flex::column()
             .with_child(header_widget("Playlists"))
             .with_child(
-                List::new(playlist::playlist_widget).lens(Ctx::map(SearchResults::playlists)),
+                // List::new(playlist::playlist_widget).lens(Ctx::map(SearchResults::playlists)),
+                // May be nicer
+                Scroll::new(
+                    List::new(
+                            || playlist::horizontal_playlist_widget(false, true)
+                        ).horizontal()
+                    ).horizontal()
+                    .lens(Ctx::map(SearchResults::playlists)),
             ),
     )
 }

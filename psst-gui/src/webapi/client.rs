@@ -8,9 +8,7 @@ use std::{
 };
 
 use druid::{
-    im::Vector,
-    image::{self, ImageFormat},
-    Data, ImageBuf,
+    im::Vector, image::{self, ImageFormat}, kurbo::MinDistance, Data, ImageBuf
 };
 use itertools::Itertools;
 use once_cell::sync::OnceCell;
@@ -26,9 +24,7 @@ use psst_core::{
 
 use crate::{
     data::{
-        Album, AlbumType, Artist, ArtistAlbums, AudioAnalysis, Cached, Episode, EpisodeId,
-        EpisodeLink, Nav, Page, Playlist, Range, Recommendations, RecommendationsRequest,
-        SearchResults, SearchTopic, Show, SpotifyUrl, Track, UserProfile, 
+        self, library_derived_lenses::playlists, Album, AlbumType, Artist, ArtistAlbums, AudioAnalysis, Cached, Episode, EpisodeId, EpisodeLink, MixedView, Nav, Page, Playlist, PublicUser, Range, Recommendations, RecommendationsRequest, SearchResults, SearchTopic, Show, SpotifyUrl, Track, UserProfile 
     },
     error::Error,
 };
@@ -70,43 +66,36 @@ impl WebApi {
         Ok(token.token)
     }
 
-    fn request(&self, method: &str, path: impl Display) -> Result<Request, Error> {
+    fn build_request(&self, 
+        method: &str, 
+        base_url: &str,
+        path: impl Display,
+    ) -> Result<Request, Error> {
         let token = self.access_token()?;
         let request = self
             .agent
-            .request(method, &format!("https://api.spotify.com/{}", path))
+            .request(method, &format!("https://{}/{}", base_url, path))
             .set("Authorization", &format!("Bearer {}", &token));
         Ok(request)
     }
 
-    fn request_mbi(&self, method: &str, path: impl Display) -> Result<Request, Error> {
-        // The token should be in the format 
-        let request = self
-            .agent
-            
-            .request(method, &format!("https://musicbrainz.org/{}", path));
-            //.set("Authorization", &format!("Bearer {}", &token));
-        Ok(request)
+    fn request(&self, method: &str, base_url: &str, path: impl Display) -> Result<Request, Error> {
+        self.build_request(method, base_url, path)
     }
 
-    fn get_from_mbi(&self, path: impl Display) -> Result<Request, Error> {
-        self.request_mbi("GET", path)
+    fn get(&self, path: impl Display, base_url: Option<&str>) -> Result<Request, Error> {
+        self.request("GET", base_url.unwrap_or("api.spotify.com"), path)    }
+
+    fn put(&self, path: impl Display, base_url: Option<&str>) -> Result<Request, Error> {
+        self.request("GET", base_url.unwrap_or("api.spotify.com"), path)
     }
 
-    fn get(&self, path: impl Display) -> Result<Request, Error> {
-        self.request("GET", path)
+    fn post(&self, path: impl Display, base_url: Option<&str>) -> Result<Request, Error> {
+        self.request("GET", base_url.unwrap_or("api.spotify.com"), path)
     }
 
-    fn put(&self, path: impl Display) -> Result<Request, Error> {
-        self.request("PUT", path)
-    }
-
-    fn post(&self, path: impl Display) -> Result<Request, Error> {
-        self.request("POST", path)
-    }
-
-    fn delete(&self, path: impl Display) -> Result<Request, Error> {
-        self.request("DELETE", path)
+    fn delete(&self, path: impl Display, base_url: Option<&str>) -> Result<Request, Error> {
+        self.request("GET", base_url.unwrap_or("api.spotify.com"), path)
     }
 
     fn with_retry(f: impl Fn() -> Result<Response, Error>) -> Result<Response, Error> {
@@ -287,6 +276,13 @@ impl WebApi {
             log::error!("failed to read local tracks: {}", err);
         }
     }
+    pub fn transform_section_item_json_map(item: &serde_json::Value) -> Option<serde_json::Value> {
+        item.get("data")
+            .and_then(|data| data.get("homeSections"))
+            .and_then(|home_sections| home_sections.get("sections"))
+            .and_then(|sections| sections.get(0))
+            .cloned()
+    }
 }
 
 static GLOBAL_WEBAPI: OnceCell<Arc<WebApi>> = OnceCell::new();
@@ -309,7 +305,7 @@ impl WebApi {
 impl WebApi {
     // https://developer.spotify.com/documentation/web-api/reference/get-users-profile
     pub fn get_user_profile(&self) -> Result<UserProfile, Error> {
-        let request = self.get("v1/me")?;
+        let request = self.get("v1/me", None)?;
         let result = self.load(request)?;
         Ok(result)
     }
@@ -317,7 +313,7 @@ impl WebApi {
     // https://developer.spotify.com/documentation/web-api/reference/get-users-top-artists-and-tracks
     // TODO Cache this.
     pub fn get_user_top_tracks(&self) -> Result<Vector<Arc<Track>>, Error> {
-        let request = self.get("v1/me/top/tracks")?
+        let request = self.get("v1/me/top/tracks", None)?
             .query("market", "from_token");
 
         let result: Vector<Arc<Track>> = self.load_some_pages(request, 30)?;
@@ -332,7 +328,7 @@ impl WebApi {
             artists: Artist,
         }
 
-        let request = self.get("v1/me/top/artists")?;
+        let request = self.get("v1/me/top/artists", None)?;
 
         Ok(self
             .load_some_pages(request, 10)?
@@ -346,7 +342,7 @@ impl WebApi {
 impl WebApi {
     // https://developer.spotify.com/documentation/web-api/reference/get-artist/
     pub fn get_artist(&self, id: &str) -> Result<Artist, Error> {
-        let request = self.get(format!("v1/artists/{}", id))?;
+        let request = self.get(format!("v1/artists/{}", id), None)?;
         let result = self.load_cached(request, "artist", id)?;
         Ok(result.data)
     }
@@ -354,7 +350,7 @@ impl WebApi {
     // https://developer.spotify.com/documentation/web-api/reference/get-an-artists-albums/
     pub fn get_artist_albums(&self, id: &str) -> Result<ArtistAlbums, Error> {
         let request = self
-            .get(format!("v1/artists/{}/albums", id))?
+            .get(format!("v1/artists/{}/albums", id), None)?
             .query("market", "from_token");
         let result: Vector<Arc<Album>> = self.load_all_pages(request)?;
 
@@ -405,7 +401,7 @@ impl WebApi {
         }
 
         let request = self
-            .get(format!("v1/artists/{}/top-tracks", id))?
+            .get(format!("v1/artists/{}/top-tracks", id), None)?
             .query("market", "from_token");
         let result: Tracks = self.load(request)?;
         Ok(result.tracks)
@@ -418,40 +414,10 @@ impl WebApi {
             artists: Vector<Artist>,
         }
 
-        let request = self.get(format!("v1/artists/{}/related-artists", id))?;
+        let request = self.get(format!("v1/artists/{}/related-artists", id), None)?;
         let result: Cached<Artists> = self.load_cached(request, "related-artists", id)?;
         Ok(result.map(|result| result.artists))
     }
-    
-    // https://musicbrainz.org/ (MusicBrainz Section)
-    // https://beta.musicbrainz.org/ws/2/url/?query=url:https://open.spotify.com/artist/1WZarnZpWEv7dDtjAETt4X
-    pub fn get_musicbrainz_artist(&self, url: &str) -> Result<String, Error> {
-        let request = self.get_from_mbi(format!("ws/2/url/?query=url:{}", url))?;
-        let result: String = self.load(request)?;
-        Ok(result)
-    }
-
-    pub fn get_artist_socials(&self, url: &str) -> Result<Vector<String>, Error> {
-        let request = self.get_from_mbi(format!("ws/2/url/?query=url:{}", url))?;
-        let mbi: String = self.load(request)?;
-
-        let scnd_request = self.get_from_mbi(format!("/ws/2/artist/{}?inc=url-rels&fmt=json", mbi))?;
-        let links: Vector<String> = self.load(scnd_request)?;
-
-        Ok(links)
-    }
-
-    /*
-    pub fn get_artist_wiki(&self, url: &str) -> Result<String, Error> {
-        let request = self.get_from_mbi(format!("ws/2/url/?query=url:{}", url))?;
-        let mbi: String = self.load(request)?;
-
-        let scnd_request = self.get_from_mbi(format!("/ws/2/artist/{}?inc=url-rels&fmt=json", mbi))?;
-        let links: Vector<String> = self.load(scnd_request)?;
-
-        Ok(links)
-    }
-    */
 }
 
 /// Album endpoints.
@@ -459,7 +425,7 @@ impl WebApi {
     // https://developer.spotify.com/documentation/web-api/reference/get-an-album/
     pub fn get_album(&self, id: &str) -> Result<Cached<Arc<Album>>, Error> {
         let request = self
-            .get(format!("v1/albums/{}", id))?
+            .get(format!("v1/albums/{}", id), None)?
             .query("market", "from_token");
         let result = self.load_cached(request, "album", id)?;
         Ok(result)
@@ -479,7 +445,7 @@ impl WebApi {
         }
 
         let request = self
-            .get("v1/episodes")?
+            .get("v1/episodes", None)?
             .query("ids", &ids.into_iter().map(|id| id.0.to_base62()).join(","))
             .query("market", "from_token");
         let result: Episodes = self.load(request)?;
@@ -489,7 +455,7 @@ impl WebApi {
     // https://developer.spotify.com/documentation/web-api/reference/get-a-shows-episodes
     pub fn get_show_episodes(&self, id: &str) -> Result<Vector<Arc<Episode>>, Error> {
         let request = self
-            .get(format!("v1/shows/{}/episodes", id))?
+            .get(format!("v1/shows/{}/episodes", id), None)?
             .query("market", "from_token");
         let mut results = Vector::new();
 
@@ -511,7 +477,7 @@ impl WebApi {
     // https://developer.spotify.com/documentation/web-api/reference/get-track
     pub fn get_track(&self, id: &str) -> Result<Arc<Track>, Error> {
         let request = self
-            .get(format!("v1/tracks/{}", id))?
+            .get(format!("v1/tracks/{}", id), None)?
             .query("market", "from_token");
         let result = self.load(request)?;
         Ok(result)
@@ -527,7 +493,7 @@ impl WebApi {
             album: Arc<Album>,
         }
 
-        let request = self.get("v1/me/albums")?.query("market", "from_token");
+        let request = self.get("v1/me/albums", None)?.query("market", "from_token");
 
         Ok(self
             .load_all_pages(request)?
@@ -538,14 +504,14 @@ impl WebApi {
 
     // https://developer.spotify.com/documentation/web-api/reference/save-albums-user/
     pub fn save_album(&self, id: &str) -> Result<(), Error> {
-        let request = self.put("v1/me/albums")?.query("ids", id);
+        let request = self.put("v1/me/albums", None)?.query("ids", id);
         self.send_empty_json(request)?;
         Ok(())
     }
 
     // https://developer.spotify.com/documentation/web-api/reference/remove-albums-user/
     pub fn unsave_album(&self, id: &str) -> Result<(), Error> {
-        let request = self.delete("v1/me/albums")?.query("ids", id);
+        let request = self.delete("v1/me/albums", None)?.query("ids", id);
         self.send_empty_json(request)?;
         Ok(())
     }
@@ -557,7 +523,7 @@ impl WebApi {
             track: Arc<Track>,
         }
 
-        let request = self.get("v1/me/tracks")?.query("market", "from_token");
+        let request = self.get("v1/me/tracks", None)?.query("market", "from_token");
 
         Ok(self
             .load_all_pages(request)?
@@ -573,7 +539,7 @@ impl WebApi {
             show: Arc<Show>,
         }
 
-        let request = self.get("v1/me/shows")?.query("market", "from_token");
+        let request = self.get("v1/me/shows", None)?.query("market", "from_token");
 
         Ok(self
             .load_all_pages(request)?
@@ -584,145 +550,35 @@ impl WebApi {
 
     // https://developer.spotify.com/documentation/web-api/reference/save-tracks-user/
     pub fn save_track(&self, id: &str) -> Result<(), Error> {
-        let request = self.put("v1/me/tracks")?.query("ids", id);
+        let request = self.put("v1/me/tracks", None)?.query("ids", id);
         self.send_empty_json(request)?;
         Ok(())
     }
 
     // https://developer.spotify.com/documentation/web-api/reference/remove-tracks-user/
     pub fn unsave_track(&self, id: &str) -> Result<(), Error> {
-        let request = self.delete("v1/me/tracks")?.query("ids", id);
+        let request = self.delete("v1/me/tracks", None)?.query("ids", id);
         self.send_empty_json(request)?;
         Ok(())
     }
 
     // https://developer.spotify.com/documentation/web-api/reference/save-shows-user
     pub fn save_show(&self, id: &str) -> Result<(), Error> {
-        let request = self.put("v1/me/shows")?.query("ids", id);
+        let request = self.put("v1/me/shows", None)?.query("ids", id);
         self.send_empty_json(request)?;
         Ok(())
     }
 
     // https://developer.spotify.com/documentation/web-api/reference/remove-shows-user
     pub fn unsave_show(&self, id: &str) -> Result<(), Error> {
-        let request = self.delete("v1/me/shows")?.query("ids", id);
+        let request = self.delete("v1/me/shows", None)?.query("ids", id);
         self.send_empty_json(request)?;
         Ok(())
     }
 }
 
-/// View endpoints.
-impl WebApi {
-    pub fn get_made_for_you(&self) -> Result<Vector<Playlist>, Error> {
-        #[derive(Deserialize)]
-        struct View {
-            content: Page<Playlist>,
-        }
 
-        let request = self
-            .get("v1/views/made-for-x")?
-            .query("types", "playlist")
-            .query("limit", "20")
-            .query("offset", "0");
-        let result: View = self.load(request)?;
-        Ok(result.content.items)
-    }
-}
-
-/// Playlist endpoints.
-impl WebApi {
-    // https://developer.spotify.com/documentation/web-api/reference/get-a-list-of-current-users-playlists
-    pub fn get_playlists(&self) -> Result<Vector<Playlist>, Error> {
-        let request = self.get("v1/me/playlists")?;
-        let result = self.load_all_pages(request)?;
-        Ok(result)
-    }
-
-    pub fn follow_playlist(&self, id: &str) -> Result<(), Error> {
-        let request = self.put(format!("v1/playlists/{}/followers", id))?;
-        request.send_json(json!({"public": false,}))?;
-        Ok(())
-    }
-
-    pub fn unfollow_playlist(&self, id: &str) -> Result<(), Error> {
-        let request = self.delete(format!("v1/playlists/{}/followers", id))?;
-        self.send_empty_json(request)?;
-        Ok(())
-    }
-
-    // https://developer.spotify.com/documentation/web-api/reference/get-playlist
-    pub fn get_playlist(&self, id: &str) -> Result<Playlist, Error> {
-        let request = self.get(format!("v1/me/playlists/{}", id))?;
-        let result = self.load(request)?;
-        Ok(result)
-    }
-
-    // https://developer.spotify.com/documentation/web-api/reference/get-playlists-tracks
-    pub fn get_playlist_tracks(&self, id: &str) -> Result<Vector<Arc<Track>>, Error> {
-        #[derive(Clone, Deserialize)]
-        struct PlaylistItem {
-            track: OptionalTrack,
-        }
-
-        // Spotify API likes to return _really_ bogus data for local tracks. Much better
-        // would be to ignore parsing this completely if `is_local` is true, but this
-        // will do as well.
-        #[derive(Clone, Deserialize)]
-        #[serde(untagged)]
-        enum OptionalTrack {
-            Track(Arc<Track>),
-            Json(serde_json::Value),
-        }
-
-        let request = self
-            .get(format!("v1/playlists/{}/tracks", id))?
-            .query("marker", "from_token")
-            .query("additional_types", "track");
-        let result: Vector<PlaylistItem> = self.load_all_pages(request)?;
-
-        let local_track_manager = self.local_track_manager.lock();
-
-        Ok(result
-            .into_iter()
-            .enumerate()
-            .filter_map(|(index, item)| {
-                let mut track = match item.track {
-                    OptionalTrack::Track(track) => track,
-                    OptionalTrack::Json(json) => local_track_manager.find_local_track(json)?,
-                };
-                Arc::make_mut(&mut track).track_pos = index;
-                Some(track)
-            })
-            .collect())
-    }
-
-    pub fn change_playlist_details(&self, id: &str, name: &str) -> Result<(), Error> {
-        let request = self.put(format!("v1/playlists/{}", id))?;
-        request.send_json(json!({ "name": name }))?;
-        Ok(())
-    }
-
-    // https://developer.spotify.com/documentation/web-api/reference/add-tracks-to-playlist
-    pub fn add_track_to_playlist(&self, playlist_id: &str, track_uri: &str) -> Result<(), Error> {
-        let request = self
-            .post(format!("v1/playlists/{}/tracks", playlist_id))?
-            .query("uris", track_uri);
-        self.send_empty_json(request)
-    }
-
-    // https://developer.spotify.com/documentation/web-api/reference/remove-tracks-playlist
-    pub fn remove_track_from_playlist(
-        &self,
-        playlist_id: &str,
-        track_pos: usize,
-    ) -> Result<(), Error> {
-        self.delete(format!("v1/playlists/{}/tracks", playlist_id))?
-            .send_json(ureq::json!({ "positions": [track_pos] }))?;
-        Ok(())
-    }
-}
-
-/// Search endpoints.
+/* 
 impl WebApi {
     // https://developer.spotify.com/documentation/web-api/reference/search/
     pub fn search(
@@ -763,6 +619,391 @@ impl WebApi {
             shows,
         })
     }
+}
+*/
+/// View endpoints.
+impl WebApi {
+    pub fn get_made_for_you(&self) -> Result<MixedView, Error> {
+        #[derive(Deserialize)]
+        pub struct Welcome {
+            data: WelcomeData,
+            extensions: Extensions,
+        }
+    
+        #[derive(Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        pub struct WelcomeData {
+            home_sections: HomeSections,
+        }
+    
+        #[derive(Deserialize)]
+        pub struct HomeSections {
+            #[serde(rename = "__typename")]
+            typename: String,
+            sections: Vec<Section>,
+        }
+    
+        #[derive(Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        pub struct Section {
+            #[serde(rename = "__typename")]
+            typename: String,
+            data: SectionData,
+            section_items: SectionItems,
+            uri: String,
+        }
+    
+        #[derive(Deserialize)]
+        pub struct SectionData {
+            #[serde(rename = "__typename")]
+            typename: String,
+            subtitle: Subtitle,
+            title: Title,
+        }
+    
+        #[derive(Deserialize)]
+        pub struct Subtitle {
+            text: String,
+        }
+    
+        #[derive(Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        pub struct Title {
+            original_label: OriginalLabel,
+            text: String,
+        }
+    
+        #[derive(Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        pub struct OriginalLabel {
+            text_attributes: TextAttributes,
+        }
+    
+        #[derive(Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        pub struct TextAttributes {
+            text_format_arguments: Vec<TextFormatArgument>,
+        }
+    
+        #[derive(Deserialize)]
+        pub struct TextFormatArgument {
+            uri: Option<serde_json::Value>,
+        }
+    
+        #[derive(Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        pub struct SectionItems {
+            items: Vec<SectionItemsItem>,
+            paging_info: PagingInfo,
+            total_count: i64,
+        }
+    
+        #[derive(Deserialize)]
+        pub struct SectionItemsItem {
+            data: Option<serde_json::Value>,
+            content: Content,
+            uri: String,
+        }
+    
+        #[derive(Deserialize)]
+        pub struct Content {
+            #[serde(rename = "__typename")]
+            typename: String,
+            data: ContentData,
+        }
+    
+        #[derive(Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        pub struct ContentData {
+            // This needs to be variable, based off the type name
+            #[serde(rename = "__typename")]
+            typename: String,
+            attributes: Option<Vec<Attribute>>,
+            description: Option<String>,
+            format: Option<String>,
+            images: Option<Images>,
+            name: Option<String>,
+            owner_v2: Option<OwnerV2>,
+            uri: String,
+            artists: Option<Artists>,
+            cover_art: Option<Images>,
+            album_type: Option<String>,
+            profile: Option<Profile>,
+            media_type: Option<String>,
+            publisher: Option<Profile>,
+        }
+
+        #[derive(Deserialize)]
+        pub struct Artists {
+            items: Vec<ArtistsItem>,
+        }
+        
+        #[derive(Deserialize)]
+        pub struct ArtistsItem {
+            profile: Profile,
+            uri: String,
+        }
+        
+        #[derive(Deserialize)]
+        pub struct Profile {
+            name: String,
+        }
+
+        #[derive(Deserialize)]
+        pub struct Attribute {
+            key: String,
+            value: String,
+        }
+    
+        #[derive(Deserialize)]
+        pub struct Images {
+            items: Vec<ImagesItem>,
+        }
+    
+        #[derive(Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        pub struct ImagesItem {
+            extracted_colors: ExtractedColors,
+            sources: Vec<Source>,
+        }
+    
+        #[derive(Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        pub struct ExtractedColors {
+            color_dark: ColorDark,
+        }
+    
+        #[derive(Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        pub struct ColorDark {
+            hex: String,
+            is_fallback: bool,
+        }
+    
+        #[derive(Deserialize)]
+        pub struct Source {
+            height: Option<serde_json::Value>,
+            url: String,
+            width: Option<serde_json::Value>,
+        }
+    
+        #[derive(Deserialize)]
+        pub struct OwnerV2 {
+            data: OwnerV2Data,
+        }
+    
+        #[derive(Deserialize)]
+        pub struct OwnerV2Data {
+            #[serde(rename = "__typename")]
+            typename: String,
+            name: String,
+            uri: String,
+        }
+    
+        #[derive(Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        pub struct PagingInfo {
+            next_offset: Option<serde_json::Value>,
+        }
+    
+        #[derive(Deserialize)]
+        pub struct Extensions {}
+    
+        let request = self.get("pathfinder/v1/query?operationName=homeSection&variables=%7B%22uri%22%3A%22spotify%3Asection%3A0JQ5DAUnp4wcj0bCb3wh3S%22%2C%22timeZone%22%3A%22Europe%2FLondon%22%2C%22sp_t%22%3A%223c7e9795a8ab85165839a5e905d6f10c%22%2C%22country%22%3A%22GB%22%2C%22sectionItemsOffset%22%3A0%2C%22sectionItemsLimit%22%3A20%7D&extensions=%7B%22persistedQuery%22%3A%7B%22version%22%3A1%2C%22sha256Hash%22%3A%224da53a78e4e98d4f3fa55698af5b751fe05ca3a1a4a526ff8147e8866ccfa49f%22%7D%7D", Some("api-partner.spotify.com"))?;
+        
+        // Extract the playlists
+        let result: Welcome = self.load(request)?;
+    
+        let playlist: Vector<Playlist> = result.data.home_sections.sections
+        .iter()
+        .flat_map(|section| {
+            section.section_items.items.iter().map(|item| {
+                let uri = item.uri.clone();
+                let id = uri.split(':').last().unwrap_or("").to_string();
+
+                Playlist {
+                    id: id.into(),
+                    name: item.content.data.name.clone().unwrap_or_default().into(),
+                    images: item.content.data.images.as_ref().map(|images| 
+                        images.items.iter().map(|img| data::utils::Image {
+                            url: img.sources.first().map(|s| s.url.clone()).unwrap_or_default().into(),
+                            width: None,
+                            height: None,
+                        }).collect()
+                    ),
+                    description: item.content.data.description.clone().unwrap_or_default().into(),
+                    track_count: Some(10),
+                    owner: PublicUser {
+                        id: "".into(),
+
+                        display_name: item.content.data.owner_v2.as_ref()
+                            .map(|owner| owner.data.name.clone())
+                            .unwrap_or_default()
+                            .into(),
+                    },
+                    collaborative: false,
+                }
+            })
+        })
+        .collect();
+
+        Ok(MixedView {
+            playlists: playlist,
+            artists: Vector::new(),
+            albums: Vector::new(),
+            shows: Vector::new(),
+        })
+    }
+
+    pub fn podcasts_and_more(&self) -> Result<Vector<Show>, Error> {
+        #[derive(Deserialize)]
+        struct View {
+            content: Page<Show>,
+        }
+        let request = self
+            .get("v1/views/podcasts-and-more", None)?
+            .query("types", "Show")
+            .query("limit", "20")
+            .query("offset", "0");
+        let result: View = self.load(request)?;
+        Ok(result.content.items)
+    }
+}
+
+/// Playlist endpoints.
+impl WebApi {
+    // https://developer.spotify.com/documentation/web-api/reference/get-a-list-of-current-users-playlists
+    pub fn get_playlists(&self) -> Result<Vector<Playlist>, Error> {
+        let request = self.get("v1/me/playlists", None)?;
+        let result = self.load_all_pages(request)?;
+        Ok(result)
+    }
+
+    pub fn follow_playlist(&self, id: &str) -> Result<(), Error> {
+        let request = self.put(format!("v1/playlists/{}/followers", id), None)?;
+        request.send_json(json!({"public": false,}))?;
+        Ok(())
+    }
+
+    pub fn unfollow_playlist(&self, id: &str) -> Result<(), Error> {
+        let request = self.delete(format!("v1/playlists/{}/followers", id), None)?;
+        self.send_empty_json(request)?;
+        Ok(())
+    }
+
+    // https://developer.spotify.com/documentation/web-api/reference/get-playlist
+    pub fn get_playlist(&self, id: &str) -> Result<Playlist, Error> {
+        let request = self.get(format!("v1/me/playlists/{}", id), None)?;
+        let result = self.load(request)?;
+        Ok(result)
+    }
+
+    // https://developer.spotify.com/documentation/web-api/reference/get-playlists-tracks
+    pub fn get_playlist_tracks(&self, id: &str) -> Result<Vector<Arc<Track>>, Error> {
+        #[derive(Clone, Deserialize)]
+        struct PlaylistItem {
+            track: OptionalTrack,
+        }
+
+        // Spotify API likes to return _really_ bogus data for local tracks. Much better
+        // would be to ignore parsing this completely if `is_local` is true, but this
+        // will do as well.
+        #[derive(Clone, Deserialize)]
+        #[serde(untagged)]
+        enum OptionalTrack {
+            Track(Arc<Track>),
+            Json(serde_json::Value),
+        }
+
+        let request = self
+            .get(format!("v1/playlists/{}/tracks", id), None)?
+            .query("marker", "from_token")
+            .query("additional_types", "track");
+        let result: Vector<PlaylistItem> = self.load_all_pages(request)?;
+
+        let local_track_manager = self.local_track_manager.lock();
+
+        Ok(result
+            .into_iter()
+            .enumerate()
+            .filter_map(|(index, item)| {
+                let mut track = match item.track {
+                    OptionalTrack::Track(track) => track,
+                    OptionalTrack::Json(json) => local_track_manager.find_local_track(json)?,
+                };
+                Arc::make_mut(&mut track).track_pos = index;
+                Some(track)
+            })
+            .collect())
+    }
+
+    pub fn change_playlist_details(&self, id: &str, name: &str) -> Result<(), Error> {
+        let request = self.put(format!("v1/playlists/{}", id), None)?;
+        request.send_json(json!({ "name": name }))?;
+        Ok(())
+    }
+
+    // https://developer.spotify.com/documentation/web-api/reference/add-tracks-to-playlist
+    pub fn add_track_to_playlist(&self, playlist_id: &str, track_uri: &str) -> Result<(), Error> {
+        let request = self
+            .post(format!("v1/playlists/{}/tracks", playlist_id), None)?
+            .query("uris", track_uri);
+        self.send_empty_json(request)
+    }
+
+    // https://developer.spotify.com/documentation/web-api/reference/remove-tracks-playlist
+    pub fn remove_track_from_playlist(
+        &self,
+        playlist_id: &str,
+        track_pos: usize,
+    ) -> Result<(), Error> {
+        self.delete(format!("v1/playlists/{}/tracks", playlist_id), None)?
+            .send_json(ureq::json!({ "positions": [track_pos] }))?;
+        Ok(())
+    }
+}
+
+/// Search endpoints.
+impl WebApi {
+    // https://developer.spotify.com/documentation/web-api/reference/search/
+    pub fn search(
+        &self,
+        query: &str,
+        topics: &[SearchTopic],
+        limit: usize,
+    ) -> Result<SearchResults, Error> {
+        #[derive(Deserialize)]
+        struct ApiSearchResults {
+            artists: Option<Page<Artist>>,
+            albums: Option<Page<Arc<Album>>>,
+            tracks: Option<Page<Arc<Track>>>,
+            playlists: Option<Page<Playlist>>,
+            shows: Option<Page<Arc<Show>>>,
+        }
+
+        let topics = topics.iter().map(SearchTopic::as_str).join(",");
+        let request = self
+            .get("v1/search", None)?
+            .query("q", query)
+            .query("type", &topics)
+            .query("limit", &limit.to_string())
+            .query("marker", "from_token");
+        let result: ApiSearchResults = self.load(request)?;
+
+        let artists = result.artists.map_or_else(Vector::new, |page| page.items);
+        let albums = result.albums.map_or_else(Vector::new, |page| page.items);
+        let tracks = result.tracks.map_or_else(Vector::new, |page| page.items);
+        let playlist = result.playlists.map_or_else(Vector::new, |page| page.items);
+        let shows = result.shows.map_or_else(Vector::new, |page| page.items);
+        Ok(SearchResults {
+            query: query.into(),
+            artists,
+            albums,
+            tracks,
+            playlists: playlist,
+            shows,
+        })
+    }
 
     pub fn load_spotify_link(&self, link: &SpotifyUrl) -> Result<Nav, Error> {
         let nav = match link {
@@ -796,7 +1037,7 @@ impl WebApi {
             .join(", ");
 
         let mut request = self
-            .get("v1/recommendations")?
+            .get("v1/recommendations", None)?
             .query("marker", "from_token")
             .query("limit", "100")
             .query("seed_artists", &seed_artists)
@@ -839,7 +1080,7 @@ impl WebApi {
 impl WebApi {
     // https://developer.spotify.com/documentation/web-api/reference/get-audio-analysis/
     pub fn _get_audio_analysis(&self, track_id: &str) -> Result<AudioAnalysis, Error> {
-        let request = self.get(format!("v1/audio-analysis/{}", track_id))?;
+        let request = self.get(format!("v1/audio-analysis/{}", track_id), None)?;
         let result = self.load_cached(request, "audio-analysis", track_id)?;
         Ok(result.data)
     }
