@@ -13,13 +13,12 @@ use druid::{
 use itertools::Itertools;
 use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
-use serde::{de::DeserializeOwned, Deserialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::json;
 use ureq::{Agent, Request, Response};
 
 use psst_core::{
-    session::{access_token::TokenProvider, SessionService},
-    util::default_ureq_agent_builder,
+    protocol::authentication::APWelcome, session::{access_token::TokenProvider, SessionService}, util::default_ureq_agent_builder
 };
 
 use crate::{
@@ -808,9 +807,32 @@ impl WebApi {
     
         #[derive(Deserialize)]
         pub struct Extensions {}
-    
-        let request = self.get("pathfinder/v1/query?operationName=homeSection&variables=%7B%22uri%22%3A%22spotify%3Asection%3A0JQ5DAUnp4wcj0bCb3wh3S%22%2C%22timeZone%22%3A%22Europe%2FLondon%22%2C%22sp_t%22%3A%223c7e9795a8ab85165839a5e905d6f10c%22%2C%22country%22%3A%22GB%22%2C%22sectionItemsOffset%22%3A0%2C%22sectionItemsLimit%22%3A20%7D&extensions=%7B%22persistedQuery%22%3A%7B%22version%22%3A1%2C%22sha256Hash%22%3A%224da53a78e4e98d4f3fa55698af5b751fe05ca3a1a4a526ff8147e8866ccfa49f%22%7D%7D", Some("api-partner.spotify.com"))?;
-        
+
+        let extensions = json!({
+            "persistedQuery": {
+                "version": 1,
+                "sha256Hash": "4da53a78e4e98d4f3fa55698af5b751fe05ca3a1a4a526ff8147e8866ccfa49f"
+            }
+        });
+
+        let variables = json!( {
+            "uri": "spotify:section:0JQ5DAUnp4wcj0bCb3wh3S",
+            "timeZone": "Europe/London",
+            "sp_t": self.access_token()?,  // Assuming this returns a Result<String, Error>
+            "country": "GB",
+            "sectionItemsOffset": 0,
+            "sectionItemsLimit": 20,
+        });
+
+        let variables_json = serde_json::to_string(&variables)?;
+        let extensions_json = serde_json::to_string(&extensions)?;
+
+        let request = self.get("pathfinder/v1/query", Some("api-partner.spotify.com"))?
+            .query("operationName", "homeSection")
+            .query("variables", &format!("{}", variables_json))
+            .query("extensions", &format!("{}", extensions_json));
+
+        log::info!("Request: {:?}", request);
         // Extract the playlists
         let result: Welcome = self.load(request)?;
     
