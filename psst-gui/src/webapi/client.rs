@@ -877,7 +877,6 @@ impl WebApi {
 
     pub fn get_made_for_you(&self) -> Result<MixedView, Error> {
         // 0JQ5DAUnp4wcj0bCb3wh3S -> Daily mixes
-        // 0JQ5DAnM3wGh0gz1MXnu89 -> Top mixes
         let json_query = self.build_home_request("spotify:section:0JQ5DAUnp4wcj0bCb3wh3S");
         let request = self.get("pathfinder/v1/query", Some("api-partner.spotify.com"))?
             .query("operationName", "homeSection")
@@ -889,7 +888,36 @@ impl WebApi {
         
         Ok(result)
     }
+    
+    pub fn get_top_mixes(&self) -> Result<MixedView, Error> {
+        // 0JQ5DAnM3wGh0gz1MXnu89 -> Top mixes
+        let json_query = self.build_home_request("spotify:section:0JQ5DAnM3wGh0gz1MXnu89");
+        let request = self.get("pathfinder/v1/query", Some("api-partner.spotify.com"))?
+            .query("operationName", "homeSection")
+            .query("variables", &json_query.0.to_string())
+            .query("extensions", &json_query.1.to_string());
 
+        // Extract the playlists
+        let result = self.load_and_return_home_section(request)?;
+        
+        Ok(result)
+    }
+    
+    pub fn jump_back_in(&self) -> Result<MixedView, Error> {
+        // 0JQ5DAIiKWzVFULQfUm85X -> Jump back in
+        // This is where we need to get the laod and  return to return everything!!!
+        let json_query = self.build_home_request("spotify:section:0JQ5DAIiKWzVFULQfUm85X");
+        let request = self.get("pathfinder/v1/query", Some("api-partner.spotify.com"))?
+            .query("operationName", "homeSection")
+            .query("variables", &json_query.0.to_string())
+            .query("extensions", &json_query.1.to_string());
+
+        // Extract the playlists
+        let result = self.load_and_return_home_section(request)?;
+        
+        Ok(result)
+    }
+    
     pub fn podcasts_and_more(&self) -> Result<Vector<Show>, Error> {
         #[derive(Deserialize)]
         struct View {

@@ -24,7 +24,11 @@ pub fn home_widget() -> impl Widget<AppState> {
     Flex::column()
         .with_child(Label::new("Made for you").with_text_size(theme::grid(2.5)).align_left().padding((theme::grid(1.5), 0.0)))
         .with_default_spacer()
-        .with_child(results_widget())
+        .with_child(made_for_you())
+        .with_default_spacer()
+        .with_child(Label::new("Your top mixes").with_text_size(theme::grid(2.5)).align_left().padding((theme::grid(1.5), 0.0)))
+        .with_default_spacer()
+        .with_child(user_top_mixes())
         .with_default_spacer()
         .with_child(Label::new("Your top artists").with_text_size(theme::grid(2.5)).align_left().padding((theme::grid(1.5), 0.0)))
         .with_default_spacer()
@@ -35,24 +39,46 @@ pub fn home_widget() -> impl Widget<AppState> {
         .with_child(user_top_tracks_widget())
 }
 
-pub fn results_widget() -> impl Widget<AppState> {
+pub fn made_for_you() -> impl Widget<AppState> {
     Async::new(
         spinner_widget,
-        loaded_results_widget,
+        loaded_results_widget.clone(),
         error_widget,
     )
     .lens(
         Ctx::make(
             AppState::common_ctx,
-            AppState::home_detail.then(HomeDetail::made_for_x_hub),
+            AppState::home_detail.then(HomeDetail::made_for_you),
         )
         .then(Ctx::in_promise()),
     )
     .on_command_async(
         LOAD_MADE_FOR_YOU,
         |q| WebApi::global().get_made_for_you(),
-        |_, data, q| data.home_detail.made_for_x_hub.defer(q),
-        |_, data, r| data.home_detail.made_for_x_hub.update(r),
+        |_, data, q| data.home_detail.made_for_you.defer(q),
+        |_, data, r| data.home_detail.made_for_you.update(r),
+    )
+}
+
+pub fn user_top_mixes() -> impl Widget<AppState> {
+    // We need a way to parse HTML
+    Async::new(
+        spinner_widget,
+        loaded_results_widget.clone(),
+        error_widget,
+    )
+    .lens(
+        Ctx::make(
+            AppState::common_ctx,
+            AppState::home_detail.then(HomeDetail::user_top_mixes),
+        )
+        .then(Ctx::in_promis_e()),
+    )
+    .on_command_async(
+        LOAD_MADE_FOR_YOU,
+        || WebApi::global().get_top_mixes(),
+        |_, data, q| data.home_detail.user_top_mixes.defer(q),
+        |_, data, r| data.home_detail.user_top_mixes.update(r),
     )
 }
 

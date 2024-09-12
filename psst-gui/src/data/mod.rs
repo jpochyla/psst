@@ -133,9 +133,10 @@ impl AppState {
             },
             home_detail: HomeDetail {
                 made_for_you: Promise::Empty,
+                user_top_mixes: Promise::Empty,
+                jump_back_in: Promise::Empty,
                 user_top_tracks: Promise::Empty,
                 user_top_artists: Promise::Empty,
-                made_for_x_hub: Promise::Empty,
             },
             album_detail: AlbumDetail {
                 album: Promise::Empty,
@@ -516,10 +517,11 @@ pub type WithCtx<T> = Ctx<Arc<CommonCtx>, T>;
 
 #[derive(Clone, Data, Lens)]
 pub struct HomeDetail {
-    pub made_for_you: Promise<Vector<Playlist>>,
+    pub made_for_you: Promise<MixedView>,
+    pub user_top_mixes: Promise<MixedView>,
+    pub jump_back_in: Promise<MixedView>,
     pub user_top_tracks: Promise<Vector<Arc<Track>>>,
     pub user_top_artists: Promise<Vector<Artist>>,
-    pub made_for_x_hub: Promise<MixedView>,
 }
 
 #[derive(Clone, Data, Lens)]
