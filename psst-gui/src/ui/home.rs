@@ -4,7 +4,7 @@ use druid::im::Vector;
 use druid::widget::{Either, Flex, Label, Scroll};
 use druid::{widget::List, LensExt, Selector, Widget, WidgetExt};
 
-use crate::data::{Album, Artist, Ctx, HomeDetail, MixedView, Playlist, Show, Track, WithCtx};
+use crate::data::{Album, Artist, Ctx, HomeDetail, MixedView, Show, Track, WithCtx};
 use crate::widget::Empty;
 use crate::{
     data::AppState,
@@ -12,7 +12,7 @@ use crate::{
     widget::{Async, MyWidgetExt},
 };
 
-use super::{album, artist, playable, show, theme, track};
+use super::{artist, playable, theme, track};
 use super::{
     playlist,
     utils::{error_widget, spinner_widget},
@@ -129,7 +129,7 @@ fn user_top_artists_widget() -> impl Widget<AppState> {
         spinner_widget,
         || Scroll::new(
             List::new(
-                    || artist::horizontal_recommended_artist_widget()
+                    artist::horizontal_recommended_artist_widget
                 ).horizontal()
                 // TODO Add a function which allows people to scroll with their scroll wheel!!!
             ).horizontal(),
@@ -162,7 +162,7 @@ fn top_tracks_widget() -> impl Widget<WithCtx<Vector<Arc<Track>>>> {
 fn user_top_tracks_widget() -> impl Widget<AppState> {
     Async::new(
         spinner_widget,
-        || top_tracks_widget(),
+        top_tracks_widget,
         error_widget,
     )
     .lens(
