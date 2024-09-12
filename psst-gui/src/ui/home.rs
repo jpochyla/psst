@@ -22,64 +22,76 @@ pub const LOAD_MADE_FOR_YOU: Selector = Selector::new("app.home.load-made-for-yo
 
 pub fn home_widget() -> impl Widget<AppState> {
     Flex::column()
-        .with_child(Label::new("Made for you").with_text_size(theme::grid(2.5)).align_left().padding((theme::grid(1.5), 0.0)))
+        .with_child(
+            Label::new("Made for you")
+                .with_text_size(theme::grid(2.5))
+                .align_left()
+                .padding((theme::grid(1.5), 0.0)),
+        )
         .with_default_spacer()
         .with_child(made_for_you())
         .with_default_spacer()
-        .with_child(Label::new("Your top mixes").with_text_size(theme::grid(2.5)).align_left().padding((theme::grid(1.5), 0.0)))
+        .with_child(
+            Label::new("Your top mixes")
+                .with_text_size(theme::grid(2.5))
+                .align_left()
+                .padding((theme::grid(1.5), 0.0)),
+        )
         .with_default_spacer()
         .with_child(user_top_mixes())
         .with_default_spacer()
-        .with_child(Label::new("Your top artists").with_text_size(theme::grid(2.5)).align_left().padding((theme::grid(1.5), 0.0)))
+        .with_child(
+            Label::new("Your top artists")
+                .with_text_size(theme::grid(2.5))
+                .align_left()
+                .padding((theme::grid(1.5), 0.0)),
+        )
         .with_default_spacer()
         .with_child(user_top_artists_widget())
         .with_default_spacer()
-        .with_child(Label::new("Your top tracks").with_text_size(theme::grid(2.5)).align_left().padding((theme::grid(1.5), 0.0)))
+        .with_child(
+            Label::new("Your top tracks")
+                .with_text_size(theme::grid(2.5))
+                .align_left()
+                .padding((theme::grid(1.5), 0.0)),
+        )
         .with_default_spacer()
         .with_child(user_top_tracks_widget())
 }
 
 pub fn made_for_you() -> impl Widget<AppState> {
-    Async::new(
-        spinner_widget,
-        loaded_results_widget.clone(),
-        error_widget,
-    )
-    .lens(
-        Ctx::make(
-            AppState::common_ctx,
-            AppState::home_detail.then(HomeDetail::made_for_you),
+    Async::new(spinner_widget, loaded_results_widget.clone(), error_widget)
+        .lens(
+            Ctx::make(
+                AppState::common_ctx,
+                AppState::home_detail.then(HomeDetail::made_for_you),
+            )
+            .then(Ctx::in_promise()),
         )
-        .then(Ctx::in_promise()),
-    )
-    .on_command_async(
-        LOAD_MADE_FOR_YOU,
-        |_| WebApi::global().get_made_for_you(),
-        |_, data, q| data.home_detail.made_for_you.defer(q),
-        |_, data, r| data.home_detail.made_for_you.update(r),
-    )
+        .on_command_async(
+            LOAD_MADE_FOR_YOU,
+            |_| WebApi::global().get_made_for_you(),
+            |_, data, q| data.home_detail.made_for_you.defer(q),
+            |_, data, r| data.home_detail.made_for_you.update(r),
+        )
 }
 
 pub fn user_top_mixes() -> impl Widget<AppState> {
     // We need a way to parse HTML
-    Async::new(
-        spinner_widget,
-        loaded_results_widget.clone(),
-        error_widget,
-    )
-    .lens(
-        Ctx::make(
-            AppState::common_ctx,
-            AppState::home_detail.then(HomeDetail::user_top_mixes),
+    Async::new(spinner_widget, loaded_results_widget.clone(), error_widget)
+        .lens(
+            Ctx::make(
+                AppState::common_ctx,
+                AppState::home_detail.then(HomeDetail::user_top_mixes),
+            )
+            .then(Ctx::in_promise()),
         )
-        .then(Ctx::in_promise()),
-    )
-    .on_command_async(
-        LOAD_MADE_FOR_YOU,
-        |_| WebApi::global().get_top_mixes(),
-        |_, data, q| data.home_detail.user_top_mixes.defer(q),
-        |_, data, r| data.home_detail.user_top_mixes.update(r),
-    )
+        .on_command_async(
+            LOAD_MADE_FOR_YOU,
+            |_| WebApi::global().get_top_mixes(),
+            |_, data, q| data.home_detail.user_top_mixes.defer(q),
+            |_, data, r| data.home_detail.user_top_mixes.update(r),
+        )
 }
 
 fn loaded_results_widget() -> impl Widget<WithCtx<MixedView>> {
@@ -106,8 +118,7 @@ fn artist_results_widget() -> impl Widget<WithCtx<MixedView>> {
     Either::new(
         |artists: &Vector<Artist>, _| artists.is_empty(),
         Empty,
-        Flex::column()
-            .with_child(List::new(artist::recommended_artist_widget)),
+        Flex::column().with_child(List::new(artist::recommended_artist_widget)),
     )
     .lens(Ctx::data().then(MixedView::artists))
 }
@@ -116,8 +127,7 @@ fn album_results_widget() -> impl Widget<WithCtx<MixedView>> {
     Either::new(
         |albums: &Vector<Album>, _| albums.is_empty(),
         Empty,
-        Flex::column()
-            .with_child(Label::new("not implemented")),
+        Flex::column().with_child(Label::new("not implemented")),
     )
     .lens(Ctx::data().then(MixedView::albums))
 }
@@ -126,17 +136,15 @@ fn playlist_results_widget() -> impl Widget<WithCtx<MixedView>> {
     Either::new(
         |playlists: &WithCtx<MixedView>, _| playlists.data.playlists.is_empty(),
         Empty,
-        Flex::column()
-            .with_child(
-                // List::new(playlist::playlist_widget).lens(Ctx::map(SearchResults::playlists)),
-                // May be nicer
-                Scroll::new(
-                    List::new(
-                            || playlist::horizontal_playlist_widget(false, true)
-                        ).horizontal()
-                    ).horizontal()
-                    .lens(Ctx::map(MixedView::playlists)),
-            ),
+        Flex::column().with_child(
+            // List::new(playlist::playlist_widget).lens(Ctx::map(SearchResults::playlists)),
+            // May be nicer
+            Scroll::new(
+                List::new(|| playlist::horizontal_playlist_widget(false, true)).horizontal(),
+            )
+            .horizontal()
+            .lens(Ctx::map(MixedView::playlists)),
+        ),
     )
 }
 
@@ -144,8 +152,7 @@ fn show_results_widget() -> impl Widget<WithCtx<MixedView>> {
     Either::new(
         |shows: &Vector<Show>, _| shows.is_empty(),
         Empty,
-        Flex::column()
-            .with_child(Label::new("not implemented")),
+        Flex::column().with_child(Label::new("not implemented")),
     )
     .lens(Ctx::data().then(MixedView::shows))
 }
@@ -153,24 +160,21 @@ fn show_results_widget() -> impl Widget<WithCtx<MixedView>> {
 fn user_top_artists_widget() -> impl Widget<AppState> {
     Async::new(
         spinner_widget,
-        || Scroll::new(
-            List::new(
-                    artist::horizontal_recommended_artist_widget
-                ).horizontal()
-                // TODO Add a function which allows people to scroll with their scroll wheel!!!
-            ).horizontal(),
+        || {
+            Scroll::new(
+                List::new(artist::horizontal_recommended_artist_widget).horizontal(), // TODO Add a function which allows people to scroll with their scroll wheel!!!
+            )
+            .horizontal()
+        },
         error_widget,
     )
-    .lens(
-        AppState::home_detail.then(HomeDetail::user_top_artists)
-    )
+    .lens(AppState::home_detail.then(HomeDetail::user_top_artists))
     .on_command_async(
         LOAD_MADE_FOR_YOU,
         |_| WebApi::global().get_user_top_artist(),
         |_, data, d| data.home_detail.user_top_artists.defer(d),
         |_, data, r| data.home_detail.user_top_artists.update(r),
     )
-
 }
 
 fn top_tracks_widget() -> impl Widget<WithCtx<Vector<Arc<Track>>>> {
@@ -186,22 +190,18 @@ fn top_tracks_widget() -> impl Widget<WithCtx<Vector<Arc<Track>>>> {
 }
 
 fn user_top_tracks_widget() -> impl Widget<AppState> {
-    Async::new(
-        spinner_widget,
-        top_tracks_widget,
-        error_widget,
-    )
-    .lens(
-        Ctx::make(
-            AppState::common_ctx,
-            AppState::home_detail.then(HomeDetail::user_top_tracks),
+    Async::new(spinner_widget, top_tracks_widget, error_widget)
+        .lens(
+            Ctx::make(
+                AppState::common_ctx,
+                AppState::home_detail.then(HomeDetail::user_top_tracks),
+            )
+            .then(Ctx::in_promise()),
         )
-        .then(Ctx::in_promise()),
-    )
-    .on_command_async(
-        LOAD_MADE_FOR_YOU,
-        |_| WebApi::global().get_user_top_tracks(),
-        |_, data, d| data.home_detail.user_top_tracks.defer(d),
-        |_, data, r| data.home_detail.user_top_tracks.update(r),
-    )
+        .on_command_async(
+            LOAD_MADE_FOR_YOU,
+            |_| WebApi::global().get_user_top_tracks(),
+            |_, data, d| data.home_detail.user_top_tracks.defer(d),
+            |_, data, r| data.home_detail.user_top_tracks.update(r),
+        )
 }

@@ -16,6 +16,8 @@ use parking_lot::Mutex;
 use serde::{de::DeserializeOwned, Deserialize};
 use serde_json::json;
 use ureq::{Agent, Request, Response};
+use sanitize_html::sanitize_str;
+use sanitize_html::rules::predefined::DEFAULT;
 
 use psst_core::{
     session::{access_token::TokenProvider, SessionService}, util::default_ureq_agent_builder
@@ -481,26 +483,35 @@ impl WebApi {
 
                 Playlist {
                     id: id.into(),
-                    name: item.content.data.name.clone().unwrap_or_default().into(),
-                    images: item.content.data.images.as_ref().map(|images| 
+                    name: Arc::from(item.content.data.name.as_deref().unwrap_or_default()),
+                    images: Some(item.content.data.images.as_ref().map_or_else(Vector::new, |images| 
                         images.items.iter().map(|img| data::utils::Image {
-                            url: img.sources.first().map(|s| s.url.clone()).unwrap_or_default().into(),
+                            url: Arc::from(img.sources.first().map(|s| s.url.as_str()).unwrap_or_default()),
                             width: None,
                             height: None,
                         }).collect()
+                    )),
+                    description: {
+                        let desc = sanitize_str(&DEFAULT, item.content.data.description.as_deref().unwrap_or_default()).unwrap_or_default();
+                        // This is roughly 3 lines of description, truncated if too long
+                        if desc.chars().count() > 65 {
+                            desc.chars().take(62).collect::<String>() + "..."
+                        } else {
+                            desc
+                        }.into()
+                    },
+                    track_count: item.content.data.attributes.as_ref().and_then(|attrs| 
+                        attrs.iter().find(|attr| attr.key == "track_count").and_then(|attr| attr.value.parse().ok())
                     ),
-                    description: item.content.data.description.clone().unwrap_or_default().into(),
-                    track_count: Some(10),
                     owner: PublicUser {
-                        id: "".into(),
-
+                        id: Arc::from(""),
                         display_name: item.content.data.owner_v2.as_ref()
-                            .map(|owner| owner.data.name.clone())
-                            .unwrap_or_default()
-                            .into(),
+                            .map(|owner| Arc::from(owner.data.name.as_str()))
+                            .unwrap_or_else(|| Arc::from("")),
                     },
                     collaborative: false,
                 }
+                
             })
         })
         .collect();

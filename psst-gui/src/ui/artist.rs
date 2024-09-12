@@ -96,7 +96,7 @@ fn async_related_widget() -> impl Widget<AppState> {
 }
 
 pub fn artist_widget() -> impl Widget<Artist> {
-    let artist_image = artist_cover_widget(theme::grid(21.0));
+    let artist_image = artist_cover_widget(theme::grid(18.0));
     Flex::row()
         .with_child(artist_image)
         .with_child(
@@ -105,14 +105,14 @@ pub fn artist_widget() -> impl Widget<Artist> {
                     "Coldplay are a British rock band formed in London in 1997, consisting of vocalist and pianist Chris Martin, lead guitarist Jonny Buckland, bassist Guy Berryman, drummer and percussionist Will Champion, and manager Phil Harvey. They are best known for their live performances, having also impacted popular culture with their artistry, advocacy and achievements. \n The members of the band initially met at University College London, calling themselves Big Fat Noises and changing to Starfish, before settling on the current name. After releasing Safety (1998) independently, Coldplay signed with Parlophone in 1999 and wrote their debut album, Parachutes (2000). It featured breakthrough single \"Yellow\" and received a Brit Award for British Album of the Year and a Grammy Award for Best Alternative Music Album. The group's follow-up, A Rush of Blood to the Head (2002), won the same accolades. X&Y (2005) later saw the completion of what they considered a trilogy, being nominated for Best Rock Album as well. Its successor, Viva la Vida or Death and All His Friends (2008), prevailed in the category. Both albums were the best-selling of their years, topping the charts in over 30 countries. Viva la Vida's title track also became the first British act single to lead the Billboard Hot 100 and UK Singles Chart simultaneously in the 21st century."
                 )
                 .with_line_break_mode(LineBreaking::WordWrap)
-                .fix_width(theme::grid(35.0))
+                .fix_width(theme::grid(18.0))
             )
-            .fix_size(theme::grid(35.0), theme::grid(21.0))
+            .fix_size(theme::grid(20.0), theme::grid(20.0))
         )
         .context_menu(|artist| artist_menu(&artist.link()))
 }
 pub fn horizontal_recommended_artist_widget() -> impl Widget<Artist> {
-    let artist_image = cover_widget(theme::grid(21.0));
+    let artist_image = cover_widget(theme::grid(16.0));
     let artist_label = Label::raw()
         .with_font(theme::UI_FONT_MEDIUM)
         .lens(Artist::name);
@@ -121,8 +121,10 @@ pub fn horizontal_recommended_artist_widget() -> impl Widget<Artist> {
         .with_default_spacer()
         .with_child(artist_label);
     artist
-        .padding(theme::grid(0.5))
+        .padding(theme::grid(1.0))
+        .fix_width(theme::grid(20.0))
         .link()
+        .rounded(theme::BUTTON_BORDER_RADIUS)
         .on_left_click(|ctx, _, artist, _| {
             ctx.submit_command(cmd::NAVIGATE.with(Nav::ArtistDetail(artist.link())));
         })

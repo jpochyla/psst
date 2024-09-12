@@ -318,8 +318,11 @@ fn information_section(title_msg: &str, description_msg: &str) -> impl Widget<Ap
         .with_child(description_label)
 }
 
-pub fn horizontal_playlist_widget(show_name: bool, show_description: bool) -> impl Widget<WithCtx<Playlist>> {
-    let playlist_image = rounded_cover_widget(theme::grid(21.0)).lens(Ctx::data());
+pub fn horizontal_playlist_widget(
+    show_name: bool,
+    show_description: bool,
+) -> impl Widget<WithCtx<Playlist>> {
+    let playlist_image = rounded_cover_widget(theme::grid(16.0)).lens(Ctx::data());
 
     let mut playlist = Flex::column()
         .with_child(playlist_image)
@@ -350,7 +353,7 @@ pub fn horizontal_playlist_widget(show_name: bool, show_description: bool) -> im
         .on_left_click(|ctx, _, playlist, _| {
             ctx.submit_command(cmd::NAVIGATE.with(Nav::PlaylistDetail(playlist.data.link())));
         })
-        .fix_width(theme::grid(25.0))
+        .fix_width(theme::grid(20.0))
         .context_menu(playlist_menu_ctx)
 }
 
