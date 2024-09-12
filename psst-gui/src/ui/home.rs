@@ -54,7 +54,7 @@ pub fn made_for_you() -> impl Widget<AppState> {
     )
     .on_command_async(
         LOAD_MADE_FOR_YOU,
-        |q| WebApi::global().get_made_for_you(),
+        |_| WebApi::global().get_made_for_you(),
         |_, data, q| data.home_detail.made_for_you.defer(q),
         |_, data, r| data.home_detail.made_for_you.update(r),
     )
@@ -72,11 +72,11 @@ pub fn user_top_mixes() -> impl Widget<AppState> {
             AppState::common_ctx,
             AppState::home_detail.then(HomeDetail::user_top_mixes),
         )
-        .then(Ctx::in_promis_e()),
+        .then(Ctx::in_promise()),
     )
     .on_command_async(
         LOAD_MADE_FOR_YOU,
-        || WebApi::global().get_top_mixes(),
+        |_| WebApi::global().get_top_mixes(),
         |_, data, q| data.home_detail.user_top_mixes.defer(q),
         |_, data, r| data.home_detail.user_top_mixes.update(r),
     )
