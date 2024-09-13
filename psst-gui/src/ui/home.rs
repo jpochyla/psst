@@ -4,6 +4,8 @@ use druid::im::Vector;
 use druid::widget::{Either, Flex, Label, Scroll};
 use druid::{widget::List, LensExt, Selector, Widget, WidgetExt};
 
+use crate::data::config::authentication_derived_lenses::result;
+use crate::data::mixed_view_derived_lenses::title;
 use crate::data::{Album, Artist, Ctx, HomeDetail, MixedView, Show, Track, WithCtx};
 use crate::widget::Empty;
 use crate::{
@@ -22,24 +24,18 @@ pub const LOAD_MADE_FOR_YOU: Selector = Selector::new("app.home.load-made-for-yo
 
 pub fn home_widget() -> impl Widget<AppState> {
     Flex::column()
-        .with_child(
-            Label::new("Made for you")
-                .with_text_size(theme::grid(2.5))
-                .align_left()
-                .padding((theme::grid(1.5), 0.0)),
-        )
-        .with_default_spacer()
         .with_child(made_for_you())
-        .with_default_spacer()
+        .with_child(user_top_mixes())
+        .with_child(recommended_stations())
+        // turn this into a function as it is like title_label(title: &str){}!!!
         .with_child(
-            Label::new("Your top mixes")
+            Label::new("Uniquely yours")
                 .with_text_size(theme::grid(2.5))
                 .align_left()
                 .padding((theme::grid(1.5), 0.0)),
         )
         .with_default_spacer()
-        .with_child(user_top_mixes())
-        .with_default_spacer()
+        .with_child(uniquely_yours())
         .with_child(
             Label::new("Your top artists")
                 .with_text_size(theme::grid(2.5))
@@ -76,6 +72,40 @@ pub fn made_for_you() -> impl Widget<AppState> {
         )
 }
 
+pub fn recommended_stations() -> impl Widget<AppState> {
+    Async::new(spinner_widget, loaded_results_widget.clone(), error_widget)
+        .lens(
+            Ctx::make(
+                AppState::common_ctx,
+                AppState::home_detail.then(HomeDetail::recommended_stations),
+            )
+            .then(Ctx::in_promise()),
+        )
+        .on_command_async(
+            LOAD_MADE_FOR_YOU,
+            |_| WebApi::global().recommended_stations(),
+            |_, data, q| data.home_detail.recommended_stations.defer(q),
+            |_, data, r| data.home_detail.recommended_stations.update(r),
+        )
+}
+
+pub fn uniquely_yours() -> impl Widget<AppState> {
+    Async::new(spinner_widget, loaded_results_widget.clone(), error_widget)
+        .lens(
+            Ctx::make(
+                AppState::common_ctx,
+                AppState::home_detail.then(HomeDetail::uniquely_yours),
+            )
+            .then(Ctx::in_promise()),
+        )
+        .on_command_async(
+            LOAD_MADE_FOR_YOU,
+            |_| WebApi::global().uniquely_yours(),
+            |_, data, q| data.home_detail.uniquely_yours.defer(q),
+            |_, data, r| data.home_detail.uniquely_yours.update(r),
+        )
+}
+
 pub fn user_top_mixes() -> impl Widget<AppState> {
     // We need a way to parse HTML
     Async::new(spinner_widget, loaded_results_widget.clone(), error_widget)
@@ -108,17 +138,36 @@ fn loaded_results_widget() -> impl Widget<WithCtx<MixedView>> {
             .padding(theme::grid(6.0))
             .center(),
         Flex::column()
+            .with_child(title_label())
             .with_child(artist_results_widget())
             .with_child(album_results_widget())
             .with_child(playlist_results_widget())
             .with_child(show_results_widget()),
     )
 }
+
+fn title_label() -> impl Widget<WithCtx<MixedView>> {
+    Either::new(
+        |title_check: &Arc<str>, _| title_check.is_empty(),
+        Empty,
+        Flex::column()
+            .with_default_spacer()
+            .with_child(Label::raw()
+                .with_text_size(theme::grid(2.5))
+                .align_left()
+                .padding((theme::grid(1.5), 0.0)),)
+            .with_default_spacer()
+            .align_left()
+        )
+    .lens(Ctx::data().then(MixedView::title))
+}
+
 fn artist_results_widget() -> impl Widget<WithCtx<MixedView>> {
     Either::new(
         |artists: &Vector<Artist>, _| artists.is_empty(),
         Empty,
-        Flex::column().with_child(List::new(artist::recommended_artist_widget)),
+        Flex::column().with_child(List::new(artist::recommended_artist_widget))
+        .align_left(),
     )
     .lens(Ctx::data().then(MixedView::artists))
 }
@@ -127,7 +176,8 @@ fn album_results_widget() -> impl Widget<WithCtx<MixedView>> {
     Either::new(
         |albums: &Vector<Album>, _| albums.is_empty(),
         Empty,
-        Flex::column().with_child(Label::new("not implemented")),
+        Flex::column().with_child(Label::new("not implemented"))
+        .align_left(),
     )
     .lens(Ctx::data().then(MixedView::albums))
 }
@@ -143,6 +193,7 @@ fn playlist_results_widget() -> impl Widget<WithCtx<MixedView>> {
                 List::new(|| playlist::horizontal_playlist_widget(false, true)).horizontal(),
             )
             .horizontal()
+            .align_left()
             .lens(Ctx::map(MixedView::playlists)),
         ),
     )
@@ -152,7 +203,8 @@ fn show_results_widget() -> impl Widget<WithCtx<MixedView>> {
     Either::new(
         |shows: &Vector<Show>, _| shows.is_empty(),
         Empty,
-        Flex::column().with_child(Label::new("not implemented")),
+        Flex::column().with_child(Label::new("not implemented"))
+        .align_left(),
     )
     .lens(Ctx::data().then(MixedView::shows))
 }

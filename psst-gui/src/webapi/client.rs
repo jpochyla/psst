@@ -25,9 +25,9 @@ use psst_core::{
 
 use crate::{
     data::{
-        self, Album, AlbumType, Artist, ArtistAlbums, AudioAnalysis, Cached, Episode, EpisodeId, EpisodeLink, MixedView, Nav, Page, Playlist, PublicUser, Range, Recommendations, RecommendationsRequest, SearchResults, SearchTopic, Show, SpotifyUrl, Track, UserProfile 
+        self, library_derived_lenses::playlists, Album, AlbumType, Artist, ArtistAlbums, AudioAnalysis, Cached, Episode, EpisodeId, EpisodeLink, MixedView, Nav, Page, Playlist, PublicUser, Range, Recommendations, RecommendationsRequest, SearchResults, SearchTopic, Show, SpotifyUrl, Track, UserProfile 
     },
-    error::Error,
+    error::Error, ui::album,
 };
 
 use super::{cache::WebApiCache, local::LocalTrackManager};
@@ -277,13 +277,6 @@ impl WebApi {
             log::error!("failed to read local tracks: {}", err);
         }
     }
-    pub fn transform_section_item_json_map(item: &serde_json::Value) -> Option<serde_json::Value> {
-        item.get("data")
-            .and_then(|data| data.get("homeSections"))
-            .and_then(|home_sections| home_sections.get("sections"))
-            .and_then(|sections| sections.get(0))
-            .cloned()
-    }
 
     fn load_and_return_home_section(&self, request: Request) -> Result<MixedView, Error> {
         #[derive(Deserialize)]
@@ -471,59 +464,92 @@ impl WebApi {
         #[derive(Deserialize)]
         pub struct Extensions {}
 
-         // Extract the playlists
-         let result: Welcome = self.load(request)?;
+        // Extract the playlists
+        let result: Welcome = self.load(request)?;
         
-        let playlist: Vector<Playlist> = result.data.home_sections.sections
+        let mut title: Arc<str> = Arc::from("");
+        let mut playlist: Vector<Playlist> = Vector::new();
+        let mut album: Vector<Album> = Vector::new();
+        let mut artist: Vector<Artist> = Vector::new();
+        let mut show: Vector<Show> = Vector::new();
+
+        result.data.home_sections.sections
         .iter()
-        .flat_map(|section| {
-            section.section_items.items.iter().map(|item| {
+        .for_each(|section| {
+            title = section.data.title.text.clone().into();
+                
+            section.section_items.items.iter().for_each(|item| {
                 let uri = item.uri.clone();
                 let id = uri.split(':').last().unwrap_or("").to_string();
 
-                Playlist {
-                    id: id.into(),
-                    name: Arc::from(item.content.data.name.as_deref().unwrap_or_default()),
-                    images: Some(item.content.data.images.as_ref().map_or_else(Vector::new, |images| 
-                        images.items.iter().map(|img| data::utils::Image {
-                            url: Arc::from(img.sources.first().map(|s| s.url.as_str()).unwrap_or_default()),
-                            width: None,
-                            height: None,
-                        }).collect()
-                    )),
-                    description: {
-                        let desc = sanitize_str(&DEFAULT, item.content.data.description.as_deref().unwrap_or_default()).unwrap_or_default();
-                        // This is roughly 3 lines of description, truncated if too long
-                        if desc.chars().count() > 65 {
-                            desc.chars().take(62).collect::<String>() + "..."
-                        } else {
-                            desc
-                        }.into()
-                    },
-                    track_count: item.content.data.attributes.as_ref().and_then(|attrs| 
-                        attrs.iter().find(|attr| attr.key == "track_count").and_then(|attr| attr.value.parse().ok())
-                    ),
-                    owner: PublicUser {
-                        id: Arc::from(""),
-                        display_name: item.content.data.owner_v2.as_ref()
-                            .map(|owner| Arc::from(owner.data.name.as_str()))
-                            .unwrap_or_else(|| Arc::from("")),
-                    },
-                    collaborative: false,
+                if uri.contains("playlist") {
+                    playlist.push_back(Playlist {
+                        id: id.into(),
+                        name: Arc::from(item.content.data.name.as_deref().unwrap_or_default()),
+                        images: Some(item.content.data.images.as_ref().map_or_else(Vector::new, |images| 
+                            images.items.iter().map(|img| data::utils::Image {
+                                url: Arc::from(img.sources.first().map(|s| s.url.as_str()).unwrap_or_default()),
+                                width: None,
+                                height: None,
+                            }).collect()
+                        )),
+                        description: {
+                            let desc = sanitize_str(&DEFAULT, item.content.data.description.as_deref().unwrap_or_default()).unwrap_or_default();
+                            // This is roughly 3 lines of description, truncated if too long
+                            if desc.chars().count() > 65 {
+                                desc.chars().take(62).collect::<String>() + "..."
+                            } else {
+                                desc
+                            }.into()
+                        },
+                        track_count: item.content.data.attributes.as_ref().and_then(|attrs| 
+                            attrs.iter().find(|attr| attr.key == "track_count").and_then(|attr| attr.value.parse().ok())
+                        ),
+                        owner: PublicUser {
+                            id: Arc::from(""),
+                            display_name: item.content.data.owner_v2.as_ref()
+                                .map(|owner| Arc::from(owner.data.name.as_str()))
+                                .unwrap_or_else(|| Arc::from("")),
+                        },
+                        collaborative: false,
+                    });
+                } else if uri.contains("episode") {
+                    show.push_back(Show {
+                        /*
+                        - id
+                        - name
+                        - images
+                        - publisher
+                        - description
+                        */
+                        id: id.into(),
+                        name: Arc::from(item.content.data.name.as_deref().unwrap_or_default()),
+                        images: item.content.data.images.as_ref().map_or_else(Vector::new, |images| 
+                            images.items.iter().map(|img| data::utils::Image {
+                                url: Arc::from(img.sources.first().map(|s| s.url.as_str()).unwrap_or_default()),
+                                width: None,
+                                height: None,
+                            }).collect()
+                        ),
+                        publisher: item.content.data.publisher.as_ref().map(|p| p.name.clone()).unwrap_or_default().into(),
+                        description: item.content.data.description.as_deref().unwrap_or_default().into(),
+                    })
                 }
                 
-            })
-        })
-        .collect();
+                else {
+                    log::info!("adkj");
+                }
+            });
+        });
 
         Ok(MixedView {
+            title: title,
             playlists: playlist,
             artists: Vector::new(),
             albums: Vector::new(),
-            shows: Vector::new(),
+            shows: show,
         })
-    }
-}
+    }}
 
 static GLOBAL_WEBAPI: OnceCell<Arc<WebApi>> = OnceCell::new();
 
@@ -817,50 +843,6 @@ impl WebApi {
     }
 }
 
-
-/* 
-impl WebApi {
-    // https://developer.spotify.com/documentation/web-api/reference/search/
-    pub fn search(
-        &self,
-        query: &str,
-        topics: &[SearchTopic],
-        limit: usize,
-    ) -> Result<SearchResults, Error> {
-        #[derive(Deserialize)]
-        struct ApiSearchResults {
-            artists: Option<Page<Artist>>,
-            albums: Option<Page<Arc<Album>>>,
-            tracks: Option<Page<Arc<Track>>>,
-            playlists: Option<Page<Playlist>>,
-            shows: Option<Page<Arc<Show>>>,
-        }
-
-        let topics = topics.iter().map(SearchTopic::as_str).join(",");
-        let request = self
-            .get("v1/search")?
-            .query("q", query)
-            .query("type", &topics)
-            .query("limit", &limit.to_string())
-            .query("marker", "from_token");
-        let result: ApiSearchResults = self.load(request)?;
-
-        let artists = result.artists.map_or_else(Vector::new, |page| page.items);
-        let albums = result.albums.map_or_else(Vector::new, |page| page.items);
-        let tracks = result.tracks.map_or_else(Vector::new, |page| page.items);
-        let playlists = result.playlists.map_or_else(Vector::new, |page| page.items);
-        let shows = result.shows.map_or_else(Vector::new, |page| page.items);
-        Ok(SearchResults {
-            query: query.into(),
-            artists,
-            albums,
-            tracks,
-            playlists,
-            shows,
-        })
-    }
-}
-*/
 /// View endpoints.
 impl WebApi {
     fn build_home_request(&self, section_uri: &str) -> (String, String) {
@@ -913,6 +895,49 @@ impl WebApi {
         
         Ok(result)
     }
+
+    pub fn recommended_stations(&self) -> Result<MixedView, Error> {
+        // 0JQ5DAnM3wGh0gz1MXnu3R -> Recommended stations
+        let json_query = self.build_home_request("spotify:section:0JQ5DAnM3wGh0gz1MXnu3R");
+    
+        let request = self.get("pathfinder/v1/query", Some("api-partner.spotify.com"))?
+            .query("operationName", "homeSection")
+            .query("variables", &json_query.0.to_string())
+            .query("extensions", &json_query.1.to_string());
+
+        // Extract the playlists
+        let result = self.load_and_return_home_section(request)?;
+        
+        Ok(result)
+    }
+
+    pub fn uniquely_yours(&self) -> Result<MixedView, Error> {
+        // 0JQ5DAqAJXkJGsa2DyEjKi -> Uniquely yours
+        let json_query = self.build_home_request("spotify:section:0JQ5DAqAJXkJGsa2DyEjKi");
+    
+        let request = self.get("pathfinder/v1/query", Some("api-partner.spotify.com"))?
+            .query("operationName", "homeSection")
+            .query("variables", &json_query.0.to_string())
+            .query("extensions", &json_query.1.to_string());
+
+        // Extract the playlists
+        let result = self.load_and_return_home_section(request)?;
+        
+        Ok(result)
+    }
+
+    pub fn best_of_artists(&self) -> Result<MixedView, Error> {
+        // 0JQ5DAnM3wGh0gz1MXnu3n -> Best of artists
+        let json_query = self.build_home_request("spotify:section:0JQ5DAnM3wGh0gz1MXnu3n");
+        let request = self.get("pathfinder/v1/query", Some("api-partner.spotify.com"))?
+            .query("operationName", "homeSection")
+            .query("variables", &json_query.0.to_string())
+            .query("extensions", &json_query.1.to_string());
+
+        let result = self.load_and_return_home_section(request)?;
+    
+        Ok(result)
+    }
     
     pub fn jump_back_in(&self) -> Result<MixedView, Error> {
         // 0JQ5DAIiKWzVFULQfUm85X -> Jump back in
@@ -929,19 +954,22 @@ impl WebApi {
         Ok(result)
     }
     
-    pub fn podcasts_and_more(&self) -> Result<Vector<Show>, Error> {
-        #[derive(Deserialize)]
-        struct View {
-            content: Page<Show>,
-        }
-        let request = self
-            .get("v1/views/podcasts-and-more", None)?
-            .query("types", "Show")
-            .query("limit", "20")
-            .query("offset", "0");
-        let result: View = self.load(request)?;
-        Ok(result.content.items)
+    /*
+    pub fn podcasts_and_more(&self) -> Result<Vector<Episode>, Error> {
+        // 0JQ5DAnM3wGh0gz1MXnu9e -> Jump back in
+        // This is where we need to get the laod and  return to return everything!!!
+        let json_query = self.build_home_request("spotify:section:0JQ5DAnM3wGh0gz1MXnu9e");
+        let request = self.get("pathfinder/v1/query", Some("api-partner.spotify.com"))?
+            .query("operationName", "homeSection")
+            .query("variables", &json_query.0.to_string())
+            .query("extensions", &json_query.1.to_string());
+
+        // Extract the playlists
+        let result = self.load_and_return_home_section(request)?;
+        
+        Ok(result.episodes)
     }
+    */
 }
 
 /// Playlist endpoints.
