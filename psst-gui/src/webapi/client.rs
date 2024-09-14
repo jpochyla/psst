@@ -1,10 +1,5 @@
 use std::{
-    fmt::Display,
-    io::{self, Read},
-    path::PathBuf,
-    sync::Arc,
-    thread,
-    time::Duration,
+    fmt::Display, io::{self, Read}, path::PathBuf, string, sync::Arc, thread, time::Duration
 };
 
 use druid::{
@@ -279,190 +274,194 @@ impl WebApi {
     }
 
     fn load_and_return_home_section(&self, request: Request) -> Result<MixedView, Error> {
-        #[derive(Deserialize)]
+        use serde::{Serialize, Deserialize};
+
+        #[derive(Serialize, Deserialize)]
         pub struct Welcome {
             data: WelcomeData,
-            extensions: Extensions,
         }
-    
-        #[derive(Deserialize)]
+
+        #[derive(Serialize, Deserialize)]
         #[serde(rename_all = "camelCase")]
         pub struct WelcomeData {
             home_sections: HomeSections,
         }
-    
-        #[derive(Deserialize)]
+
+        #[derive(Serialize, Deserialize)]
         pub struct HomeSections {
-            #[serde(rename = "__typename")]
-            typename: String,
             sections: Vec<Section>,
         }
-    
-        #[derive(Deserialize)]
+
+        #[derive(Serialize, Deserialize)]
         #[serde(rename_all = "camelCase")]
         pub struct Section {
-            #[serde(rename = "__typename")]
-            typename: String,
             data: SectionData,
             section_items: SectionItems,
-            uri: String,
         }
-    
-        #[derive(Deserialize)]
+
+        #[derive(Serialize, Deserialize)]
         pub struct SectionData {
-            #[serde(rename = "__typename")]
-            typename: String,
-            subtitle: Subtitle,
+            subtitle: Option<Subtitle>,
             title: Title,
         }
-    
-        #[derive(Deserialize)]
+
+        #[derive(Serialize, Deserialize)]
         pub struct Subtitle {
             text: String,
         }
-    
-        #[derive(Deserialize)]
+
+        #[derive(Serialize, Deserialize)]
         #[serde(rename_all = "camelCase")]
         pub struct Title {
-            original_label: OriginalLabel,
+            original_label: Option<OriginalLabel>,
             text: String,
         }
-    
-        #[derive(Deserialize)]
+
+        #[derive(Serialize, Deserialize)]
         #[serde(rename_all = "camelCase")]
         pub struct OriginalLabel {
             text_attributes: TextAttributes,
         }
-    
-        #[derive(Deserialize)]
+
+        #[derive(Serialize, Deserialize)]
         #[serde(rename_all = "camelCase")]
         pub struct TextAttributes {
-            text_format_arguments: Vec<TextFormatArgument>,
+            text_format_arguments: Vec<Option<serde_json::Value>>,
         }
-    
-        #[derive(Deserialize)]
-        pub struct TextFormatArgument {
-            uri: Option<serde_json::Value>,
-        }
-    
-        #[derive(Deserialize)]
+
+        #[derive(Serialize, Deserialize)]
         #[serde(rename_all = "camelCase")]
         pub struct SectionItems {
-            items: Vec<SectionItemsItem>,
+            items: Vec<Item>,
             paging_info: PagingInfo,
             total_count: i64,
         }
-    
-        #[derive(Deserialize)]
-        pub struct SectionItemsItem {
+
+        #[derive(Serialize, Deserialize)]
+        pub struct Item {
             data: Option<serde_json::Value>,
             content: Content,
             uri: String,
         }
-    
-        #[derive(Deserialize)]
+
+        #[derive(Serialize, Deserialize)]
         pub struct Content {
             #[serde(rename = "__typename")]
-            typename: String,
+            typename: ContentTypename,
             data: ContentData,
         }
-    
-        #[derive(Deserialize)]
+
+        #[derive(Serialize, Deserialize)]
         #[serde(rename_all = "camelCase")]
         pub struct ContentData {
-            // This needs to be variable, based off the type name
             #[serde(rename = "__typename")]
-            typename: String,
+            typename: DataTypename,
+            cover_art: Option<CoverArt>,
+            media_type: Option<MediaType>,
+            name: String,
+            publisher: Option<Publisher>,
+            uri: String,
+            // Playlist-specific fields
             attributes: Option<Vec<Attribute>>,
             description: Option<String>,
-            format: Option<String>,
             images: Option<Images>,
-            name: Option<String>,
             owner_v2: Option<OwnerV2>,
-            uri: String,
-            artists: Option<Artists>,
-            cover_art: Option<Images>,
-            album_type: Option<String>,
-            profile: Option<Profile>,
-            media_type: Option<String>,
-            publisher: Option<Profile>,
         }
 
-        #[derive(Deserialize)]
-        pub struct Artists {
-            items: Vec<ArtistsItem>,
-        }
-        
-        #[derive(Deserialize)]
-        pub struct ArtistsItem {
-            profile: Profile,
-            uri: String,
-        }
-        
-        #[derive(Deserialize)]
-        pub struct Profile {
-            name: String,
-        }
-
-        #[derive(Deserialize)]
-        pub struct Attribute {
-            key: String,
-            value: String,
-        }
-    
-        #[derive(Deserialize)]
-        pub struct Images {
-            items: Vec<ImagesItem>,
-        }
-    
-        #[derive(Deserialize)]
+        #[derive(Serialize, Deserialize)]
         #[serde(rename_all = "camelCase")]
-        pub struct ImagesItem {
+        pub struct CoverArt {
             extracted_colors: ExtractedColors,
             sources: Vec<Source>,
         }
-    
-        #[derive(Deserialize)]
+
+        #[derive(Serialize, Deserialize)]
         #[serde(rename_all = "camelCase")]
         pub struct ExtractedColors {
             color_dark: ColorDark,
         }
-    
-        #[derive(Deserialize)]
+
+        #[derive(Serialize, Deserialize)]
         #[serde(rename_all = "camelCase")]
         pub struct ColorDark {
             hex: String,
             is_fallback: bool,
         }
-    
-        #[derive(Deserialize)]
+
+        #[derive(Serialize, Deserialize)]
         pub struct Source {
-            height: Option<serde_json::Value>,
+            height: Option<i64>,
             url: String,
-            width: Option<serde_json::Value>,
+            width: Option<i64>,
         }
-    
-        #[derive(Deserialize)]
+
+        #[derive(Serialize, Deserialize)]
+        pub enum MediaType {
+            #[serde(rename = "AUDIO")]
+            Audio,
+            #[serde(rename = "MIXED")]
+            Mixed,
+        }
+
+        #[derive(Serialize, Deserialize)]
+        pub struct Publisher {
+            name: String,
+        }
+
+        #[derive(Serialize, Deserialize)]
+        pub enum DataTypename {
+            Podcast,
+            Playlist,
+        }
+
+        #[derive(Serialize, Deserialize)]
+        pub enum ContentTypename {
+            #[serde(rename = "PodcastOrAudiobookResponseWrapper")]
+            PodcastOrAudiobookResponseWrapper,
+            #[serde(rename = "PlaylistResponseWrapper")]
+            PlaylistResponseWrapper,
+        }
+
+        #[derive(Serialize, Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        pub struct PagingInfo {
+            next_offset: Option<serde_json::Value>,
+        }
+
+        #[derive(Serialize, Deserialize)]
+        pub struct Extensions {}
+
+        // Playlist-specific structures
+        #[derive(Serialize, Deserialize)]
+        pub struct Attribute {
+            key: String,
+            value: String,
+        }
+
+        #[derive(Serialize, Deserialize)]
+        pub struct Images {
+            items: Vec<ImagesItem>,
+        }
+
+        #[derive(Serialize, Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        pub struct ImagesItem {
+            sources: Vec<Source>,
+            extracted_colors: ExtractedColors,
+        }
+
+        #[derive(Serialize, Deserialize)]
         pub struct OwnerV2 {
             data: OwnerV2Data,
         }
-    
-        #[derive(Deserialize)]
+
+        #[derive(Serialize, Deserialize)]
         pub struct OwnerV2Data {
             #[serde(rename = "__typename")]
             typename: String,
             name: String,
             uri: String,
         }
-    
-        #[derive(Deserialize)]
-        #[serde(rename_all = "camelCase")]
-        pub struct PagingInfo {
-            next_offset: Option<serde_json::Value>,
-        }
-    
-        #[derive(Deserialize)]
-        pub struct Extensions {}
 
         // Extract the playlists
         let result: Welcome = self.load(request)?;
@@ -471,7 +470,7 @@ impl WebApi {
         let mut playlist: Vector<Playlist> = Vector::new();
         let mut album: Vector<Album> = Vector::new();
         let mut artist: Vector<Artist> = Vector::new();
-        let mut show: Vector<Show> = Vector::new();
+        let mut show: Vector<Arc<Show>> = Vector::new();
 
         result.data.home_sections.sections
         .iter()
@@ -479,13 +478,13 @@ impl WebApi {
             title = section.data.title.text.clone().into();
                 
             section.section_items.items.iter().for_each(|item| {
-                let uri = item.uri.clone();
+                let uri = item.content.data.uri.clone();
                 let id = uri.split(':').last().unwrap_or("").to_string();
 
                 if uri.contains("playlist") {
                     playlist.push_back(Playlist {
                         id: id.into(),
-                        name: Arc::from(item.content.data.name.as_deref().unwrap_or_default()),
+                        name: Arc::from(item.content.data.name.clone()),
                         images: Some(item.content.data.images.as_ref().map_or_else(Vector::new, |images| 
                             images.items.iter().map(|img| data::utils::Image {
                                 url: Arc::from(img.sources.first().map(|s| s.url.as_str()).unwrap_or_default()),
@@ -513,27 +512,20 @@ impl WebApi {
                         },
                         collaborative: false,
                     });
-                } else if uri.contains("episode") {
-                    show.push_back(Show {
-                        /*
-                        - id
-                        - name
-                        - images
-                        - publisher
-                        - description
-                        */
+                } else if uri.contains("show") {
+                    show.push_back(Arc::new(Show {
                         id: id.into(),
-                        name: Arc::from(item.content.data.name.as_deref().unwrap_or_default()),
-                        images: item.content.data.images.as_ref().map_or_else(Vector::new, |images| 
-                            images.items.iter().map(|img| data::utils::Image {
-                                url: Arc::from(img.sources.first().map(|s| s.url.as_str()).unwrap_or_default()),
+                        name: Arc::from(item.content.data.name.clone()),
+                        images: item.content.data.cover_art.as_ref().map_or_else(Vector::new, |images| 
+                            images.sources.iter().map(|src| data::utils::Image {
+                                url: Arc::from(src.url.clone()),
                                 width: None,
                                 height: None,
                             }).collect()
                         ),
-                        publisher: item.content.data.publisher.as_ref().map(|p| p.name.clone()).unwrap_or_default().into(),
-                        description: item.content.data.description.as_deref().unwrap_or_default().into(),
-                    })
+                        publisher: Arc::from(item.content.data.publisher.as_ref().unwrap().name.clone()),
+                        description: "".into(),
+                    }))
                 }
                 
                 else {
@@ -543,14 +535,14 @@ impl WebApi {
         });
 
         Ok(MixedView {
-            title: title,
+            title,
             playlists: playlist,
             artists: Vector::new(),
             albums: Vector::new(),
             shows: show,
         })
-    }}
-
+    }
+}
 static GLOBAL_WEBAPI: OnceCell<Arc<WebApi>> = OnceCell::new();
 
 /// Global instance.
@@ -939,9 +931,9 @@ impl WebApi {
         Ok(result)
     }
     
+    // Need to make a mix of it!
     pub fn jump_back_in(&self) -> Result<MixedView, Error> {
         // 0JQ5DAIiKWzVFULQfUm85X -> Jump back in
-        // This is where we need to get the laod and  return to return everything!!!
         let json_query = self.build_home_request("spotify:section:0JQ5DAIiKWzVFULQfUm85X");
         let request = self.get("pathfinder/v1/query", Some("api-partner.spotify.com"))?
             .query("operationName", "homeSection")
@@ -953,12 +945,25 @@ impl WebApi {
         
         Ok(result)
     }
-    
-    /*
-    pub fn podcasts_and_more(&self) -> Result<Vector<Episode>, Error> {
-        // 0JQ5DAnM3wGh0gz1MXnu9e -> Jump back in
-        // This is where we need to get the laod and  return to return everything!!!
-        let json_query = self.build_home_request("spotify:section:0JQ5DAnM3wGh0gz1MXnu9e");
+
+    // Shows
+    pub fn your_shows(&self) -> Result<MixedView, Error> {
+        // 0JQ5DAnM3wGh0gz1MXnu3N -> Your shows
+        let json_query = self.build_home_request("spotify:section:0JQ5DAnM3wGh0gz1MXnu3N");
+        let request = self.get("pathfinder/v1/query", Some("api-partner.spotify.com"))?
+            .query("operationName", "homeSection")
+            .query("variables", &json_query.0.to_string())
+            .query("extensions", &json_query.1.to_string());
+
+         // Extract the playlists
+        let result = self.load_and_return_home_section(request)?;
+        
+        Ok(result)
+    }
+
+    pub fn shows_that_you_might_like(&self) -> Result<MixedView, Error> {
+        // 0JQ5DAnM3wGh0gz1MXnu3P -> Shows that you might like
+        let json_query = self.build_home_request("spotify:section:0JQ5DAnM3wGh0gz1MXnu3P");
         let request = self.get("pathfinder/v1/query", Some("api-partner.spotify.com"))?
             .query("operationName", "homeSection")
             .query("variables", &json_query.0.to_string())
@@ -967,7 +972,38 @@ impl WebApi {
         // Extract the playlists
         let result = self.load_and_return_home_section(request)?;
         
-        Ok(result.episodes)
+        Ok(result)
+    }
+
+    /* EPISODES
+    // Episodes for you, this needs a different thing, mixedview could include this
+    pub fn new_episodes(&self) -> Result<MixedView, Error> {
+        // 0JQ5DAnM3wGh0gz1MXnu3K -> New episodes
+        let json_query = self.build_home_request("spotify:section:0JQ5DAnM3wGh0gz1MXnu3K");
+        let request = self.get("pathfinder/v1/query", Some("api-partner.spotify.com"))?
+            .query("operationName", "homeSection")
+            .query("variables", &json_query.0.to_string())
+            .query("extensions", &json_query.1.to_string());
+
+        // Extract the playlists
+        let result = self.load_and_return_home_section(request)?;
+        
+        Ok(result)
+    }
+
+    // Episodes for you, this needs a different thing, mixedview could include this
+    // 
+    pub fn episode_for_you(&self) -> Result<MixedView, Error> {
+        // 0JQ5DAnM3wGh0gz1MXnu9e -> Episodes for you
+        let json_query = self.build_home_request("spotify:section:0JQ5DAnM3wGh0gz1MXnu9e");
+        let request = self.get("pathfinder/v1/query", Some("api-partner.spotify.com"))?
+            .query("operationName", "homeSection")
+            .query("variables", &json_query.0.to_string())
+            .query("extensions", &json_query.1.to_string());
+
+        // Extract the playlists
+        let result = self.load_and_return_home_section(request)?;
+        Ok(result)
     }
     */
 }

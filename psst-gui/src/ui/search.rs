@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use druid::{
     im::Vector,
-    widget::{CrossAxisAlignment, Either, Flex, Label, LabelText, List, Scroll, TextBox},
+    widget::{CrossAxisAlignment, Either, Flex, Label, LabelText, List, TextBox},
     Data, LensExt, Selector, Widget, WidgetExt,
 };
 
@@ -10,8 +10,7 @@ use crate::{
     cmd,
     controller::InputController,
     data::{
-        Album, AppState, Artist, Ctx, Nav, Search, SearchResults, SearchTopic, Show, SpotifyUrl,
-        WithCtx,
+        Album, AppState, Artist, Ctx, Nav, Search, SearchResults, SearchTopic, Show, SpotifyUrl, WithCtx
     },
     ui::show,
     webapi::WebApi,
@@ -101,7 +100,7 @@ fn artist_results_widget() -> impl Widget<WithCtx<SearchResults>> {
         Empty,
         Flex::column()
             .with_child(header_widget("Artists"))
-            .with_child(List::new(artist::recommended_artist_widget)),
+            .with_child(List::new(artist::artist_widget)),
     )
     .lens(Ctx::data().then(SearchResults::artists))
 }
@@ -142,14 +141,7 @@ fn playlist_results_widget() -> impl Widget<WithCtx<SearchResults>> {
         Flex::column()
             .with_child(header_widget("Playlists"))
             .with_child(
-                // List::new(playlist::playlist_widget).lens(Ctx::map(SearchResults::playlists)),
-                // May be nicer
-                Scroll::new(
-                    List::new(
-                            || playlist::horizontal_playlist_widget(false, true)
-                        ).horizontal()
-                    ).horizontal()
-                    .lens(Ctx::map(SearchResults::playlists)),
+                List::new(playlist::playlist_widget).lens(Ctx::map(SearchResults::playlists)),
             ),
     )
 }

@@ -76,6 +76,40 @@ fn async_episodes_widget() -> impl Widget<AppState> {
     )
 }
 
+pub fn horizontal_show_widget() -> impl Widget<WithCtx<Arc<Show>>> {
+    let show_image = rounded_cover_widget(theme::grid(16.0));
+
+    let show_name = Label::raw()
+        .with_font(theme::UI_FONT_MEDIUM)
+        .with_line_break_mode(LineBreaking::Clip)
+        .lens(Show::name.in_arc());
+
+    let show_publisher = Label::raw()
+        .with_text_size(theme::TEXT_SIZE_SMALL)
+        .with_text_color(theme::PLACEHOLDER_COLOR)
+        .lens(Show::publisher.in_arc());
+
+    let show_info = Flex::column()
+        .cross_axis_alignment(CrossAxisAlignment::Start)
+        .with_child(show_name)
+        .with_spacer(1.0)
+        .with_child(show_publisher);
+
+    let show = Flex::column()
+        .with_child(show_image)
+        .with_default_spacer()
+        .with_child(show_info)
+        .lens(Ctx::data());
+
+    show.padding(theme::grid(1.0))
+        .link()
+        .on_left_click(|ctx, _, show, _| {
+            ctx.submit_command(cmd::NAVIGATE.with(Nav::ShowDetail(show.data.link())));
+        })
+        .fix_width(theme::grid(20.0))
+        .context_menu(show_ctx_menu)
+}
+
 pub fn show_widget() -> impl Widget<WithCtx<Arc<Show>>> {
     let show_image = rounded_cover_widget(theme::grid(6.0));
 

@@ -135,6 +135,8 @@ impl AppState {
                 made_for_you: Promise::Empty,
                 user_top_mixes: Promise::Empty,
                 recommended_stations: Promise::Empty,
+                your_shows: Promise::Empty,
+                shows_that_you_might_like: Promise::Empty,
                 uniquely_yours: Promise::Empty,
                 jump_back_in: Promise::Empty,
                 user_top_tracks: Promise::Empty,
@@ -523,6 +525,8 @@ pub struct HomeDetail {
     pub user_top_mixes: Promise<MixedView>,
     pub recommended_stations: Promise<MixedView>,
     pub uniquely_yours: Promise<MixedView>,
+    pub your_shows: Promise<MixedView>,
+    pub shows_that_you_might_like: Promise<MixedView>,
     pub jump_back_in: Promise<MixedView>,
     pub user_top_tracks: Promise<Vector<Arc<Track>>>,
     pub user_top_artists: Promise<Vector<Artist>>,
@@ -534,7 +538,7 @@ pub struct MixedView {
     pub playlists: Vector<Playlist>,
     pub artists: Vector<Artist>,
     pub albums: Vector<Album>,
-    pub shows: Vector<Show>,
+    pub shows: Vector<Arc<Show>>,
 }
 
 static ALERT_ID: AtomicUsize = AtomicUsize::new(0);

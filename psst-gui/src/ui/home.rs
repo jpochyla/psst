@@ -4,8 +4,6 @@ use druid::im::Vector;
 use druid::widget::{Either, Flex, Label, Scroll};
 use druid::{widget::List, LensExt, Selector, Widget, WidgetExt};
 
-use crate::data::config::authentication_derived_lenses::result;
-use crate::data::mixed_view_derived_lenses::title;
 use crate::data::{Album, Artist, Ctx, HomeDetail, MixedView, Show, Track, WithCtx};
 use crate::widget::Empty;
 use crate::{
@@ -14,7 +12,7 @@ use crate::{
     widget::{Async, MyWidgetExt},
 };
 
-use super::{artist, playable, theme, track};
+use super::{artist, playable, show, theme, track};
 use super::{
     playlist,
     utils::{error_widget, spinner_widget},
@@ -36,6 +34,8 @@ pub fn home_widget() -> impl Widget<AppState> {
         )
         .with_default_spacer()
         .with_child(uniquely_yours())
+        .with_child(your_shows())
+        .with_child(shows_that_you_might_like())
         .with_child(
             Label::new("Your top artists")
                 .with_text_size(theme::grid(2.5))
@@ -107,7 +107,6 @@ pub fn uniquely_yours() -> impl Widget<AppState> {
 }
 
 pub fn user_top_mixes() -> impl Widget<AppState> {
-    // We need a way to parse HTML
     Async::new(spinner_widget, loaded_results_widget.clone(), error_widget)
         .lens(
             Ctx::make(
@@ -121,6 +120,40 @@ pub fn user_top_mixes() -> impl Widget<AppState> {
             |_| WebApi::global().get_top_mixes(),
             |_, data, q| data.home_detail.user_top_mixes.defer(q),
             |_, data, r| data.home_detail.user_top_mixes.update(r),
+        )
+}
+
+pub fn your_shows() -> impl Widget<AppState> {
+    Async::new(spinner_widget, loaded_results_widget.clone(), error_widget)
+        .lens(
+            Ctx::make(
+                AppState::common_ctx,
+                AppState::home_detail.then(HomeDetail::your_shows),
+            )
+            .then(Ctx::in_promise()),
+        )
+        .on_command_async(
+            LOAD_MADE_FOR_YOU,
+            |_| WebApi::global().your_shows(),
+            |_, data, q| data.home_detail.your_shows.defer(q),
+            |_, data, r| data.home_detail.your_shows.update(r),
+        )
+}
+
+pub fn shows_that_you_might_like() -> impl Widget<AppState> {
+    Async::new(spinner_widget, loaded_results_widget.clone(), error_widget)
+        .lens(
+            Ctx::make(
+                AppState::common_ctx,
+                AppState::home_detail.then(HomeDetail::shows_that_you_might_like),
+            )
+            .then(Ctx::in_promise()),
+        )
+        .on_command_async(
+            LOAD_MADE_FOR_YOU,
+            |_| WebApi::global().shows_that_you_might_like(),
+            |_, data, q| data.home_detail.shows_that_you_might_like.defer(q),
+            |_, data, r| data.home_detail.shows_that_you_might_like.update(r),
         )
 }
 
@@ -166,7 +199,7 @@ fn artist_results_widget() -> impl Widget<WithCtx<MixedView>> {
     Either::new(
         |artists: &Vector<Artist>, _| artists.is_empty(),
         Empty,
-        Flex::column().with_child(List::new(artist::recommended_artist_widget))
+        Flex::column().with_child(List::new(artist::artist_widget))
         .align_left(),
     )
     .lens(Ctx::data().then(MixedView::artists))
@@ -187,8 +220,6 @@ fn playlist_results_widget() -> impl Widget<WithCtx<MixedView>> {
         |playlists: &WithCtx<MixedView>, _| playlists.data.playlists.is_empty(),
         Empty,
         Flex::column().with_child(
-            // List::new(playlist::playlist_widget).lens(Ctx::map(SearchResults::playlists)),
-            // May be nicer
             Scroll::new(
                 List::new(|| playlist::horizontal_playlist_widget(false, true)).horizontal(),
             )
@@ -201,12 +232,16 @@ fn playlist_results_widget() -> impl Widget<WithCtx<MixedView>> {
 
 fn show_results_widget() -> impl Widget<WithCtx<MixedView>> {
     Either::new(
-        |shows: &Vector<Show>, _| shows.is_empty(),
+        |shows: &WithCtx<Vector<Arc<Show>>>, _| shows.data.is_empty(),
         Empty,
-        Flex::column().with_child(Label::new("not implemented"))
-        .align_left(),
+        Flex::column().with_child(
+            Scroll::new(
+                List::new(|| show::horizontal_show_widget()).horizontal(),
+            )
+            .align_left()
+        ),
     )
-    .lens(Ctx::data().then(MixedView::shows))
+    .lens(Ctx::map(MixedView::shows))
 }
 
 fn user_top_artists_widget() -> impl Widget<AppState> {
@@ -214,7 +249,7 @@ fn user_top_artists_widget() -> impl Widget<AppState> {
         spinner_widget,
         || {
             Scroll::new(
-                List::new(artist::horizontal_recommended_artist_widget).horizontal(), // TODO Add a function which allows people to scroll with their scroll wheel!!!
+                List::new(artist::horizontal_artist_widget).horizontal(), // TODO Add a function which allows people to scroll with their scroll wheel!!!
             )
             .horizontal()
         },
