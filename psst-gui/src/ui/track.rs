@@ -1,5 +1,4 @@
-use std::sync::Arc;
-
+use crate::cmd::SHOW_TRACK_CREDITS;
 use druid::{
     widget::{CrossAxisAlignment, Either, Flex, Label, ViewSwitcher},
     LensExt, LocalizedString, Menu, MenuItem, Size, TextAlignment, Widget, WidgetExt,
@@ -9,6 +8,7 @@ use psst_core::{
     item_id::{ItemId, ItemIdType},
     player::item::PlaybackItem,
 };
+use std::sync::Arc;
 
 use crate::{
     cmd,
@@ -362,6 +362,13 @@ pub fn track_menu(
         );
     }
     menu = menu.entry(playlist_menu);
+
+    menu = menu.entry(
+        MenuItem::new(
+            LocalizedString::new("menu-item-show-credits").with_placeholder("Show Track Credits"),
+        )
+        .command(SHOW_TRACK_CREDITS.with(track.clone())),
+    );
 
     menu
 }

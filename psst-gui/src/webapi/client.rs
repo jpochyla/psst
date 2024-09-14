@@ -10,8 +10,9 @@ use std::{
 use druid::{
     im::Vector,
     image::{self, ImageFormat},
-    Data, ImageBuf,
+    Data, ImageBuf, Lens,
 };
+
 use itertools::Itertools;
 use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
@@ -37,6 +38,24 @@ use crate::{
 };
 
 use super::{cache::WebApiCache, local::LocalTrackManager};
+
+#[derive(Debug, Clone, Data, Lens, Deserialize)]
+pub struct TrackCredits {
+    pub track_name: String,
+    pub role_credits: Arc<Vec<RoleCredit>>,
+    pub source_names: Arc<Vec<String>>,
+}
+
+#[derive(Debug, Clone, Data, Lens, Deserialize)]
+pub struct RoleCredit {
+    pub role_title: String,
+    pub artists: Arc<Vec<CreditArtist>>,
+}
+
+#[derive(Debug, Clone, Data, Lens, Deserialize)]
+pub struct CreditArtist {
+    pub name: String,
+}
 
 pub struct WebApi {
     session: SessionService,
@@ -284,6 +303,22 @@ impl WebApi {
             log::error!("failed to read local tracks: {}", err);
         }
     }
+
+    pub fn get_track_credits(&self, track_id: &str) -> Result<TrackCredits, Error> {
+        let request = self
+            .get(format!(
+                "v1/track-credits-view/v0/experimental/{}/credits",
+                track_id
+            ))?
+            .set(
+                "client-token",
+                self.session.client_token().unwrap_or_default(),
+            );
+        let mut result: TrackCredits = self.load(request)?;
+        result.track_name = self.get_track(track_id)?.name.to_string();
+        Ok(result)
+    }
+}
 
     fn load_and_return_home_section(&self, request: Request) -> Result<MixedView, Error> {
         #[derive(Deserialize)]

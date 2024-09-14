@@ -1,13 +1,7 @@
-use std::time::Duration;
-
-use druid::{
-    im::Vector,
-    widget::{CrossAxisAlignment, Either, Flex, Label, List, Scroll, Slider, Split, ViewSwitcher},
-    Color, Env, Insets, Key, LensExt, Menu, MenuItem, Selector, Widget, WidgetExt, WindowDesc,
-};
-use druid_shell::Cursor;
-
 use crate::data::config::SortCriteria;
+use crate::data::Track;
+use crate::error::Error;
+use crate::webapi::TrackCredits;
 use crate::{
     cmd,
     controller::{
@@ -17,13 +11,23 @@ use crate::{
         config::SortOrder, Alert, AlertStyle, AppState, Config, Nav, Playable, Playback, Route,
         ALERT_DURATION,
     },
+    webapi::WebApi,
     widget::{
         icons, icons::SvgIcon, Border, Empty, MyWidgetExt, Overlay, ThemeScope, ViewDispatcher,
     },
 };
+use druid::{
+    im::Vector,
+    widget::{CrossAxisAlignment, Either, Flex, Label, List, Scroll, Slider, Split, ViewSwitcher},
+    Color, Env, Insets, Key, LensExt, Menu, MenuItem, Selector, Widget, WidgetExt, WindowDesc,
+};
+use druid_shell::Cursor;
+use std::sync::Arc;
+use std::time::Duration;
 
 pub mod album;
 pub mod artist;
+pub mod credits;
 pub mod episode;
 pub mod find;
 pub mod home;
@@ -166,6 +170,28 @@ fn root_widget() -> impl Widget<AppState> {
         .controller(SessionController)
         .controller(NavController)
         .controller(SortController)
+        .on_command_async(
+            crate::cmd::SHOW_TRACK_CREDITS,
+            |track: Arc<Track>| WebApi::global().get_track_credits(&track.id.0.to_base62()),
+            |_, data: &mut AppState, _| {
+                data.credits = None;
+            },
+            |ctx: &mut druid::EventCtx,
+             data: &mut AppState,
+             (_, result): (Arc<Track>, Result<TrackCredits, Error>)| {
+                match result {
+                    Ok(credits) => {
+                        data.credits = Some(credits.clone());
+                        let window = credits::credits_window(&credits.track_name);
+                        ctx.new_window(window);
+                    }
+                    Err(err) => {
+                        log::error!("Failed to fetch track credits: {:?}", err);
+                        data.error_alert(format!("Failed to fetch track credits: {}", err));
+                    }
+                }
+            },
+        )
     // .debug_invalidation()
     // .debug_widget_id()
     // .debug_paint_layout()
