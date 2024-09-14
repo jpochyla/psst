@@ -1,7 +1,8 @@
-use std::time::Duration;
-
+use crate::data::Track;
 use druid::{Selector, WidgetId};
 use psst_core::{item_id::ItemId, player::item::PlaybackItem};
+use std::sync::Arc;
+use std::time::Duration;
 
 use crate::{
     data::{Nav, PlaybackPayload, QueueBehavior, QueueEntry},
@@ -66,3 +67,6 @@ pub const SORT_BY_DURATION: Selector = Selector::new("app.sort-by-duration");
 
 // Sort direction control
 pub const TOGGLE_SORT_ORDER: Selector = Selector::new("app.toggle-sort-order");
+
+// Track credits
+pub const SHOW_TRACK_CREDITS: Selector<Arc<Track>> = Selector::new("app.track.show-credits");

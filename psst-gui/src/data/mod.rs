@@ -61,6 +61,7 @@ pub use crate::data::{
     user::{PublicUser, UserProfile},
     utils::{Cached, Float64, Image, Page},
 };
+use crate::webapi::{TrackCredits, WebApi};
 
 pub const ALERT_DURATION: Duration = Duration::from_secs(5);
 
@@ -86,6 +87,8 @@ pub struct AppState {
     pub finder: Finder,
     pub added_queue: Vector<QueueEntry>,
     pub lyrics: Promise<Vector<TrackLines>>,
+    pub credits: Option<TrackCredits>,
+    pub webapi: Arc<WebApi>,
 }
 
 impl AppState {
@@ -109,6 +112,12 @@ impl AppState {
             queue: Vector::new(),
             volume: config.volume,
         };
+        let webapi = Arc::new(WebApi::new(
+            SessionService::empty(),
+            None, // Remove config.proxy_url.as_deref()
+            None, // Remove config.cache_dir.clone()
+            config.paginated_limit,
+        ));
         Self {
             session: SessionService::empty(),
             nav: Nav::Home,
@@ -169,6 +178,8 @@ impl AppState {
             alerts: Vector::new(),
             finder: Finder::new(),
             lyrics: Promise::Empty,
+            credits: None,
+            webapi,
         }
     }
 }
