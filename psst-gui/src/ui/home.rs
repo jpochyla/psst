@@ -4,7 +4,7 @@ use druid::im::Vector;
 use druid::widget::{Either, Flex, Label, Scroll};
 use druid::{widget::List, LensExt, Selector, Widget, WidgetExt};
 
-use crate::data::{Album, Artist, Ctx, HomeDetail, MixedView, Show, Track, WithCtx};
+use crate::data::{Artist, Ctx, HomeDetail, MixedView, Show, Track, WithCtx};
 use crate::widget::Empty;
 use crate::{
     data::AppState,
@@ -12,7 +12,7 @@ use crate::{
     widget::{Async, MyWidgetExt},
 };
 
-use super::{artist, playable, show, theme, track};
+use super::{album, artist, playable, show, theme, track};
 use super::{
     playlist,
     utils::{error_widget, spinner_widget},
@@ -57,7 +57,7 @@ pub fn home_widget() -> impl Widget<AppState> {
 }
 
 pub fn made_for_you() -> impl Widget<AppState> {
-    Async::new(spinner_widget, loaded_results_widget.clone(), error_widget)
+    Async::new(spinner_widget, loaded_results_widget, error_widget)
         .lens(
             Ctx::make(
                 AppState::common_ctx,
@@ -74,7 +74,7 @@ pub fn made_for_you() -> impl Widget<AppState> {
 }
 
 pub fn recommended_stations() -> impl Widget<AppState> {
-    Async::new(spinner_widget, loaded_results_widget.clone(), error_widget)
+    Async::new(spinner_widget, loaded_results_widget, error_widget)
         .lens(
             Ctx::make(
                 AppState::common_ctx,
@@ -91,7 +91,7 @@ pub fn recommended_stations() -> impl Widget<AppState> {
 }
 
 pub fn uniquely_yours() -> impl Widget<AppState> {
-    Async::new(spinner_widget, loaded_results_widget.clone(), error_widget)
+    Async::new(spinner_widget, loaded_results_widget, error_widget)
         .lens(
             Ctx::make(
                 AppState::common_ctx,
@@ -108,7 +108,7 @@ pub fn uniquely_yours() -> impl Widget<AppState> {
 }
 
 pub fn user_top_mixes() -> impl Widget<AppState> {
-    Async::new(spinner_widget, loaded_results_widget.clone(), error_widget)
+    Async::new(spinner_widget, loaded_results_widget, error_widget)
         .lens(
             Ctx::make(
                 AppState::common_ctx,
@@ -125,7 +125,7 @@ pub fn user_top_mixes() -> impl Widget<AppState> {
 }
 
 pub fn your_shows() -> impl Widget<AppState> {
-    Async::new(spinner_widget, loaded_results_widget.clone(), error_widget)
+    Async::new(spinner_widget, loaded_results_widget, error_widget)
         .lens(
             Ctx::make(
                 AppState::common_ctx,
@@ -142,7 +142,7 @@ pub fn your_shows() -> impl Widget<AppState> {
 }
 
 pub fn jump_back_in() -> impl Widget<AppState> {
-    Async::new(spinner_widget, loaded_results_widget.clone(), error_widget)
+    Async::new(spinner_widget, loaded_results_widget, error_widget)
         .lens(
             Ctx::make(
                 AppState::common_ctx,
@@ -159,7 +159,7 @@ pub fn jump_back_in() -> impl Widget<AppState> {
 }
 
 pub fn shows_that_you_might_like() -> impl Widget<AppState> {
-    Async::new(spinner_widget, loaded_results_widget.clone(), error_widget)
+    Async::new(spinner_widget, loaded_results_widget, error_widget)
         .lens(
             Ctx::make(
                 AppState::common_ctx,
@@ -189,11 +189,14 @@ fn loaded_results_widget() -> impl Widget<WithCtx<MixedView>> {
             .padding(theme::grid(6.0))
             .center(),
         Flex::column()
-            .with_child(title_label())
-            .with_child(artist_results_widget())
-            .with_child(album_results_widget())
-            .with_child(playlist_results_widget())
-            .with_child(show_results_widget()),
+                .with_child(title_label())
+            .with_child(Scroll::new(Flex::row()
+                .with_child(artist_results_widget())
+                .with_child(album_results_widget())
+                .with_child(playlist_results_widget())
+                .with_child(show_results_widget()))
+                .align_left(),
+            )
     )
 }
 
@@ -227,12 +230,16 @@ fn artist_results_widget() -> impl Widget<WithCtx<MixedView>> {
 
 fn album_results_widget() -> impl Widget<WithCtx<MixedView>> {
     Either::new(
-        |albums: &Vector<Album>, _| albums.is_empty(),
+        |playlists: &WithCtx<MixedView>, _| playlists.data.albums.is_empty(),
         Empty,
-        Flex::column().with_child(Label::new("not implemented"))
-        .align_left(),
-    )
-    .lens(Ctx::data().then(MixedView::albums))
+        Flex::column().with_child(
+            Scroll::new(
+                List::new(album::horizontal_album_widget).horizontal(),
+            )
+            .horizontal()
+            .align_left()
+            .lens(Ctx::map(MixedView::albums)),
+    ))
 }
 
 fn playlist_results_widget() -> impl Widget<WithCtx<MixedView>> {
@@ -256,7 +263,7 @@ fn show_results_widget() -> impl Widget<WithCtx<MixedView>> {
         Empty,
         Flex::column().with_child(
             Scroll::new(
-                List::new(|| show::horizontal_show_widget()).horizontal(),
+                List::new(show::horizontal_show_widget).horizontal(),
             )
             .align_left()
         ),

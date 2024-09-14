@@ -1,5 +1,5 @@
 use druid::{
-    im::Vector, kurbo::Circle, widget::{CrossAxisAlignment, Flex, Label, LabelText, LineBreaking, List, Scroll}, Data, Insets, LensExt, LocalizedString, Menu, MenuItem, Selector, Size, Widget, WidgetExt
+    im::Vector, kurbo::Circle, widget::{CrossAxisAlignment, Flex, Label, LabelText, LineBreaking, List}, Data, Insets, LensExt, LocalizedString, Menu, MenuItem, Selector, Widget, WidgetExt
 };
 
 use crate::{

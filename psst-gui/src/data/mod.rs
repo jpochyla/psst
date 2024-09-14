@@ -537,7 +537,7 @@ pub struct MixedView {
     pub title: Arc<str>,
     pub playlists: Vector<Playlist>,
     pub artists: Vector<Artist>,
-    pub albums: Vector<Album>,
+    pub albums: Vector<Arc<Album>>,
     pub shows: Vector<Arc<Show>>,
 }
 

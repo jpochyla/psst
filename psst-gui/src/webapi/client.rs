@@ -1,5 +1,5 @@
 use std::{
-    fmt::Display, io::{self, Read}, path::PathBuf, string, sync::Arc, thread, time::Duration
+    fmt::Display, io::{self, Read}, path::PathBuf, sync::Arc, thread, time::Duration
 };
 
 use druid::{
@@ -20,9 +20,9 @@ use psst_core::{
 
 use crate::{
     data::{
-        self, library_derived_lenses::playlists, Album, AlbumType, Artist, ArtistAlbums, AudioAnalysis, Cached, Episode, EpisodeId, EpisodeLink, MixedView, Nav, Page, Playlist, PublicUser, Range, Recommendations, RecommendationsRequest, SearchResults, SearchTopic, Show, SpotifyUrl, Track, UserProfile 
+        self, Album, AlbumType, Artist, ArtistAlbums, ArtistLink, AudioAnalysis, Cached, Episode, EpisodeId, EpisodeLink, MixedView, Nav, Page, Playlist, PublicUser, Range, Recommendations, RecommendationsRequest, SearchResults, SearchTopic, Show, SpotifyUrl, Track, UserProfile 
     },
-    error::Error, ui::album,
+    error::Error,
 };
 
 use super::{cache::WebApiCache, local::LocalTrackManager};
@@ -500,7 +500,7 @@ impl WebApi {
         
         let mut title: Arc<str> = Arc::from("");
         let mut playlist: Vector<Playlist> = Vector::new();
-        let mut album: Vector<Album> = Vector::new();
+        let mut album: Vector<Arc<Album>> = Vector::new();
         let mut artist: Vector<Artist> = Vector::new();
         let mut show: Vector<Arc<Show>> = Vector::new();
 
@@ -557,8 +557,32 @@ impl WebApi {
                                     height: None,
                                 }).collect()
                             ),
-                        })},
-
+                        })
+                    },
+                    DataTypename::Album => {
+                        album.push_back(Arc::new(Album {
+                            id: id.into(),
+                            name: Arc::from(item.content.data.name.clone().unwrap()),
+                            album_type: AlbumType::Album,
+                            images: item.content.data.cover_art.as_ref().map_or_else(Vector::new, |images| 
+                                images.sources.iter().map(|src| data::utils::Image {
+                                    url: Arc::from(src.url.clone()),
+                                    width: None,
+                                    height: None,
+                                }).collect()
+                            ),
+                            artists: item.content.data.artists.as_ref().map_or_else(Vector::new, |artists|
+                                artists.items.iter().map(|artist| ArtistLink {
+                                    id: Arc::from(artist.uri.split(':').last().unwrap_or("").to_string()),
+                                    name: Arc::from(artist.profile.name.clone()),
+                                }).collect()),
+                            copyrights: Vector::new(),
+                            label: "".into(),
+                            tracks: Vector::new(),
+                            release_date: None,
+                            release_date_precision: None,
+                        }))
+                    },
                     DataTypename::Podcast => {
                         show.push_back(Arc::new(Show {
                             id: id.into(),
@@ -582,8 +606,8 @@ impl WebApi {
         Ok(MixedView {
             title,
             playlists: playlist,
-            artists: Vector::new(),
-            albums: Vector::new(),
+            artists: artist,
+            albums: album,
             shows: show,
         })
     }
@@ -1018,7 +1042,7 @@ impl WebApi {
         Ok(result)
     }
 
-    /* EPISODES
+    /* EPISODES, IMPLEMENT THIS TO REDO THE PODCAST SECTION
     // Episodes for you, this needs a different thing, mixedview could include this
     pub fn new_episodes(&self) -> Result<MixedView, Error> {
         // 0JQ5DAnM3wGh0gz1MXnu3K -> New episodes
