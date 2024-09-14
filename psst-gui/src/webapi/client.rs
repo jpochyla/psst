@@ -273,63 +273,62 @@ impl WebApi {
         }
     }
 
+    /// VERY MUCH NEED TO MAKE THE CODE LOOK NICER & MORE CONSISTANT
     fn load_and_return_home_section(&self, request: Request) -> Result<MixedView, Error> {
-        use serde::{Serialize, Deserialize};
-
-        #[derive(Serialize, Deserialize)]
+        #[derive(Deserialize)]
         pub struct Welcome {
             data: WelcomeData,
         }
 
-        #[derive(Serialize, Deserialize)]
+        #[derive(Deserialize)]
         #[serde(rename_all = "camelCase")]
         pub struct WelcomeData {
             home_sections: HomeSections,
         }
 
-        #[derive(Serialize, Deserialize)]
+        #[derive(Deserialize)]
         pub struct HomeSections {
             sections: Vec<Section>,
         }
 
-        #[derive(Serialize, Deserialize)]
+        #[derive(Deserialize)]
         #[serde(rename_all = "camelCase")]
         pub struct Section {
             data: SectionData,
             section_items: SectionItems,
         }
 
-        #[derive(Serialize, Deserialize)]
+        #[derive(Deserialize)]
         pub struct SectionData {
             subtitle: Option<Subtitle>,
             title: Title,
         }
 
-        #[derive(Serialize, Deserialize)]
+        #[derive(Deserialize)]
         pub struct Subtitle {
             text: String,
         }
 
-        #[derive(Serialize, Deserialize)]
+        #[derive(Deserialize)]
         #[serde(rename_all = "camelCase")]
         pub struct Title {
             original_label: Option<OriginalLabel>,
             text: String,
         }
 
-        #[derive(Serialize, Deserialize)]
+        #[derive(Deserialize)]
         #[serde(rename_all = "camelCase")]
         pub struct OriginalLabel {
             text_attributes: TextAttributes,
         }
 
-        #[derive(Serialize, Deserialize)]
+        #[derive(Deserialize)]
         #[serde(rename_all = "camelCase")]
         pub struct TextAttributes {
             text_format_arguments: Vec<Option<serde_json::Value>>,
         }
 
-        #[derive(Serialize, Deserialize)]
+        #[derive(Deserialize)]
         #[serde(rename_all = "camelCase")]
         pub struct SectionItems {
             items: Vec<Item>,
@@ -337,65 +336,102 @@ impl WebApi {
             total_count: i64,
         }
 
-        #[derive(Serialize, Deserialize)]
+        #[derive(Deserialize)]
         pub struct Item {
             data: Option<serde_json::Value>,
             content: Content,
             uri: String,
         }
 
-        #[derive(Serialize, Deserialize)]
+        #[derive(Deserialize)]
         pub struct Content {
             #[serde(rename = "__typename")]
             typename: ContentTypename,
             data: ContentData,
         }
 
-        #[derive(Serialize, Deserialize)]
+        #[derive(Deserialize)]
         #[serde(rename_all = "camelCase")]
         pub struct ContentData {
             #[serde(rename = "__typename")]
             typename: DataTypename,
-            cover_art: Option<CoverArt>,
-            media_type: Option<MediaType>,
-            name: String,
-            publisher: Option<Publisher>,
+            name: Option<String>,
             uri: String,
+
             // Playlist-specific fields
             attributes: Option<Vec<Attribute>>,
             description: Option<String>,
             images: Option<Images>,
             owner_v2: Option<OwnerV2>,
+
+            // Artist-specific fields
+            artists: Option<Artists>,
+            profile: Option<Profile>,
+            visuals: Option<Visuals>,
+            album_type: Option<String>,
+
+            // Show-specific fields
+            cover_art: Option<CoverArt>,
+            media_type: Option<MediaType>,
+            publisher: Option<Publisher>,
+        }
+        
+        #[derive(Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        pub struct Visuals {
+            avatar_image: CoverArt,
+        }
+        
+        #[derive(Deserialize)]
+        pub struct Artists {
+            items: Vec<ArtistsItem>,
         }
 
-        #[derive(Serialize, Deserialize)]
+        #[derive(Deserialize)]
+        pub struct ArtistsItem {
+            profile: Profile,
+            uri: String,
+        }
+
+        #[derive(Deserialize)]
+        pub struct Profile {
+            name: String,
+        }
+
+        #[derive(Deserialize)]
+        pub struct Attribute {
+            key: String,
+            value: String,
+        }
+
+        #[derive(Deserialize)]
         #[serde(rename_all = "camelCase")]
         pub struct CoverArt {
             extracted_colors: ExtractedColors,
             sources: Vec<Source>,
         }
 
-        #[derive(Serialize, Deserialize)]
+        #[derive(Deserialize)]
         #[serde(rename_all = "camelCase")]
         pub struct ExtractedColors {
             color_dark: ColorDark,
         }
 
-        #[derive(Serialize, Deserialize)]
+        #[derive(Deserialize)]
         #[serde(rename_all = "camelCase")]
         pub struct ColorDark {
             hex: String,
             is_fallback: bool,
         }
 
-        #[derive(Serialize, Deserialize)]
+        #[derive(Deserialize)]
         pub struct Source {
             height: Option<i64>,
             url: String,
             width: Option<i64>,
         }
 
-        #[derive(Serialize, Deserialize)]
+        #[derive(Deserialize)]
         pub enum MediaType {
             #[serde(rename = "AUDIO")]
             Audio,
@@ -403,59 +439,55 @@ impl WebApi {
             Mixed,
         }
 
-        #[derive(Serialize, Deserialize)]
+        #[derive(Deserialize)]
         pub struct Publisher {
             name: String,
         }
 
-        #[derive(Serialize, Deserialize)]
+        #[derive(Deserialize)]
         pub enum DataTypename {
             Podcast,
             Playlist,
+            Artist,
+            Album,
         }
 
-        #[derive(Serialize, Deserialize)]
+        #[derive(Deserialize)]
         pub enum ContentTypename {
             #[serde(rename = "PodcastOrAudiobookResponseWrapper")]
             PodcastOrAudiobookResponseWrapper,
             #[serde(rename = "PlaylistResponseWrapper")]
             PlaylistResponseWrapper,
+            #[serde(rename = "AlbumResponseWrapper")]
+            AlbumResponseWrapper,
+            #[serde(rename = "ArtistResponseWrapper")]
+            ArtistResponseWrapper,
         }
 
-        #[derive(Serialize, Deserialize)]
+        #[derive(Deserialize)]
         #[serde(rename_all = "camelCase")]
         pub struct PagingInfo {
             next_offset: Option<serde_json::Value>,
         }
 
-        #[derive(Serialize, Deserialize)]
-        pub struct Extensions {}
-
-        // Playlist-specific structures
-        #[derive(Serialize, Deserialize)]
-        pub struct Attribute {
-            key: String,
-            value: String,
-        }
-
-        #[derive(Serialize, Deserialize)]
+        #[derive(Deserialize)]
         pub struct Images {
             items: Vec<ImagesItem>,
         }
 
-        #[derive(Serialize, Deserialize)]
+        #[derive(Deserialize)]
         #[serde(rename_all = "camelCase")]
         pub struct ImagesItem {
             sources: Vec<Source>,
             extracted_colors: ExtractedColors,
         }
 
-        #[derive(Serialize, Deserialize)]
+        #[derive(Deserialize)]
         pub struct OwnerV2 {
             data: OwnerV2Data,
         }
 
-        #[derive(Serialize, Deserialize)]
+        #[derive(Deserialize)]
         pub struct OwnerV2Data {
             #[serde(rename = "__typename")]
             typename: String,
@@ -481,55 +513,68 @@ impl WebApi {
                 let uri = item.content.data.uri.clone();
                 let id = uri.split(':').last().unwrap_or("").to_string();
 
-                if uri.contains("playlist") {
-                    playlist.push_back(Playlist {
-                        id: id.into(),
-                        name: Arc::from(item.content.data.name.clone()),
-                        images: Some(item.content.data.images.as_ref().map_or_else(Vector::new, |images| 
-                            images.items.iter().map(|img| data::utils::Image {
-                                url: Arc::from(img.sources.first().map(|s| s.url.as_str()).unwrap_or_default()),
-                                width: None,
-                                height: None,
-                            }).collect()
-                        )),
-                        description: {
-                            let desc = sanitize_str(&DEFAULT, item.content.data.description.as_deref().unwrap_or_default()).unwrap_or_default();
-                            // This is roughly 3 lines of description, truncated if too long
-                            if desc.chars().count() > 65 {
-                                desc.chars().take(62).collect::<String>() + "..."
-                            } else {
-                                desc
-                            }.into()
-                        },
-                        track_count: item.content.data.attributes.as_ref().and_then(|attrs| 
-                            attrs.iter().find(|attr| attr.key == "track_count").and_then(|attr| attr.value.parse().ok())
-                        ),
-                        owner: PublicUser {
-                            id: Arc::from(""),
-                            display_name: item.content.data.owner_v2.as_ref()
-                                .map(|owner| Arc::from(owner.data.name.as_str()))
-                                .unwrap_or_else(|| Arc::from("")),
-                        },
-                        collaborative: false,
-                    });
-                } else if uri.contains("show") {
-                    show.push_back(Arc::new(Show {
-                        id: id.into(),
-                        name: Arc::from(item.content.data.name.clone()),
-                        images: item.content.data.cover_art.as_ref().map_or_else(Vector::new, |images| 
-                            images.sources.iter().map(|src| data::utils::Image {
-                                url: Arc::from(src.url.clone()),
-                                width: None,
-                                height: None,
-                            }).collect()
-                        ),
-                        publisher: Arc::from(item.content.data.publisher.as_ref().unwrap().name.clone()),
-                        description: "".into(),
-                    }))
-                }
-                
-                else {
-                    log::info!("adkj");
+                match item.content.data.typename {
+                    DataTypename::Playlist => {
+                        playlist.push_back(Playlist {
+                            id: id.into(),
+                            name: Arc::from(item.content.data.name.clone().unwrap()),
+                            images: Some(item.content.data.images.as_ref().map_or_else(Vector::new, |images| 
+                                images.items.iter().map(|img| data::utils::Image {
+                                    url: Arc::from(img.sources.first().map(|s| s.url.as_str()).unwrap_or_default()),
+                                    width: None,
+                                    height: None,
+                                }).collect()
+                            )),
+                            description: {
+                                let desc = sanitize_str(&DEFAULT, item.content.data.description.as_deref().unwrap_or_default()).unwrap_or_default();
+                                // This is roughly 3 lines of description, truncated if too long
+                                if desc.chars().count() > 65 {
+                                    desc.chars().take(62).collect::<String>() + "..."
+                                } else {
+                                    desc
+                                }.into()
+                            },
+                            track_count: item.content.data.attributes.as_ref().and_then(|attrs| 
+                                attrs.iter().find(|attr| attr.key == "track_count").and_then(|attr| attr.value.parse().ok())
+                            ),
+                            owner: PublicUser {
+                                id: Arc::from(""),
+                                display_name: item.content.data.owner_v2.as_ref()
+                                    .map(|owner| Arc::from(owner.data.name.as_str()))
+                                    .unwrap_or_else(|| Arc::from("")),
+                            },
+                            collaborative: false,
+                        });
+                    },
+                    DataTypename::Artist => {
+                        artist.push_back(Artist {
+                            id: id.into(),
+                            name: Arc::from(item.content.data.profile.as_ref().unwrap().name.clone()),
+                            images: item.content.data.visuals.as_ref().map_or_else(Vector::new, |images| 
+                                images.avatar_image.sources.iter().map(|img| data::utils::Image {
+                                    url: Arc::from(img.url.as_str()),
+                                    width: None,
+                                    height: None,
+                                }).collect()
+                            ),
+                        })},
+
+                    DataTypename::Podcast => {
+                        show.push_back(Arc::new(Show {
+                            id: id.into(),
+                            name: Arc::from(item.content.data.name.clone().unwrap()),
+                            images: item.content.data.cover_art.as_ref().map_or_else(Vector::new, |images| 
+                                images.sources.iter().map(|src| data::utils::Image {
+                                    url: Arc::from(src.url.clone()),
+                                    width: None,
+                                    height: None,
+                                }).collect()
+                            ),
+                            publisher: Arc::from(item.content.data.publisher.as_ref().unwrap().name.clone()),
+                            description: "".into(),
+                        }))
+                    },
+                    _ => {}
                 }
             });
         });
@@ -955,7 +1000,6 @@ impl WebApi {
             .query("variables", &json_query.0.to_string())
             .query("extensions", &json_query.1.to_string());
 
-         // Extract the playlists
         let result = self.load_and_return_home_section(request)?;
         
         Ok(result)
@@ -969,7 +1013,6 @@ impl WebApi {
             .query("variables", &json_query.0.to_string())
             .query("extensions", &json_query.1.to_string());
 
-        // Extract the playlists
         let result = self.load_and_return_home_section(request)?;
         
         Ok(result)

@@ -34,6 +34,7 @@ pub fn home_widget() -> impl Widget<AppState> {
         )
         .with_default_spacer()
         .with_child(uniquely_yours())
+        .with_child(jump_back_in())
         .with_child(your_shows())
         .with_child(shows_that_you_might_like())
         .with_child(
@@ -140,6 +141,23 @@ pub fn your_shows() -> impl Widget<AppState> {
         )
 }
 
+pub fn jump_back_in() -> impl Widget<AppState> {
+    Async::new(spinner_widget, loaded_results_widget.clone(), error_widget)
+        .lens(
+            Ctx::make(
+                AppState::common_ctx,
+                AppState::home_detail.then(HomeDetail::jump_back_in),
+            )
+            .then(Ctx::in_promise()),
+        )
+        .on_command_async(
+            LOAD_MADE_FOR_YOU,
+            |_| WebApi::global().jump_back_in(),
+            |_, data, q| data.home_detail.jump_back_in.defer(q),
+            |_, data, r| data.home_detail.jump_back_in.update(r),
+        )
+}
+
 pub fn shows_that_you_might_like() -> impl Widget<AppState> {
     Async::new(spinner_widget, loaded_results_widget.clone(), error_widget)
         .lens(
@@ -199,8 +217,10 @@ fn artist_results_widget() -> impl Widget<WithCtx<MixedView>> {
     Either::new(
         |artists: &Vector<Artist>, _| artists.is_empty(),
         Empty,
-        Flex::column().with_child(List::new(artist::artist_widget))
-        .align_left(),
+        Scroll::new(
+            List::new(artist::horizontal_artist_widget).horizontal(),
+        )
+        .horizontal().align_left(),
     )
     .lens(Ctx::data().then(MixedView::artists))
 }
@@ -221,7 +241,7 @@ fn playlist_results_widget() -> impl Widget<WithCtx<MixedView>> {
         Empty,
         Flex::column().with_child(
             Scroll::new(
-                List::new(|| playlist::horizontal_playlist_widget(false, true)).horizontal(),
+                List::new(|| playlist::horizontal_playlist_widget(true, true)).horizontal(),
             )
             .horizontal()
             .align_left()
@@ -249,7 +269,7 @@ fn user_top_artists_widget() -> impl Widget<AppState> {
         spinner_widget,
         || {
             Scroll::new(
-                List::new(artist::horizontal_artist_widget).horizontal(), // TODO Add a function which allows people to scroll with their scroll wheel!!!
+                List::new(artist::horizontal_artist_widget).horizontal(),
             )
             .horizontal()
         },
