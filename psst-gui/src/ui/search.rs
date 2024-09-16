@@ -141,7 +141,7 @@ fn playlist_results_widget() -> impl Widget<WithCtx<SearchResults>> {
         Flex::column()
             .with_child(header_widget("Playlists"))
             .with_child(
-                List::new(playlist::playlist_widget).lens(Ctx::map(SearchResults::playlists)),
+                List::new(|| playlist::playlist_widget(false)).lens(Ctx::map(SearchResults::playlists)),
             ),
     )
 }
@@ -152,7 +152,7 @@ fn show_results_widget() -> impl Widget<WithCtx<SearchResults>> {
         Empty,
         Flex::column()
             .with_child(header_widget("Podcasts"))
-            .with_child(List::new(show::show_widget)),
+            .with_child(List::new(|| show::show_widget(false))),
     )
     .lens(Ctx::map(SearchResults::shows))
 }

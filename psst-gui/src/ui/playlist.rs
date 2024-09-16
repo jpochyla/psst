@@ -357,8 +357,11 @@ pub fn horizontal_playlist_widget(
         .context_menu(playlist_menu_ctx)
 }
 
-pub fn playlist_widget() -> impl Widget<WithCtx<Playlist>> {
-    let playlist_image = rounded_cover_widget(theme::grid(6.0)).lens(Ctx::data());
+pub fn playlist_widget(horizontal: bool) -> impl Widget<WithCtx<Playlist>> {
+    let playlist_image = if horizontal {rounded_cover_widget(theme::grid(16.0)).lens(Ctx::data())} else {rounded_cover_widget(theme::grid(6.0)).lens(Ctx::data())};
+
+    let mut playlist_info = if horizontal {Flex::column()} else {Flex::row()};
+    let mut playlist = if horizontal {Flex::column()} else {Flex::row()};
 
     let playlist_name = Label::raw()
         .with_font(theme::UI_FONT_MEDIUM)
@@ -371,16 +374,27 @@ pub fn playlist_widget() -> impl Widget<WithCtx<Playlist>> {
         .with_text_size(theme::TEXT_SIZE_SMALL)
         .lens(Ctx::data().then(Playlist::description));
 
-    let playlist_info = Flex::column()
-        .cross_axis_alignment(CrossAxisAlignment::Start)
+    let playlist_description = if horizontal {
+        playlist_description.fix_width(theme::grid(16.0)).padding_horizontal(theme::grid(1.0)).align_left()
+    } else {
+        playlist_description.align_left()
+    };
+
+    let playlist_name = if horizontal {
+        playlist_name.fix_width(theme::grid(16.0)).padding_horizontal(theme::grid(1.0)).align_left()
+    } else {
+        playlist_name.align_left()
+    };
+
+    playlist_info = playlist_info
         .with_child(playlist_name)
         .with_spacer(2.0)
         .with_child(playlist_description);
 
-    let playlist = Flex::row()
+    let playlist = playlist
         .with_child(playlist_image)
         .with_default_spacer()
-        .with_flex_child(playlist_info, 1.0)
+        .with_child(playlist_info)
         .padding(theme::grid(1.0));
 
     playlist

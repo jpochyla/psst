@@ -195,6 +195,7 @@ fn loaded_results_widget() -> impl Widget<WithCtx<MixedView>> {
                 .with_child(album_results_widget())
                 .with_child(playlist_results_widget())
                 .with_child(show_results_widget()))
+                // We want it to allign vertially too so it looks neater!
                 .align_left(),
             )
     )
@@ -248,7 +249,7 @@ fn playlist_results_widget() -> impl Widget<WithCtx<MixedView>> {
         Empty,
         Flex::column().with_child(
             Scroll::new(
-                List::new(|| playlist::horizontal_playlist_widget(true, true)).horizontal(),
+                List::new(|| playlist::playlist_widget(true)).horizontal(),
             )
             .horizontal()
             .align_left()
@@ -263,7 +264,7 @@ fn show_results_widget() -> impl Widget<WithCtx<MixedView>> {
         Empty,
         Flex::column().with_child(
             Scroll::new(
-                List::new(show::horizontal_show_widget).horizontal(),
+                List::new(|| show::show_widget(true)).horizontal(),
             )
             .align_left()
         ),
