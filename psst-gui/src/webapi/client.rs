@@ -187,7 +187,6 @@ impl WebApi {
     }
 
     /// Very similar to `for_all_pages`, but only returns a certain number of results
-    /// TODO: test properly
     fn for_some_pages<T: DeserializeOwned + Clone>(
         &self,
         request: Request,
@@ -572,7 +571,6 @@ impl WebApi {
     }
 
     // https://developer.spotify.com/documentation/web-api/reference/get-users-top-artists-and-tracks
-    // TODO Cache this.
     pub fn get_user_top_tracks(&self) -> Result<Vector<Arc<Track>>, Error> {
         let request = self.get("v1/me/top/tracks", None)?
             .query("market", "from_token");
@@ -582,7 +580,6 @@ impl WebApi {
         Ok(result)
     }
 
-    // TODO Cache this.
     pub fn get_user_top_artist(&self) -> Result<Vector<Artist>, Error> {
         #[derive(Clone, Data, Deserialize)]
         struct Artists {
