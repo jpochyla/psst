@@ -80,7 +80,7 @@ pub fn show_widget(horizontal: bool) -> impl Widget<WithCtx<Arc<Show>>> {
     let show_image = if horizontal {rounded_cover_widget(theme::grid(16.0))} else {rounded_cover_widget(theme::grid(6.0))};
 
     let mut show_info = if horizontal {Flex::column()} else {Flex::row()};
-    let mut show = if horizontal {Flex::column()} else {Flex::row()};
+    let show = if horizontal {Flex::column()} else {Flex::row()};
 
     let show_name = Label::raw()
         .with_font(theme::UI_FONT_MEDIUM)
@@ -118,6 +118,7 @@ pub fn show_widget(horizontal: bool) -> impl Widget<WithCtx<Arc<Show>>> {
         .lens(Ctx::data());
 
     show
+        .align_left()
         .link()
         .rounded(theme::BUTTON_BORDER_RADIUS)
         .on_left_click(|ctx, _, show, _| {

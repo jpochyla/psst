@@ -195,7 +195,7 @@ fn loaded_results_widget() -> impl Widget<WithCtx<MixedView>> {
                 .with_child(album_results_widget())
                 .with_child(playlist_results_widget())
                 .with_child(show_results_widget()))
-                // We want it to allign vertially too so it looks neater!
+                // Figure out a way to algin these widgets!
                 .align_left(),
             )
     )
@@ -222,7 +222,7 @@ fn artist_results_widget() -> impl Widget<WithCtx<MixedView>> {
         |artists: &Vector<Artist>, _| artists.is_empty(),
         Empty,
         Scroll::new(
-            List::new(artist::horizontal_artist_widget).horizontal(),
+            List::new(|| artist::artist_widget(true)).horizontal(),
         )
         .horizontal().align_left(),
     )
@@ -235,7 +235,7 @@ fn album_results_widget() -> impl Widget<WithCtx<MixedView>> {
         Empty,
         Flex::column().with_child(
             Scroll::new(
-                List::new(album::horizontal_album_widget).horizontal(),
+                List::new(|| album::album_widget(true)).horizontal(),
             )
             .horizontal()
             .align_left()
@@ -277,7 +277,7 @@ fn user_top_artists_widget() -> impl Widget<AppState> {
         spinner_widget,
         || {
             Scroll::new(
-                List::new(artist::horizontal_artist_widget).horizontal(),
+                List::new(|| artist::artist_widget(true)).horizontal(),
             )
             .horizontal()
         },

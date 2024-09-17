@@ -273,7 +273,6 @@ impl WebApi {
         }
     }
 
-    /// VERY MUCH NEED TO MAKE THE CODE LOOK NICER & MORE CONSISTANT
     fn load_and_return_home_section(&self, request: Request) -> Result<MixedView, Error> {
         #[derive(Deserialize)]
         pub struct Welcome {
@@ -300,53 +299,28 @@ impl WebApi {
 
         #[derive(Deserialize)]
         pub struct SectionData {
-            subtitle: Option<Subtitle>,
             title: Title,
-        }
-
-        #[derive(Deserialize)]
-        pub struct Subtitle {
-            text: String,
         }
 
         #[derive(Deserialize)]
         #[serde(rename_all = "camelCase")]
         pub struct Title {
-            original_label: Option<OriginalLabel>,
             text: String,
-        }
-
-        #[derive(Deserialize)]
-        #[serde(rename_all = "camelCase")]
-        pub struct OriginalLabel {
-            text_attributes: TextAttributes,
-        }
-
-        #[derive(Deserialize)]
-        #[serde(rename_all = "camelCase")]
-        pub struct TextAttributes {
-            text_format_arguments: Vec<Option<serde_json::Value>>,
         }
 
         #[derive(Deserialize)]
         #[serde(rename_all = "camelCase")]
         pub struct SectionItems {
             items: Vec<Item>,
-            paging_info: PagingInfo,
-            total_count: i64,
         }
 
         #[derive(Deserialize)]
         pub struct Item {
-            data: Option<serde_json::Value>,
             content: Content,
-            uri: String,
         }
 
         #[derive(Deserialize)]
         pub struct Content {
-            #[serde(rename = "__typename")]
-            typename: ContentTypename,
             data: ContentData,
         }
 
@@ -368,11 +342,9 @@ impl WebApi {
             artists: Option<Artists>,
             profile: Option<Profile>,
             visuals: Option<Visuals>,
-            album_type: Option<String>,
 
             // Show-specific fields
             cover_art: Option<CoverArt>,
-            media_type: Option<MediaType>,
             publisher: Option<Publisher>,
         }
         
@@ -407,28 +379,12 @@ impl WebApi {
         #[derive(Deserialize)]
         #[serde(rename_all = "camelCase")]
         pub struct CoverArt {
-            extracted_colors: ExtractedColors,
             sources: Vec<Source>,
         }
 
         #[derive(Deserialize)]
-        #[serde(rename_all = "camelCase")]
-        pub struct ExtractedColors {
-            color_dark: ColorDark,
-        }
-
-        #[derive(Deserialize)]
-        #[serde(rename_all = "camelCase")]
-        pub struct ColorDark {
-            hex: String,
-            is_fallback: bool,
-        }
-
-        #[derive(Deserialize)]
         pub struct Source {
-            height: Option<i64>,
             url: String,
-            width: Option<i64>,
         }
 
         #[derive(Deserialize)]
@@ -453,24 +409,6 @@ impl WebApi {
         }
 
         #[derive(Deserialize)]
-        pub enum ContentTypename {
-            #[serde(rename = "PodcastOrAudiobookResponseWrapper")]
-            PodcastOrAudiobookResponseWrapper,
-            #[serde(rename = "PlaylistResponseWrapper")]
-            PlaylistResponseWrapper,
-            #[serde(rename = "AlbumResponseWrapper")]
-            AlbumResponseWrapper,
-            #[serde(rename = "ArtistResponseWrapper")]
-            ArtistResponseWrapper,
-        }
-
-        #[derive(Deserialize)]
-        #[serde(rename_all = "camelCase")]
-        pub struct PagingInfo {
-            next_offset: Option<serde_json::Value>,
-        }
-
-        #[derive(Deserialize)]
         pub struct Images {
             items: Vec<ImagesItem>,
         }
@@ -479,7 +417,6 @@ impl WebApi {
         #[serde(rename_all = "camelCase")]
         pub struct ImagesItem {
             sources: Vec<Source>,
-            extracted_colors: ExtractedColors,
         }
 
         #[derive(Deserialize)]
@@ -490,9 +427,7 @@ impl WebApi {
         #[derive(Deserialize)]
         pub struct OwnerV2Data {
             #[serde(rename = "__typename")]
-            typename: String,
             name: String,
-            uri: String,
         }
 
         // Extract the playlists
@@ -597,8 +532,7 @@ impl WebApi {
                             publisher: Arc::from(item.content.data.publisher.as_ref().unwrap().name.clone()),
                             description: "".into(),
                         }))
-                    },
-                    _ => {}
+                    }
                 }
             });
         });
@@ -906,6 +840,25 @@ impl WebApi {
 
 /// View endpoints.
 impl WebApi {
+    pub fn get_user_info(&self) -> Result<(String, String), Error> {
+        #[derive(Deserialize)]
+        struct User {
+            region: String,
+            timezone: String,
+        }
+        let token = self.access_token()?;
+        let request = self
+            .agent
+            .request("GET", &format!("http://{}/{}", "ip-api.com", "json"))
+            .query("fields", "260")
+            .set("Authorization", &format!("Bearer {}", &token));
+
+        let result: User = self.load(request)?;
+        
+        Ok((result.region, result.timezone))
+        
+    }
+
     fn build_home_request(&self, section_uri: &str) -> (String, String) {
         let extensions = json!({
             "persistedQuery": {
@@ -913,12 +866,12 @@ impl WebApi {
                 "sha256Hash": "4da53a78e4e98d4f3fa55698af5b751fe05ca3a1a4a526ff8147e8866ccfa49f"
             }
         });
-
+        
         let variables = json!( {
             "uri": section_uri,
-            "timeZone": "Europe/London",
+            "timeZone": self.get_user_info().unwrap().0,
             "sp_t": self.access_token().unwrap(),  // Assuming this returns a Result<String, Error>
-            "country": "GB",
+            "country": self.get_user_info().unwrap().1,
             "sectionItemsOffset": 0,
             "sectionItemsLimit": 20,
         });

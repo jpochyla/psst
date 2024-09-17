@@ -5,7 +5,7 @@ use std::{cmp::Ordering, sync::Arc};
 use druid::widget::{Button, LensWrap, TextBox};
 use druid::{
     im::Vector,
-    widget::{CrossAxisAlignment, Flex, Label, LineBreaking, List},
+    widget::{Flex, Label, LineBreaking, List},
     Insets, Lens, LensExt, LocalizedString, Menu, MenuItem, Selector, Size, Widget, WidgetExt,
     WindowDesc,
 };
@@ -318,50 +318,8 @@ fn information_section(title_msg: &str, description_msg: &str) -> impl Widget<Ap
         .with_child(description_label)
 }
 
-pub fn horizontal_playlist_widget(
-    show_name: bool,
-    show_description: bool,
-) -> impl Widget<WithCtx<Playlist>> {
-    let playlist_image = rounded_cover_widget(theme::grid(16.0)).lens(Ctx::data());
-
-    let mut playlist = Flex::column()
-        .with_child(playlist_image)
-        .with_default_spacer();
-
-    if show_name {
-        let playlist_name = Label::raw()
-            .with_font(theme::UI_FONT_MEDIUM)
-            .with_line_break_mode(LineBreaking::Clip)
-            .lens(Ctx::data().then(Playlist::name));
-        playlist.add_child(playlist_name);
-        playlist.add_spacer(2.0);
-    }
-
-    if show_description {
-        let playlist_description = Label::raw()
-            .with_line_break_mode(LineBreaking::WordWrap)
-            .with_text_color(theme::PLACEHOLDER_COLOR)
-            .with_text_size(theme::TEXT_SIZE_SMALL)
-            .lens(Ctx::data().then(Playlist::description));
-        playlist.add_child(playlist_description);
-    }
-
-    playlist
-        .padding(theme::grid(1.0))
-        .link()
-        .rounded(theme::BUTTON_BORDER_RADIUS)
-        .on_left_click(|ctx, _, playlist, _| {
-            ctx.submit_command(cmd::NAVIGATE.with(Nav::PlaylistDetail(playlist.data.link())));
-        })
-        .fix_width(theme::grid(20.0))
-        .context_menu(playlist_menu_ctx)
-}
-
 pub fn playlist_widget(horizontal: bool) -> impl Widget<WithCtx<Playlist>> {
     let playlist_image = if horizontal {rounded_cover_widget(theme::grid(16.0)).lens(Ctx::data())} else {rounded_cover_widget(theme::grid(6.0)).lens(Ctx::data())};
-
-    let mut playlist_info = if horizontal {Flex::column()} else {Flex::row()};
-    let mut playlist = if horizontal {Flex::column()} else {Flex::row()};
 
     let playlist_name = Label::raw()
         .with_font(theme::UI_FONT_MEDIUM)
@@ -386,12 +344,12 @@ pub fn playlist_widget(horizontal: bool) -> impl Widget<WithCtx<Playlist>> {
         playlist_name.align_left()
     };
 
-    playlist_info = playlist_info
+    let playlist_info = if horizontal {Flex::column()} else {Flex::row()}
         .with_child(playlist_name)
         .with_spacer(2.0)
         .with_child(playlist_description);
 
-    let playlist = playlist
+    let playlist = if horizontal { Flex::column() } else { Flex::row() }
         .with_child(playlist_image)
         .with_default_spacer()
         .with_child(playlist_info)

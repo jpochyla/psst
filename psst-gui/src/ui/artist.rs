@@ -5,8 +5,7 @@ use druid::{
 use crate::{
     cmd,
     data::{
-        AppState, Artist, ArtistAlbums, ArtistDetail, ArtistLink, ArtistTracks, Cached, Ctx, Nav,
-        WithCtx,
+        AppState, Artist, ArtistAlbums, ArtistDetail, ArtistLink, ArtistTracks, Cached, Ctx, Nav, WithCtx
     },
     webapi::WebApi,
     widget::{Async, MyWidgetExt, RemoteImage},
@@ -79,36 +78,31 @@ fn async_related_widget() -> impl Widget<AppState> {
         )
 }
 
-pub fn horizontal_artist_widget() -> impl Widget<Artist> {
-    let artist_image = cover_widget(theme::grid(16.0));
-    let artist_label = Label::raw()
-        .with_font(theme::UI_FONT_MEDIUM)
-        .lens(Artist::name);
-    let artist = Flex::column()
+pub fn artist_widget(horizontal: bool) -> impl Widget<Artist> {
+    let mut artist = if horizontal { Flex::column() } else { Flex::row() };
+
+    let artist_image = cover_widget(if horizontal { theme::grid(16.0) } else { theme::grid(6.0) });
+    artist = artist
         .with_child(artist_image)
-        .with_default_spacer()
-        .with_child(artist_label);
-    artist
-        .padding(theme::grid(1.0))
-        .fix_width(theme::grid(20.0))
-        .link()
-        .rounded(theme::BUTTON_BORDER_RADIUS)
-        .on_left_click(|ctx, _, artist, _| {
-            ctx.submit_command(cmd::NAVIGATE.with(Nav::ArtistDetail(artist.link())));
-        })
-        .context_menu(|artist| artist_menu(&artist.link()))
-}
-pub fn artist_widget() -> impl Widget<Artist> {
-    let artist_image = cover_widget(theme::grid(7.0));
-    let artist_label = Label::raw()
-        .with_font(theme::UI_FONT_MEDIUM)
-        .lens(Artist::name);
-    let artist = Flex::row()
-        .with_child(artist_image)
-        .with_default_spacer()
-        .with_flex_child(artist_label, 1.0);
-    artist
-        .padding(theme::grid(0.5))
+        .with_default_spacer();
+
+    artist = if horizontal {
+        artist.with_child(Label::raw()
+            .with_font(theme::UI_FONT_MEDIUM)
+            .lens(Artist::name))
+    } else {
+        artist.with_flex_child(Label::raw()
+            .with_font(theme::UI_FONT_MEDIUM)
+            .lens(Artist::name), 1.0)
+    };
+    
+    let artist = if horizontal {
+        artist.fix_width(theme::grid(16.0)).padding_horizontal(theme::grid(1.0)).align_left()
+    } else {
+        artist.align_left()
+    };
+
+    artist.padding(theme::grid(1.0))
         .link()
         .on_left_click(|ctx, _, artist, _| {
             ctx.submit_command(cmd::NAVIGATE.with(Nav::ArtistDetail(artist.link())));
@@ -153,20 +147,20 @@ fn albums_widget() -> impl Widget<WithCtx<ArtistAlbums>> {
     Flex::column()
         .cross_axis_alignment(CrossAxisAlignment::Start)
         .with_child(header_widget("Albums"))
-        .with_child(List::new(album::album_widget).lens(Ctx::map(ArtistAlbums::albums)))
+        .with_child(List::new(|| album::album_widget(false)).lens(Ctx::map(ArtistAlbums::albums)))
         .with_child(header_widget("Singles"))
-        .with_child(List::new(album::album_widget).lens(Ctx::map(ArtistAlbums::singles)))
+        .with_child(List::new(|| album::album_widget(false)).lens(Ctx::map(ArtistAlbums::singles)))
         .with_child(header_widget("Compilations"))
-        .with_child(List::new(album::album_widget).lens(Ctx::map(ArtistAlbums::compilations)))
+        .with_child(List::new(|| album::album_widget(false)).lens(Ctx::map(ArtistAlbums::compilations)))
         .with_child(header_widget("Appears On"))
-        .with_child(List::new(album::album_widget).lens(Ctx::map(ArtistAlbums::appears_on)))
+        .with_child(List::new(|| album::album_widget(false)).lens(Ctx::map(ArtistAlbums::appears_on)))
 }
 
 fn related_widget() -> impl Widget<Cached<Vector<Artist>>> {
     Flex::column()
         .cross_axis_alignment(CrossAxisAlignment::Start)
         .with_child(header_widget("Related Artists"))
-        .with_child(List::new(artist_widget))
+        .with_child(List::new(|| artist_widget(false)))
         .lens(Cached::data)
 }
 
