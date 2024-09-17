@@ -23,37 +23,28 @@ pub const LOAD_MADE_FOR_YOU: Selector = Selector::new("app.home.load-made-for-yo
 pub fn home_widget() -> impl Widget<AppState> {
     Flex::column()
         .with_child(made_for_you())
+        .with_child(jump_back_in())
         .with_child(user_top_mixes())
         .with_child(recommended_stations())
-        // turn this into a function as it is like title_label(title: &str){}!!!
-        .with_child(
-            Label::new("Uniquely yours")
-                .with_text_size(theme::grid(2.5))
-                .align_left()
-                .padding((theme::grid(1.5), 0.0)),
-        )
+        .with_child(simple_title_label("Uniquely yours"))
         .with_default_spacer()
         .with_child(uniquely_yours())
-        .with_child(jump_back_in())
         .with_child(your_shows())
         .with_child(shows_that_you_might_like())
-        .with_child(
-            Label::new("Your top artists")
-                .with_text_size(theme::grid(2.5))
-                .align_left()
-                .padding((theme::grid(1.5), 0.0)),
-        )
+        .with_child(simple_title_label("Your top artists"))
         .with_default_spacer()
         .with_child(user_top_artists_widget())
         .with_default_spacer()
-        .with_child(
-            Label::new("Your top tracks")
-                .with_text_size(theme::grid(2.5))
-                .align_left()
-                .padding((theme::grid(1.5), 0.0)),
-        )
+        .with_child(simple_title_label("Your top tracks"))
         .with_default_spacer()
         .with_child(user_top_tracks_widget())
+}
+
+fn simple_title_label(title: &str) -> impl Widget<AppState> {
+    Label::new(title)
+        .with_text_size(theme::grid(2.5))
+        .align_left()
+        .padding((theme::grid(1.5), 0.0))
 }
 
 pub fn made_for_you() -> impl Widget<AppState> {
