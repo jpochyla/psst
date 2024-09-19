@@ -1,6 +1,5 @@
 use std::{
-    thread::{self, JoinHandle},
-    time::Duration,
+    cmp::Ordering, thread::{self, JoinHandle}, time::Duration
 };
 
 use crossbeam_channel::Sender;
@@ -357,7 +356,7 @@ where
             Event::Command(cmd) if cmd.is(cmd::PLAYBACK_PLAYING) => {
                 let (item, progress) = cmd.get_unchecked(cmd::PLAYBACK_PLAYING);
 
-                // TODO this falsely removes the song if you click on a song from the playlist that is also in the queue
+                // TODO: this falsely removes the song if you click on a song from the playlist that is also in the queue, not sure how to solve this?
                 if !data.displayed_added_queue.is_empty() && data.playback.now_playing.as_mut().is_some_and(|np| {
                     np.origin.to_string() == PlaybackOrigin::Queue.to_string()
                     && np.item.id() == data.displayed_added_queue[0].item.id()
@@ -460,30 +459,34 @@ where
             }
             Event::Command(cmd) if cmd.is(cmd::SKIP_TO_PLACE_IN_QUEUE) => {
                 let track_pos = *cmd.get_unchecked(cmd::SKIP_TO_PLACE_IN_QUEUE);
-                if track_pos > 0 {
-                    if data.playback.queue.is_empty() || (data.playback.queue.len() <= 1 && data.playback.queue[0].origin.to_string() == PlaybackOrigin::Queue.to_string()) {
-                        data.playback.queue.clear();
-                        data.playback.queue.push_back(data.displayed_added_queue[track_pos].clone());
-                        data.displayed_added_queue = data.displayed_added_queue.split_off(track_pos);
-                        self.skip_to_place_in_queue(&(track_pos+1));
-                        self.play(&data.playback.queue, track_pos);}
-                    else if data.playback.now_playing.is_some() {
-                        data.displayed_added_queue = data.displayed_added_queue.split_off(track_pos);
-                        self.skip_to_place_in_queue(&track_pos);
-                        self.next();
+                match track_pos.cmp(&0)  {
+                    Ordering::Greater => {
+                        if data.playback.queue.is_empty() || (data.playback.queue.len() <= 1 && data.playback.queue[0].origin.to_string() == PlaybackOrigin::Queue.to_string()) {
+                            data.playback.queue.clear();
+                            data.playback.queue.push_back(data.displayed_added_queue[track_pos].clone());
+                            data.displayed_added_queue = data.displayed_added_queue.split_off(track_pos);
+                            self.skip_to_place_in_queue(&(track_pos+1));
+                            self.play(&data.playback.queue, track_pos);}
+                        else if data.playback.now_playing.is_some() {
+                            data.displayed_added_queue = data.displayed_added_queue.split_off(track_pos);
+                            self.skip_to_place_in_queue(&track_pos);
+                            self.next();
+                        }
+                    },
+                    Ordering::Equal => {
+                        if data.playback.queue.is_empty() || (data.playback.queue.len() <= 1 && data.playback.queue[0].origin.to_string() == PlaybackOrigin::Queue.to_string()) {
+                            data.playback.queue.clear();
+                            data.playback.queue.push_back(data.displayed_added_queue[track_pos].clone());
+                            self.remove_from_queue(&track_pos);
+                            data.displayed_added_queue.remove(track_pos);
+                            self.play(&data.playback.queue, track_pos);
+                        }
+                        else if data.playback.now_playing.is_some() {
+                            self.next();
+                        }
                     }
-                } else if track_pos == 0 {
-                    if data.playback.queue.is_empty() || (data.playback.queue.len() <= 1 && data.playback.queue[0].origin.to_string() == PlaybackOrigin::Queue.to_string()) {
-                        data.playback.queue.clear();
-                        data.playback.queue.push_back(data.displayed_added_queue[track_pos].clone());
-                        self.remove_from_queue(&track_pos);
-                        data.displayed_added_queue.remove(track_pos);
-                        self.play(&data.playback.queue, track_pos);
-                    }
-                    else if data.playback.now_playing.is_some() {
-                        self.next();
-                    }
-                }
+                    _ => {}}
+                            
                 ctx.set_handled();
             }
             Event::Command(cmd) if cmd.is(cmd::REMOVE_FROM_QUEUE) => {
