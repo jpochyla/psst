@@ -102,10 +102,7 @@ fn rounded_cover_widget(size: f64) -> impl Widget<Arc<Album>> {
 pub fn album_widget(horizontal: bool) -> impl Widget<WithCtx<Arc<Album>>> {
     let album_cover = if horizontal { rounded_cover_widget(theme::grid(16.0)) } else { rounded_cover_widget(theme::grid(6.0)) };
 
-    let album_name = if horizontal {
-        Flex::column()
-    } else {
-        Flex::row() }
+    let album_name = if horizontal { Flex::column() } else { Flex::row() }
     .with_child(
         Label::raw()
             .with_font(theme::UI_FONT_MEDIUM)

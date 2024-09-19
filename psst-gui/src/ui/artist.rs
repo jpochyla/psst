@@ -104,6 +104,7 @@ pub fn artist_widget(horizontal: bool) -> impl Widget<Artist> {
 
     artist.padding(theme::grid(1.0))
         .link()
+        .rounded(theme::BUTTON_BORDER_RADIUS)
         .on_left_click(|ctx, _, artist, _| {
             ctx.submit_command(cmd::NAVIGATE.with(Nav::ArtistDetail(artist.link())));
         })

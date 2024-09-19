@@ -134,6 +134,7 @@ impl AppState {
             home_detail: HomeDetail {
                 made_for_you: Promise::Empty,
                 user_top_mixes: Promise::Empty,
+                best_of_artists: Promise::Empty,
                 recommended_stations: Promise::Empty,
                 your_shows: Promise::Empty,
                 shows_that_you_might_like: Promise::Empty,
@@ -523,6 +524,7 @@ pub type WithCtx<T> = Ctx<Arc<CommonCtx>, T>;
 pub struct HomeDetail {
     pub made_for_you: Promise<MixedView>,
     pub user_top_mixes: Promise<MixedView>,
+    pub best_of_artists: Promise<MixedView>,
     pub recommended_stations: Promise<MixedView>,
     pub uniquely_yours: Promise<MixedView>,
     pub your_shows: Promise<MixedView>,

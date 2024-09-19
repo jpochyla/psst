@@ -26,6 +26,7 @@ pub fn home_widget() -> impl Widget<AppState> {
         .with_child(jump_back_in())
         .with_child(user_top_mixes())
         .with_child(recommended_stations())
+        .with_child(best_of_artists())
         .with_child(simple_title_label("Uniquely yours"))
         .with_default_spacer()
         .with_child(uniquely_yours())
@@ -115,6 +116,23 @@ pub fn user_top_mixes() -> impl Widget<AppState> {
         )
 }
 
+pub fn best_of_artists() -> impl Widget<AppState> {
+    Async::new(spinner_widget, loaded_results_widget, error_widget)
+        .lens(
+            Ctx::make(
+                AppState::common_ctx,
+                AppState::home_detail.then(HomeDetail::best_of_artists),
+            )
+            .then(Ctx::in_promise()),
+        )
+        .on_command_async(
+            LOAD_MADE_FOR_YOU,
+            |_| WebApi::global().best_of_artists(),
+            |_, data, q| data.home_detail.best_of_artists.defer(q),
+            |_, data, r| data.home_detail.best_of_artists.update(r),
+        )
+}
+
 pub fn your_shows() -> impl Widget<AppState> {
     Async::new(spinner_widget, loaded_results_widget, error_widget)
         .lens(
@@ -182,11 +200,10 @@ fn loaded_results_widget() -> impl Widget<WithCtx<MixedView>> {
         Flex::column()
                 .with_child(title_label())
             .with_child(Scroll::new(Flex::row()
-                .with_child(artist_results_widget())
-                .with_child(album_results_widget())
                 .with_child(playlist_results_widget())
+                .with_child(album_results_widget())
+                .with_child(artist_results_widget())
                 .with_child(show_results_widget()))
-                // Figure out a way to algin these widgets!
                 .align_left(),
             )
     )
