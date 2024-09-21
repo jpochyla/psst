@@ -154,7 +154,7 @@ impl PlaybackController {
 
     fn handle_media_control_event(event: MediaControlEvent, sender: &Sender<PlayerEvent>) {
         let cmd = match event {
-            MediaControlEvent::Play(_) => PlayerEvent::Command(PlayerCommand::Resume),
+            MediaControlEvent::Play => PlayerEvent::Command(PlayerCommand::Resume),
             MediaControlEvent::Pause => PlayerEvent::Command(PlayerCommand::Pause),
             MediaControlEvent::Toggle => PlayerEvent::Command(PlayerCommand::PauseOrResume),
             MediaControlEvent::Next => PlayerEvent::Command(PlayerCommand::Next),
