@@ -79,27 +79,26 @@ fn async_related_widget() -> impl Widget<AppState> {
 }
 
 pub fn artist_widget(horizontal: bool) -> impl Widget<Artist> {
-    let mut artist = if horizontal { Flex::column() } else { Flex::row() };
-
-    let artist_image = cover_widget(if horizontal { theme::grid(16.0) } else { theme::grid(6.0) });
-    artist = artist
-        .with_child(artist_image)
-        .with_default_spacer();
+    let ( mut artist, artist_image) = if horizontal { (Flex::column(), cover_widget(theme::grid(16.0))) } else { (Flex::row(), cover_widget(theme::grid(6.0))) };
 
     artist = if horizontal {
-        artist.with_child(Label::raw()
-            .with_font(theme::UI_FONT_MEDIUM)
+        artist
+            .with_child(artist_image)
+            .with_default_spacer()
+            .with_child(Label::raw()
+            .with_font(theme::UI_FONT_MEDIUM)        
+            .center()
+            .fix_width(theme::grid(16.0))
+            .padding_horizontal(theme::grid(1.0))
             .lens(Artist::name))
+            .with_spacer(theme::grid(2.0))
     } else {
-        artist.with_flex_child(Label::raw()
+        artist
+        .with_child(artist_image)
+            .with_default_spacer()
+            .with_flex_child(Label::raw()
             .with_font(theme::UI_FONT_MEDIUM)
             .lens(Artist::name), 1.0)
-    };
-    
-    let artist = if horizontal {
-        artist.fix_width(theme::grid(16.0)).padding_horizontal(theme::grid(1.0)).align_left()
-    } else {
-        artist.align_left()
     };
 
     artist.padding(theme::grid(1.0))

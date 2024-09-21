@@ -192,11 +192,7 @@ fn loaded_results_widget() -> impl Widget<WithCtx<MixedView>> {
                 && results.data.playlists.is_empty()
                 && results.data.shows.is_empty()
         },
-        Label::new("No results")
-            .with_text_size(theme::TEXT_SIZE_LARGE)
-            .with_text_color(theme::PLACEHOLDER_COLOR)
-            .padding(theme::grid(6.0))
-            .center(),
+        Empty,
         Flex::column()
                 .with_child(title_label())
             .with_child(Scroll::new(Flex::row()

@@ -319,7 +319,8 @@ fn information_section(title_msg: &str, description_msg: &str) -> impl Widget<Ap
 }
 
 pub fn playlist_widget(horizontal: bool) -> impl Widget<WithCtx<Playlist>> {
-    let playlist_image = if horizontal {rounded_cover_widget(theme::grid(16.0)).lens(Ctx::data())} else {rounded_cover_widget(theme::grid(6.0)).lens(Ctx::data())};
+    let playlist_image_size = if horizontal { theme::grid(16.0) } else { theme::grid(6.0) };
+    let playlist_image = rounded_cover_widget(playlist_image_size).lens(Ctx::data());
 
     let playlist_name = Label::raw()
         .with_font(theme::UI_FONT_MEDIUM)
@@ -332,29 +333,39 @@ pub fn playlist_widget(horizontal: bool) -> impl Widget<WithCtx<Playlist>> {
         .with_text_size(theme::TEXT_SIZE_SMALL)
         .lens(Ctx::data().then(Playlist::description));
 
-    let playlist_description = if horizontal {
-        playlist_description.fix_width(theme::grid(16.0)).padding_horizontal(theme::grid(1.0)).align_left()
+    let (playlist_name, playlist_description) = if horizontal {
+        (playlist_name
+            .fix_width(playlist_image_size)
+            .padding_horizontal(theme::grid(1.0))
+            .align_left(),
+        playlist_description
+            .fix_width(playlist_image_size)
+            .padding_horizontal(theme::grid(1.0))
+            .align_left())
     } else {
-        playlist_description.align_left()
+        (playlist_name.align_left(), playlist_description.align_left())
     };
 
-    let playlist_name = if horizontal {
-        playlist_name.fix_width(theme::grid(16.0)).padding_horizontal(theme::grid(1.0)).align_left()
-    } else {
-        playlist_name.align_left()
-    };
-
-    let playlist_info = if horizontal {Flex::column()} else {Flex::row()}
+    let playlist_info = Flex::column()
         .with_child(playlist_name)
         .with_spacer(2.0)
         .with_child(playlist_description);
 
-    let playlist = if horizontal { Flex::column() } else { Flex::row() }
-        .with_child(playlist_image)
-        .with_default_spacer()
-        .with_child(playlist_info)
-        .padding(theme::grid(1.0));
-
+    let playlist = if horizontal {
+        Flex::column()        
+            .with_child(playlist_image)
+            .with_default_spacer()
+            .with_child(playlist_info)
+            .with_spacer(theme::grid(2.0))
+            .padding(theme::grid(1.0))} 
+    else {
+        Flex::row()        
+            .with_child(playlist_image)
+            .with_default_spacer()
+            .with_flex_child(playlist_info, 1.0)
+            .padding(theme::grid(1.0))
+    };
+    
     playlist
         .link()
         .rounded(theme::BUTTON_BORDER_RADIUS)

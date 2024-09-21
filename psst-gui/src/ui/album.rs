@@ -8,7 +8,7 @@ use druid::{
 use crate::{
     cmd,
     data::{
-        Album, AlbumDetail, AlbumLink, AppState, ArtistLink, Cached, Ctx, Library, Nav, WithCtx,
+        Album, AlbumDetail, AlbumLink, AppState, ArtistLink, Cached, Ctx, Library, Nav, WithCtx
     },
     webapi::WebApi,
     widget::{icons, Async, MyWidgetExt, RemoteImage},
@@ -100,24 +100,25 @@ fn rounded_cover_widget(size: f64) -> impl Widget<Arc<Album>> {
 }
 
 pub fn album_widget(horizontal: bool) -> impl Widget<WithCtx<Arc<Album>>> {
-    let album_cover = if horizontal { rounded_cover_widget(theme::grid(16.0)) } else { rounded_cover_widget(theme::grid(6.0)) };
-
-    let album_name = if horizontal { Flex::column() } else { Flex::row() }
-    .with_child(
-        Label::raw()
-            .with_font(theme::UI_FONT_MEDIUM)
-            .with_line_break_mode(LineBreaking::WordWrap)
-            .lens(Album::name.in_arc()),
-    )
-    .with_spacer(theme::grid(0.5))
-    .with_child(ViewSwitcher::new(
-        |album: &Arc<Album>, _| album.has_explicit(),
-        |selector: &bool, _, _| match selector {
-            true => icons::EXPLICIT.scale(theme::ICON_SIZE_TINY).boxed(),
-            false => Box::new(Flex::column()),
-        },
-    ));
-
+    let (album_cover_size, album_name_layout) = if horizontal { (16.0, Flex::column()) } else { (6.0, Flex::row()) };
+    let album_cover = rounded_cover_widget(theme::grid(album_cover_size));
+    
+    let album_name = album_name_layout
+        .with_child(
+            Label::raw()
+                .with_font(theme::UI_FONT_MEDIUM)
+                .with_line_break_mode(LineBreaking::WordWrap)
+                .lens(Album::name.in_arc()),
+        )
+        .with_spacer(theme::grid(0.5))
+        .with_child(ViewSwitcher::new(
+            |album: &Arc<Album>, _| album.has_explicit(),
+            |selector: &bool, _, _| match selector {
+                true => icons::EXPLICIT.scale(theme::ICON_SIZE_TINY).boxed(),
+                false => Box::new(Flex::column()),
+            },
+        ));
+    
     let album_artists = List::new(|| {
         Label::raw()
             .with_text_size(theme::TEXT_SIZE_SMALL)
@@ -127,12 +128,12 @@ pub fn album_widget(horizontal: bool) -> impl Widget<WithCtx<Arc<Album>>> {
     .horizontal()
     .with_spacing(theme::grid(1.0))
     .lens(Album::artists.in_arc());
-
+    
     let album_date = Label::<Arc<Album>>::dynamic(|album, _| album.release_year())
         .with_line_break_mode(LineBreaking::WordWrap)
         .with_text_size(theme::TEXT_SIZE_SMALL)
         .with_text_color(theme::PLACEHOLDER_COLOR);
-
+    
     let album_info = Flex::column()
         .cross_axis_alignment(CrossAxisAlignment::Start)
         .with_child(album_name)
@@ -141,24 +142,25 @@ pub fn album_widget(horizontal: bool) -> impl Widget<WithCtx<Arc<Album>>> {
         .with_spacer(1.0)
         .with_child(album_date)
         .fix_width(theme::grid(16.0));
-
+    
     let album_layout = if horizontal {
         Flex::column()
             .with_child(album_cover)
             .with_default_spacer()
             .with_child(album_info)
+            .with_spacer(theme::grid(2.0))
             .fix_width(theme::grid(16.0))
             .padding_horizontal(theme::grid(1.0))
             .align_left()
     } else {
         Flex::row()
-        .with_child(album_cover)
-        .with_default_spacer()
-        .with_flex_child(album_info, 1.0)
-        .with_spacer(1.0)
-        .align_left()
+            .with_child(album_cover)
+            .with_default_spacer()
+            .with_flex_child(album_info, 1.0)
+            .padding(theme::grid(1.0))
+            .align_left()
     };
-
+    
     album_layout
         .padding(theme::grid(1.0))
         .lens(Ctx::data())

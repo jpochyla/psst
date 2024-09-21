@@ -59,7 +59,7 @@ impl Album {
         self.release_date
             .as_ref()
             .map(|date| date.format(format).expect("invalid format"))
-            .unwrap_or_else(|| '-'.to_string())
+            .unwrap_or_else(|| "".to_string())
     }
 
     pub fn image(&self, width: f64, height: f64) -> Option<&Image> {

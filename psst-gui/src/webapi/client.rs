@@ -837,6 +837,8 @@ impl WebApi {
 
 /// View endpoints.
 impl WebApi {
+    // This is getting called too often! It only needs to be called once ever really.
+    // Maybe we could call it once then allow the user to change it in the settings?
     pub fn get_user_info(&self) -> Result<(String, String), Error> {
         #[derive(Deserialize)]
         struct User {
@@ -992,8 +994,8 @@ impl WebApi {
         Ok(result)
     }
 
-    /* EPISODES, IMPLEMENT THIS TO REDO THE PODCAST SECTION
-    // Episodes for you, this needs a different thing, mixedview could include this
+    /* 
+    // TODO: Episodes for you, implement this to redesign the podcast page
     pub fn new_episodes(&self) -> Result<MixedView, Error> {
         // 0JQ5DAnM3wGh0gz1MXnu3K -> New episodes
         let json_query = self.build_home_request("spotify:section:0JQ5DAnM3wGh0gz1MXnu3K");
@@ -1008,8 +1010,7 @@ impl WebApi {
         Ok(result)
     }
 
-    // Episodes for you, this needs a different thing, mixedview could include this
-    // 
+    // Episodes for you, this needs to have its own thing or be part of a mixed view as it is in episode form
     pub fn episode_for_you(&self) -> Result<MixedView, Error> {
         // 0JQ5DAnM3wGh0gz1MXnu9e -> Episodes for you
         let json_query = self.build_home_request("spotify:section:0JQ5DAnM3wGh0gz1MXnu9e");
