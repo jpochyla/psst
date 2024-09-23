@@ -860,7 +860,8 @@ impl WebApi {
         let extensions = json!({
             "persistedQuery": {
                 "version": 1,
-                "sha256Hash": "4da53a78e4e98d4f3fa55698af5b751fe05ca3a1a4a526ff8147e8866ccfa49f"
+                // From https://github.com/KRTirtho/spotube/blob/9b024120601c0d381edeab4460cb22f87149d0f8/lib%2Fservices%2Fcustom_spotify_endpoints%2Fspotify_endpoints.dart keep and eye on this and change accordingly
+                "sha256Hash": "eb3fba2d388cf4fc4d696b1757a58584e9538a3b515ea742e9cc9465807340be"
             }
         });
         
