@@ -106,7 +106,7 @@ pub fn album_widget(horizontal: bool) -> impl Widget<WithCtx<Arc<Album>>> {
         .with_child(
             Label::raw()
                 .with_font(theme::UI_FONT_MEDIUM)
-                .with_line_break_mode(LineBreaking::WordWrap)
+                .with_line_break_mode(LineBreaking::Clip)
                 .lens(Album::name.in_arc()),
         )
         .with_spacer(theme::grid(0.5))
