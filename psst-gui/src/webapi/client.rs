@@ -835,12 +835,11 @@ impl WebApi {
     }
 }
 
+
 /// View endpoints.
 impl WebApi {
-    // This is getting called too often! It only needs to be called once ever really.
-    // Maybe we could call it once then allow the user to change it in the settings?
     pub fn get_user_info(&self) -> Result<(String, String), Error> {
-        #[derive(Deserialize)]
+        #[derive(Deserialize, Clone, Data)]
         struct User {
             region: String,
             timezone: String,
@@ -852,10 +851,9 @@ impl WebApi {
             .query("fields", "260")
             .set("Authorization", &format!("Bearer {}", &token));
 
-        let result: User = self.load(request)?;
-        
-        Ok((result.region, result.timezone))
-        
+        let result: Cached<User> = self.load_cached(request, "User_info", "usrinfo")?;
+    
+        Ok((result.data.region.clone(), result.data.timezone.clone()))
     }
 
     fn build_home_request(&self, section_uri: &str) -> (String, String) {
