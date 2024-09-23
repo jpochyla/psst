@@ -1,5 +1,5 @@
 use druid::{
-    im::Vector, kurbo::Circle, widget::{CrossAxisAlignment, Flex, Label, LabelText, LineBreaking, List}, Data, Insets, LensExt, LocalizedString, Menu, MenuItem, Selector, Widget, WidgetExt
+    im::Vector, kurbo::Circle, widget::{CrossAxisAlignment, Flex, Label, LabelText, LineBreaking, List}, Data, Insets, LensExt, LocalizedString, Menu, MenuItem, Selector, UnitPoint, Widget, WidgetExt
 };
 
 use crate::{
@@ -86,12 +86,11 @@ pub fn artist_widget(horizontal: bool) -> impl Widget<Artist> {
             .with_child(artist_image)
             .with_default_spacer()
             .with_child(Label::raw()
-            .with_font(theme::UI_FONT_MEDIUM)        
-            .center()
-            .fix_width(theme::grid(16.0))
-            .padding_horizontal(theme::grid(1.0))
+            .with_font(theme::UI_FONT_MEDIUM)
+            .align_horizontal(UnitPoint::CENTER)
+            .align_vertical(UnitPoint::TOP)
+            .fix_size(theme::grid(16.0), theme::grid(8.5))
             .lens(Artist::name))
-            .with_spacer(theme::grid(2.0))
     } else {
         artist
         .with_child(artist_image)

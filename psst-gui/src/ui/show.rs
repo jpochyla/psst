@@ -1,8 +1,7 @@
 use std::sync::Arc;
 
 use druid::{
-    widget::{CrossAxisAlignment, Flex, Label, LineBreaking},
-    LensExt, LocalizedString, Menu, MenuItem, Selector, Size, Widget, WidgetExt,
+    widget::{CrossAxisAlignment, Flex, Label, LineBreaking}, LensExt, LocalizedString, Menu, MenuItem, Selector, Size, UnitPoint, Widget, WidgetExt
 };
 
 use crate::{
@@ -93,38 +92,25 @@ pub fn show_widget(horizontal: bool) -> impl Widget<WithCtx<Arc<Show>>> {
         .lens(Show::publisher.in_arc())
         .align_left();
 
-    let (show_name, show_publisher) = if horizontal {
-        (show_name
-            .fix_width(image_size)
-            .padding_horizontal(theme::grid(1.0))
-            .align_left(),
-        show_publisher
-            .fix_width(image_size)
-            .padding_horizontal(theme::grid(1.0))
-            .align_left())
-    } else {
-        (show_name.align_left(), show_publisher.align_left())
-    };
-
-    let show_info = Flex::column()
-        .with_child(show_name.padding_horizontal(theme::grid(1.0)))
-        .with_spacer(2.0)
-        .with_child(show_publisher.padding_horizontal(theme::grid(1.0)))
-        .align_left();
-
     let show = if horizontal {
         Flex::column()        
             .with_child(show_image)
             .with_default_spacer()
-            .with_child(show_info)
-            .with_spacer(theme::grid(2.0))
+            .with_child(Flex::column()
+                .with_child(show_name)
+                .with_child(show_publisher)
+                .align_horizontal(UnitPoint::CENTER)
+                .align_vertical(UnitPoint::TOP)
+                .fix_size(theme::grid(16.0), theme::grid(8.5)))
             .padding(theme::grid(1.0)) 
-            .lens(Ctx::data())}
-    else {
+            .lens(Ctx::data())
+    } else {
         Flex::row()        
             .with_child(show_image)
             .with_default_spacer()
-            .with_flex_child(show_info, 1.0)
+            .with_flex_child(Flex::column()
+            .with_child(show_name)
+            .with_child(show_publisher), 1.0)
             .padding(theme::grid(1.0))
             .lens(Ctx::data())
     };

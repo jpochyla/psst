@@ -3,6 +3,7 @@ use std::rc::Rc;
 use std::{cmp::Ordering, sync::Arc};
 
 use druid::widget::{Button, LensWrap, TextBox};
+use druid::UnitPoint;
 use druid::{
     im::Vector,
     widget::{Flex, Label, LineBreaking, List},
@@ -336,33 +337,34 @@ pub fn playlist_widget(horizontal: bool) -> impl Widget<WithCtx<Playlist>> {
     let (playlist_name, playlist_description) = if horizontal {
         (playlist_name
             .fix_width(playlist_image_size)
-            .padding_horizontal(theme::grid(1.0))
             .align_left(),
         playlist_description
             .fix_width(playlist_image_size)
-            .padding_horizontal(theme::grid(1.0))
             .align_left())
     } else {
         (playlist_name.align_left(), playlist_description.align_left())
     };
 
-    let playlist_info = Flex::column()
-        .with_child(playlist_name)
-        .with_spacer(2.0)
-        .with_child(playlist_description);
-
     let playlist = if horizontal {
         Flex::column()        
             .with_child(playlist_image)
             .with_default_spacer()
-            .with_child(playlist_info)
-            .with_spacer(theme::grid(2.0))
-            .padding(theme::grid(1.0))} 
-    else {
+            .with_child(Flex::column()
+                .with_child(playlist_name)
+                .with_spacer(2.0)
+                .with_child(playlist_description)
+                .align_horizontal(UnitPoint::CENTER)
+                .align_vertical(UnitPoint::TOP)
+                .fix_size(theme::grid(16.0), theme::grid(8.5)))
+            .padding(theme::grid(1.0))
+    } else {
         Flex::row()        
             .with_child(playlist_image)
             .with_default_spacer()
-            .with_flex_child(playlist_info, 1.0)
+            .with_flex_child(Flex::column()
+                .with_child(playlist_name)
+                .with_spacer(2.0)
+                .with_child(playlist_description), 1.0)
             .padding(theme::grid(1.0))
     };
     

@@ -1,8 +1,7 @@
 use std::sync::Arc;
 
 use druid::{
-    widget::{CrossAxisAlignment, Flex, Label, LineBreaking, List, ViewSwitcher},
-    LensExt, LocalizedString, Menu, MenuItem, Selector, Size, Widget, WidgetExt,
+    widget::{CrossAxisAlignment, Flex, Label, LineBreaking, List, ViewSwitcher}, LensExt, LocalizedString, Menu, MenuItem, Selector, Size, UnitPoint, Widget, WidgetExt
 };
 
 use crate::{
@@ -124,40 +123,42 @@ pub fn album_widget(horizontal: bool) -> impl Widget<WithCtx<Arc<Album>>> {
             .with_text_size(theme::TEXT_SIZE_SMALL)
             .with_line_break_mode(LineBreaking::WordWrap)
             .lens(ArtistLink::name)
-    })
-    .horizontal()
-    .with_spacing(theme::grid(1.0))
-    .lens(Album::artists.in_arc());
+        })
+        .horizontal()
+        .with_spacing(theme::grid(1.0))
+        .lens(Album::artists.in_arc());
     
     let album_date = Label::<Arc<Album>>::dynamic(|album, _| album.release_year())
         .with_line_break_mode(LineBreaking::WordWrap)
         .with_text_size(theme::TEXT_SIZE_SMALL)
         .with_text_color(theme::PLACEHOLDER_COLOR);
     
-    let album_info = Flex::column()
-        .cross_axis_alignment(CrossAxisAlignment::Start)
-        .with_child(album_name)
-        .with_spacer(1.0)
-        .with_child(album_artists)
-        .with_spacer(1.0)
-        .with_child(album_date)
-        .fix_width(theme::grid(16.0));
-    
     let album_layout = if horizontal {
         Flex::column()
             .with_child(album_cover)
             .with_default_spacer()
-            .with_child(album_info)
-            .with_spacer(theme::grid(2.0))
-            .fix_width(theme::grid(16.0))
-            .padding_horizontal(theme::grid(1.0))
+            .with_child(Flex::column()
+                .cross_axis_alignment(CrossAxisAlignment::Start)
+                .with_child(album_name)
+                .with_spacer(1.0)
+                .with_child(album_artists)
+                .with_spacer(1.0)
+                .with_child(album_date)
+                .align_horizontal(UnitPoint::CENTER)
+                .align_vertical(UnitPoint::TOP)
+                .fix_size(theme::grid(16.0), theme::grid(8.5)))
             .align_left()
     } else {
         Flex::row()
             .with_child(album_cover)
             .with_default_spacer()
-            .with_flex_child(album_info, 1.0)
-            .padding(theme::grid(1.0))
+            .with_flex_child(Flex::column()
+                .cross_axis_alignment(CrossAxisAlignment::Start)
+                .with_child(album_name)
+                .with_spacer(1.0)
+                .with_child(album_artists)
+                .with_spacer(1.0)
+                .with_child(album_date), 1.0)
             .align_left()
     };
     
