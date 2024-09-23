@@ -173,7 +173,7 @@ fn cover_widget(size: f64) -> impl Widget<NowPlaying> {
 fn playback_origin_icon(origin: &PlaybackOrigin) -> &'static SvgIcon {
     match origin {
         // TODO add home widget
-        PlaybackOrigin::Home => &icons::PODCAST,
+        PlaybackOrigin::Home => &icons::HOME,
         PlaybackOrigin::Library => &icons::HEART,
         PlaybackOrigin::Album { .. } => &icons::ALBUM,
         PlaybackOrigin::Artist { .. } => &icons::ARTIST,
