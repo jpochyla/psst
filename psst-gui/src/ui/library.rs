@@ -104,7 +104,7 @@ pub fn saved_tracks_widget() -> impl Widget<AppState> {
 pub fn saved_albums_widget() -> impl Widget<AppState> {
     Async::new(
         utils::spinner_widget,
-        || List::new(album::album_widget).lens(Ctx::map(SavedAlbums::albums)),
+        || List::new(|| album::album_widget(false)).lens(Ctx::map(SavedAlbums::albums)),
         utils::error_widget,
     )
     .lens(
@@ -165,7 +165,7 @@ pub fn saved_albums_widget() -> impl Widget<AppState> {
 pub fn saved_shows_widget() -> impl Widget<AppState> {
     Async::new(
         utils::spinner_widget,
-        || List::new(show::show_widget).lens(Ctx::map(SavedShows::shows)),
+        || List::new(|| show::show_widget(false)).lens(Ctx::map(SavedShows::shows)),
         utils::error_widget,
     )
     .lens(

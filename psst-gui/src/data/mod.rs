@@ -56,7 +56,7 @@ pub use crate::data::{
     show::{Episode, EpisodeId, EpisodeLink, Show, ShowDetail, ShowEpisodes, ShowLink},
     slider_scroll_scale::SliderScrollScale,
     track::{AudioAnalysis, Track, TrackId},
-    user::UserProfile,
+    user::{PublicUser, UserProfile},
     utils::{Cached, Float64, Image, Page},
 };
 
@@ -79,7 +79,7 @@ pub struct AppState {
     pub show_detail: ShowDetail,
     pub library: Arc<Library>,
     pub common_ctx: Arc<CommonCtx>,
-    pub personalized: Personalized,
+    pub home_detail: HomeDetail,
     pub alerts: Vector<Alert>,
     pub finder: Finder,
     pub added_queue: Vector<QueueEntry>,
@@ -131,6 +131,18 @@ impl AppState {
                 knobs: Default::default(),
                 results: Promise::Empty,
             },
+            home_detail: HomeDetail {
+                made_for_you: Promise::Empty,
+                user_top_mixes: Promise::Empty,
+                best_of_artists: Promise::Empty,
+                recommended_stations: Promise::Empty,
+                your_shows: Promise::Empty,
+                shows_that_you_might_like: Promise::Empty,
+                uniquely_yours: Promise::Empty,
+                jump_back_in: Promise::Empty,
+                user_top_tracks: Promise::Empty,
+                user_top_artists: Promise::Empty,
+            },
             album_detail: AlbumDetail {
                 album: Promise::Empty,
             },
@@ -150,9 +162,6 @@ impl AppState {
             },
             library,
             common_ctx,
-            personalized: Personalized {
-                made_for_you: Promise::Empty,
-            },
             alerts: Vector::new(),
             finder: Finder::new(),
         }
@@ -512,8 +521,26 @@ impl CommonCtx {
 pub type WithCtx<T> = Ctx<Arc<CommonCtx>, T>;
 
 #[derive(Clone, Data, Lens)]
-pub struct Personalized {
-    pub made_for_you: Promise<Vector<Playlist>>,
+pub struct HomeDetail {
+    pub made_for_you: Promise<MixedView>,
+    pub user_top_mixes: Promise<MixedView>,
+    pub best_of_artists: Promise<MixedView>,
+    pub recommended_stations: Promise<MixedView>,
+    pub uniquely_yours: Promise<MixedView>,
+    pub your_shows: Promise<MixedView>,
+    pub shows_that_you_might_like: Promise<MixedView>,
+    pub jump_back_in: Promise<MixedView>,
+    pub user_top_tracks: Promise<Vector<Arc<Track>>>,
+    pub user_top_artists: Promise<Vector<Artist>>,
+}
+
+#[derive(Clone, Data, Lens)]
+pub struct MixedView {
+    pub title: Arc<str>,
+    pub playlists: Vector<Playlist>,
+    pub artists: Vector<Artist>,
+    pub albums: Vector<Arc<Album>>,
+    pub shows: Vector<Arc<Show>>,
 }
 
 static ALERT_ID: AtomicUsize = AtomicUsize::new(0);
