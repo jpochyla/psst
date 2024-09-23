@@ -152,7 +152,7 @@ pub fn album_widget(horizontal: bool) -> impl Widget<WithCtx<Arc<Album>>> {
                     .with_child(album_date)
                     .align_horizontal(UnitPoint::CENTER)
                     .align_vertical(UnitPoint::TOP)
-                    .fix_size(theme::grid(16.0), theme::grid(7.0)),
+                    .fix_size(theme::grid(16.0), theme::grid(8.0)),
             )
             .align_left()
     } else {

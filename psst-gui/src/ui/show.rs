@@ -103,7 +103,7 @@ pub fn show_widget(horizontal: bool) -> impl Widget<WithCtx<Arc<Show>>> {
                     .with_child(show_publisher)
                     .align_horizontal(UnitPoint::CENTER)
                     .align_vertical(UnitPoint::TOP)
-                    .fix_size(theme::grid(16.0), theme::grid(7.0)),
+                    .fix_size(theme::grid(16.0), theme::grid(8.0)),
             )
             .padding(theme::grid(1.0))
             .lens(Ctx::data())
