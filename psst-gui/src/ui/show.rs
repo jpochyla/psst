@@ -1,7 +1,8 @@
 use std::sync::Arc;
 
 use druid::{
-    widget::{CrossAxisAlignment, Flex, Label, LineBreaking}, LensExt, LocalizedString, Menu, MenuItem, Selector, Size, UnitPoint, Widget, WidgetExt
+    widget::{CrossAxisAlignment, Flex, Label, LineBreaking},
+    LensExt, LocalizedString, Menu, MenuItem, Selector, Size, UnitPoint, Widget, WidgetExt,
 };
 
 use crate::{
@@ -93,24 +94,29 @@ pub fn show_widget(horizontal: bool) -> impl Widget<WithCtx<Arc<Show>>> {
         .align_left();
 
     let show = if horizontal {
-        Flex::column()        
+        Flex::column()
             .with_child(show_image)
             .with_default_spacer()
-            .with_child(Flex::column()
-                .with_child(show_name)
-                .with_child(show_publisher)
-                .align_horizontal(UnitPoint::CENTER)
-                .align_vertical(UnitPoint::TOP)
-                .fix_size(theme::grid(16.0), theme::grid(8.5)))
-            .padding(theme::grid(1.0)) 
+            .with_child(
+                Flex::column()
+                    .with_child(show_name)
+                    .with_child(show_publisher)
+                    .align_horizontal(UnitPoint::CENTER)
+                    .align_vertical(UnitPoint::TOP)
+                    .fix_size(theme::grid(16.0), theme::grid(7.0)),
+            )
+            .padding(theme::grid(1.0))
             .lens(Ctx::data())
     } else {
-        Flex::row()        
+        Flex::row()
             .with_child(show_image)
             .with_default_spacer()
-            .with_flex_child(Flex::column()
-            .with_child(show_name)
-            .with_child(show_publisher), 1.0)
+            .with_flex_child(
+                Flex::column()
+                    .with_child(show_name)
+                    .with_child(show_publisher),
+                1.0,
+            )
             .padding(theme::grid(1.0))
             .lens(Ctx::data())
     };

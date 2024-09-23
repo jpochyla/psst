@@ -1,13 +1,14 @@
 use std::sync::Arc;
 
 use druid::{
-    widget::{CrossAxisAlignment, Flex, Label, LineBreaking, List, ViewSwitcher}, LensExt, LocalizedString, Menu, MenuItem, Selector, Size, UnitPoint, Widget, WidgetExt
+    widget::{CrossAxisAlignment, Flex, Label, LineBreaking, List, ViewSwitcher},
+    LensExt, LocalizedString, Menu, MenuItem, Selector, Size, UnitPoint, Widget, WidgetExt,
 };
 
 use crate::{
     cmd,
     data::{
-        Album, AlbumDetail, AlbumLink, AppState, ArtistLink, Cached, Ctx, Library, Nav, WithCtx
+        Album, AlbumDetail, AlbumLink, AppState, ArtistLink, Cached, Ctx, Library, Nav, WithCtx,
     },
     webapi::WebApi,
     widget::{icons, Async, MyWidgetExt, RemoteImage},
@@ -99,9 +100,13 @@ fn rounded_cover_widget(size: f64) -> impl Widget<Arc<Album>> {
 }
 
 pub fn album_widget(horizontal: bool) -> impl Widget<WithCtx<Arc<Album>>> {
-    let (album_cover_size, album_name_layout) = if horizontal { (16.0, Flex::column()) } else { (6.0, Flex::row()) };
+    let (album_cover_size, album_name_layout) = if horizontal {
+        (16.0, Flex::column())
+    } else {
+        (6.0, Flex::row())
+    };
     let album_cover = rounded_cover_widget(theme::grid(album_cover_size));
-    
+
     let album_name = album_name_layout
         .with_child(
             Label::raw()
@@ -117,51 +122,56 @@ pub fn album_widget(horizontal: bool) -> impl Widget<WithCtx<Arc<Album>>> {
                 false => Box::new(Flex::column()),
             },
         ));
-    
+
     let album_artists = List::new(|| {
         Label::raw()
             .with_text_size(theme::TEXT_SIZE_SMALL)
             .with_line_break_mode(LineBreaking::WordWrap)
             .lens(ArtistLink::name)
-        })
-        .horizontal()
-        .with_spacing(theme::grid(1.0))
-        .lens(Album::artists.in_arc());
-    
+    })
+    .horizontal()
+    .with_spacing(theme::grid(1.0))
+    .lens(Album::artists.in_arc());
+
     let album_date = Label::<Arc<Album>>::dynamic(|album, _| album.release_year())
         .with_line_break_mode(LineBreaking::WordWrap)
         .with_text_size(theme::TEXT_SIZE_SMALL)
         .with_text_color(theme::PLACEHOLDER_COLOR);
-    
+
     let album_layout = if horizontal {
         Flex::column()
             .with_child(album_cover)
             .with_default_spacer()
-            .with_child(Flex::column()
-                .cross_axis_alignment(CrossAxisAlignment::Start)
-                .with_child(album_name)
-                .with_spacer(1.0)
-                .with_child(album_artists)
-                .with_spacer(1.0)
-                .with_child(album_date)
-                .align_horizontal(UnitPoint::CENTER)
-                .align_vertical(UnitPoint::TOP)
-                .fix_size(theme::grid(16.0), theme::grid(8.5)))
+            .with_child(
+                Flex::column()
+                    .cross_axis_alignment(CrossAxisAlignment::Start)
+                    .with_child(album_name)
+                    .with_spacer(1.0)
+                    .with_child(album_artists)
+                    .with_spacer(1.0)
+                    .with_child(album_date)
+                    .align_horizontal(UnitPoint::CENTER)
+                    .align_vertical(UnitPoint::TOP)
+                    .fix_size(theme::grid(16.0), theme::grid(7.0)),
+            )
             .align_left()
     } else {
         Flex::row()
             .with_child(album_cover)
             .with_default_spacer()
-            .with_flex_child(Flex::column()
-                .cross_axis_alignment(CrossAxisAlignment::Start)
-                .with_child(album_name)
-                .with_spacer(1.0)
-                .with_child(album_artists)
-                .with_spacer(1.0)
-                .with_child(album_date), 1.0)
+            .with_flex_child(
+                Flex::column()
+                    .cross_axis_alignment(CrossAxisAlignment::Start)
+                    .with_child(album_name)
+                    .with_spacer(1.0)
+                    .with_child(album_artists)
+                    .with_spacer(1.0)
+                    .with_child(album_date),
+                1.0,
+            )
             .align_left()
     };
-    
+
     album_layout
         .padding(theme::grid(1.0))
         .lens(Ctx::data())

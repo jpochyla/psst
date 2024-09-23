@@ -1,11 +1,15 @@
 use druid::{
-    im::Vector, kurbo::Circle, widget::{CrossAxisAlignment, Flex, Label, LabelText, LineBreaking, List}, Data, Insets, LensExt, LocalizedString, Menu, MenuItem, Selector, UnitPoint, Widget, WidgetExt
+    im::Vector,
+    kurbo::Circle,
+    widget::{CrossAxisAlignment, Flex, Label, LabelText, LineBreaking, List},
+    Data, Insets, LensExt, LocalizedString, Menu, MenuItem, Selector, UnitPoint, Widget, WidgetExt,
 };
 
 use crate::{
     cmd,
     data::{
-        AppState, Artist, ArtistAlbums, ArtistDetail, ArtistLink, ArtistTracks, Cached, Ctx, Nav, WithCtx
+        AppState, Artist, ArtistAlbums, ArtistDetail, ArtistLink, ArtistTracks, Cached, Ctx, Nav,
+        WithCtx,
     },
     webapi::WebApi,
     widget::{Async, MyWidgetExt, RemoteImage},
@@ -79,28 +83,38 @@ fn async_related_widget() -> impl Widget<AppState> {
 }
 
 pub fn artist_widget(horizontal: bool) -> impl Widget<Artist> {
-    let ( mut artist, artist_image) = if horizontal { (Flex::column(), cover_widget(theme::grid(16.0))) } else { (Flex::row(), cover_widget(theme::grid(6.0))) };
+    let (mut artist, artist_image) = if horizontal {
+        (Flex::column(), cover_widget(theme::grid(16.0)))
+    } else {
+        (Flex::row(), cover_widget(theme::grid(6.0)))
+    };
 
     artist = if horizontal {
         artist
             .with_child(artist_image)
             .with_default_spacer()
-            .with_child(Label::raw()
-            .with_font(theme::UI_FONT_MEDIUM)
-            .align_horizontal(UnitPoint::CENTER)
-            .align_vertical(UnitPoint::TOP)
-            .fix_size(theme::grid(16.0), theme::grid(8.5))
-            .lens(Artist::name))
+            .with_child(
+                Label::raw()
+                    .with_font(theme::UI_FONT_MEDIUM)
+                    .align_horizontal(UnitPoint::CENTER)
+                    .align_vertical(UnitPoint::TOP)
+                    .fix_size(theme::grid(16.0), theme::grid(7.0))
+                    .lens(Artist::name),
+            )
     } else {
         artist
-        .with_child(artist_image)
+            .with_child(artist_image)
             .with_default_spacer()
-            .with_flex_child(Label::raw()
-            .with_font(theme::UI_FONT_MEDIUM)
-            .lens(Artist::name), 1.0)
+            .with_flex_child(
+                Label::raw()
+                    .with_font(theme::UI_FONT_MEDIUM)
+                    .lens(Artist::name),
+                1.0,
+            )
     };
 
-    artist.padding(theme::grid(1.0))
+    artist
+        .padding(theme::grid(1.0))
         .link()
         .rounded(theme::BUTTON_BORDER_RADIUS)
         .on_left_click(|ctx, _, artist, _| {
@@ -150,9 +164,13 @@ fn albums_widget() -> impl Widget<WithCtx<ArtistAlbums>> {
         .with_child(header_widget("Singles"))
         .with_child(List::new(|| album::album_widget(false)).lens(Ctx::map(ArtistAlbums::singles)))
         .with_child(header_widget("Compilations"))
-        .with_child(List::new(|| album::album_widget(false)).lens(Ctx::map(ArtistAlbums::compilations)))
+        .with_child(
+            List::new(|| album::album_widget(false)).lens(Ctx::map(ArtistAlbums::compilations)),
+        )
         .with_child(header_widget("Appears On"))
-        .with_child(List::new(|| album::album_widget(false)).lens(Ctx::map(ArtistAlbums::appears_on)))
+        .with_child(
+            List::new(|| album::album_widget(false)).lens(Ctx::map(ArtistAlbums::appears_on)),
+        )
 }
 
 fn related_widget() -> impl Widget<Cached<Vector<Artist>>> {

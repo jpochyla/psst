@@ -193,15 +193,16 @@ fn loaded_results_widget() -> impl Widget<WithCtx<MixedView>> {
                 && results.data.shows.is_empty()
         },
         Empty,
-        Flex::column()
-                .with_child(title_label())
-            .with_child(Scroll::new(Flex::row()
-                .with_child(playlist_results_widget())
-                .with_child(album_results_widget())
-                .with_child(artist_results_widget())
-                .with_child(show_results_widget()))
-                .align_left(),
+        Flex::column().with_child(title_label()).with_child(
+            Scroll::new(
+                Flex::row()
+                    .with_child(playlist_results_widget())
+                    .with_child(album_results_widget())
+                    .with_child(artist_results_widget())
+                    .with_child(show_results_widget()),
             )
+            .align_left(),
+        ),
     )
 }
 
@@ -211,13 +212,15 @@ fn title_label() -> impl Widget<WithCtx<MixedView>> {
         Empty,
         Flex::column()
             .with_default_spacer()
-            .with_child(Label::raw()
-                .with_text_size(theme::grid(2.5))
-                .align_left()
-                .padding((theme::grid(1.5), 0.0)),)
+            .with_child(
+                Label::raw()
+                    .with_text_size(theme::grid(2.5))
+                    .align_left()
+                    .padding((theme::grid(1.5), theme::grid(0.5))),
+            )
             .with_default_spacer()
-            .align_left()
-        )
+            .align_left(),
+    )
     .lens(Ctx::data().then(MixedView::title))
 }
 
@@ -225,10 +228,9 @@ fn artist_results_widget() -> impl Widget<WithCtx<MixedView>> {
     Either::new(
         |artists: &Vector<Artist>, _| artists.is_empty(),
         Empty,
-        Scroll::new(
-            List::new(|| artist::artist_widget(true)).horizontal(),
-        )
-        .horizontal().align_left(),
+        Scroll::new(List::new(|| artist::artist_widget(true)).horizontal())
+            .horizontal()
+            .align_left(),
     )
     .lens(Ctx::data().then(MixedView::artists))
 }
@@ -238,13 +240,12 @@ fn album_results_widget() -> impl Widget<WithCtx<MixedView>> {
         |playlists: &WithCtx<MixedView>, _| playlists.data.albums.is_empty(),
         Empty,
         Flex::column().with_child(
-            Scroll::new(
-                List::new(|| album::album_widget(true)).horizontal(),
-            )
-            .horizontal()
-            .align_left()
-            .lens(Ctx::map(MixedView::albums)),
-    ))
+            Scroll::new(List::new(|| album::album_widget(true)).horizontal())
+                .horizontal()
+                .align_left()
+                .lens(Ctx::map(MixedView::albums)),
+        ),
+    )
 }
 
 fn playlist_results_widget() -> impl Widget<WithCtx<MixedView>> {
@@ -252,12 +253,10 @@ fn playlist_results_widget() -> impl Widget<WithCtx<MixedView>> {
         |playlists: &WithCtx<MixedView>, _| playlists.data.playlists.is_empty(),
         Empty,
         Flex::column().with_child(
-            Scroll::new(
-                List::new(|| playlist::playlist_widget(true)).horizontal(),
-            )
-            .horizontal()
-            .align_left()
-            .lens(Ctx::map(MixedView::playlists)),
+            Scroll::new(List::new(|| playlist::playlist_widget(true)).horizontal())
+                .horizontal()
+                .align_left()
+                .lens(Ctx::map(MixedView::playlists)),
         ),
     )
 }
@@ -267,10 +266,7 @@ fn show_results_widget() -> impl Widget<WithCtx<MixedView>> {
         |shows: &WithCtx<Vector<Arc<Show>>>, _| shows.data.is_empty(),
         Empty,
         Flex::column().with_child(
-            Scroll::new(
-                List::new(|| show::show_widget(true)).horizontal(),
-            )
-            .align_left()
+            Scroll::new(List::new(|| show::show_widget(true)).horizontal()).align_left(),
         ),
     )
     .lens(Ctx::map(MixedView::shows))
@@ -279,12 +275,7 @@ fn show_results_widget() -> impl Widget<WithCtx<MixedView>> {
 fn user_top_artists_widget() -> impl Widget<AppState> {
     Async::new(
         spinner_widget,
-        || {
-            Scroll::new(
-                List::new(|| artist::artist_widget(true)).horizontal(),
-            )
-            .horizontal()
-        },
+        || Scroll::new(List::new(|| artist::artist_widget(true)).horizontal()).horizontal(),
         error_widget,
     )
     .lens(AppState::home_detail.then(HomeDetail::user_top_artists))

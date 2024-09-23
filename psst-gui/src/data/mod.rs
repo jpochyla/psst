@@ -56,7 +56,7 @@ pub use crate::data::{
     show::{Episode, EpisodeId, EpisodeLink, Show, ShowDetail, ShowEpisodes, ShowLink},
     slider_scroll_scale::SliderScrollScale,
     track::{AudioAnalysis, Track, TrackId},
-    user::{UserProfile, PublicUser},
+    user::{PublicUser, UserProfile},
     utils::{Cached, Float64, Image, Page},
 };
 
