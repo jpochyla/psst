@@ -14,7 +14,7 @@ use crate::{
     data::{
         Album, ArtistTracks, CommonCtx, FindQuery, MatchFindQuery, Playable, PlaybackOrigin,
         PlaybackPayload, PlaylistTracks, Recommendations, SavedTracks, SearchResults, ShowEpisodes,
-        WithCtx,
+        Track, WithCtx,
     },
     ui::theme,
 };
@@ -149,6 +149,24 @@ impl PlayableIter for Arc<Album> {
 
     fn count(&self) -> usize {
         self.tracks.len()
+    }
+}
+
+// This should change to a more specific name as it could be confusing for others
+// As at the moment this is only used for the home page!
+impl PlayableIter for Vector<Arc<Track>> {
+    fn origin(&self) -> PlaybackOrigin {
+        PlaybackOrigin::Home
+    }
+
+    fn for_each(&self, mut cb: impl FnMut(Playable, usize)) {
+        for (position, track) in self.iter().enumerate() {
+            cb(Playable::Track(track.to_owned()), position);
+        }
+    }
+
+    fn count(&self) -> usize {
+        self.len()
     }
 }
 

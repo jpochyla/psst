@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use druid::{
     widget::{CrossAxisAlignment, Flex, Label, LineBreaking},
-    LensExt, LocalizedString, Menu, MenuItem, Selector, Size, Widget, WidgetExt,
+    LensExt, LocalizedString, Menu, MenuItem, Selector, Size, UnitPoint, Widget, WidgetExt,
 };
 
 use crate::{
@@ -76,33 +76,54 @@ fn async_episodes_widget() -> impl Widget<AppState> {
     )
 }
 
-pub fn show_widget() -> impl Widget<WithCtx<Arc<Show>>> {
-    let show_image = rounded_cover_widget(theme::grid(6.0));
+pub fn show_widget(horizontal: bool) -> impl Widget<WithCtx<Arc<Show>>> {
+    let image_size = theme::grid(if horizontal { 16.0 } else { 6.0 });
+    let show_image = rounded_cover_widget(image_size);
 
     let show_name = Label::raw()
         .with_font(theme::UI_FONT_MEDIUM)
         .with_line_break_mode(LineBreaking::Clip)
-        .lens(Show::name.in_arc());
+        .lens(Show::name.in_arc())
+        .align_left();
 
     let show_publisher = Label::raw()
+        .with_line_break_mode(LineBreaking::Clip)
         .with_text_size(theme::TEXT_SIZE_SMALL)
         .with_text_color(theme::PLACEHOLDER_COLOR)
-        .lens(Show::publisher.in_arc());
+        .lens(Show::publisher.in_arc())
+        .align_left();
 
-    let show_info = Flex::column()
-        .cross_axis_alignment(CrossAxisAlignment::Start)
-        .with_child(show_name)
-        .with_spacer(1.0)
-        .with_child(show_publisher);
+    let show = if horizontal {
+        Flex::column()
+            .with_child(show_image)
+            .with_default_spacer()
+            .with_child(
+                Flex::column()
+                    .with_child(show_name)
+                    .with_child(show_publisher)
+                    .align_horizontal(UnitPoint::CENTER)
+                    .align_vertical(UnitPoint::TOP)
+                    .fix_size(theme::grid(16.0), theme::grid(8.0)),
+            )
+            .padding(theme::grid(1.0))
+            .lens(Ctx::data())
+    } else {
+        Flex::row()
+            .with_child(show_image)
+            .with_default_spacer()
+            .with_flex_child(
+                Flex::column()
+                    .with_child(show_name)
+                    .with_child(show_publisher),
+                1.0,
+            )
+            .padding(theme::grid(1.0))
+            .lens(Ctx::data())
+    };
 
-    let show = Flex::row()
-        .with_child(show_image)
-        .with_default_spacer()
-        .with_flex_child(show_info, 1.0)
-        .lens(Ctx::data());
-
-    show.padding(theme::grid(1.0))
+    show.align_left()
         .link()
+        .rounded(theme::BUTTON_BORDER_RADIUS)
         .on_left_click(|ctx, _, show, _| {
             ctx.submit_command(cmd::NAVIGATE.with(Nav::ShowDetail(show.data.link())));
         })
