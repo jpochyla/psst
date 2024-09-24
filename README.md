@@ -121,6 +121,7 @@ cargo bundle --release
 - [x] Audio loudness normalization
 - [x] Genre playlists and "For You" content
 - [x] Dark theme
+- [x] Credits support
 - [ ] Resilience to network errors (automatically retry timed-out requests)
 - [ ] Managing playlists
   - Follow/unfollow

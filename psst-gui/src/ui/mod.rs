@@ -182,7 +182,7 @@ fn root_widget() -> impl Widget<AppState> {
                 match result {
                     Ok(credits) => {
                         data.credits = Some(credits.clone());
-                        let window = credits::credits_window(&credits.track_name);
+                        let window = credits::credits_window(&credits.track_title);
                         ctx.new_window(window);
                     }
                     Err(err) => {
