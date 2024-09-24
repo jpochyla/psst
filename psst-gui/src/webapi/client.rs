@@ -41,20 +41,39 @@ use super::{cache::WebApiCache, local::LocalTrackManager};
 
 #[derive(Debug, Clone, Data, Lens, Deserialize)]
 pub struct TrackCredits {
-    pub track_name: String,
+    #[serde(rename = "trackUri")]
+    pub track_uri: String,
+    #[serde(rename = "trackTitle")]
+    pub track_title: String,
+    #[serde(rename = "roleCredits")]
     pub role_credits: Arc<Vec<RoleCredit>>,
+    #[serde(rename = "extendedCredits")]
+    pub extended_credits: Arc<Vec<String>>,
+    #[serde(rename = "sourceNames")]
     pub source_names: Arc<Vec<String>>,
 }
 
 #[derive(Debug, Clone, Data, Lens, Deserialize)]
 pub struct RoleCredit {
+    #[serde(rename = "roleTitle")]
     pub role_title: String,
     pub artists: Arc<Vec<CreditArtist>>,
 }
 
 #[derive(Debug, Clone, Data, Lens, Deserialize)]
 pub struct CreditArtist {
+    pub uri: Option<String>,
     pub name: String,
+    #[serde(rename = "imageUri")]
+    pub image_uri: Option<String>,
+    #[serde(rename = "externalUrl")]
+    pub external_url: Option<String>,
+    #[serde(rename = "creatorUri")]
+    pub creator_uri: Option<String>,
+    #[serde(default)]
+    pub subroles: Arc<Vec<String>>,
+    #[serde(default)]
+    pub weight: f64,
 }
 
 pub struct WebApi {
@@ -306,19 +325,17 @@ impl WebApi {
 
     pub fn get_track_credits(&self, track_id: &str) -> Result<TrackCredits, Error> {
         let request = self
-            .get(format!(
-                "v1/track-credits-view/v0/experimental/{}/credits",
-                track_id
-            ))?
+            .get(
+                format!("track-credits-view/v0/experimental/{}/credits", track_id),
+                Some("spclient.wg.spotify.com"),
+            )?
             .set(
                 "client-token",
                 self.session.client_token().unwrap_or_default(),
             );
-        let mut result: TrackCredits = self.load(request)?;
-        result.track_name = self.get_track(track_id)?.name.to_string();
-        Ok(result)
+        let response = Self::with_retry(|| Ok(request.clone().call()?))?;
+        Ok(serde_json::from_str(&response.into_string()?)?)
     }
-}
 
     fn load_and_return_home_section(&self, request: Request) -> Result<MixedView, Error> {
         #[derive(Deserialize)]
@@ -661,6 +678,7 @@ impl WebApi {
         })
     }
 }
+
 static GLOBAL_WEBAPI: OnceCell<Arc<WebApi>> = OnceCell::new();
 
 /// Global instance.
