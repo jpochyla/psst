@@ -145,6 +145,8 @@ fn root_widget() -> impl Widget<AppState> {
         .with_child(topbar_back_button_widget())
         .with_child(topbar_title_widget())
         .with_child(topbar_sort_widget())
+        .with_flex_spacer(6.0)
+        .with_child(topbar_shortcut_buttons_widget())
         .background(Border::Bottom.with_color(theme::BACKGROUND_DARK));
 
     let main = Flex::column()
@@ -347,8 +349,8 @@ fn volume_slider() -> impl Widget<AppState> {
 }
 
 fn topbar_sort_widget() -> impl Widget<AppState> {
-    let up_icon = icons::UP.scale((10.0, theme::grid(2.0)));
-    let down_icon = icons::DOWN.scale((10.0, theme::grid(2.0)));
+    let up_icon = icons::UP.scale((theme::grid(2.0), theme::grid(2.0)));
+    let down_icon = icons::DOWN.scale((theme::grid(2.0), theme::grid(2.0)));
 
     let ascending_icon = up_icon
         .padding(theme::grid(1.0))
@@ -391,7 +393,7 @@ fn topbar_sort_widget() -> impl Widget<AppState> {
 }
 
 fn topbar_back_button_widget() -> impl Widget<AppState> {
-    let icon = icons::BACK.scale((10.0, theme::grid(2.0)));
+    let icon = icons::BACK.scale((theme::grid(2.0), theme::grid(2.0)));
     let disabled = icon
         .clone()
         .with_color(theme::GREY_600)
@@ -411,6 +413,65 @@ fn topbar_back_button_widget() -> impl Widget<AppState> {
     )
     .padding(theme::grid(1.0))
     .lens(AppState::history)
+}
+
+fn topbar_shortcut_buttons_widget() -> impl Widget<AppState> {
+    let reload_icon = icons::RELOAD.scale(theme::ICON_SIZE_LARGE)
+        .padding(theme::grid(1.0))
+        .link()
+        .rounded(theme::BUTTON_BORDER_RADIUS)
+        .on_left_click(|ctx, _, data: &mut AppState, _| {
+            match &data.nav {
+                Nav::SavedTracks => {
+                    ctx.submit_command(library::LOAD_TRACKS);
+                }
+                Nav::SavedShows => {
+                    ctx.submit_command(library::LOAD_SHOWS);
+                }
+                Nav::SavedAlbums => {
+                    ctx.submit_command(library::LOAD_ALBUMS);
+                }
+                Nav::Home => {
+                    ctx.submit_command(home::LOAD_MADE_FOR_YOU);
+                }
+                Nav::PlaylistDetail(_) => {
+                    ctx.submit_command(cmd::NAVIGATE_REFRESH);
+                }
+                _ => {}
+            }
+        });
+
+    let search_icon = icons::SEARCH.scale(theme::ICON_SIZE_LARGE)
+    .padding(theme::grid(1.0))
+    .link()
+    .rounded(theme::BUTTON_BORDER_RADIUS)
+    .on_left_click(|ctx, _, _, _| {
+        ctx.submit_command(cmd::TOGGLE_FINDER);
+    });
+    let srch_icon = Either::new(
+        |nav: &AppState, _| {
+            // check if the current nav is PlaylistDetail
+            !matches!(nav.nav, Nav::SavedTracks)
+            &&  !matches!(nav.nav, Nav::SavedShows)
+            &&  !matches!(nav.nav, Nav::Home)
+            &&  !matches!(nav.nav, Nav::SavedAlbums)
+        },
+        search_icon,
+        Empty.boxed(),
+    );
+
+    let icons = Flex::row()
+        .with_child(reload_icon)
+        .with_child(srch_icon);
+
+    Either::new(
+        |nav: &AppState, _| {
+            !matches!(nav.nav, Nav::SearchResults(_))
+            &&  !matches!(nav.nav, Nav::Recommendations(_))
+        },
+        icons,
+        Empty.boxed(),
+    )
 }
 
 fn history_menu(history: &Vector<Nav>) -> Menu<AppState> {
