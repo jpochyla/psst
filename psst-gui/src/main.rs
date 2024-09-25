@@ -38,7 +38,7 @@ fn main() {
 
     let args: Vec<String> = env::args().collect();
     state.config.kiosk_mode = false;
-    if !args.is_empty() && (args.contains(&"-k".to_string()) || args.contains(&"-kiosk".to_string())) {
+    if !args.is_empty() && (args.contains(&"-k".to_string()) || args.contains(&"--kiosk".to_string())) {
         state.config.kiosk_mode = true;
     }
 
