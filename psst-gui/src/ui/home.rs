@@ -49,7 +49,7 @@ fn simple_title_label(title: &str) -> impl Widget<AppState> {
 }
 
 pub fn made_for_you() -> impl Widget<AppState> {
-    Async::new(spinner_widget, loaded_results_widget, error_widget)
+    Async::new(spinner_widget, loaded_results_widget, || {Empty})
         .lens(
             Ctx::make(
                 AppState::common_ctx,
@@ -66,7 +66,7 @@ pub fn made_for_you() -> impl Widget<AppState> {
 }
 
 pub fn recommended_stations() -> impl Widget<AppState> {
-    Async::new(spinner_widget, loaded_results_widget, error_widget)
+    Async::new(spinner_widget, loaded_results_widget, || {Empty})
         .lens(
             Ctx::make(
                 AppState::common_ctx,
@@ -83,7 +83,7 @@ pub fn recommended_stations() -> impl Widget<AppState> {
 }
 
 pub fn uniquely_yours() -> impl Widget<AppState> {
-    Async::new(spinner_widget, loaded_results_widget, error_widget)
+    Async::new(spinner_widget, loaded_results_widget, || {Empty})
         .lens(
             Ctx::make(
                 AppState::common_ctx,
@@ -100,7 +100,7 @@ pub fn uniquely_yours() -> impl Widget<AppState> {
 }
 
 pub fn user_top_mixes() -> impl Widget<AppState> {
-    Async::new(spinner_widget, loaded_results_widget, error_widget)
+    Async::new(spinner_widget, loaded_results_widget, || {Empty})
         .lens(
             Ctx::make(
                 AppState::common_ctx,
@@ -117,7 +117,7 @@ pub fn user_top_mixes() -> impl Widget<AppState> {
 }
 
 pub fn best_of_artists() -> impl Widget<AppState> {
-    Async::new(spinner_widget, loaded_results_widget, error_widget)
+    Async::new(spinner_widget, loaded_results_widget, || {Empty})
         .lens(
             Ctx::make(
                 AppState::common_ctx,
@@ -134,7 +134,7 @@ pub fn best_of_artists() -> impl Widget<AppState> {
 }
 
 pub fn your_shows() -> impl Widget<AppState> {
-    Async::new(spinner_widget, loaded_results_widget, error_widget)
+    Async::new(spinner_widget, loaded_results_widget, || {Empty})
         .lens(
             Ctx::make(
                 AppState::common_ctx,
@@ -151,7 +151,7 @@ pub fn your_shows() -> impl Widget<AppState> {
 }
 
 pub fn jump_back_in() -> impl Widget<AppState> {
-    Async::new(spinner_widget, loaded_results_widget, error_widget)
+    Async::new(spinner_widget, loaded_results_widget, || {Empty})
         .lens(
             Ctx::make(
                 AppState::common_ctx,
@@ -168,7 +168,7 @@ pub fn jump_back_in() -> impl Widget<AppState> {
 }
 
 pub fn shows_that_you_might_like() -> impl Widget<AppState> {
-    Async::new(spinner_widget, loaded_results_widget, error_widget)
+    Async::new(spinner_widget, loaded_results_widget, || {Empty})
         .lens(
             Ctx::make(
                 AppState::common_ctx,
