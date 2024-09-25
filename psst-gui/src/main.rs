@@ -13,6 +13,7 @@ mod widget;
 use druid::AppLauncher;
 use env_logger::{Builder, Env};
 use webapi::WebApi;
+use std::env;
 
 use crate::{
     data::{AppState, Config},
@@ -33,7 +34,14 @@ fn main() {
 
     let config = Config::load().unwrap_or_default();
     let paginated_limit = config.paginated_limit;
-    let state = AppState::default_with_config(config);
+    let mut state = AppState::default_with_config(config);
+
+    let args: Vec<String> = env::args().collect();
+    state.config.kiosk_mode = false;
+    if !args.is_empty() && (args.contains(&"-k".to_string()) || args.contains(&"-kiosk".to_string())) {
+        state.config.kiosk_mode = true;
+    }
+
     WebApi::new(
         state.session.clone(),
         Config::proxy().as_deref(),
@@ -54,7 +62,12 @@ fn main() {
         WebApi::global().load_local_tracks(state.config.username().unwrap());
     } else {
         // No configured credentials, open the account setup.
-        let window = ui::account_setup_window();
+        let mut window = ui::account_setup_window();
+        
+        if state.config.kiosk_mode {
+            window = ui::kiosk_setup_window();
+        } 
+
         delegate = Delegate::with_preferences(window.id);
         launcher = AppLauncher::with_window(window).configure_env(ui::theme::setup);
     };
