@@ -33,17 +33,15 @@ fn credits_widget() -> impl Widget<AppState> {
                     .expand_width(),
                 ),
             )
-            .with_child(
-                List::new(|| role_credit_widget()).lens(AppState::credits.map(
-                    |credits| {
-                        credits
-                            .as_ref()
-                            .map(|c| c.role_credits.clone())
-                            .unwrap_or_default()
-                    },
-                    |_, _| {},
-                )),
-            )
+            .with_child(List::new(role_credit_widget).lens(AppState::credits.map(
+                |credits| {
+                    credits
+                        .as_ref()
+                        .map(|c| c.role_credits.clone())
+                        .unwrap_or_default()
+                },
+                |_, _| {},
+            )))
             .with_child(
                 Label::new(|data: &AppState, _: &_| {
                     data.credits.as_ref().map_or("".to_string(), |c| {
@@ -70,7 +68,7 @@ fn role_credit_widget() -> impl Widget<RoleCredit> {
                 .padding((theme::grid(2.0), theme::grid(1.0))),
         )
         .with_child(
-            List::new(|| credit_artist_widget())
+            List::new(credit_artist_widget)
                 .lens(RoleCredit::artists)
                 .padding((theme::grid(2.0), 0.0, theme::grid(2.0), 0.0)),
         )
@@ -142,15 +140,12 @@ impl<W: Widget<CreditArtist>> Controller<CreditArtist, W> for CursorController {
         data: &mut CreditArtist,
         env: &Env,
     ) {
-        match event {
-            Event::MouseMove(_) => {
-                if data.uri.is_some() {
-                    ctx.set_cursor(&Cursor::Pointer);
-                } else {
-                    ctx.clear_cursor();
-                }
+        if let Event::MouseMove(_) = event {
+            if data.uri.is_some() {
+                ctx.set_cursor(&Cursor::Pointer);
+            } else {
+                ctx.clear_cursor();
             }
-            _ => {}
         }
         child.event(ctx, event, data, env)
     }
