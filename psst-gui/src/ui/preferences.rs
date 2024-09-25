@@ -329,6 +329,7 @@ impl<W: Widget<AppState>> Controller<AppState, W> for Authenticate {
     ) {
         match event {
             Event::Command(cmd) if cmd.is(Self::REQUEST) => {
+                log::info!("Received Authenticate::REQUEST command");
                 data.preferences.auth.result.defer_default();
 
                 let (auth_url, pkce_verifier) = oauth::generate_auth_url(8888);
@@ -347,14 +348,37 @@ impl<W: Widget<AppState>> Controller<AppState, W> for Authenticate {
                     ) {
                         Ok(code) => {
                             let token = oauth::exchange_code_for_token(8888, code, pkce_verifier);
-                            let response =
-                                Authentication::authenticate_and_get_credentials(SessionConfig {
-                                    login_creds: Credentials::from_access_token(token),
-                                    ..config
-                                });
-                            event_sink
-                                .submit_command(Self::RESPONSE, response, widget_id)
-                                .unwrap();
+                            let mut retries = 3;
+                            while retries > 0 {
+                                let response = Authentication::authenticate_and_get_credentials(
+                                    SessionConfig {
+                                        login_creds: Credentials::from_access_token(token.clone()),
+                                        ..config.clone()
+                                    },
+                                );
+                                match response {
+                                    Ok(credentials) => {
+                                        event_sink
+                                            .submit_command(
+                                                Self::RESPONSE,
+                                                Ok(credentials),
+                                                widget_id,
+                                            )
+                                            .unwrap();
+                                        return;
+                                    }
+                                    Err(e) if retries > 1 => {
+                                        log::warn!("Authentication failed, retrying: {:?}", e);
+                                        retries -= 1;
+                                    }
+                                    Err(e) => {
+                                        event_sink
+                                            .submit_command(Self::RESPONSE, Err(e), widget_id)
+                                            .unwrap();
+                                        return;
+                                    }
+                                }
+                            }
                         }
                         Err(e) => {
                             event_sink
@@ -367,6 +391,7 @@ impl<W: Widget<AppState>> Controller<AppState, W> for Authenticate {
                 ctx.set_handled();
             }
             Event::Command(cmd) if cmd.is(Self::RESPONSE) => {
+                log::info!("Received Authenticate::RESPONSE command");
                 self.thread.take();
 
                 let result = cmd
