@@ -95,15 +95,15 @@ impl WebApi {
     }
 
     fn put(&self, path: impl Display, base_url: Option<&str>) -> Result<Request, Error> {
-        self.request("GET", base_url.unwrap_or("api.spotify.com"), path)
+        self.request("PUT", base_url.unwrap_or("api.spotify.com"), path)
     }
 
     fn post(&self, path: impl Display, base_url: Option<&str>) -> Result<Request, Error> {
-        self.request("GET", base_url.unwrap_or("api.spotify.com"), path)
+        self.request("POST", base_url.unwrap_or("api.spotify.com"), path)
     }
 
     fn delete(&self, path: impl Display, base_url: Option<&str>) -> Result<Request, Error> {
-        self.request("GET", base_url.unwrap_or("api.spotify.com"), path)
+        self.request("DELETE", base_url.unwrap_or("api.spotify.com"), path)
     }
 
     fn with_retry(f: impl Fn() -> Result<Response, Error>) -> Result<Response, Error> {
