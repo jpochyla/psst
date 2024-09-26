@@ -357,13 +357,12 @@ where
                 let (item, progress) = cmd.get_unchecked(cmd::PLAYBACK_PLAYING);
 
                 // TODO: this falsely removes the song if you click on a song from the playlist that is also in the queue, not sure how to solve this?
-                if !data.displayed_added_queue.is_empty() && data.playback.now_playing.as_mut().is_some_and(|np| {
+                if !data.added_queue.displayed_queue.is_empty() && data.playback.now_playing.as_mut().is_some_and(|np| {
                     np.origin.to_string() == PlaybackOrigin::Queue.to_string()
-                    && np.item.id() == data.displayed_added_queue[0].item.id()
+                    && np.item.id() == data.added_queue.displayed_queue[0].item.id()
                 }) {
-                    data.displayed_added_queue.remove(0);
+                    data.added_queue.displayed_queue.remove(0);
                 }
-
                 if let Some(queued) = data.queued_entry(*item) {
                     data.start_playback(queued.item, queued.origin, progress.to_owned());
                     self.update_media_control_playback(&data.playback);
@@ -463,12 +462,12 @@ where
                     Ordering::Greater => {
                         if data.playback.queue.is_empty() || (data.playback.queue.len() <= 1 && data.playback.queue[0].origin.to_string() == PlaybackOrigin::Queue.to_string()) {
                             data.playback.queue.clear();
-                            data.playback.queue.push_back(data.displayed_added_queue[track_pos].clone());
-                            data.displayed_added_queue = data.displayed_added_queue.split_off(track_pos);
+                            data.playback.queue.push_back(data.added_queue.displayed_queue[track_pos].clone());
+                            data.added_queue.displayed_queue = data.added_queue.displayed_queue.split_off(track_pos);
                             self.skip_to_place_in_queue(&(track_pos+1));
                             self.play(&data.playback.queue, track_pos);}
                         else if data.playback.now_playing.is_some() {
-                            data.displayed_added_queue = data.displayed_added_queue.split_off(track_pos);
+                            data.added_queue.displayed_queue = data.added_queue.displayed_queue.split_off(track_pos);
                             self.skip_to_place_in_queue(&track_pos);
                             self.next();
                         }
@@ -476,9 +475,9 @@ where
                     Ordering::Equal => {
                         if data.playback.queue.is_empty() || (data.playback.queue.len() <= 1 && data.playback.queue[0].origin.to_string() == PlaybackOrigin::Queue.to_string()) {
                             data.playback.queue.clear();
-                            data.playback.queue.push_back(data.displayed_added_queue[track_pos].clone());
+                            data.playback.queue.push_back(data.added_queue.displayed_queue[track_pos].clone());
                             self.remove_from_queue(&track_pos);
-                            data.displayed_added_queue.remove(track_pos);
+                            data.added_queue.displayed_queue.remove(track_pos);
                             self.play(&data.playback.queue, track_pos);
                         }
                         else if data.playback.now_playing.is_some() {
@@ -491,14 +490,14 @@ where
             }
             Event::Command(cmd) if cmd.is(cmd::REMOVE_FROM_QUEUE) => {
                 let item = cmd.get_unchecked(cmd::REMOVE_FROM_QUEUE);
-                data.displayed_added_queue.remove(*item);
+                data.added_queue.displayed_queue.remove(*item);
                 self.remove_from_queue(item);
                 data.info_alert("Track removed from queue.");
         
                 ctx.set_handled();
             }
             Event::Command(cmd) if cmd.is(cmd::CLEAR_QUEUE) => {
-                data.displayed_added_queue.clear();
+                data.added_queue.displayed_queue.clear();
                 self.clear_queue();
                 data.info_alert("Tracks cleared from queue.");
                 ctx.set_handled();

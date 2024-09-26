@@ -74,6 +74,10 @@ impl Queue {
         self.user_items.push(item);
     }
 
+    pub fn get_playing_from_user_items_bool(&mut self) -> bool{
+        self.playing_from_user_items
+    }
+
     pub fn remove(&mut self, index: usize) {
         if self.playing_from_user_items {
             self.user_items.remove(index+1);

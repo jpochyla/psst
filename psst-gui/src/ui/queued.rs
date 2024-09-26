@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::{
     cmd,
-    data::{AppState, Nav, QueueEntry, RecommendationsRequest},
+    data::{AppState, Nav, QueueEntry, QueueFields, RecommendationsRequest},
     ui::Vector,
     widget::{icons, Border, Empty, MyWidgetExt},
 };
@@ -43,7 +43,7 @@ pub fn queue_widget() -> impl Widget<AppState> {
             .with_flex_child(
                 Scroll::new(queue_list_widget())
                     .vertical()
-                    .lens(AppState::displayed_added_queue.map(
+                    .lens(AppState::added_queue.then(QueueFields::displayed_queue).map(
                         |entries| queue_entries_with_index(entries.clone()),
                         |_, _| (),
                     )),
