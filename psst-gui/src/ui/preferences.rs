@@ -270,10 +270,11 @@ fn general_tab_widget() -> impl Widget<AppState> {
                 .lens(AppState::config.then(Config::paginated_limit)),
         );
 
-    col = col.with_default_spacer()
-        .with_child(Button::new("Done")
-        .align_right()
-        .on_click(|ctx, _,  _| {ctx.submit_command(commands::CLOSE_WINDOW)}));
+    col = col.with_default_spacer().with_child(
+        Button::new("Done")
+            .align_right()
+            .on_click(|ctx, _, _| ctx.submit_command(commands::CLOSE_WINDOW)),
+    );
 
     col
 }
@@ -323,13 +324,16 @@ fn account_tab_widget(tab: AccountTab) -> impl Widget<AppState> {
         );
 
     if matches!(tab, AccountTab::InPreferences) {
-        col = col.with_child(Button::new("Log Out").on_left_click(|ctx, _, _, _| {
-            ctx.submit_command(cmd::LOG_OUT);
-        }))        
-        .with_default_spacer()
-        .with_child(Button::new("Done")
-        .align_right()
-        .on_click(|ctx, _,  _| {ctx.submit_command(commands::CLOSE_WINDOW)}))
+        col = col
+            .with_child(Button::new("Log Out").on_left_click(|ctx, _, _, _| {
+                ctx.submit_command(cmd::LOG_OUT);
+            }))
+            .with_default_spacer()
+            .with_child(
+                Button::new("Done")
+                    .align_right()
+                    .on_click(|ctx, _, _| ctx.submit_command(commands::CLOSE_WINDOW)),
+            )
     }
 
     col.controller(Authenticate::new(tab))
@@ -481,10 +485,11 @@ fn cache_tab_widget() -> impl Widget<AppState> {
                 }
             },
         ));
-    col = col.with_default_spacer()
-        .with_child(Button::new("Done")
-        .align_right()
-        .on_click(|ctx, _,  _| {ctx.submit_command(commands::CLOSE_WINDOW)}));
+    col = col.with_default_spacer().with_child(
+        Button::new("Done")
+            .align_right()
+            .on_click(|ctx, _, _| ctx.submit_command(commands::CLOSE_WINDOW)),
+    );
 
     col.controller(MeasureCacheSize::new())
         .lens(AppState::preferences)
@@ -578,7 +583,9 @@ fn about_tab_widget() -> impl Widget<AppState> {
         .with_child(build_time)
         .with_child(remote_url)
         .with_default_spacer()
-        .with_child(Button::new("Done")
-        .align_right()
-        .on_click(|ctx, _,  _| {ctx.submit_command(commands::CLOSE_WINDOW)}))
+        .with_child(
+            Button::new("Done")
+                .align_right()
+                .on_click(|ctx, _, _| ctx.submit_command(commands::CLOSE_WINDOW)),
+        )
 }
