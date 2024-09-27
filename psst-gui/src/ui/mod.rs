@@ -89,7 +89,6 @@ pub fn preferences_window(config: &Config) -> WindowDesc<AppState> {
 
     let mut win = WindowDesc::new(preferences_widget())
         .title("Preferences")
-        .resizable(false)
         .show_title(false)
         .transparent_titlebar(true);
 
@@ -108,6 +107,7 @@ pub fn preferences_window(config: &Config) -> WindowDesc<AppState> {
             .show_titlebar(false);
     } else {
         win = win.window_size(win_size)
+            .resizable(false)
     }
     if cfg!(target_os = "macos") {
         win.menu(menu::main_menu)
@@ -131,10 +131,8 @@ pub fn account_setup_window() -> WindowDesc<AppState> {
 }
 
 pub fn kiosk_setup_window() -> WindowDesc<AppState> {
-
     let mut win = WindowDesc::new(kiosk_setup_widget())
         .title("Setup")
-        .resizable(false)
         .show_title(false)
         .set_window_state(WindowState::Maximized)
         .show_titlebar(false)
@@ -144,7 +142,8 @@ pub fn kiosk_setup_window() -> WindowDesc<AppState> {
         let work_area = monitor.virtual_work_rect();
         win = win
             .window_size(work_area.size())
-            .set_position(druid::Point::new(0.0, 0.0));
+            .set_position(druid::Point::new(0.0, 0.0))
+            .resizable(false);
     }
         
     if cfg!(target_os = "macos") {
