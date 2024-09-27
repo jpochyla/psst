@@ -46,8 +46,7 @@ pub mod utils;
 pub fn main_window(config: &Config) -> WindowDesc<AppState> {
     let mut win = WindowDesc::new(root_widget(config))
         .title(compute_main_window_title)
-        .show_title(false)
-        .transparent_titlebar(true);
+        .show_title(false);
 
     if config.kiosk_mode {
         win = win
@@ -65,7 +64,8 @@ pub fn main_window(config: &Config) -> WindowDesc<AppState> {
     } else {
         win = win
             .window_size(config.window_size)
-            .with_min_size((theme::grid(65.0), theme::grid(50.0)));
+            .with_min_size((theme::grid(65.0), theme::grid(50.0)))
+            .transparent_titlebar(true);
     }
 
     if cfg!(target_os = "macos") {
