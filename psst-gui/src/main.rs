@@ -59,10 +59,12 @@ fn main() {
         WebApi::global().load_local_tracks(state.config.username().unwrap());
     } else {
         // No configured credentials, open the account setup.
-        let mut window = ui::account_setup_window();
+        let window = ui::account_setup_window();
 
         if state.config.kiosk_mode {
-            window = ui::kiosk_setup_window();
+           let window = ui::kiosk_setup_window();
+        } else {
+
         }
 
         delegate = Delegate::with_preferences(window.id);
