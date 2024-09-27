@@ -46,29 +46,28 @@ fn main() {
         paginated_limit,
     )
     .install_as_global();
-
-    let delegate;
-    let launcher;
-    if state.config.has_credentials() {
+    let (delegate, launcher) = if state.config.has_credentials() {
         // Credentials are configured, open the main window.
         let window = ui::main_window(&state.config);
-        delegate = Delegate::with_main(window.id);
-        launcher = AppLauncher::with_window(window).configure_env(ui::theme::setup);
+        let delegate = Delegate::with_main(window.id);
 
         // Load user's local tracks for the WebApi.
         WebApi::global().load_local_tracks(state.config.username().unwrap());
+
+        (delegate, AppLauncher::with_window(window))
     } else {
-        // No configured credentials, open the account setup.
-        let window = ui::account_setup_window();
-
-        if state.config.kiosk_mode {
-            let window = ui::kiosk_setup_window();
+        // No configured credentials, open the setup window.
+        let window = if state.config.kiosk_mode {
+            ui::kiosk_setup_window()
         } else {
-        }
+            ui::account_setup_window()
+        };
+        let delegate = Delegate::with_preferences(window.id);
 
-        delegate = Delegate::with_preferences(window.id);
-        launcher = AppLauncher::with_window(window).configure_env(ui::theme::setup);
+        (delegate, AppLauncher::with_window(window))
     };
+
+    let launcher = launcher.configure_env(ui::theme::setup);
 
     launcher
         .delegate(delegate)
