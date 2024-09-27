@@ -62,9 +62,8 @@ fn main() {
         let window = ui::account_setup_window();
 
         if state.config.kiosk_mode {
-           let window = ui::kiosk_setup_window();
+            let window = ui::kiosk_setup_window();
         } else {
-
         }
 
         delegate = Delegate::with_preferences(window.id);

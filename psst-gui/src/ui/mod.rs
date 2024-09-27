@@ -85,7 +85,7 @@ pub fn preferences_window() -> WindowDesc<AppState> {
     } else {
         win_size
     };
-    
+
     let win = WindowDesc::new(preferences_widget())
         .title("Preferences")
         .window_size(win_size)
