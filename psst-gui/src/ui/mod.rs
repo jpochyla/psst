@@ -53,8 +53,7 @@ pub fn main_window(config: &Config) -> WindowDesc<AppState> {
         win = win
             .set_window_state(WindowState::Maximized)
             .resizable(false)
-            .show_titlebar(false)
-            .set_always_on_top(true);
+            .show_titlebar(false);
 
         // Set the window size to the primary monitor's work area and position it at (0, 0)
         if let Some(monitor) = druid::Screen::get_monitors().first() {
@@ -95,6 +94,13 @@ pub fn preferences_window(config: &Config) -> WindowDesc<AppState> {
         .transparent_titlebar(true);
 
     if config.kiosk_mode {
+        if let Some(monitor) = druid::Screen::get_monitors().first() {
+            let work_area = monitor.virtual_work_rect();
+            win = win
+                .window_size(work_area.size())
+                .set_position(druid::Point::new(0.0, 0.0));
+        }
+
         win = win
             .set_window_state(WindowState::Maximized)
             .resizable(false)
@@ -125,13 +131,22 @@ pub fn account_setup_window() -> WindowDesc<AppState> {
 }
 
 pub fn kiosk_setup_window() -> WindowDesc<AppState> {
-    let win = WindowDesc::new(kiosk_setup_widget())
+
+    let mut win = WindowDesc::new(kiosk_setup_widget())
         .title("Setup")
         .resizable(false)
         .show_title(false)
         .set_window_state(WindowState::Maximized)
         .show_titlebar(false)
         .transparent_titlebar(true);
+
+    if let Some(monitor) = druid::Screen::get_monitors().first() {
+        let work_area = monitor.virtual_work_rect();
+        win = win
+            .window_size(work_area.size())
+            .set_position(druid::Point::new(0.0, 0.0));
+    }
+        
     if cfg!(target_os = "macos") {
         win.menu(menu::main_menu)
     } else {
