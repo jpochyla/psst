@@ -75,40 +75,17 @@ pub fn main_window(config: &Config) -> WindowDesc<AppState> {
     }
 }
 
-pub fn preferences_window(config: &Config) -> WindowDesc<AppState> {
+pub fn preferences_window() -> WindowDesc<AppState> {
     // Change this
     let win_size = (theme::grid(50.0), theme::grid(55.0));
 
-    // On Windows, the window size includes the titlebar.
-    let win_size = if cfg!(target_os = "windows") {
-        const WINDOWS_TITLEBAR_OFFSET: f64 = 56.0;
-        (win_size.0, win_size.1 + WINDOWS_TITLEBAR_OFFSET)
-    } else {
-        win_size
-    };
-
-    let mut win = WindowDesc::new(preferences_widget())
+    let win = WindowDesc::new(preferences_widget())
         .title("Preferences")
+        .window_size(win_size)
+        .resizable(false)
         .show_title(false)
+        .set_always_on_top(true)
         .transparent_titlebar(true);
-
-    if config.kiosk_mode {
-        if let Some(monitor) = druid::Screen::get_monitors().first() {
-            let work_area = monitor.virtual_work_rect();
-            win = win
-                .window_size(work_area.size())
-                .set_position(druid::Point::new(0.0, 0.0));
-        }
-
-        win = win
-            .set_window_state(WindowState::Maximized)
-            .resizable(false)
-            .set_always_on_top(true)
-            .show_titlebar(false);
-    } else {
-        win = win.window_size(win_size)
-            .resizable(false)
-    }
     if cfg!(target_os = "macos") {
         win.menu(menu::main_menu)
     } else {
@@ -131,21 +108,12 @@ pub fn account_setup_window() -> WindowDesc<AppState> {
 }
 
 pub fn kiosk_setup_window() -> WindowDesc<AppState> {
-    let mut win = WindowDesc::new(kiosk_setup_widget())
+    let win = WindowDesc::new(kiosk_setup_widget())
         .title("Setup")
+        .resizable(false)
         .show_title(false)
-        .set_window_state(WindowState::Maximized)
-        .show_titlebar(false)
+        .window_size((theme::grid(50.0), theme::grid(45.0)))
         .transparent_titlebar(true);
-
-    if let Some(monitor) = druid::Screen::get_monitors().first() {
-        let work_area = monitor.virtual_work_rect();
-        win = win
-            .window_size(work_area.size())
-            .set_position(druid::Point::new(0.0, 0.0))
-            .resizable(false);
-    }
-        
     if cfg!(target_os = "macos") {
         win.menu(menu::main_menu)
     } else {

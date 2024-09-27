@@ -430,9 +430,9 @@ impl<W: Widget<AppState>> Controller<AppState, W> for Authenticate {
                             ctx.submit_command(cmd::SESSION_CONNECT);
                         }
                         AccountTab::KioskSetup => {
-                            ctx.submit_command(cmd::SHOW_MAIN);
                             ctx.submit_command(commands::CLOSE_WINDOW);
                             ctx.submit_command(commands::SHOW_PREFERENCES);
+                            ctx.submit_command(cmd::SHOW_MAIN);
                         }
                     }
                 }
