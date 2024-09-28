@@ -27,29 +27,27 @@ pub fn home_widget() -> impl Widget<AppState> {
         .with_child(user_top_mixes())
         .with_child(recommended_stations())
         .with_child(best_of_artists())
-        .with_child(simple_title_label("Uniquely yours"))
-        .with_default_spacer()
         .with_child(uniquely_yours())
         .with_child(your_shows())
         .with_child(shows_that_you_might_like())
         .with_child(simple_title_label("Your top artists"))
-        .with_default_spacer()
         .with_child(user_top_artists_widget())
-        .with_default_spacer()
         .with_child(simple_title_label("Your top tracks"))
-        .with_default_spacer()
         .with_child(user_top_tracks_widget())
 }
 
 fn simple_title_label(title: &str) -> impl Widget<AppState> {
-    Label::new(title)
+    Flex::column()
+    .with_default_spacer()
+    .with_child(Label::new(title)
         .with_text_size(theme::grid(2.5))
         .align_left()
         .padding((theme::grid(1.5), 0.0))
+    )
 }
 
 pub fn made_for_you() -> impl Widget<AppState> {
-    Async::new(spinner_widget, loaded_results_widget, error_widget)
+    Async::new(spinner_widget, loaded_results_widget, || {Empty})
         .lens(
             Ctx::make(
                 AppState::common_ctx,
@@ -66,7 +64,7 @@ pub fn made_for_you() -> impl Widget<AppState> {
 }
 
 pub fn recommended_stations() -> impl Widget<AppState> {
-    Async::new(spinner_widget, loaded_results_widget, error_widget)
+    Async::new(spinner_widget, loaded_results_widget, || {Empty})
         .lens(
             Ctx::make(
                 AppState::common_ctx,
@@ -82,8 +80,29 @@ pub fn recommended_stations() -> impl Widget<AppState> {
         )
 }
 
+fn uniquely_yours_results_widget() -> impl Widget<WithCtx<MixedView>> {
+    Either::new(
+        |results: &WithCtx<MixedView>, _| {
+                results.data.playlists.is_empty()
+        },
+        Empty,
+        Flex::column().with_default_spacer()
+        .with_child(Label::new("Uniquely yours")
+            .with_text_size(theme::grid(2.5))
+            .align_left()
+            .padding((theme::grid(1.5), 0.0))
+        ).with_child(
+            Scroll::new(
+                Flex::row()
+                    .with_child(playlist_results_widget())
+            )
+            .align_left(),
+        ),
+    )
+}
+
 pub fn uniquely_yours() -> impl Widget<AppState> {
-    Async::new(spinner_widget, loaded_results_widget, error_widget)
+    Async::new(spinner_widget, uniquely_yours_results_widget, || {Empty})
         .lens(
             Ctx::make(
                 AppState::common_ctx,
@@ -100,7 +119,7 @@ pub fn uniquely_yours() -> impl Widget<AppState> {
 }
 
 pub fn user_top_mixes() -> impl Widget<AppState> {
-    Async::new(spinner_widget, loaded_results_widget, error_widget)
+    Async::new(spinner_widget, loaded_results_widget, || {Empty})
         .lens(
             Ctx::make(
                 AppState::common_ctx,
@@ -117,7 +136,7 @@ pub fn user_top_mixes() -> impl Widget<AppState> {
 }
 
 pub fn best_of_artists() -> impl Widget<AppState> {
-    Async::new(spinner_widget, loaded_results_widget, error_widget)
+    Async::new(spinner_widget, loaded_results_widget, || {Empty})
         .lens(
             Ctx::make(
                 AppState::common_ctx,
@@ -134,7 +153,7 @@ pub fn best_of_artists() -> impl Widget<AppState> {
 }
 
 pub fn your_shows() -> impl Widget<AppState> {
-    Async::new(spinner_widget, loaded_results_widget, error_widget)
+    Async::new(spinner_widget, loaded_results_widget, || {Empty})
         .lens(
             Ctx::make(
                 AppState::common_ctx,
@@ -151,7 +170,7 @@ pub fn your_shows() -> impl Widget<AppState> {
 }
 
 pub fn jump_back_in() -> impl Widget<AppState> {
-    Async::new(spinner_widget, loaded_results_widget, error_widget)
+    Async::new(spinner_widget, loaded_results_widget, || {Empty})
         .lens(
             Ctx::make(
                 AppState::common_ctx,
@@ -168,7 +187,7 @@ pub fn jump_back_in() -> impl Widget<AppState> {
 }
 
 pub fn shows_that_you_might_like() -> impl Widget<AppState> {
-    Async::new(spinner_widget, loaded_results_widget, error_widget)
+    Async::new(spinner_widget, loaded_results_widget, || {Empty})
         .lens(
             Ctx::make(
                 AppState::common_ctx,
