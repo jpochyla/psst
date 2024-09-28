@@ -74,6 +74,13 @@ impl Track {
     }
 }
 
+#[derive(Clone, Debug, Data, Lens, Deserialize, PartialEq)]
+pub struct TrackLines {
+    pub start_time_ms: String,
+    pub words: String,
+    pub end_time_ms: String,
+}
+
 #[derive(Clone, Copy, Default, PartialEq, Eq, Debug, Hash, Deserialize, Serialize)]
 #[serde(try_from = "String")]
 #[serde(into = "String")]

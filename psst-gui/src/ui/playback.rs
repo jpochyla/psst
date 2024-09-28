@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use druid::{
     kurbo::{Affine, BezPath},
-    widget::{CrossAxisAlignment, Either, Flex, Label, LineBreaking, Spinner, ViewSwitcher},
+    widget::{Button, CrossAxisAlignment, Either, Flex, Label, LineBreaking, Spinner, ViewSwitcher},
     BoxConstraints, Cursor, Data, Env, Event, EventCtx, LayoutCtx, LensExt, LifeCycle,
     LifeCycleCtx, MouseButton, PaintCtx, Point, Rect, RenderContext, Size, UpdateCtx, Widget,
     WidgetExt, WidgetPod,
@@ -13,8 +13,7 @@ use crate::{
     cmd::{self, ADD_TO_QUEUE},
     controller::PlaybackController,
     data::{
-        AppState, AudioAnalysis, Episode, NowPlaying, Playable, PlayableMatcher, Playback,
-        PlaybackOrigin, PlaybackState, QueueBehavior, ShowLink, Track,
+        AppState, AudioAnalysis, Episode, Nav, NowPlaying, Playable, PlayableMatcher, Playback, PlaybackOrigin, PlaybackState, QueueBehavior, ShowLink, Track
     },
     widget::{
         icons::{self, SvgIcon},
@@ -201,6 +200,9 @@ fn player_widget() -> impl Widget<Playback> {
         .with_child(queue_behavior_widget())
         .with_default_spacer()
         .with_child(Maybe::or_empty(durations_widget).lens(Playback::now_playing))
+        .with_child(small_button_widget(&icons::ALBUM)
+            .align_right()
+            .on_left_click(|ctx, _, _, _| ctx.submit_command(cmd::NAVIGATE.with(Nav::Lyrics))))
         .padding(theme::grid(2.0))
 }
 

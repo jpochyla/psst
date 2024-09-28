@@ -28,9 +28,7 @@ use psst_core::{
 
 use crate::{
     data::{
-        self, Album, AlbumType, Artist, ArtistAlbums, ArtistLink, AudioAnalysis, Cached, Episode,
-        EpisodeId, EpisodeLink, MixedView, Nav, Page, Playlist, PublicUser, Range, Recommendations,
-        RecommendationsRequest, SearchResults, SearchTopic, Show, SpotifyUrl, Track, UserProfile,
+        self, Album, AlbumType, Artist, ArtistAlbums, ArtistLink, AudioAnalysis, Cached, Episode, EpisodeId, EpisodeLink, MixedView, Nav, Page, Playlist, PublicUser, Range, Recommendations, RecommendationsRequest, SearchResults, SearchTopic, Show, SpotifyUrl, Track, TrackLines, UserProfile
     },
     error::Error,
 };
@@ -1207,6 +1205,52 @@ impl WebApi {
         self.delete(format!("v1/playlists/{}/tracks", playlist_id), None)?
             .send_json(ureq::json!({ "positions": [track_pos] }))?;
         Ok(())
+    }
+}
+
+/// Genius endpoints.
+impl WebApi {
+    // https://spclient.wg.spotify.com/color-lyrics/v2/track/0Xf3chg0IH3ivgHfSRDImY/image/https%3A%2F%2Fi.scdn.co%2Fimage%2Fab67616d0000b2730e60d57a785d7c4f8418c8a3?format=json&vocalRemoval=false&market=from_token
+    pub fn get_lyrics(&self, track_id: String, image_url: String) -> Result<Vector<TrackLines>, Error> {
+        #[derive(Default, Debug, Clone, PartialEq, Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        pub struct Root {
+            pub lyrics: Lyrics,
+            pub colors: Colors,
+            pub has_vocal_removal: bool,
+        }
+
+        #[derive(Default, Debug, Clone, PartialEq, Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        pub struct Lyrics {
+            pub sync_type: String,
+            pub lines: Vector<TrackLines>,
+            pub provider: String,
+            pub provider_lyrics_id: String,
+            pub provider_display_name: String,
+            pub sync_lyrics_uri: String,
+            pub is_dense_typeface: bool,
+            pub language: String,
+            pub is_rtl_language: bool,
+            pub show_upsell: bool,
+            pub cap_status: String,
+            pub is_snippet: bool,
+        }
+
+        #[derive(Default, Debug, Clone, PartialEq, Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        pub struct Colors {
+            pub background: i64,
+            pub text: i64,
+            pub highlight_text: i64,
+        }
+
+        let request = self.get(format!("color-lyrics/v2/track/{}/image/https://{}", track_id, image_url), Some("spclient.wg.spotify.com"))?
+            .query("vocalRemoveal", "false")
+            .query("market", "from_token");
+
+        let result: Root = self.load(request)?;
+        Ok(result.lyrics.lines)
     }
 }
 
