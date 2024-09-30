@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use druid::{
     kurbo::{Affine, BezPath},
-    widget::{Button, CrossAxisAlignment, Either, Flex, Label, LineBreaking, Spinner, ViewSwitcher},
+    widget::{CrossAxisAlignment, Either, Flex, Label, LineBreaking, Spinner, ViewSwitcher},
     BoxConstraints, Cursor, Data, Env, Event, EventCtx, LayoutCtx, LensExt, LifeCycle,
     LifeCycleCtx, MouseButton, PaintCtx, Point, Rect, RenderContext, Size, UpdateCtx, Widget,
     WidgetExt, WidgetPod,

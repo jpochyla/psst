@@ -1,23 +1,17 @@
-use std::sync::Arc;
 
-use druid::im::Vector;
-use druid::widget::{Button, Either, Flex, Label, LineBreaking, Scroll};
+use druid::widget::{Flex, Label, LineBreaking};
 use druid::Insets;
 use druid::{widget::List, LensExt, Selector, Widget, WidgetExt};
 
-use crate::data::{Artist, Ctx, HomeDetail, MixedView, NowPlaying, Show, Track, TrackLines, WithCtx};
-use crate::widget::Empty;
+use crate::data::{Ctx, NowPlaying, TrackLines};
 use crate::{
     data::AppState,
     webapi::WebApi,
     widget::{Async, MyWidgetExt},
 };
 
-use super::{album, artist, playable, show, theme, track, utils};
-use super::{
-    playlist,
-    utils::{error_widget, spinner_widget},
-};
+use super::theme;
+use super::utils::{error_widget, spinner_widget};
 
 pub const LOAD_LYRICS: Selector<NowPlaying> = Selector::new("app.home.load_lyrics");
 

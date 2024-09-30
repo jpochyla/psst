@@ -861,6 +861,7 @@ impl WebApi {
             .query("format", "json")
             .query("vocalRemoval", "false")
             .query("market", "from_token")
+            // This is the reason for redoing the request method here rather than reusing as the order needs to be this way round.
             .set("app-platform", "WebPlayer")
             .set("Authorization", &format!("Bearer {}", &token));
 
@@ -870,7 +871,7 @@ impl WebApi {
                 Ok(result.lyrics.lines)
             },
             Err(e) => {
-                Err(e)
+                Err(e) 
             }
         }
     }
