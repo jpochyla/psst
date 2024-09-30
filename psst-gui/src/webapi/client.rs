@@ -819,6 +819,61 @@ impl WebApi {
         let result = self.load(request)?;
         Ok(result)
     }
+
+    pub fn get_lyrics(&self, track_id: String, image_url: String) -> Result<Vector<TrackLines>, Error> {
+        #[derive(Default, Debug, Clone, PartialEq, Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        pub struct Root {
+            pub lyrics: Lyrics,
+            pub colors: Colors,
+            pub has_vocal_removal: bool,
+        }
+
+        #[derive(Default, Debug, Clone, PartialEq, Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        pub struct Lyrics {
+            pub sync_type: String,
+            pub lines: Vector<TrackLines>,
+            pub provider: String,
+            pub provider_lyrics_id: String,
+            pub provider_display_name: String,
+            pub sync_lyrics_uri: String,
+            pub is_dense_typeface: bool,
+            pub language: String,
+            pub is_rtl_language: bool,
+            pub show_upsell: bool,
+            pub cap_status: String,
+            pub is_snippet: bool,
+        }
+
+        #[derive(Default, Debug, Clone, PartialEq, Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        pub struct Colors {
+            pub background: i64,
+            pub text: i64,
+            pub highlight_text: i64,
+        }
+        // https://spclient.wg.spotify.com/color-lyrics/v2/track/6h4yONyGIFXYhrvEX6jVeb/image/https%3A%2F%2Fi.scdn.co%2Fimage%2Fab67616d0000b273f8bd876cdda0e7a825bb9afb?format=json&vocalRemoval=false&market=from_token
+        let token = self.access_token()?;
+        let request = self
+            .agent
+            .request("GET", &format!("https://{}/{}", "spclient.wg.spotify.com", format!("color-lyrics/v2/track/{}/image/https%3A%2F%2Fi.scdn.co%2Fimage%2F{}", track_id, track_id.clone().split_off(3))))
+            .query("format", "json")
+            .query("vocalRemoval", "false")
+            .query("market", "from_token")
+            .set("app-platform", "WebPlayer")
+            .set("Authorization", &format!("Bearer {}", &token));
+
+// WE can defiantly cache this very effectivly!
+        match self.load::<Root>(request) {
+            Ok(result) => {
+                Ok(result.lyrics.lines)
+            },
+            Err(e) => {
+                Err(e)
+            }
+        }
+    }
 }
 
 /// Library endpoints.
@@ -1205,52 +1260,6 @@ impl WebApi {
         self.delete(format!("v1/playlists/{}/tracks", playlist_id), None)?
             .send_json(ureq::json!({ "positions": [track_pos] }))?;
         Ok(())
-    }
-}
-
-/// Genius endpoints.
-impl WebApi {
-    // https://spclient.wg.spotify.com/color-lyrics/v2/track/0Xf3chg0IH3ivgHfSRDImY/image/https%3A%2F%2Fi.scdn.co%2Fimage%2Fab67616d0000b2730e60d57a785d7c4f8418c8a3?format=json&vocalRemoval=false&market=from_token
-    pub fn get_lyrics(&self, track_id: String, image_url: String) -> Result<Vector<TrackLines>, Error> {
-        #[derive(Default, Debug, Clone, PartialEq, Deserialize)]
-        #[serde(rename_all = "camelCase")]
-        pub struct Root {
-            pub lyrics: Lyrics,
-            pub colors: Colors,
-            pub has_vocal_removal: bool,
-        }
-
-        #[derive(Default, Debug, Clone, PartialEq, Deserialize)]
-        #[serde(rename_all = "camelCase")]
-        pub struct Lyrics {
-            pub sync_type: String,
-            pub lines: Vector<TrackLines>,
-            pub provider: String,
-            pub provider_lyrics_id: String,
-            pub provider_display_name: String,
-            pub sync_lyrics_uri: String,
-            pub is_dense_typeface: bool,
-            pub language: String,
-            pub is_rtl_language: bool,
-            pub show_upsell: bool,
-            pub cap_status: String,
-            pub is_snippet: bool,
-        }
-
-        #[derive(Default, Debug, Clone, PartialEq, Deserialize)]
-        #[serde(rename_all = "camelCase")]
-        pub struct Colors {
-            pub background: i64,
-            pub text: i64,
-            pub highlight_text: i64,
-        }
-
-        let request = self.get(format!("color-lyrics/v2/track/{}/image/https://{}", track_id, image_url), Some("spclient.wg.spotify.com"))?
-            .query("vocalRemoveal", "false")
-            .query("market", "from_token");
-
-        let result: Root = self.load(request)?;
-        Ok(result.lyrics.lines)
     }
 }
 

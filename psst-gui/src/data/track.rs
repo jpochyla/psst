@@ -27,6 +27,7 @@ pub struct Track {
     pub popularity: Option<u32>,
     #[serde(skip)]
     pub track_pos: usize,
+    pub lyrics: Option<Vector<TrackLines>>,
 }
 
 impl Track {
@@ -75,6 +76,7 @@ impl Track {
 }
 
 #[derive(Clone, Debug, Data, Lens, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub struct TrackLines {
     pub start_time_ms: String,
     pub words: String,

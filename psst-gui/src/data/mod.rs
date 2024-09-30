@@ -83,6 +83,7 @@ pub struct AppState {
     pub alerts: Vector<Alert>,
     pub finder: Finder,
     pub added_queue: Vector<QueueEntry>,
+    pub lyrics: Promise<Vector<TrackLines>>,
 }
 
 impl AppState {
@@ -164,6 +165,7 @@ impl AppState {
             common_ctx,
             alerts: Vector::new(),
             finder: Finder::new(),
+            lyrics: Promise::Empty,
         }
     }
 }

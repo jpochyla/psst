@@ -1,10 +1,11 @@
 use std::sync::Arc;
 
 use druid::im::Vector;
-use druid::widget::{Either, Flex, Label, Scroll};
+use druid::widget::{Button, Either, Flex, Label, LineBreaking, Scroll};
+use druid::Insets;
 use druid::{widget::List, LensExt, Selector, Widget, WidgetExt};
 
-use crate::data::{Artist, Ctx, HomeDetail, MixedView, Show, Track, TrackLines, WithCtx};
+use crate::data::{Artist, Ctx, HomeDetail, MixedView, NowPlaying, Show, Track, TrackLines, WithCtx};
 use crate::widget::Empty;
 use crate::{
     data::AppState,
@@ -12,31 +13,44 @@ use crate::{
     widget::{Async, MyWidgetExt},
 };
 
-use super::{album, artist, playable, show, theme, track};
+use super::{album, artist, playable, show, theme, track, utils};
 use super::{
     playlist,
     utils::{error_widget, spinner_widget},
 };
 
-pub const LOAD_LYRICS: Selector = Selector::new("app.home.load-made-for-your");
+pub const LOAD_LYRICS: Selector<NowPlaying> = Selector::new("app.home.load_lyrics");
 
 pub fn lyrics_widget() -> impl Widget<AppState> {
     Flex::column()
         .with_child(user_top_tracks_widget())
 }
 
-fn top_tracks_widget() -> impl Widget<WithCtx<Vector<Arc<Track>>>> {
-    playable::list_widget(playable::Display {
-        track: track::Display {
-            title: true,
-            album: true,
-            popularity: true,
-            cover: true,
-            ..track::Display::empty()
-        },
-    })
-}
-
 fn user_top_tracks_widget() -> impl Widget<AppState> {
-    Label::new(format!("{:?}", WebApi::global().get_lyrics("0Xf3chg0IH3ivgHfSRDImY".to_string(),  "i.scdn.co%2Fimage%2Fab67616d0000b2730e60d57a785d7c4f8418c8a3".to_string()).unwrap()[0]))
+    Async::new(
+        spinner_widget,
+        || {List::new(|| {
+            Label::raw()
+                .with_line_break_mode(LineBreaking::WordWrap)
+                .with_text_size(theme::TEXT_SIZE_SMALL)
+                .lens(Ctx::data().then(TrackLines::words))
+                .expand_width()
+                .padding(Insets::uniform_xy(theme::grid(2.0), theme::grid(0.6)))
+                .link()
+        })},
+        error_widget,
+    )
+    .lens(
+        Ctx::make(
+            AppState::common_ctx,
+            AppState::lyrics,
+        )
+        .then(Ctx::in_promise()),
+    )
+    .on_command_async(
+        LOAD_LYRICS,
+        |t| WebApi::global().get_lyrics(t.item.id().to_base62(), t.cover_image_url(250.0, 250.0).unwrap().to_string()),
+        |_, data, _| data.lyrics.defer(()),
+        |_, data, r| data.lyrics.update(((), r.1)),
+    )
 }
