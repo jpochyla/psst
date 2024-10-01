@@ -13,7 +13,6 @@ impl NavController {
         match &data.nav {
             // TODO: Change this to preload the data
             Nav::Home => {}
-            // TODO: Change this to preload the data
             Nav::Lyrics => {}
             Nav::SavedTracks => {
                 if !data.library.saved_tracks.is_resolved() {

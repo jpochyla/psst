@@ -12,16 +12,17 @@ use crate::{
 };
 
 use super::theme;
-use super::utils::{error_widget, spinner_widget};
+use super::utils::spinner_widget;
 
-pub const LOAD_LYRICS: Selector<NowPlaying> = Selector::new("app.home.load_lyrics");
+pub const SHOW_LYRICS: Selector<NowPlaying> = Selector::new("app.home.show_lyrics");
+
 
 pub fn lyrics_widget() -> impl Widget<AppState> {
     Flex::column()
-        .with_child(user_top_tracks_widget())
+        .with_child(track_lyrics_widget())
 }
 
-fn user_top_tracks_widget() -> impl Widget<AppState> {
+fn track_lyrics_widget() -> impl Widget<AppState> {
     Async::new(
         spinner_widget,
         || {List::new(|| {
@@ -32,7 +33,6 @@ fn user_top_tracks_widget() -> impl Widget<AppState> {
                 .expand_width()
                 .padding(Insets::uniform_xy(theme::grid(2.0), theme::grid(0.6)))
                 .link()
-                // 19360
                 .on_left_click(|ctx, _, c, _| ctx.submit_command(cmd::SKIP_TO_POSITION.with(c.data.start_time_ms.parse::<u64>().unwrap())))
             
         })},
@@ -46,7 +46,7 @@ fn user_top_tracks_widget() -> impl Widget<AppState> {
         .then(Ctx::in_promise()),
     )
     .on_command_async(
-        LOAD_LYRICS,
+        SHOW_LYRICS,
         |t| WebApi::global().get_lyrics(t.item.id().to_base62()),
         |_, data, _| data.lyrics.defer(()),
         |_, data, r| data.lyrics.update(((), r.1)),

@@ -186,14 +186,22 @@ fn player_widget() -> impl Widget<Playback> {
     Flex::row()
         .with_child(
             small_button_widget(&icons::SKIP_BACK)
-                .on_left_click(|ctx, _, _, _| ctx.submit_command(cmd::PLAY_PREVIOUS)),
-        )
+                .on_left_click(|ctx, _, now_playing: &mut Playback, _| {
+                    ctx.submit_command(cmd::PLAY_PREVIOUS);
+                    ctx.submit_command(lyrics::SHOW_LYRICS.with(now_playing.now_playing.as_ref().unwrap().clone()))
+                }
+                ),        
+            )
         .with_default_spacer()
         .with_child(player_play_pause_widget())
         .with_default_spacer()
         .with_child(
             small_button_widget(&icons::SKIP_FORWARD)
-                .on_left_click(|ctx, _, _, _| ctx.submit_command(cmd::PLAY_NEXT)),
+                .on_left_click(|ctx, _, now_playing: &mut Playback, _| {
+                    ctx.submit_command(cmd::PLAY_NEXT);
+                    ctx.submit_command(lyrics::SHOW_LYRICS.with(now_playing.now_playing.as_ref().unwrap().clone()))
+                }
+            ),
         )
         .with_default_spacer()
         .with_child(queue_behavior_widget())
@@ -202,8 +210,11 @@ fn player_widget() -> impl Widget<Playback> {
         // TODO: make toggle, and make it more concise!
         .with_child(small_button_widget(&icons::ALBUM)
             .align_right()
-            .on_left_click(|ctx, _, now_playing: &mut Playback, _| ctx.submit_command(lyrics::LOAD_LYRICS.with(now_playing.now_playing.as_ref().unwrap().clone()))))
-            .on_left_click(|ctx, _, _, _| ctx.submit_command(cmd::NAVIGATE.with(Nav::Lyrics)))
+            .on_left_click(|ctx, _, now_playing: &mut Playback, _| {
+                ctx.submit_command(lyrics::SHOW_LYRICS.with(now_playing.now_playing.as_ref().unwrap().clone()));
+                ctx.submit_command(cmd::NAVIGATE.with(Nav::Lyrics))}
+            )
+        )
         // Or navigate back one!
         .padding(theme::grid(2.0))
 }

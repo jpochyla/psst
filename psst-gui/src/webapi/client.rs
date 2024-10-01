@@ -827,7 +827,6 @@ impl WebApi {
             pub lyrics: Lyrics,
         }
 
-
         #[derive(Default, Debug, Clone, PartialEq, Deserialize, Data)]
         #[serde(rename_all = "camelCase")]
         pub struct Lyrics {
