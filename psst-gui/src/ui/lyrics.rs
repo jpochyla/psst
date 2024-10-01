@@ -3,6 +3,7 @@ use druid::widget::{Flex, Label, LineBreaking};
 use druid::Insets;
 use druid::{widget::List, LensExt, Selector, Widget, WidgetExt};
 
+use crate::cmd;
 use crate::data::{Ctx, NowPlaying, TrackLines};
 use crate::{
     data::AppState,
@@ -31,8 +32,11 @@ fn user_top_tracks_widget() -> impl Widget<AppState> {
                 .expand_width()
                 .padding(Insets::uniform_xy(theme::grid(2.0), theme::grid(0.6)))
                 .link()
+                // 19360
+                .on_left_click(|ctx, _, c, _| ctx.submit_command(cmd::SKIP_TO_POSITION.with(c.data.start_time_ms.parse::<u64>().unwrap())))
+            
         })},
-        error_widget,
+        || Label::new("No lyrics for this song!"),
     )
     .lens(
         Ctx::make(
@@ -43,7 +47,7 @@ fn user_top_tracks_widget() -> impl Widget<AppState> {
     )
     .on_command_async(
         LOAD_LYRICS,
-        |t| WebApi::global().get_lyrics(t.item.id().to_base62(), t.cover_image_url(250.0, 250.0).unwrap().to_string()),
+        |t| WebApi::global().get_lyrics(t.item.id().to_base62()),
         |_, data, _| data.lyrics.defer(()),
         |_, data, r| data.lyrics.update(((), r.1)),
     )

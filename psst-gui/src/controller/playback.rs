@@ -436,6 +436,12 @@ where
                 }
                 ctx.set_handled();
             }
+            Event::Command(cmd) if cmd.is(cmd::SKIP_TO_POSITION) => {
+                let location = cmd.get_unchecked(cmd::SKIP_TO_POSITION);
+                self.seek(Duration::from_millis(location.clone()));
+
+                ctx.set_handled();
+            }
             // Keyboard shortcuts.
             Event::KeyDown(key) if key.code == Code::Space => {
                 self.pause_or_resume();
