@@ -13,7 +13,8 @@ use crate::{
     cmd::{self, ADD_TO_QUEUE},
     controller::PlaybackController,
     data::{
-        AppState, AudioAnalysis, Episode, Nav, NowPlaying, Playable, PlayableMatcher, Playback, PlaybackOrigin, PlaybackState, QueueBehavior, ShowLink, Track
+        AppState, AudioAnalysis, Episode, Nav, NowPlaying, Playable, PlayableMatcher, Playback,
+        PlaybackOrigin, PlaybackState, QueueBehavior, ShowLink, Track,
     },
     widget::{
         icons::{self, SvgIcon},
@@ -185,35 +186,32 @@ fn playback_origin_icon(origin: &PlaybackOrigin) -> &'static SvgIcon {
 fn player_widget() -> impl Widget<Playback> {
     Flex::row()
         .with_child(
-            small_button_widget(&icons::SKIP_BACK)
-                .on_left_click(|ctx, _, now_playing: &mut Playback, _| {
-                    ctx.submit_command(cmd::PLAY_PREVIOUS);
-                    ctx.submit_command(lyrics::SHOW_LYRICS.with(now_playing.now_playing.as_ref().unwrap().clone()))
-                }
-                ),        
-            )
+            small_button_widget(&icons::SKIP_BACK).on_left_click(|ctx, _, _, _| {
+                ctx.submit_command(cmd::PLAY_PREVIOUS);
+            }),
+        )
         .with_default_spacer()
         .with_child(player_play_pause_widget())
         .with_default_spacer()
         .with_child(
-            small_button_widget(&icons::SKIP_FORWARD)
-                .on_left_click(|ctx, _, now_playing: &mut Playback, _| {
-                    ctx.submit_command(cmd::PLAY_NEXT);
-                    ctx.submit_command(lyrics::SHOW_LYRICS.with(now_playing.now_playing.as_ref().unwrap().clone()))
-                }
-            ),
+            small_button_widget(&icons::SKIP_FORWARD).on_left_click(|ctx, _, _, _| {
+                ctx.submit_command(cmd::PLAY_NEXT);
+            }),
         )
         .with_default_spacer()
         .with_child(queue_behavior_widget())
         .with_default_spacer()
         .with_child(Maybe::or_empty(durations_widget).lens(Playback::now_playing))
         // TODO: make toggle, and make it more concise!
-        .with_child(small_button_widget(&icons::ALBUM)
-            .align_right()
-            .on_left_click(|ctx, _, now_playing: &mut Playback, _| {
-                ctx.submit_command(lyrics::SHOW_LYRICS.with(now_playing.now_playing.as_ref().unwrap().clone()));
-                ctx.submit_command(cmd::NAVIGATE.with(Nav::Lyrics))}
-            )
+        .with_child(
+            small_button_widget(&icons::ALBUM)
+                .align_right()
+                .on_left_click(|ctx, _, now_playing: &mut Playback, _| {
+                    ctx.submit_command(
+                        lyrics::SHOW_LYRICS.with(now_playing.now_playing.as_ref().unwrap().clone()),
+                    );
+                    ctx.submit_command(cmd::NAVIGATE.with(Nav::Lyrics))
+                }),
         )
         // Or navigate back one!
         .padding(theme::grid(2.0))
