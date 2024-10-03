@@ -1,24 +1,25 @@
 use druid::{
-    im::Vector, kurbo::Circle, piet::d3d::Error, widget::{CrossAxisAlignment, Flex, Label, LabelText, LineBreaking, List}, Data, Insets, LensExt, LocalizedString, Menu, MenuItem, Selector, UnitPoint, Widget, WidgetExt
+    im::Vector, kurbo::Circle, widget::{CrossAxisAlignment, Flex, Label, LabelText, LineBreaking, List}, Data, Insets, LensExt, LocalizedString, Menu, MenuItem, Selector, Size, UnitPoint, Widget, WidgetExt
 };
 
 use crate::{
     cmd,
     data::{
-        AppState, Artist, ArtistAlbums, ArtistDetail, ArtistLink, ArtistTracks, Cached, Ctx, Nav,
-        WithCtx,
+        AppState, Artist, ArtistAlbums, ArtistDetail, ArtistInfo, ArtistLink, ArtistStats, ArtistTracks, Cached, Ctx, Nav, WithCtx
     },
     webapi::WebApi,
     widget::{Async, MyWidgetExt, RemoteImage},
 };
 
-use super::{album, playable, theme, track, utils::{self, error_widget}};
+use super::{album, playable, theme, track, utils::{self}};
 
 pub const LOAD_DETAIL: Selector<ArtistLink> = Selector::new("app.artist.load-detail");
 
 pub fn detail_widget() -> impl Widget<AppState> {
     Flex::column()
-        .with_child(async_artist_links())
+        .with_child(Flex::row()
+            .with_child(async_artist_info())
+        )
         .with_child(async_top_tracks_widget())
         .with_child(async_albums_widget().padding((theme::grid(1.0), 0.0)))
         .with_child(async_related_widget().padding((theme::grid(1.0), 0.0)))
@@ -69,30 +70,24 @@ fn async_albums_widget() -> impl Widget<AppState> {
         )
 }
 
-fn async_artist_links() -> impl Widget<AppState> {
+fn async_artist_info() -> impl Widget<AppState> {
     Async::new(
         || utils::spinner_widget(),
-        || {
-            List::new(|| {
-                Label::new(|item: &String, _env: &_| item.to_string())
-                    .with_line_break_mode(LineBreaking::WordWrap)
-            })
-            .lens(Ctx::data())
-        },
+        artist_info_widget,
         || utils::error_widget(),
     )
     .lens(
         Ctx::make(
             AppState::common_ctx,
-            AppState::artist_detail.then(ArtistDetail::artist_links),
+            AppState::artist_detail.then(ArtistDetail::artist_info),
         )
         .then(Ctx::in_promise()),
     )
     .on_command_async(
         LOAD_DETAIL,
-        |d| WebApi::global().get_artist_links(&d.id),
-        |_, data, d| data.artist_detail.artist_links.defer(d),
-        |_, data, r| data.artist_detail.artist_links.update(r),
+        |d| WebApi::global().get_artist_info(&d.id),
+        |_, data, d| data.artist_detail.artist_info.defer(d),
+        |_, data, r| data.artist_detail.artist_info.update(r),
     )
 }
 
@@ -169,6 +164,43 @@ pub fn cover_widget(size: f64) -> impl Widget<Artist> {
     .clip(Circle::new((radius, radius), radius))
 }
 
+fn artist_info_widget() -> impl Widget<WithCtx<ArtistInfo>> {
+    let size = theme::grid(10.0);
+    Flex::row()
+        .cross_axis_alignment(CrossAxisAlignment::Start)
+        .with_spacer(theme::grid(1.0))
+        .with_child(RemoteImage::new(utils::placeholder_widget(), move |artist: &ArtistInfo, _| {
+            Some(artist.main_image.clone())
+            })
+            .fix_size(size, size)
+            .clip(Size::new(size, size).to_rounded_rect(4.0))
+            .lens(Ctx::data())
+        )
+        .with_child(List::new(|| {
+            Label::new(|item: &String, _env: &_| item.to_string())
+                .with_line_break_mode(LineBreaking::WordWrap)
+        })
+        .lens(Ctx::data().then(ArtistInfo::artist_links)))
+        .with_child(Label::raw()
+            .with_line_break_mode(LineBreaking::WordWrap)
+            .lens(Ctx::data().then(ArtistInfo::stats.then(ArtistStats::followers))))
+        .with_child(Label::raw()   
+            .with_line_break_mode(LineBreaking::WordWrap)
+            .lens(Ctx::data().then(ArtistInfo::stats.then(ArtistStats::monthly_listeners))))
+        .with_child(Label::raw()   
+            .with_line_break_mode(LineBreaking::WordWrap)
+            .lens(Ctx::data().then(ArtistInfo::stats.then(ArtistStats::world_rank))))
+        .with_child(
+        Flex::column()
+            .cross_axis_alignment(CrossAxisAlignment::Start)
+            .with_child(header_widget("Biography"))
+            .with_child(
+                Label::raw()
+                    .with_line_break_mode(LineBreaking::WordWrap)
+                    .lens(Ctx::data().then(ArtistInfo::bio))
+            )
+        )
+}
 fn top_tracks_widget() -> impl Widget<WithCtx<ArtistTracks>> {
     playable::list_widget(playable::Display {
         track: track::Display {

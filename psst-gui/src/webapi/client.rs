@@ -1,5 +1,5 @@
 use std::{
-    env::var, fmt::Display, io::{self, Read}, path::PathBuf, sync::Arc, thread, time::Duration
+    fmt::Display, io::{self, Read}, path::PathBuf, sync::Arc, thread, time::Duration
 };
 
 use druid::{
@@ -14,7 +14,6 @@ use sanitize_html::rules::predefined::DEFAULT;
 use sanitize_html::sanitize_str;
 use serde::{de::DeserializeOwned, Deserialize};
 use serde_json::json;
-use serde_json::Value;
 use ureq::{Agent, Request, Response};
 
 use psst_core::{
@@ -24,9 +23,7 @@ use psst_core::{
 
 use crate::{
     data::{
-        self, Album, AlbumType, Artist, ArtistAlbums, ArtistLink, AudioAnalysis, Cached, Episode,
-        EpisodeId, EpisodeLink, MixedView, Nav, Page, Playlist, PublicUser, Range, Recommendations,
-        RecommendationsRequest, SearchResults, SearchTopic, Show, SpotifyUrl, Track, UserProfile,
+        self, Album, AlbumType, Artist, ArtistAlbums, ArtistInfo, ArtistLink, ArtistStats, AudioAnalysis, Cached, Episode, EpisodeId, EpisodeLink, MixedView, Nav, Page, Playlist, PublicUser, Range, Recommendations, RecommendationsRequest, SearchResults, SearchTopic, Show, SpotifyUrl, Track, UserProfile
     },
     error::Error,
 };
@@ -754,7 +751,7 @@ impl WebApi {
         Ok(result.map(|result| result.artists))
     }
 
-    pub fn get_artist_links(&self, id: &str) -> Result<Vector<String>, Error> {
+    pub fn get_artist_info(&self, id: &str) -> Result<ArtistInfo, Error> {
         #[derive(Deserialize)]
         pub struct Welcome {
             data: Data,
@@ -768,27 +765,9 @@ impl WebApi {
 
         #[derive(Deserialize)]
         pub struct ArtistUnion {
-            goods: Goods,
-            id: String,
             profile: Profile,
             stats: Stats,
-        }
-
-        #[derive(Deserialize)]
-        pub struct Goods {
-            events: Events,
-        }
-
-        #[derive(Deserialize)]
-        pub struct Events {
-            concerts: Merch,
-        }
-
-        #[derive(Deserialize)]
-        #[serde(rename_all = "camelCase")]
-        pub struct Merch {
-            items: Vec<Option<serde_json::Value>>,
-            total_count: i64,
+            visuals: Visuals,
         }
 
         #[derive(Deserialize)]
@@ -796,7 +775,6 @@ impl WebApi {
         pub struct Profile {
             biography: Biography,
             external_links: ExternalLinks,
-            name: String,
         }
 
         #[derive(Deserialize)]
@@ -810,8 +788,24 @@ impl WebApi {
         }
 
         #[derive(Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        pub struct Visuals {
+            avatar_image: AvatarImage,
+        }
+        #[derive(Deserialize)]
+        pub struct AvatarImage {
+            sources: Vec<Source>,
+        }
+
+        #[derive(Deserialize)]
+        pub struct Source {
+            height: i64,
+            url: String,
+            width: i64,
+        }
+
+        #[derive(Deserialize)]
         pub struct ExternalLinksItem {
-            name: String,
             url: String,
         }
 
@@ -820,22 +814,7 @@ impl WebApi {
         pub struct Stats {
             followers: i64,
             monthly_listeners: i64,
-            top_cities: TopCities,
             world_rank: i64,
-        }
-
-        #[derive(Deserialize)]
-        pub struct TopCities {
-            items: Vec<TopCitiesItem>,
-        }
-
-        #[derive(Deserialize)]
-        #[serde(rename_all = "camelCase")]
-        pub struct TopCitiesItem {
-            city: String,
-            country: String,
-            number_of_listeners: i64,
-            region: String,
         }
 
         let extensions = json!({
@@ -865,7 +844,17 @@ impl WebApi {
         .into_iter()
         .map(|link| link.url)
         .collect();
-        Ok(hrefs)
+
+        Ok(ArtistInfo {
+            main_image: Arc::from(result.data.artist_union.visuals.avatar_image.sources[0].url.to_string()),
+            stats: ArtistStats{
+                followers: result.data.artist_union.stats.followers.to_string(),
+                monthly_listeners: result.data.artist_union.stats.monthly_listeners.to_string(),
+                world_rank: result.data.artist_union.stats.world_rank.to_string()
+            },
+            bio: result.data.artist_union.profile.biography.text,
+            artist_links: hrefs.into()
+        })
     }
 }
 

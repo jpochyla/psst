@@ -11,7 +11,7 @@ pub struct ArtistDetail {
     pub albums: Promise<ArtistAlbums, ArtistLink>,
     pub top_tracks: Promise<ArtistTracks, ArtistLink>,
     pub related_artists: Promise<Cached<Vector<Artist>>, ArtistLink>,
-    pub artist_links: Promise<Vector<String>, ArtistLink>
+    pub artist_info: Promise<ArtistInfo, ArtistLink>,
 }
 
 #[derive(Clone, Data, Lens, Deserialize)]
@@ -40,6 +40,20 @@ pub struct ArtistAlbums {
     pub singles: Vector<Arc<Album>>,
     pub compilations: Vector<Arc<Album>>,
     pub appears_on: Vector<Arc<Album>>,
+}
+#[derive(Clone, Data, Lens)]
+pub struct ArtistInfo {
+    pub main_image: Arc<str>,
+    pub stats: ArtistStats,
+    pub bio: String,
+    pub artist_links: Vector<String>,
+}
+
+#[derive(Clone, Data, Lens)]
+pub struct ArtistStats {
+    pub followers: String,
+    pub monthly_listeners: String,
+    pub world_rank: String,
 }
 
 #[derive(Clone, Data, Lens)]
