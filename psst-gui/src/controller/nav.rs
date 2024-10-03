@@ -1,7 +1,7 @@
 use crate::{
     cmd,
     data::{AppState, Nav, SpotifyUrl},
-    ui::{album, artist, library, lyrics, playlist, recommend, search, show},
+    ui::{album, artist, library, playlist, recommend, search, show},
 };
 use druid::widget::{prelude::*, Controller};
 

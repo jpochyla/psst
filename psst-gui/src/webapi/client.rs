@@ -824,21 +824,20 @@ impl WebApi {
     }
 
     pub fn get_lyrics(&self, track_id: String) -> Result<Vector<TrackLines>, Error> {
-        let track_id_arc: Arc<str> = track_id.clone().into();
-
-        // Check in-memory cache
-        if let Some(cached_lyrics) = self.cache.get_lyrics(&track_id_arc) {
-            return Ok(cached_lyrics);
+        #[derive(Default, Debug, Clone, PartialEq, Deserialize, Data)]
+        #[serde(rename_all = "camelCase")]
+        pub struct Root {
+            pub lyrics: Lyrics,
         }
 
-        // Check disk cache
-        if let Some(disk_cached_lyrics) = self.cache.get_lyrics_from_disk(&track_id_arc) {
-            self.cache
-                .set_lyrics(track_id_arc.clone(), disk_cached_lyrics.clone());
-            return Ok(disk_cached_lyrics);
+        #[derive(Default, Debug, Clone, PartialEq, Deserialize, Data)]
+        #[serde(rename_all = "camelCase")]
+        pub struct Lyrics {
+            pub lines: Vector<TrackLines>,
+            pub provider: String,
+            pub provider_lyrics_id: String,
         }
 
-        // If not in cache, fetch from API
         let token = self.access_token()?;
         let request = self
             .agent
@@ -849,13 +848,8 @@ impl WebApi {
             .set("app-platform", "WebPlayer")
             .set("Authorization", &format!("Bearer {}", &token));
 
-        let lyrics: Vector<TrackLines> = self.load(request)?;
-
-        // Save to in-memory and disk cache
-        self.cache.set_lyrics(track_id_arc.clone(), lyrics.clone());
-        self.cache.save_lyrics_to_disk(&track_id_arc, &lyrics);
-
-        Ok(lyrics)
+        let lyrics: Cached<Root> = self.load_cached(request.clone(), "TrackLines", &track_id)?;
+        Ok(lyrics.data.lyrics.lines)
     }
 }
 
