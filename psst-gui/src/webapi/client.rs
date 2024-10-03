@@ -28,7 +28,10 @@ use psst_core::{
 
 use crate::{
     data::{
-        self, Album, AlbumType, Artist, ArtistAlbums, ArtistLink, AudioAnalysis, Cached, Episode, EpisodeId, EpisodeLink, MixedView, Nav, Page, Playlist, PublicUser, Range, Recommendations, RecommendationsRequest, SearchResults, SearchTopic, Show, SpotifyUrl, Track, TrackLines, UserProfile
+        self, Album, AlbumType, Artist, ArtistAlbums, ArtistLink, AudioAnalysis, Cached, Episode,
+        EpisodeId, EpisodeLink, MixedView, Nav, Page, Playlist, PublicUser, Range, Recommendations,
+        RecommendationsRequest, SearchResults, SearchTopic, Show, SpotifyUrl, Track, TrackLines,
+        UserProfile,
     },
     error::Error,
 };
@@ -821,20 +824,21 @@ impl WebApi {
     }
 
     pub fn get_lyrics(&self, track_id: String) -> Result<Vector<TrackLines>, Error> {
-        #[derive(Default, Debug, Clone, PartialEq, Deserialize, Data)]
-        #[serde(rename_all = "camelCase")]
-        pub struct Root {
-            pub lyrics: Lyrics,
+        let track_id_arc: Arc<str> = track_id.clone().into();
+
+        // Check in-memory cache
+        if let Some(cached_lyrics) = self.cache.get_lyrics(&track_id_arc) {
+            return Ok(cached_lyrics);
         }
 
-        #[derive(Default, Debug, Clone, PartialEq, Deserialize, Data)]
-        #[serde(rename_all = "camelCase")]
-        pub struct Lyrics {
-            pub lines: Vector<TrackLines>,
-            pub provider: String,
-            pub provider_lyrics_id: String,
+        // Check disk cache
+        if let Some(disk_cached_lyrics) = self.cache.get_lyrics_from_disk(&track_id_arc) {
+            self.cache
+                .set_lyrics(track_id_arc.clone(), disk_cached_lyrics.clone());
+            return Ok(disk_cached_lyrics);
         }
 
+        // If not in cache, fetch from API
         let token = self.access_token()?;
         let request = self
             .agent
@@ -842,12 +846,16 @@ impl WebApi {
             .query("format", "json")
             .query("vocalRemoval", "false")
             .query("market", "from_token")
-            // This is the reason for redoing the request method here rather than reusing as the order needs to be this way round.
             .set("app-platform", "WebPlayer")
             .set("Authorization", &format!("Bearer {}", &token));
 
-        let result: Cached<Root> = self.load_cached(request.clone(), "Lyrics", &track_id)?;
-        Ok(result.data.lyrics.lines)
+        let lyrics: Vector<TrackLines> = self.load(request)?;
+
+        // Save to in-memory and disk cache
+        self.cache.set_lyrics(track_id_arc.clone(), lyrics.clone());
+        self.cache.save_lyrics_to_disk(&track_id_arc, &lyrics);
+
+        Ok(lyrics)
     }
 }
 

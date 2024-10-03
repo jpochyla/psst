@@ -6,6 +6,8 @@ use std::{
     sync::Arc,
 };
 
+use crate::data::TrackLines;
+use druid::im::Vector;
 use druid::image;
 use druid::ImageBuf;
 use lru_cache::LruCache;
@@ -15,14 +17,17 @@ use psst_core::cache::mkdir_if_not_exists;
 pub struct WebApiCache {
     base: Option<PathBuf>,
     images: Mutex<LruCache<Arc<str>, ImageBuf>>,
+    lyrics: Mutex<LruCache<Arc<str>, Vector<TrackLines>>>,
 }
 
 impl WebApiCache {
     pub fn new(base: Option<PathBuf>) -> Self {
         const IMAGE_CACHE_SIZE: usize = 256;
+        const LYRICS_CACHE_SIZE: usize = 100;
         Self {
             base,
             images: Mutex::new(LruCache::new(IMAGE_CACHE_SIZE)),
+            lyrics: Mutex::new(LruCache::new(LYRICS_CACHE_SIZE)),
         }
     }
 
@@ -81,5 +86,33 @@ impl WebApiCache {
 
     fn key(&self, bucket: &str, key: &str) -> Option<PathBuf> {
         self.bucket(bucket).map(|path| path.join(key))
+    }
+
+    pub fn get_lyrics(&self, track_id: &Arc<str>) -> Option<Vector<TrackLines>> {
+        let result = self.lyrics.lock().get_mut(track_id).cloned();
+        result
+    }
+
+    pub fn set_lyrics(&self, track_id: Arc<str>, lyrics: Vector<TrackLines>) {
+        self.lyrics.lock().insert(track_id, lyrics);
+    }
+
+    pub fn get_lyrics_from_disk(&self, track_id: &Arc<str>) -> Option<Vector<TrackLines>> {
+        let result = self
+            .key("lyrics", track_id)
+            .and_then(|path| std::fs::read(path).ok())
+            .and_then(|bytes| serde_json::from_slice(&bytes).ok());
+        result
+    }
+
+    pub fn save_lyrics_to_disk(&self, track_id: &Arc<str>, lyrics: &Vector<TrackLines>) {
+        if let Some(path) = self.key("lyrics", track_id) {
+            if let Some(parent) = path.parent() {
+                let _ = std::fs::create_dir_all(parent);
+            }
+            if let Ok(data) = serde_json::to_vec(lyrics) {
+                let _ = std::fs::write(path, data);
+            }
+        }
     }
 }

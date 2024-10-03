@@ -75,7 +75,7 @@ impl Track {
     }
 }
 
-#[derive(Clone, Debug, Data, Lens, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Data, Lens, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct TrackLines {
     pub start_time_ms: String,

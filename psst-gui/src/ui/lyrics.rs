@@ -82,7 +82,7 @@ fn track_lyrics_widget() -> impl Widget<AppState> {
                     })
             })
         },
-        || Label::new("No lyrics for this song!").center(),
+        || Label::new("No lyrics found for this track").center(),
     )
     .lens(Ctx::make(AppState::common_ctx, AppState::lyrics).then(Ctx::in_promise()))
     .on_command_async(

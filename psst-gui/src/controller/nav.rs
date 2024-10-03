@@ -11,11 +11,7 @@ impl NavController {
     fn load_route_data(&self, ctx: &mut EventCtx, data: &mut AppState) {
         match &data.nav {
             Nav::Home => {}
-            Nav::Lyrics => {
-                if let Some(now_playing) = &data.playback.now_playing {
-                    ctx.submit_command(lyrics::SHOW_LYRICS.with(now_playing.clone()));
-                }
-            }
+            Nav::Lyrics => {}
             Nav::SavedTracks => {
                 if !data.library.saved_tracks.is_resolved() {
                     ctx.submit_command(library::LOAD_TRACKS);
