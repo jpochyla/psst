@@ -151,6 +151,7 @@ impl AppState {
                 albums: Promise::Empty,
                 top_tracks: Promise::Empty,
                 related_artists: Promise::Empty,
+                artist_links: Promise::Empty,
             },
             playlist_detail: PlaylistDetail {
                 playlist: Promise::Empty,

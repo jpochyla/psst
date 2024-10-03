@@ -1,10 +1,5 @@
 use std::{
-    fmt::Display,
-    io::{self, Read},
-    path::PathBuf,
-    sync::Arc,
-    thread,
-    time::Duration,
+    env::var, fmt::Display, io::{self, Read}, path::PathBuf, sync::Arc, thread, time::Duration
 };
 
 use druid::{
@@ -19,6 +14,7 @@ use sanitize_html::rules::predefined::DEFAULT;
 use sanitize_html::sanitize_str;
 use serde::{de::DeserializeOwned, Deserialize};
 use serde_json::json;
+use serde_json::Value;
 use ureq::{Agent, Request, Response};
 
 use psst_core::{
@@ -756,6 +752,120 @@ impl WebApi {
         let request = self.get(format!("v1/artists/{}/related-artists", id), None)?;
         let result: Cached<Artists> = self.load_cached(request, "related-artists", id)?;
         Ok(result.map(|result| result.artists))
+    }
+
+    pub fn get_artist_links(&self, id: &str) -> Result<Vector<String>, Error> {
+        #[derive(Deserialize)]
+        pub struct Welcome {
+            data: Data,
+        }
+
+        #[derive(Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        pub struct Data {
+            artist_union: ArtistUnion,
+        }
+
+        #[derive(Deserialize)]
+        pub struct ArtistUnion {
+            goods: Goods,
+            id: String,
+            profile: Profile,
+            stats: Stats,
+        }
+
+        #[derive(Deserialize)]
+        pub struct Goods {
+            events: Events,
+        }
+
+        #[derive(Deserialize)]
+        pub struct Events {
+            concerts: Merch,
+        }
+
+        #[derive(Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        pub struct Merch {
+            items: Vec<Option<serde_json::Value>>,
+            total_count: i64,
+        }
+
+        #[derive(Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        pub struct Profile {
+            biography: Biography,
+            external_links: ExternalLinks,
+            name: String,
+        }
+
+        #[derive(Deserialize)]
+        pub struct Biography {
+            text: String,
+        }
+
+        #[derive(Deserialize)]
+        pub struct ExternalLinks {
+            items: Vec<ExternalLinksItem>,
+        }
+
+        #[derive(Deserialize)]
+        pub struct ExternalLinksItem {
+            name: String,
+            url: String,
+        }
+
+        #[derive(Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        pub struct Stats {
+            followers: i64,
+            monthly_listeners: i64,
+            top_cities: TopCities,
+            world_rank: i64,
+        }
+
+        #[derive(Deserialize)]
+        pub struct TopCities {
+            items: Vec<TopCitiesItem>,
+        }
+
+        #[derive(Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        pub struct TopCitiesItem {
+            city: String,
+            country: String,
+            number_of_listeners: i64,
+            region: String,
+        }
+
+        let extensions = json!({
+            "persistedQuery": {
+                "version": 1,
+                // From https://github.com/spicetify/cli/blob/bb767a9059143fe183c1c577acff335dc6a462b7/Extensions/shuffle%2B.js#L373 keep and eye on this and change accordingly
+                "sha256Hash": "35648a112beb1794e39ab931365f6ae4a8d45e65396d641eeda94e4003d41497"
+            }
+        });
+        let extensions_json = serde_json::to_string(&extensions);
+        
+        let variables = json!( {
+            "uri": format!("spotify:artist:{}", id),
+            "locale": "",
+            "includePrerelease": true,  // Assuming this returns a Result<String, Error>
+        });
+        let variables_json = serde_json::to_string(&variables);
+
+        let request = self.get("pathfinder/v1/query", Some("api-partner.spotify.com"))?
+            .query("operationName", "queryArtistOverview")
+            .query("variables", &variables_json.unwrap().to_string())
+            .query("extensions", &extensions_json.unwrap().to_string());
+
+        let result: Welcome = self.load(request)?;
+
+        let hrefs: Vector<String> = result.data.artist_union.profile.external_links.items
+        .into_iter()
+        .map(|link| link.url)
+        .collect();
+        Ok(hrefs)
     }
 }
 

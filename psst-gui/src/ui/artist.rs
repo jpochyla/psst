@@ -1,8 +1,5 @@
 use druid::{
-    im::Vector,
-    kurbo::Circle,
-    widget::{CrossAxisAlignment, Flex, Label, LabelText, LineBreaking, List},
-    Data, Insets, LensExt, LocalizedString, Menu, MenuItem, Selector, UnitPoint, Widget, WidgetExt,
+    im::Vector, kurbo::Circle, piet::d3d::Error, widget::{CrossAxisAlignment, Flex, Label, LabelText, LineBreaking, List}, Data, Insets, LensExt, LocalizedString, Menu, MenuItem, Selector, UnitPoint, Widget, WidgetExt
 };
 
 use crate::{
@@ -15,12 +12,13 @@ use crate::{
     widget::{Async, MyWidgetExt, RemoteImage},
 };
 
-use super::{album, playable, theme, track, utils};
+use super::{album, playable, theme, track, utils::{self, error_widget}};
 
 pub const LOAD_DETAIL: Selector<ArtistLink> = Selector::new("app.artist.load-detail");
 
 pub fn detail_widget() -> impl Widget<AppState> {
     Flex::column()
+        .with_child(async_artist_links())
         .with_child(async_top_tracks_widget())
         .with_child(async_albums_widget().padding((theme::grid(1.0), 0.0)))
         .with_child(async_related_widget().padding((theme::grid(1.0), 0.0)))
@@ -69,6 +67,33 @@ fn async_albums_widget() -> impl Widget<AppState> {
             |_, data, d| data.artist_detail.albums.defer(d),
             |_, data, r| data.artist_detail.albums.update(r),
         )
+}
+
+fn async_artist_links() -> impl Widget<AppState> {
+    Async::new(
+        || utils::spinner_widget(),
+        || {
+            List::new(|| {
+                Label::new(|item: &String, _env: &_| item.to_string())
+                    .with_line_break_mode(LineBreaking::WordWrap)
+            })
+            .lens(Ctx::data())
+        },
+        || utils::error_widget(),
+    )
+    .lens(
+        Ctx::make(
+            AppState::common_ctx,
+            AppState::artist_detail.then(ArtistDetail::artist_links),
+        )
+        .then(Ctx::in_promise()),
+    )
+    .on_command_async(
+        LOAD_DETAIL,
+        |d| WebApi::global().get_artist_links(&d.id),
+        |_, data, d| data.artist_detail.artist_links.defer(d),
+        |_, data, r| data.artist_detail.artist_links.update(r),
+    )
 }
 
 fn async_related_widget() -> impl Widget<AppState> {
