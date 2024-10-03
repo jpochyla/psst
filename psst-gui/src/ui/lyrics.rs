@@ -1,36 +1,79 @@
-use druid::widget::{Flex, Label, LineBreaking};
-use druid::Insets;
-use druid::{widget::List, LensExt, Selector, Widget, WidgetExt};
+use druid::widget::{Container, CrossAxisAlignment, Flex, Label, LineBreaking, List, Scroll};
+use druid::{Insets, LensExt, Selector, Widget, WidgetExt};
 
 use crate::cmd;
-use crate::data::{Ctx, NowPlaying, TrackLines};
-use crate::{
-    data::AppState,
-    webapi::WebApi,
-    widget::{Async, MyWidgetExt},
-};
+use crate::data::{AppState, Ctx, NowPlaying, Playable, TrackLines};
+use crate::widget::MyWidgetExt;
+use crate::{webapi::WebApi, widget::Async};
 
 use super::theme;
-use super::utils::spinner_widget;
+use super::utils;
 
 pub const SHOW_LYRICS: Selector<NowPlaying> = Selector::new("app.home.show_lyrics");
 
 pub fn lyrics_widget() -> impl Widget<AppState> {
-    Flex::column().with_child(track_lyrics_widget())
+    Scroll::new(
+        Container::new(
+            Flex::column()
+                .cross_axis_alignment(CrossAxisAlignment::Center)
+                .with_default_spacer()
+                .with_child(track_info_widget())
+                .with_spacer(theme::grid(2.0))
+                .with_child(track_lyrics_widget()),
+        )
+        .fix_width(400.0)
+        .center(),
+    )
+    .vertical()
+}
+
+fn track_info_widget() -> impl Widget<AppState> {
+    Flex::column()
+        .cross_axis_alignment(CrossAxisAlignment::Center)
+        .with_child(
+            Label::dynamic(|data: &AppState, _| {
+                data.playback.now_playing.as_ref().map_or_else(
+                    || "No track playing".to_string(),
+                    |np| match &np.item {
+                        Playable::Track(track) => track.name.clone().to_string(),
+                        _ => "Unknown track".to_string(),
+                    },
+                )
+            })
+            .with_font(theme::UI_FONT_MEDIUM)
+            .with_text_size(theme::TEXT_SIZE_LARGE),
+        )
+        .with_spacer(theme::grid(0.5))
+        .with_child(
+            Label::dynamic(|data: &AppState, _| {
+                data.playback.now_playing.as_ref().map_or_else(
+                    || "".to_string(),
+                    |np| match &np.item {
+                        Playable::Track(track) => {
+                            format!("{} - {}", track.artist_name(), track.album_name())
+                        }
+                        _ => "".to_string(),
+                    },
+                )
+            })
+            .with_text_size(theme::TEXT_SIZE_SMALL)
+            .with_text_color(theme::PLACEHOLDER_COLOR),
+        )
 }
 
 fn track_lyrics_widget() -> impl Widget<AppState> {
     Async::new(
-        spinner_widget,
+        utils::spinner_widget,
         || {
             List::new(|| {
                 Label::raw()
                     .with_line_break_mode(LineBreaking::WordWrap)
-                    .with_text_size(theme::TEXT_SIZE_SMALL)
                     .lens(Ctx::data().then(TrackLines::words))
                     .expand_width()
-                    .padding(Insets::uniform_xy(theme::grid(2.0), theme::grid(0.6)))
+                    .center()
+                    .padding(Insets::uniform_xy(theme::grid(1.0), theme::grid(0.5)))
                     .link()
+                    .rounded(theme::BUTTON_BORDER_RADIUS)
                     .on_left_click(|ctx, _, c, _| {
                         ctx.submit_command(
                             cmd::SKIP_TO_POSITION
@@ -39,7 +82,7 @@ fn track_lyrics_widget() -> impl Widget<AppState> {
                     })
             })
         },
-        || Label::new("No lyrics for this song!"),
+        || Label::new("No lyrics for this song!").center(),
     )
     .lens(Ctx::make(AppState::common_ctx, AppState::lyrics).then(Ctx::in_promise()))
     .on_command_async(
