@@ -202,9 +202,8 @@ fn player_widget() -> impl Widget<Playback> {
         .with_child(queue_behavior_widget())
         .with_default_spacer()
         .with_child(Maybe::or_empty(durations_widget).lens(Playback::now_playing))
-        // TODO: make toggle, and make it more concise!
         .with_child(
-            small_button_widget(&icons::ALBUM)
+            small_button_widget(&icons::MUSIC_NOTE)
                 .align_right()
                 .on_left_click(|ctx, _, now_playing: &mut Playback, _| {
                     ctx.submit_command(
@@ -213,7 +212,6 @@ fn player_widget() -> impl Widget<Playback> {
                     ctx.submit_command(cmd::NAVIGATE.with(Nav::Lyrics))
                 }),
         )
-        // Or navigate back one!
         .padding(theme::grid(2.0))
 }
 
