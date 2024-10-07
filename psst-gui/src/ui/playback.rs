@@ -10,10 +10,10 @@ use druid::{
 use itertools::Itertools;
 
 use crate::{
-    cmd::{self, ADD_TO_QUEUE},
+    cmd::{self, ADD_TO_QUEUE, TOGGLE_LYRICS},
     controller::PlaybackController,
     data::{
-        AppState, AudioAnalysis, Episode, Nav, NowPlaying, Playable, PlayableMatcher, Playback,
+        AppState, AudioAnalysis, Episode, NowPlaying, Playable, PlayableMatcher, Playback,
         PlaybackOrigin, PlaybackState, QueueBehavior, ShowLink, Track,
     },
     widget::{
@@ -22,7 +22,7 @@ use crate::{
     },
 };
 
-use super::{episode, library, lyrics, theme, track, utils};
+use super::{episode, library, theme, track, utils};
 
 pub fn panel_widget() -> impl Widget<AppState> {
     let seek_bar = Maybe::or_empty(SeekBar::new).lens(Playback::now_playing);
@@ -205,11 +205,8 @@ fn player_widget() -> impl Widget<Playback> {
         .with_child(
             small_button_widget(&icons::MUSIC_NOTE)
                 .align_right()
-                .on_left_click(|ctx, _, now_playing: &mut Playback, _| {
-                    ctx.submit_command(
-                        lyrics::SHOW_LYRICS.with(now_playing.now_playing.as_ref().unwrap().clone()),
-                    );
-                    ctx.submit_command(cmd::NAVIGATE.with(Nav::Lyrics))
+                .on_left_click(|ctx, _, _, _| {
+                    ctx.submit_command(TOGGLE_LYRICS);
                 }),
         )
         .padding(theme::grid(2.0))
