@@ -1,8 +1,8 @@
 use druid::widget::{Container, CrossAxisAlignment, Flex, Label, LineBreaking, List, Scroll};
-use druid::{EventCtx, Insets, LensExt, Selector, Widget, WidgetExt};
+use druid::{Insets, LensExt, Selector, Widget, WidgetExt};
 
 use crate::cmd;
-use crate::data::{AppState, Ctx, Nav, NowPlaying, Playable, TrackLines};
+use crate::data::{AppState, Ctx, NowPlaying, Playable, TrackLines};
 use crate::widget::MyWidgetExt;
 use crate::{webapi::WebApi, widget::Async};
 
@@ -25,9 +25,6 @@ pub fn lyrics_widget() -> impl Widget<AppState> {
         .center(),
     )
     .vertical()
-    .on_command(cmd::TOGGLE_LYRICS, |ctx, _, data| {
-        toggle_lyrics(data, ctx);
-    })
 }
 
 fn track_info_widget() -> impl Widget<AppState> {
@@ -94,15 +91,4 @@ fn track_lyrics_widget() -> impl Widget<AppState> {
         |_, data, _| data.lyrics.defer(()),
         |_, data, r| data.lyrics.update(((), r.1)),
     )
-}
-
-pub fn toggle_lyrics(data: &mut AppState, ctx: &mut EventCtx) {
-    if data.nav == Nav::Lyrics {
-        ctx.submit_command(cmd::NAVIGATE_BACK.with(1));
-    } else {
-        if let Some(now_playing) = &data.playback.now_playing {
-            ctx.submit_command(SHOW_LYRICS.with(now_playing.clone()));
-            ctx.submit_command(cmd::NAVIGATE.with(Nav::Lyrics));
-        }
-    }
 }

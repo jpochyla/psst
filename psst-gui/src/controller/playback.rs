@@ -452,7 +452,7 @@ where
             }
             Event::Command(cmd) if cmd.is(cmd::SKIP_TO_POSITION) => {
                 let location = cmd.get_unchecked(cmd::SKIP_TO_POSITION);
-                self.seek(Duration::from_millis(location.clone()));
+                self.seek(Duration::from_millis(*location));
 
                 ctx.set_handled();
             }
