@@ -32,7 +32,6 @@ pub const LOG_OUT: Selector = Selector::new("app.log-out");
 pub const NAVIGATE: Selector<Nav> = Selector::new("app.navigates");
 pub const NAVIGATE_BACK: Selector<usize> = Selector::new("app.navigate-back");
 pub const NAVIGATE_REFRESH: Selector = Selector::new("app.navigate-refresh");
-pub const TOGGLE_LYRICS: Selector = Selector::new("app.toggle-lyrics");
 
 // Playback state
 pub const PLAYBACK_LOADING: Selector<ItemId> = Selector::new("app.playback-loading");
@@ -54,7 +53,6 @@ pub const PLAY_STOP: Selector = Selector::new("app.play-stop");
 pub const ADD_TO_QUEUE: Selector<(QueueEntry, PlaybackItem)> = Selector::new("app.add-to-queue");
 pub const PLAY_QUEUE_BEHAVIOR: Selector<QueueBehavior> = Selector::new("app.play-queue-behavior");
 pub const PLAY_SEEK: Selector<f64> = Selector::new("app.play-seek");
-pub const SKIP_TO_POSITION: Selector<u64> = Selector::new("app.skip-to-position");
 
 // Sorting control
 pub const SORT_BY_DATE_ADDED: Selector = Selector::new("app.sort-by-date-added");

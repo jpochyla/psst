@@ -30,8 +30,7 @@ use crate::{
     data::{
         self, Album, AlbumType, Artist, ArtistAlbums, ArtistLink, AudioAnalysis, Cached, Episode,
         EpisodeId, EpisodeLink, MixedView, Nav, Page, Playlist, PublicUser, Range, Recommendations,
-        RecommendationsRequest, SearchResults, SearchTopic, Show, SpotifyUrl, Track, TrackLines,
-        UserProfile,
+        RecommendationsRequest, SearchResults, SearchTopic, Show, SpotifyUrl, Track, UserProfile,
     },
     error::Error,
 };
@@ -821,35 +820,6 @@ impl WebApi {
             .query("market", "from_token");
         let result = self.load(request)?;
         Ok(result)
-    }
-
-    pub fn get_lyrics(&self, track_id: String) -> Result<Vector<TrackLines>, Error> {
-        #[derive(Default, Debug, Clone, PartialEq, Deserialize, Data)]
-        #[serde(rename_all = "camelCase")]
-        pub struct Root {
-            pub lyrics: Lyrics,
-        }
-
-        #[derive(Default, Debug, Clone, PartialEq, Deserialize, Data)]
-        #[serde(rename_all = "camelCase")]
-        pub struct Lyrics {
-            pub lines: Vector<TrackLines>,
-            pub provider: String,
-            pub provider_lyrics_id: String,
-        }
-
-        let token = self.access_token()?;
-        let request = self
-            .agent
-            .request("GET", &format!("https://spclient.wg.spotify.com/color-lyrics/v2/track/{}/image/https%3A%2F%2Fi.scdn.co%2Fimage%2F{}", track_id, track_id.clone().split_off(3)))
-            .query("format", "json")
-            .query("vocalRemoval", "false")
-            .query("market", "from_token")
-            .set("app-platform", "WebPlayer")
-            .set("Authorization", &format!("Bearer {}", &token));
-
-        let lyrics: Cached<Root> = self.load_cached(request.clone(), "TrackLines", &track_id)?;
-        Ok(lyrics.data.lyrics.lines)
     }
 }
 

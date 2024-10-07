@@ -1,9 +1,10 @@
+use druid::widget::{prelude::*, Controller};
+
 use crate::{
     cmd,
     data::{AppState, Nav, SpotifyUrl},
     ui::{album, artist, library, playlist, recommend, search, show},
 };
-use druid::widget::{prelude::*, Controller};
 
 pub struct NavController;
 
@@ -11,7 +12,6 @@ impl NavController {
     fn load_route_data(&self, ctx: &mut EventCtx, data: &mut AppState) {
         match &data.nav {
             Nav::Home => {}
-            Nav::Lyrics => {}
             Nav::SavedTracks => {
                 if !data.library.saved_tracks.is_resolved() {
                     ctx.submit_command(library::LOAD_TRACKS);
