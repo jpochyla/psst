@@ -176,11 +176,6 @@ fn artist_info_widget() -> impl Widget<WithCtx<ArtistInfo>> {
             .clip(Size::new(size, size).to_rounded_rect(4.0))
             .lens(Ctx::data())
         )
-        .with_child(List::new(|| {
-            Label::new(|item: &String, _env: &_| item.to_string())
-                .with_line_break_mode(LineBreaking::WordWrap)
-        })
-        .lens(Ctx::data().then(ArtistInfo::artist_links)))
         .with_child(Label::raw()
             .with_line_break_mode(LineBreaking::WordWrap)
             .lens(Ctx::data().then(ArtistInfo::stats.then(ArtistStats::followers))))
@@ -200,6 +195,7 @@ fn artist_info_widget() -> impl Widget<WithCtx<ArtistInfo>> {
                     .lens(Ctx::data().then(ArtistInfo::bio))
             )
         )
+        .context_menu(|artist| artist_info_menu(&artist.data))
 }
 fn top_tracks_widget() -> impl Widget<WithCtx<ArtistTracks>> {
     playable::list_widget(playable::Display {
@@ -244,6 +240,31 @@ fn header_widget<T: Data>(text: impl Into<LabelText<T>>) -> impl Widget<T> {
         .with_text_color(theme::PLACEHOLDER_COLOR)
         .with_text_size(theme::TEXT_SIZE_SMALL)
         .padding(Insets::new(0.0, theme::grid(2.0), 0.0, theme::grid(1.0)))
+}
+
+fn artist_info_menu(artist: &ArtistInfo) -> Menu<AppState> {
+    let mut menu = Menu::empty();
+
+    for artist_links in &artist.artist_links {
+        let more_than_one_artist = artist.artist_links.len() > 1;
+        let title = if more_than_one_artist {
+            LocalizedString::new("menu-item-go-to-social")
+                .with_placeholder(format!("Go to their“{:?}”", artist_links
+                .strip_prefix("https://")
+                .unwrap_or(artist_links)
+                .split(".com")
+                .next()
+                .unwrap_or("No socials")))
+        } else {
+            LocalizedString::new("").with_placeholder("")
+        };
+        menu = menu.entry(
+            MenuItem::new(title)
+                .command(cmd::GO_TO_URL.with(artist_links.to_owned()))
+        );
+    }
+
+    menu
 }
 
 fn artist_menu(artist: &ArtistLink) -> Menu<AppState> {

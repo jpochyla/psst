@@ -23,7 +23,7 @@ use psst_core::{
 
 use crate::{
     data::{
-        self, Album, AlbumType, Artist, ArtistAlbums, ArtistInfo, ArtistLink, ArtistStats, AudioAnalysis, Cached, Episode, EpisodeId, EpisodeLink, MixedView, Nav, Page, Playlist, PublicUser, Range, Recommendations, RecommendationsRequest, SearchResults, SearchTopic, Show, SpotifyUrl, Track, UserProfile
+        self, Album, AlbumType, Artist, ArtistAlbums, ArtistInfo, ArtistLink, ArtistStats, AudioAnalysis, Cached, Episode, EpisodeId, EpisodeLink, Image, MixedView, Nav, Page, Playlist, PublicUser, Range, Recommendations, RecommendationsRequest, SearchResults, SearchTopic, Show, SpotifyUrl, Track, UserProfile
     },
     error::Error,
 };
@@ -752,64 +752,56 @@ impl WebApi {
     }
 
     pub fn get_artist_info(&self, id: &str) -> Result<ArtistInfo, Error> {
-        #[derive(Deserialize)]
+        #[derive(Clone, Data, Deserialize)]
         pub struct Welcome {
-            data: Data,
+            data: Data1,
         }
 
-        #[derive(Deserialize)]
+        #[derive(Clone, Data, Deserialize)]
         #[serde(rename_all = "camelCase")]
-        pub struct Data {
+        pub struct Data1 {
             artist_union: ArtistUnion,
         }
 
-        #[derive(Deserialize)]
+        #[derive(Clone, Data, Deserialize)]
         pub struct ArtistUnion {
             profile: Profile,
             stats: Stats,
             visuals: Visuals,
         }
 
-        #[derive(Deserialize)]
+        #[derive(Clone, Data, Deserialize)]
         #[serde(rename_all = "camelCase")]
         pub struct Profile {
             biography: Biography,
             external_links: ExternalLinks,
         }
 
-        #[derive(Deserialize)]
+        #[derive(Clone, Data, Deserialize)]
         pub struct Biography {
             text: String,
         }
 
-        #[derive(Deserialize)]
+        #[derive(Clone, Data, Deserialize)]
         pub struct ExternalLinks {
-            items: Vec<ExternalLinksItem>,
+            items: Vector<ExternalLinksItem>,
         }
 
-        #[derive(Deserialize)]
+        #[derive(Clone, Data, Deserialize)]
         #[serde(rename_all = "camelCase")]
         pub struct Visuals {
             avatar_image: AvatarImage,
         }
-        #[derive(Deserialize)]
+        #[derive(Clone, Data, Deserialize)]
         pub struct AvatarImage {
-            sources: Vec<Source>,
+            sources: Vector<Image>,
         }
-
-        #[derive(Deserialize)]
-        pub struct Source {
-            height: i64,
-            url: String,
-            width: i64,
-        }
-
-        #[derive(Deserialize)]
+        #[derive(Clone, Data, Deserialize)]
         pub struct ExternalLinksItem {
             url: String,
         }
 
-        #[derive(Deserialize)]
+        #[derive(Clone, Data, Deserialize)]
         #[serde(rename_all = "camelCase")]
         pub struct Stats {
             followers: i64,
@@ -838,21 +830,37 @@ impl WebApi {
             .query("variables", &variables_json.unwrap().to_string())
             .query("extensions", &extensions_json.unwrap().to_string());
 
-        let result: Welcome = self.load(request)?;
+        let result: Cached<Welcome> = self.load_cached(request, "artist-info", id)?;
 
-        let hrefs: Vector<String> = result.data.artist_union.profile.external_links.items
+        let hrefs: Vector<String> = result.data.data.artist_union.profile.external_links.items
         .into_iter()
         .map(|link| link.url)
         .collect();
 
         Ok(ArtistInfo {
-            main_image: Arc::from(result.data.artist_union.visuals.avatar_image.sources[0].url.to_string()),
+            main_image: Arc::from(result.data.data.artist_union.visuals.avatar_image.sources[0].url.to_string()),
             stats: ArtistStats{
-                followers: result.data.artist_union.stats.followers.to_string(),
-                monthly_listeners: result.data.artist_union.stats.monthly_listeners.to_string(),
-                world_rank: result.data.artist_union.stats.world_rank.to_string()
+                followers: result.data.data.artist_union.stats.followers.to_string(),
+                monthly_listeners: result.data.data.artist_union.stats.monthly_listeners.to_string(),
+                world_rank: result.data.data.artist_union.stats.world_rank.to_string()
             },
-            bio: result.data.artist_union.profile.biography.text,
+            bio: {
+                let desc = sanitize_str(
+                    &DEFAULT,
+                    &result.data
+                        .data
+                        .artist_union.profile.biography.text,
+                )
+                .unwrap_or_default();
+                // This is roughly 3 lines of description, truncated if too long
+                if desc.chars().count() > 255 {
+                    desc.chars().take(254).collect::<String>() + "..."
+                } else {
+                    desc
+                }
+                .into()
+            },
+            
             artist_links: hrefs.into()
         })
     }
