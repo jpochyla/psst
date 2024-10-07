@@ -13,17 +13,17 @@ Contributions are welcome!
 
 ## Download
 
-GitHub Actions automatically creates builds when new commits are pushed to the `master` branch.
+GitHub Actions automatically creates builds when new commits are pushed to the `main` branch.
 You can download the prebuilt binaries for x86_64 Windows, Linux (Ubuntu), and macOS.
 
 | Platform                                                                                                            |
 | ------------------------------------------------------------------------------------------------------------------- |
-| [Linux (x86_64)](https://nightly.link/jpochyla/psst/workflows/build/master/psst-gui-x86_64-unknown-linux-gnu.zip)   |
-| [Linux (aarch64)](https://nightly.link/jpochyla/psst/workflows/build/master/psst-gui-aarch64-unknown-linux-gnu.zip) |
-| [Debian Package (amd64)](https://nightly.link/jpochyla/psst/workflows/build/master/psst-deb-amd64.zip)              |
-| [Debian Package (arm64)](https://nightly.link/jpochyla/psst/workflows/build/master/psst-deb-arm64.zip)              |
-| [MacOS](https://nightly.link/jpochyla/psst/workflows/build/master/Psst.dmg.zip)                                     |
-| [Windows](https://nightly.link/jpochyla/psst/workflows/build/master/Psst.exe.zip)                                   |
+| [Linux (x86_64)](https://nightly.link/jpochyla/psst/workflows/build/main/psst-gui-x86_64-unknown-linux-gnu.zip)   |
+| [Linux (aarch64)](https://nightly.link/jpochyla/psst/workflows/build/main/psst-gui-aarch64-unknown-linux-gnu.zip) |
+| [Debian Package (amd64)](https://nightly.link/jpochyla/psst/workflows/build/main/psst-deb-amd64.zip)              |
+| [Debian Package (arm64)](https://nightly.link/jpochyla/psst/workflows/build/main/psst-deb-arm64.zip)              |
+| [MacOS](https://nightly.link/jpochyla/psst/workflows/build/main/Psst.dmg.zip)                                     |
+| [Windows](https://nightly.link/jpochyla/psst/workflows/build/main/Psst.exe.zip)                                   |
 
 Unofficial builds of Psst are also available through the [AUR](https://aur.archlinux.org/packages/psst-git) and [Homebrew](https://formulae.brew.sh/cask/psst).
 

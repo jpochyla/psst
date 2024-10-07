@@ -27,6 +27,7 @@ pub struct Track {
     pub popularity: Option<u32>,
     #[serde(skip)]
     pub track_pos: usize,
+    pub lyrics: Option<Vector<TrackLines>>,
 }
 
 impl Track {
@@ -72,6 +73,14 @@ impl Track {
     pub fn url(&self) -> String {
         format!("https://open.spotify.com/track/{}", self.id.0.to_base62())
     }
+}
+
+#[derive(Clone, Debug, Data, Lens, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct TrackLines {
+    pub start_time_ms: String,
+    pub words: String,
+    pub end_time_ms: String,
 }
 
 #[derive(Clone, Copy, Default, PartialEq, Eq, Debug, Hash, Deserialize, Serialize)]

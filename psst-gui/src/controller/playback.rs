@@ -22,7 +22,12 @@ use souvlaki::{
 
 use crate::{
     cmd,
-    data::{AppState, Config, Playback, PlaybackOrigin, PlaybackState, QueueBehavior, QueueEntry},
+    data::Nav,
+    data::{
+        AppState, Config, NowPlaying, Playback, PlaybackOrigin, PlaybackState, QueueBehavior,
+        QueueEntry,
+    },
+    ui::lyrics,
 };
 
 pub struct PlaybackController {
@@ -310,6 +315,12 @@ impl PlaybackController {
             },
         }));
     }
+
+    fn update_lyrics(&self, ctx: &mut EventCtx, data: &AppState, now_playing: &NowPlaying) {
+        if matches!(data.nav, Nav::Lyrics) {
+            ctx.submit_command(lyrics::SHOW_LYRICS.with(now_playing.clone()));
+        }
+    }
 }
 
 impl<W> Controller<AppState, W> for PlaybackController
@@ -348,6 +359,9 @@ where
                     data.start_playback(queued.item, queued.origin, progress.to_owned());
                     self.update_media_control_playback(&data.playback);
                     self.update_media_control_metadata(&data.playback);
+                    if let Some(now_playing) = &data.playback.now_playing {
+                        self.update_lyrics(ctx, data, now_playing);
+                    }
                 } else {
                     log::warn!("played item not found in playback queue");
                 }
@@ -434,6 +448,12 @@ where
                     );
                     self.seek(position);
                 }
+                ctx.set_handled();
+            }
+            Event::Command(cmd) if cmd.is(cmd::SKIP_TO_POSITION) => {
+                let location = cmd.get_unchecked(cmd::SKIP_TO_POSITION);
+                self.seek(Duration::from_millis(*location));
+
                 ctx.set_handled();
             }
             // Keyboard shortcuts.

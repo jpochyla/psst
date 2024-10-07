@@ -28,6 +28,7 @@ pub mod episode;
 pub mod find;
 pub mod home;
 pub mod library;
+pub mod lyrics;
 pub mod menu;
 pub mod playable;
 pub mod playback;
@@ -215,6 +216,9 @@ fn route_widget() -> impl Widget<AppState> {
         |state: &AppState, _| state.nav.route(),
         |route: &Route, _, _| match route {
             Route::Home => Scroll::new(home::home_widget().padding(theme::grid(1.0)))
+                .vertical()
+                .boxed(),
+            Route::Lyrics => Scroll::new(lyrics::lyrics_widget().padding(theme::grid(1.0)))
                 .vertical()
                 .boxed(),
             Route::SavedTracks => Flex::column()
@@ -471,6 +475,7 @@ fn route_icon_widget() -> impl Widget<Nav> {
             let icon = |icon: &SvgIcon| icon.scale(theme::ICON_SIZE_MEDIUM);
             match &nav {
                 Nav::Home => Empty.boxed(),
+                Nav::Lyrics => Empty.boxed(),
                 Nav::SavedTracks => Empty.boxed(),
                 Nav::SavedAlbums => Empty.boxed(),
                 Nav::SavedShows => Empty.boxed(),

@@ -11,6 +11,7 @@ use super::RecommendationsRequest;
 #[derive(Copy, Clone, Debug, Data, PartialEq, Eq, Hash)]
 pub enum Route {
     Home,
+    Lyrics,
     SavedTracks,
     SavedAlbums,
     SavedShows,
@@ -26,6 +27,7 @@ pub enum Route {
 pub enum Nav {
     #[default]
     Home,
+    Lyrics,
     SavedTracks,
     SavedAlbums,
     SavedShows,
@@ -41,6 +43,7 @@ impl Nav {
     pub fn route(&self) -> Route {
         match self {
             Nav::Home => Route::Home,
+            Nav::Lyrics => Route::Lyrics,
             Nav::SavedTracks => Route::SavedTracks,
             Nav::SavedAlbums => Route::SavedAlbums,
             Nav::SavedShows => Route::SavedShows,
@@ -56,6 +59,7 @@ impl Nav {
     pub fn title(&self) -> String {
         match self {
             Nav::Home => "Home".to_string(),
+            Nav::Lyrics => "Lyrics".to_string(),
             Nav::SavedTracks => "Saved Tracks".to_string(),
             Nav::SavedAlbums => "Saved Albums".to_string(),
             Nav::SavedShows => "Saved Podcasts".to_string(),
@@ -71,6 +75,7 @@ impl Nav {
     pub fn full_title(&self) -> String {
         match self {
             Nav::Home => "Home".to_string(),
+            Nav::Lyrics => "Lyrics".to_string(),
             Nav::SavedTracks => "Saved Tracks".to_string(),
             Nav::SavedAlbums => "Saved Albums".to_string(),
             Nav::SavedShows => "Saved Shows".to_string(),
