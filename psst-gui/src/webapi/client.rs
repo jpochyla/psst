@@ -25,9 +25,8 @@ use crate::{
     data::{
         self, Album, AlbumType, Artist, ArtistAlbums, ArtistLink, AudioAnalysis, Cached, Episode,
         EpisodeId, EpisodeLink, MixedView, Nav, Page, Playlist, PublicUser, Range, Recommendations,
-        Artist-view, RecommendationsRequest, SearchResults, SearchTopic, Show, SpotifyUrl, Track,
-        UserProfile, ArtistInfo, Image, ArtistStats, RecommendationsRequest, SearchResults, SearchTopic, Show, SpotifyUrl, Track, TrackLines,
-        UserProfile,main
+        RecommendationsRequest, SearchResults, SearchTopic, Show, SpotifyUrl, Track,
+        UserProfile, ArtistInfo, Image, ArtistStats, TrackLines,
     },
     error::Error,
 };
