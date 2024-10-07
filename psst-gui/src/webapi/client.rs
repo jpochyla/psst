@@ -23,7 +23,10 @@ use psst_core::{
 
 use crate::{
     data::{
-        self, Album, AlbumType, Artist, ArtistAlbums, ArtistInfo, ArtistLink, ArtistStats, AudioAnalysis, Cached, Episode, EpisodeId, EpisodeLink, Image, MixedView, Nav, Page, Playlist, PublicUser, Range, Recommendations, RecommendationsRequest, SearchResults, SearchTopic, Show, SpotifyUrl, Track, UserProfile
+        self, Album, AlbumType, Artist, ArtistAlbums, ArtistLink, AudioAnalysis, Cached, Episode,
+        EpisodeId, EpisodeLink, MixedView, Nav, Page, Playlist, PublicUser, Range, Recommendations,
+        RecommendationsRequest, SearchResults, SearchTopic, Show, SpotifyUrl, Track,
+        UserProfile, ArtistInfo, Image, ArtistStats,
     },
     error::Error,
 };
