@@ -1,25 +1,31 @@
 use druid::{
-    im::Vector, kurbo::Circle, widget::{CrossAxisAlignment, Flex, Label, LabelText, LineBreaking, List}, Data, Insets, LensExt, LocalizedString, Menu, MenuItem, Selector, Size, UnitPoint, Widget, WidgetExt
+    im::Vector,
+    kurbo::Circle,
+    widget::{CrossAxisAlignment, Flex, Label, LabelText, LineBreaking, List},
+    Data, Insets, LensExt, LocalizedString, Menu, MenuItem, Selector, Size, UnitPoint, Widget,
+    WidgetExt,
 };
 
 use crate::{
     cmd,
     data::{
-        AppState, Artist, ArtistAlbums, ArtistDetail, ArtistInfo, ArtistLink, ArtistStats, ArtistTracks, Cached, Ctx, Nav, WithCtx
+        AppState, Artist, ArtistAlbums, ArtistDetail, ArtistInfo, ArtistLink, ArtistTracks, Cached,
+        Ctx, Nav, WithCtx,
     },
     webapi::WebApi,
     widget::{Async, MyWidgetExt, RemoteImage},
 };
 
-use super::{album, playable, theme, track, utils::{self}};
+use super::{
+    album, playable, theme, track,
+    utils::{self},
+};
 
 pub const LOAD_DETAIL: Selector<ArtistLink> = Selector::new("app.artist.load-detail");
 
 pub fn detail_widget() -> impl Widget<AppState> {
     Flex::column()
-        .with_child(Flex::row()
-            .with_child(async_artist_info())
-        )
+        .with_child(Flex::row().with_child(async_artist_info()))
         .with_child(async_top_tracks_widget())
         .with_child(async_albums_widget().padding((theme::grid(1.0), 0.0)))
         .with_child(async_related_widget().padding((theme::grid(1.0), 0.0)))
@@ -166,37 +172,55 @@ pub fn cover_widget(size: f64) -> impl Widget<Artist> {
 
 fn artist_info_widget() -> impl Widget<WithCtx<ArtistInfo>> {
     let size = theme::grid(10.0);
+
+    let artist_image = RemoteImage::new(
+        utils::placeholder_widget(),
+        move |artist: &ArtistInfo, _| Some(artist.main_image.clone()),
+    )
+    .fix_size(size, size)
+    .clip(Size::new(size, size).to_rounded_rect(4.0))
+    .lens(Ctx::data());
+
+    let biography = Flex::column()
+        .cross_axis_alignment(CrossAxisAlignment::Start)
+        .with_child(header_widget("Biography"))
+        .with_child(
+            Label::raw()
+                .with_line_break_mode(LineBreaking::WordWrap)
+                .with_text_size(theme::TEXT_SIZE_SMALL)
+                .lens(Ctx::data().then(ArtistInfo::bio))
+                .expand_width(),
+        )
+        .fix_width(theme::grid(40.0));
+
+    let artist_stats = Flex::column()
+        .cross_axis_alignment(CrossAxisAlignment::Start)
+        .with_child(header_widget("Artist Stats"))
+        .with_child(stat_row("Followers:", |info: &ArtistInfo| {
+            format!("{} followers", info.stats.followers)
+        }))
+        .with_child(stat_row("Monthly Listeners:", |info: &ArtistInfo| {
+            format!("{} monthly listeners", info.stats.monthly_listeners)
+        }))
+        .with_child(stat_row("Ranking:", |info: &ArtistInfo| {
+            format!("#{} in the world", info.stats.world_rank)
+        }))
+        .fix_width(theme::grid(20.0));
+
     Flex::row()
         .cross_axis_alignment(CrossAxisAlignment::Start)
+        .with_child(artist_image)
         .with_spacer(theme::grid(1.0))
-        .with_child(RemoteImage::new(utils::placeholder_widget(), move |artist: &ArtistInfo, _| {
-            Some(artist.main_image.clone())
-            })
-            .fix_size(size, size)
-            .clip(Size::new(size, size).to_rounded_rect(4.0))
-            .lens(Ctx::data())
-        )
-        .with_child(Label::raw()
-            .with_line_break_mode(LineBreaking::WordWrap)
-            .lens(Ctx::data().then(ArtistInfo::stats.then(ArtistStats::followers))))
-        .with_child(Label::raw()   
-            .with_line_break_mode(LineBreaking::WordWrap)
-            .lens(Ctx::data().then(ArtistInfo::stats.then(ArtistStats::monthly_listeners))))
-        .with_child(Label::raw()   
-            .with_line_break_mode(LineBreaking::WordWrap)
-            .lens(Ctx::data().then(ArtistInfo::stats.then(ArtistStats::world_rank))))
-        .with_child(
-        Flex::column()
-            .cross_axis_alignment(CrossAxisAlignment::Start)
-            .with_child(header_widget("Biography"))
-            .with_child(
-                Label::raw()
-                    .with_line_break_mode(LineBreaking::WordWrap)
-                    .lens(Ctx::data().then(ArtistInfo::bio))
-            )
-        )
+        .with_flex_child(biography, 1.0)
+        .with_spacer(theme::grid(1.0))
+        .with_child(artist_stats)
+        .expand_width()
+        .padding(theme::grid(1.5))
+        .background(theme::BACKGROUND_DARK)
+        .rounded(theme::BUTTON_BORDER_RADIUS)
         .context_menu(|artist| artist_info_menu(&artist.data))
 }
+
 fn top_tracks_widget() -> impl Widget<WithCtx<ArtistTracks>> {
     playable::list_widget(playable::Display {
         track: track::Display {
@@ -245,23 +269,31 @@ fn header_widget<T: Data>(text: impl Into<LabelText<T>>) -> impl Widget<T> {
 fn artist_info_menu(artist: &ArtistInfo) -> Menu<AppState> {
     let mut menu = Menu::empty();
 
-    for artist_links in &artist.artist_links {
-        let more_than_one_artist = artist.artist_links.len() > 1;
-        let title = if more_than_one_artist {
-            LocalizedString::new("menu-item-go-to-social")
-                .with_placeholder(format!("Go to their“{:?}”", artist_links
-                .strip_prefix("https://")
-                .unwrap_or(artist_links)
-                .split(".com")
-                .next()
-                .unwrap_or("No socials")))
+    for artist_link in &artist.artist_links {
+        let platform = if artist_link.contains("wikipedia.org") {
+            "Wikipedia"
         } else {
-            LocalizedString::new("").with_placeholder("")
+            artist_link
+                .strip_prefix("https://")
+                .unwrap_or(artist_link)
+                .split('.')
+                .next()
+                .unwrap_or("Unknown")
         };
-        menu = menu.entry(
-            MenuItem::new(title)
-                .command(cmd::GO_TO_URL.with(artist_links.to_owned()))
-        );
+
+        let title = LocalizedString::new("menu-item-go-to-social").with_placeholder(format!(
+            "Go to their {}",
+            platform
+                .chars()
+                .next()
+                .unwrap()
+                .to_uppercase()
+                .collect::<String>()
+                + &platform[1..]
+        ));
+
+        menu =
+            menu.entry(MenuItem::new(title).command(cmd::GO_TO_URL.with(artist_link.to_owned())));
     }
 
     menu
@@ -278,4 +310,21 @@ fn artist_menu(artist: &ArtistLink) -> Menu<AppState> {
     );
 
     menu
+}
+
+fn stat_row(
+    label: &'static str,
+    value_func: impl Fn(&ArtistInfo) -> String + 'static,
+) -> impl Widget<WithCtx<ArtistInfo>> {
+    Flex::row()
+        .with_child(
+            Label::new(label)
+                .with_text_size(theme::TEXT_SIZE_SMALL)
+                .with_text_color(theme::PLACEHOLDER_COLOR),
+        )
+        .with_spacer(theme::grid(0.5))
+        .with_child(
+            Label::new(move |ctx: &WithCtx<ArtistInfo>, _env: &_| value_func(&ctx.data))
+                .with_text_size(theme::TEXT_SIZE_SMALL),
+        )
 }
