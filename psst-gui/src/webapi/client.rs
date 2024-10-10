@@ -855,12 +855,7 @@ impl WebApi {
                         .artist_union.profile.biography.text,
                 )
                 .unwrap_or_default();
-                // This is roughly 3 lines of description, truncated if too long
-                if desc.chars().count() > 255 {
-                    desc.chars().take(254).collect::<String>() + "..."
-                } else {
-                    desc
-                }
+                desc
                 .into()
             },
             

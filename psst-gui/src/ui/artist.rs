@@ -1,7 +1,7 @@
 use druid::{
     im::Vector,
     kurbo::Circle,
-    widget::{CrossAxisAlignment, Flex, Label, LabelText, LineBreaking, List},
+    widget::{CrossAxisAlignment, Flex, Label, LabelText, LineBreaking, List, Scroll},
     Data, Insets, LensExt, LocalizedString, Menu, MenuItem, Selector, Size, UnitPoint, Widget,
     WidgetExt,
 };
@@ -25,10 +25,10 @@ pub const LOAD_DETAIL: Selector<ArtistLink> = Selector::new("app.artist.load-det
 
 pub fn detail_widget() -> impl Widget<AppState> {
     Flex::column()
-        .with_child(Flex::row().with_child(async_artist_info()))
+        .with_child(async_artist_info().expand_width().padding((theme::grid(1.0), 0.0)))
         .with_child(async_top_tracks_widget())
-        .with_child(async_albums_widget().padding((theme::grid(1.0), 0.0)))
-        .with_child(async_related_widget().padding((theme::grid(1.0), 0.0)))
+        .with_child(async_albums_widget().expand_width().padding((theme::grid(1.0), 0.0)))
+        .with_child(async_related_widget().expand_width().padding((theme::grid(1.0), 0.0)))
 }
 
 fn async_top_tracks_widget() -> impl Widget<AppState> {
@@ -171,7 +171,7 @@ pub fn cover_widget(size: f64) -> impl Widget<Artist> {
 }
 
 fn artist_info_widget() -> impl Widget<WithCtx<ArtistInfo>> {
-    let size = theme::grid(10.0);
+    let size = theme::grid(13.0);
 
     let artist_image = RemoteImage::new(
         utils::placeholder_widget(),
@@ -182,20 +182,18 @@ fn artist_info_widget() -> impl Widget<WithCtx<ArtistInfo>> {
     .lens(Ctx::data());
 
     let biography = Flex::column()
-        .cross_axis_alignment(CrossAxisAlignment::Start)
-        .with_child(header_widget("Biography"))
-        .with_child(
-            Label::raw()
-                .with_line_break_mode(LineBreaking::WordWrap)
-                .with_text_size(theme::TEXT_SIZE_SMALL)
-                .lens(Ctx::data().then(ArtistInfo::bio))
-                .expand_width(),
-        )
-        .fix_width(theme::grid(40.0));
+    .cross_axis_alignment(CrossAxisAlignment::Start)
+    .with_child(header_widget("Biography"))
+    .with_child(Scroll::new(
+        Label::new(|data: &ArtistInfo, _env: &_| data.bio.clone()) // Use a closure to fetch the biography
+            .with_line_break_mode(LineBreaking::WordWrap)
+            .with_text_size(theme::TEXT_SIZE_SMALL)
+            .lens(Ctx::data()),)
+            .vertical()
+            .fix_height(size-theme::grid(1.5))
+    );
 
-    let artist_stats = Flex::column()
-        .cross_axis_alignment(CrossAxisAlignment::Start)
-        .with_child(header_widget("Artist Stats"))
+    let artist_stats = Flex::row()
         .with_child(stat_row("Followers:", |info: &ArtistInfo| {
             format!("{} followers", info.stats.followers)
         }))
@@ -205,19 +203,17 @@ fn artist_info_widget() -> impl Widget<WithCtx<ArtistInfo>> {
         .with_child(stat_row("Ranking:", |info: &ArtistInfo| {
             format!("#{} in the world", info.stats.world_rank)
         }))
-        .fix_width(theme::grid(20.0));
+        .align_left();
 
     Flex::row()
-        .cross_axis_alignment(CrossAxisAlignment::Start)
         .with_child(artist_image)
         .with_spacer(theme::grid(1.0))
-        .with_flex_child(biography, 1.0)
-        .with_spacer(theme::grid(1.0))
-        .with_child(artist_stats)
-        .expand_width()
-        .padding(theme::grid(1.5))
-        .background(theme::BACKGROUND_DARK)
-        .rounded(theme::BUTTON_BORDER_RADIUS)
+        .with_flex_child(Flex::column()
+            .with_child(biography)
+            .with_spacer(theme::grid(1.0))
+            .with_child(artist_stats),
+            1.0
+        )
         .context_menu(|artist| artist_info_menu(&artist.data))
 }
 
