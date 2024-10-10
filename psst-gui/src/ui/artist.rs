@@ -25,10 +25,10 @@ pub const LOAD_DETAIL: Selector<ArtistLink> = Selector::new("app.artist.load-det
 
 pub fn detail_widget() -> impl Widget<AppState> {
     Flex::column()
-        .with_child(async_artist_info().expand_width().padding((theme::grid(1.0), 0.0)))
+        .with_child(async_artist_info().padding((theme::grid(1.0), 0.0)))
         .with_child(async_top_tracks_widget())
-        .with_child(async_albums_widget().expand_width().padding((theme::grid(1.0), 0.0)))
-        .with_child(async_related_widget().expand_width().padding((theme::grid(1.0), 0.0)))
+        .with_child(async_albums_widget().padding((theme::grid(1.0), 0.0)))
+        .with_child(async_related_widget().padding((theme::grid(1.0), 0.0)))
 }
 
 fn async_top_tracks_widget() -> impl Widget<AppState> {
@@ -78,9 +78,9 @@ fn async_albums_widget() -> impl Widget<AppState> {
 
 fn async_artist_info() -> impl Widget<AppState> {
     Async::new(
-        || utils::spinner_widget(),
+        utils::spinner_widget,
         artist_info_widget,
-        || utils::error_widget(),
+        utils::error_widget,
     )
     .lens(
         Ctx::make(

@@ -848,18 +848,16 @@ impl WebApi {
                 world_rank: result.data.data.artist_union.stats.world_rank.to_string()
             },
             bio: {
-                let desc = sanitize_str(
+                sanitize_str(
                     &DEFAULT,
                     &result.data
                         .data
                         .artist_union.profile.biography.text,
                 )
-                .unwrap_or_default();
-                desc
-                .into()
+                .unwrap_or_default()
             },
             
-            artist_links: hrefs.into()
+            artist_links: hrefs
         })
     }
 }
