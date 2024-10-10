@@ -183,11 +183,10 @@ fn artist_info_widget() -> impl Widget<WithCtx<ArtistInfo>> {
 
     let biography = Flex::column()
     .cross_axis_alignment(CrossAxisAlignment::Start)
-    .with_child(header_widget("Biography"))
     .with_child(Scroll::new(
         Label::new(|data: &ArtistInfo, _env: &_| data.bio.clone()) // Use a closure to fetch the biography
             .with_line_break_mode(LineBreaking::WordWrap)
-            .with_text_size(theme::TEXT_SIZE_SMALL)
+            .with_text_size(theme::TEXT_SIZE_NORMAL)
             .lens(Ctx::data()),)
             .vertical()
             .fix_height(size-theme::grid(1.5))
