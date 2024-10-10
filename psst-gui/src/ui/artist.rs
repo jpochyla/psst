@@ -201,7 +201,11 @@ fn artist_info_widget() -> impl Widget<WithCtx<ArtistInfo>> {
             format!("{} monthly listeners", info.stats.monthly_listeners)
         }))
         .with_child(stat_row("Ranking:", |info: &ArtistInfo| {
-            format!("#{} in the world", info.stats.world_rank)
+            if !info.stats.world_rank.starts_with("0") {
+                format!("#{} in the world", info.stats.world_rank)
+            } else {
+                "N/A".to_string()
+            }
         }))
         .align_left();
 
