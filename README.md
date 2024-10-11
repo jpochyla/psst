@@ -203,7 +203,7 @@ Use this space to show useful examples of how a project can be used. Additional 
 - [ ] Feature 3
     - [ ] Nested Feature
 
-See the [open issues](https://github.com/github_username/repo_name/issues) for a full list of proposed features (and known issues).
+See the [open issues](https://github.com/jpochyla/psst/issues) for a full list of proposed features (and known issues).
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -227,8 +227,8 @@ Don't forget to give the project a star! Thanks again!
 
 ### Top contributors:
 
-<a href="https://github.com/github_username/repo_name/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=github_username/repo_name" alt="contrib.rocks image" />
+<a href="https://github.com/github_username/jpochyla/psst/contributors">
+  <img src="https://contrib.rocks/image?repo=jpochyla/psst" alt="contrib.rocks image" />
 </a>
 
 
@@ -247,7 +247,7 @@ Distributed under the MIT License. See `LICENSE.txt` for more information.
 
 Your Name - [@twitter_handle](https://twitter.com/twitter_handle) - email@email_client.com
 
-Project Link: [https://github.com/github_username/repo_name](https://github.com/github_username/repo_name)
+Project Link: [https://github.com/github_username/repo_name](https://github.com/jpochyla/psst)
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
