@@ -2,8 +2,9 @@ use druid::{
     im::Vector,
     kurbo::Circle,
     widget::{CrossAxisAlignment, Flex, Label, LabelText, LineBreaking, List, Scroll},
-    Data, Insets, LensExt, LocalizedString, Menu, MenuItem, Selector, Size, UnitPoint, Widget,
-    WidgetExt,
+    BoxConstraints, Data, Env, Event, EventCtx, Insets, LayoutCtx, LensExt, LifeCycle,
+    LifeCycleCtx, LocalizedString, Menu, MenuItem, PaintCtx, Point, Selector, Size, UnitPoint,
+    UpdateCtx, Widget, WidgetExt, WidgetPod,
 };
 
 use crate::{
@@ -171,7 +172,7 @@ pub fn cover_widget(size: f64) -> impl Widget<Artist> {
 }
 
 fn artist_info_widget() -> impl Widget<WithCtx<ArtistInfo>> {
-    let size = theme::grid(13.0);
+    let size = theme::grid(15.0);
 
     let artist_image = RemoteImage::new(
         utils::placeholder_widget(),
@@ -182,17 +183,19 @@ fn artist_info_widget() -> impl Widget<WithCtx<ArtistInfo>> {
     .lens(Ctx::data());
 
     let biography = Flex::column()
-    .cross_axis_alignment(CrossAxisAlignment::Start)
-    .with_child(Scroll::new(
-        Label::new(|data: &ArtistInfo, _env: &_| data.bio.clone()) // Use a closure to fetch the biography
-            .with_line_break_mode(LineBreaking::WordWrap)
-            .with_text_size(theme::TEXT_SIZE_NORMAL)
-            .lens(Ctx::data()),)
+        .cross_axis_alignment(CrossAxisAlignment::Start)
+        .with_child(
+            Scroll::new(
+                Label::new(|data: &ArtistInfo, _env: &_| data.bio.clone())
+                    .with_line_break_mode(LineBreaking::WordWrap)
+                    .with_text_size(theme::TEXT_SIZE_NORMAL)
+                    .lens(Ctx::data()),
+            )
             .vertical()
-            .fix_height(size-theme::grid(1.5))
-    );
+            .fix_height(size - theme::grid(1.5)),
+        );
 
-    let artist_stats = Flex::row()
+    let artist_stats = Flex::column()
         .with_child(stat_row("Followers:", |info: &ArtistInfo| {
             format!("{} followers", info.stats.followers)
         }))
@@ -205,19 +208,98 @@ fn artist_info_widget() -> impl Widget<WithCtx<ArtistInfo>> {
             } else {
                 "N/A".to_string()
             }
-        }))
-        .align_left();
+        }));
 
     Flex::row()
         .with_child(artist_image)
         .with_spacer(theme::grid(1.0))
-        .with_flex_child(Flex::column()
-            .with_child(biography)
-            .with_spacer(theme::grid(1.0))
-            .with_child(artist_stats),
-            1.0
+        .with_flex_child(
+            Flex::row().with_flex_child(ArtistInfoLayout::new(biography, artist_stats), 1.0),
+            1.0,
         )
         .context_menu(|artist| artist_info_menu(&artist.data))
+        .padding((0.0, theme::grid(1.0))) // Keep overall vertical padding
+}
+
+struct ArtistInfoLayout<T, B, S> {
+    biography: WidgetPod<T, B>,
+    stats: WidgetPod<T, S>,
+}
+
+impl<T, B, S> ArtistInfoLayout<T, B, S>
+where
+    T: Data,
+    B: Widget<T>,
+    S: Widget<T>,
+{
+    fn new(biography: B, stats: S) -> Self {
+        Self {
+            biography: WidgetPod::new(biography),
+            stats: WidgetPod::new(stats),
+        }
+    }
+}
+
+impl<T: Data, B: Widget<T>, S: Widget<T>> Widget<T> for ArtistInfoLayout<T, B, S> {
+    fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut T, env: &Env) {
+        self.biography.event(ctx, event, data, env);
+        self.stats.event(ctx, event, data, env);
+    }
+
+    fn lifecycle(&mut self, ctx: &mut LifeCycleCtx, event: &LifeCycle, data: &T, env: &Env) {
+        self.biography.lifecycle(ctx, event, data, env);
+        self.stats.lifecycle(ctx, event, data, env);
+    }
+
+    fn update(&mut self, ctx: &mut UpdateCtx, _old_data: &T, data: &T, env: &Env) {
+        self.biography.update(ctx, data, env);
+        self.stats.update(ctx, data, env);
+    }
+
+    fn layout(&mut self, ctx: &mut LayoutCtx, bc: &BoxConstraints, data: &T, env: &Env) -> Size {
+        let max = bc.max();
+        let wide_layout = max.width > theme::grid(60.0);
+        let padding = theme::grid(1.0); // Padding between bio and stats
+
+        if wide_layout {
+            let biography_width = max.width * 0.75 - padding / 2.0;
+            let stats_width = max.width * 0.25 - padding / 2.0;
+
+            let biography_bc =
+                BoxConstraints::new(Size::ZERO, Size::new(biography_width, max.height));
+            let stats_bc = BoxConstraints::new(Size::ZERO, Size::new(stats_width, max.height));
+
+            let biography_size = self.biography.layout(ctx, &biography_bc, data, env);
+            let stats_size = self.stats.layout(ctx, &stats_bc, data, env);
+
+            self.biography.set_origin(ctx, Point::ORIGIN);
+            self.stats
+                .set_origin(ctx, Point::new(biography_width + padding, 0.0));
+
+            Size::new(max.width, biography_size.height.max(stats_size.height))
+        } else {
+            let biography_size = self.biography.layout(ctx, bc, data, env);
+            let stats_bc = BoxConstraints::new(
+                Size::ZERO,
+                Size::new(max.width, max.height - biography_size.height - padding),
+            );
+            let stats_size = self.stats.layout(ctx, &stats_bc, data, env);
+
+            self.biography.set_origin(ctx, Point::ORIGIN);
+            self.stats
+                .set_origin(ctx, Point::new(0.0, biography_size.height + padding));
+
+            Size::new(
+                max.width,
+                biography_size.height + padding + stats_size.height,
+            )
+        }
+    }
+
+    fn paint(&mut self, ctx: &mut PaintCtx, data: &T, env: &Env) {
+        self.biography.paint(ctx, data, env);
+        self.stats.paint(ctx, data, env);
+    }
 }
 
 fn top_tracks_widget() -> impl Widget<WithCtx<ArtistTracks>> {
@@ -326,4 +408,5 @@ fn stat_row(
             Label::new(move |ctx: &WithCtx<ArtistInfo>, _env: &_| value_func(&ctx.data))
                 .with_text_size(theme::TEXT_SIZE_SMALL),
         )
+        .align_left()
 }
