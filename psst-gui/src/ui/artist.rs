@@ -14,7 +14,7 @@ use crate::{
         Ctx, Nav, WithCtx,
     },
     webapi::WebApi,
-    widget::{Async, MyWidgetExt, RemoteImage},
+    widget::{Async, Empty, MyWidgetExt, RemoteImage},
 };
 
 use super::{
@@ -81,7 +81,7 @@ fn async_artist_info() -> impl Widget<AppState> {
     Async::new(
         utils::spinner_widget,
         artist_info_widget,
-        utils::error_widget,
+        || Empty,
     )
     .lens(
         Ctx::make(
@@ -258,7 +258,7 @@ impl<T: Data, B: Widget<T>, S: Widget<T>> Widget<T> for ArtistInfoLayout<T, B, S
 
     fn layout(&mut self, ctx: &mut LayoutCtx, bc: &BoxConstraints, data: &T, env: &Env) -> Size {
         let max = bc.max();
-        let wide_layout = max.width > theme::grid(60.0);
+        let wide_layout = max.width > theme::grid(60.0) + theme::GRID * 2.0;
         let padding = theme::grid(1.0); // Padding between bio and stats
 
         if wide_layout {
