@@ -1,5 +1,10 @@
 use std::{
-    fmt::Display, io::{self, Read}, path::PathBuf, sync::Arc, thread, time::Duration
+    fmt::Display,
+    io::{self, Read},
+    path::PathBuf,
+    sync::Arc,
+    thread,
+    time::Duration,
 };
 
 use druid::{
@@ -23,10 +28,10 @@ use psst_core::{
 
 use crate::{
     data::{
-        self, Album, AlbumType, Artist, ArtistAlbums, ArtistLink, AudioAnalysis, Cached, Episode,
-        EpisodeId, EpisodeLink, MixedView, Nav, Page, Playlist, PublicUser, Range, Recommendations,
-        RecommendationsRequest, SearchResults, SearchTopic, Show, SpotifyUrl, Track,
-        UserProfile, ArtistInfo, Image, ArtistStats, TrackLines,
+        self, Album, AlbumType, Artist, ArtistAlbums, ArtistInfo, ArtistLink, ArtistStats,
+        AudioAnalysis, Cached, Episode, EpisodeId, EpisodeLink, Image, MixedView, Nav, Page,
+        Playlist, PublicUser, Range, Recommendations, RecommendationsRequest, SearchResults,
+        SearchTopic, Show, SpotifyUrl, Track, TrackLines, UserProfile,
     },
     error::Error,
 };
@@ -820,7 +825,7 @@ impl WebApi {
             }
         });
         let extensions_json = serde_json::to_string(&extensions);
-        
+
         let variables = json!( {
             "uri": format!("spotify:artist:{}", id),
             "locale": "",
@@ -828,36 +833,52 @@ impl WebApi {
         });
         let variables_json = serde_json::to_string(&variables);
 
-        let request = self.get("pathfinder/v1/query", Some("api-partner.spotify.com"))?
+        let request = self
+            .get("pathfinder/v1/query", Some("api-partner.spotify.com"))?
             .query("operationName", "queryArtistOverview")
             .query("variables", &variables_json.unwrap().to_string())
             .query("extensions", &extensions_json.unwrap().to_string());
 
         let result: Cached<Welcome> = self.load_cached(request, "artist-info", id)?;
 
-        let hrefs: Vector<String> = result.data.data.artist_union.profile.external_links.items
-        .into_iter()
-        .map(|link| link.url)
-        .collect();
+        let hrefs: Vector<String> = result
+            .data
+            .data
+            .artist_union
+            .profile
+            .external_links
+            .items
+            .into_iter()
+            .map(|link| link.url)
+            .collect();
 
         Ok(ArtistInfo {
-            main_image: Arc::from(result.data.data.artist_union.visuals.avatar_image.sources[0].url.to_string()),
-            stats: ArtistStats{
+            main_image: Arc::from(
+                result.data.data.artist_union.visuals.avatar_image.sources[0]
+                    .url
+                    .to_string(),
+            ),
+            stats: ArtistStats {
                 followers: result.data.data.artist_union.stats.followers.to_string(),
-                monthly_listeners: result.data.data.artist_union.stats.monthly_listeners.to_string(),
-                world_rank: result.data.data.artist_union.stats.world_rank.to_string()
+                monthly_listeners: result
+                    .data
+                    .data
+                    .artist_union
+                    .stats
+                    .monthly_listeners
+                    .to_string(),
+                world_rank: result.data.data.artist_union.stats.world_rank.to_string(),
             },
             bio: {
-                sanitize_str(
+                let sanitized_bio = sanitize_str(
                     &DEFAULT,
-                    &result.data
-                        .data
-                        .artist_union.profile.biography.text,
+                    &result.data.data.artist_union.profile.biography.text,
                 )
-                .unwrap_or_default()
+                .unwrap_or_default();
+                sanitized_bio.replace("&amp;", "&")
             },
-            
-            artist_links: hrefs
+
+            artist_links: hrefs,
         })
     }
 }
