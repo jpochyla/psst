@@ -78,24 +78,20 @@ fn async_albums_widget() -> impl Widget<AppState> {
 }
 
 fn async_artist_info() -> impl Widget<AppState> {
-    Async::new(
-        utils::spinner_widget,
-        artist_info_widget,
-        || Empty,
-    )
-    .lens(
-        Ctx::make(
-            AppState::common_ctx,
-            AppState::artist_detail.then(ArtistDetail::artist_info),
+    Async::new(utils::spinner_widget, artist_info_widget, || Empty)
+        .lens(
+            Ctx::make(
+                AppState::common_ctx,
+                AppState::artist_detail.then(ArtistDetail::artist_info),
+            )
+            .then(Ctx::in_promise()),
         )
-        .then(Ctx::in_promise()),
-    )
-    .on_command_async(
-        LOAD_DETAIL,
-        |d| WebApi::global().get_artist_info(&d.id),
-        |_, data, d| data.artist_detail.artist_info.defer(d),
-        |_, data, r| data.artist_detail.artist_info.update(r),
-    )
+        .on_command_async(
+            LOAD_DETAIL,
+            |d| WebApi::global().get_artist_info(&d.id),
+            |_, data, d| data.artist_detail.artist_info.defer(d),
+            |_, data, r| data.artist_detail.artist_info.update(r),
+        )
 }
 
 fn async_related_widget() -> impl Widget<AppState> {
@@ -172,7 +168,7 @@ pub fn cover_widget(size: f64) -> impl Widget<Artist> {
 }
 
 fn artist_info_widget() -> impl Widget<WithCtx<ArtistInfo>> {
-    let size = theme::grid(15.0);
+    let size = theme::grid(16.0);
 
     let artist_image = RemoteImage::new(
         utils::placeholder_widget(),
@@ -199,9 +195,11 @@ fn artist_info_widget() -> impl Widget<WithCtx<ArtistInfo>> {
         .with_child(stat_row("Followers:", |info: &ArtistInfo| {
             format!("{} followers", info.stats.followers)
         }))
+        .with_default_spacer()
         .with_child(stat_row("Monthly Listeners:", |info: &ArtistInfo| {
-            format!("{} monthly listeners", info.stats.monthly_listeners)
+            format!("{} listeners", info.stats.monthly_listeners)
         }))
+        .with_default_spacer()
         .with_child(stat_row("Ranking:", |info: &ArtistInfo| {
             if !info.stats.world_rank.starts_with("0") {
                 format!("#{} in the world", info.stats.world_rank)
@@ -258,13 +256,12 @@ impl<T: Data, B: Widget<T>, S: Widget<T>> Widget<T> for ArtistInfoLayout<T, B, S
 
     fn layout(&mut self, ctx: &mut LayoutCtx, bc: &BoxConstraints, data: &T, env: &Env) -> Size {
         let max = bc.max();
-        // The smaller the nuber the futhre in you have to go
         let wide_layout = max.width > theme::grid(60.0) + theme::GRID * 3.45;
-        let padding = theme::grid(1.0); // Padding between bio and stats
+        let padding = theme::grid(1.0);
 
         if wide_layout {
-            let biography_width = max.width * 0.75 - padding / 2.0;
-            let stats_width = max.width * 0.25 - padding / 2.0;
+            let biography_width = max.width * 0.67 - padding / 2.0;
+            let stats_width = max.width * 0.33 - padding / 2.0;
 
             let biography_bc =
                 BoxConstraints::new(Size::ZERO, Size::new(biography_width, max.height));
