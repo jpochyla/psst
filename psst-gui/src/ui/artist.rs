@@ -258,7 +258,8 @@ impl<T: Data, B: Widget<T>, S: Widget<T>> Widget<T> for ArtistInfoLayout<T, B, S
 
     fn layout(&mut self, ctx: &mut LayoutCtx, bc: &BoxConstraints, data: &T, env: &Env) -> Size {
         let max = bc.max();
-        let wide_layout = max.width > theme::grid(60.0) + theme::GRID * 2.0;
+        // The smaller the nuber the futhre in you have to go
+        let wide_layout = max.width > theme::grid(60.0) + theme::GRID * 3.45;
         let padding = theme::grid(1.0); // Padding between bio and stats
 
         if wide_layout {
