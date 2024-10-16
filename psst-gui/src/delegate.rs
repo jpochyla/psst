@@ -129,6 +129,9 @@ impl AppDelegate<AppState> for Delegate {
         } else if let Some(text) = cmd.get(cmd::COPY) {
             Application::global().clipboard().put_string(text);
             Handled::Yes
+        } else if let Some(text) = cmd.get(cmd::GO_TO_URL) {
+            let _ = webbrowser::open(text);
+            Handled::Yes
         } else if let Handled::Yes = self.command_image(ctx, target, cmd, data) {
             Handled::Yes
         } else if let Some(link) = cmd.get(UNFOLLOW_PLAYLIST_CONFIRM) {

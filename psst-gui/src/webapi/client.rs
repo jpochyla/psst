@@ -28,10 +28,10 @@ use psst_core::{
 
 use crate::{
     data::{
-        self, Album, AlbumType, Artist, ArtistAlbums, ArtistLink, AudioAnalysis, Cached, Episode,
-        EpisodeId, EpisodeLink, MixedView, Nav, Page, Playlist, PublicUser, Range, Recommendations,
-        RecommendationsRequest, SearchResults, SearchTopic, Show, SpotifyUrl, Track, TrackLines,
-        UserProfile,
+        self, Album, AlbumType, Artist, ArtistAlbums, ArtistInfo, ArtistLink, ArtistStats,
+        AudioAnalysis, Cached, Episode, EpisodeId, EpisodeLink, Image, MixedView, Nav, Page,
+        Playlist, PublicUser, Range, Recommendations, RecommendationsRequest, SearchResults,
+        SearchTopic, Show, SpotifyUrl, Track, TrackLines, UserProfile,
     },
     error::Error,
 };
@@ -757,6 +757,129 @@ impl WebApi {
         let request = self.get(format!("v1/artists/{}/related-artists", id), None)?;
         let result: Cached<Artists> = self.load_cached(request, "related-artists", id)?;
         Ok(result.map(|result| result.artists))
+    }
+
+    pub fn get_artist_info(&self, id: &str) -> Result<ArtistInfo, Error> {
+        #[derive(Clone, Data, Deserialize)]
+        pub struct Welcome {
+            data: Data1,
+        }
+
+        #[derive(Clone, Data, Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        pub struct Data1 {
+            artist_union: ArtistUnion,
+        }
+
+        #[derive(Clone, Data, Deserialize)]
+        pub struct ArtistUnion {
+            profile: Profile,
+            stats: Stats,
+            visuals: Visuals,
+        }
+
+        #[derive(Clone, Data, Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        pub struct Profile {
+            biography: Biography,
+            external_links: ExternalLinks,
+        }
+
+        #[derive(Clone, Data, Deserialize)]
+        pub struct Biography {
+            text: String,
+        }
+
+        #[derive(Clone, Data, Deserialize)]
+        pub struct ExternalLinks {
+            items: Vector<ExternalLinksItem>,
+        }
+
+        #[derive(Clone, Data, Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        pub struct Visuals {
+            avatar_image: AvatarImage,
+        }
+        #[derive(Clone, Data, Deserialize)]
+        pub struct AvatarImage {
+            sources: Vector<Image>,
+        }
+        #[derive(Clone, Data, Deserialize)]
+        pub struct ExternalLinksItem {
+            url: String,
+        }
+
+        #[derive(Clone, Data, Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        pub struct Stats {
+            followers: i64,
+            monthly_listeners: i64,
+            world_rank: i64,
+        }
+
+        let extensions = json!({
+            "persistedQuery": {
+                "version": 1,
+                // From https://github.com/spicetify/cli/blob/bb767a9059143fe183c1c577acff335dc6a462b7/Extensions/shuffle%2B.js#L373 keep and eye on this and change accordingly
+                "sha256Hash": "35648a112beb1794e39ab931365f6ae4a8d45e65396d641eeda94e4003d41497"
+            }
+        });
+        let extensions_json = serde_json::to_string(&extensions);
+
+        let variables = json!( {
+            "uri": format!("spotify:artist:{}", id),
+            "locale": "",
+            "includePrerelease": true,  // Assuming this returns a Result<String, Error>
+        });
+        let variables_json = serde_json::to_string(&variables);
+
+        let request = self
+            .get("pathfinder/v1/query", Some("api-partner.spotify.com"))?
+            .query("operationName", "queryArtistOverview")
+            .query("variables", &variables_json.unwrap().to_string())
+            .query("extensions", &extensions_json.unwrap().to_string());
+
+        let result: Cached<Welcome> = self.load_cached(request, "artist-info", id)?;
+
+        let hrefs: Vector<String> = result
+            .data
+            .data
+            .artist_union
+            .profile
+            .external_links
+            .items
+            .into_iter()
+            .map(|link| link.url)
+            .collect();
+
+        Ok(ArtistInfo {
+            main_image: Arc::from(
+                result.data.data.artist_union.visuals.avatar_image.sources[0]
+                    .url
+                    .to_string(),
+            ),
+            stats: ArtistStats {
+                followers: result.data.data.artist_union.stats.followers.to_string(),
+                monthly_listeners: result
+                    .data
+                    .data
+                    .artist_union
+                    .stats
+                    .monthly_listeners
+                    .to_string(),
+                world_rank: result.data.data.artist_union.stats.world_rank.to_string(),
+            },
+            bio: {
+                let sanitized_bio = sanitize_str(
+                    &DEFAULT,
+                    &result.data.data.artist_union.profile.biography.text,
+                )
+                .unwrap_or_default();
+                sanitized_bio.replace("&amp;", "&")
+            },
+
+            artist_links: hrefs,
+        })
     }
 }
 
