@@ -17,14 +17,13 @@ psst-core = { path = "../psst-core" }
 
 # Common
 crossbeam-channel = { version = "0.5.13" }
+directories = { version = "5.0.1" }
 env_logger = { version = "0.11.5" }
-fs_extra = { version = "1.3.0" }
 itertools = { version = "0.13.0" }
 log = { version = "0.4.22" }
-lru-cache = { version = "0.1.2" }
+lru = { version = "0.12.5" }
 once_cell = { version = "1.19.0" }
 parking_lot = { version = "0.12.3" }
-platform-dirs = { version = "0.3.0" }
 rand = { version = "0.8.5" }
 regex = { version = "1.10.6" }
 serde = { version = "1.0.209", features = ["derive", "rc"] }
@@ -52,7 +51,6 @@ raw-window-handle = { version = "0.5.2" } # Must stay compatible with Druid
 souvlaki = { version = "0.7.3", default-features = false, features = [
   "use_zbus",
 ] }
-webbrowser = { version = "1.0.1" }
 sanitize_html = "0.8.1"
 [target.'cfg(windows)'.build-dependencies]
 winres = { version = "0.1.12" }
