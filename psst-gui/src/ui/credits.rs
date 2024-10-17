@@ -10,9 +10,11 @@ use druid::{
 };
 
 pub fn credits_window(track_title: &str) -> WindowDesc<AppState> {
+    let win_size = (theme::grid(50.0), theme::grid(55.0));
+
     WindowDesc::new(credits_widget())
         .title(format!("Credits: {}", track_title))
-        .window_size((350.0, 500.0))
+        .window_size(win_size)
         .resizable(false)
 }
 
