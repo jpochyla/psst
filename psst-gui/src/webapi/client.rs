@@ -10,8 +10,9 @@ use std::{
 use druid::{
     im::Vector,
     image::{self, ImageFormat},
-    Data, ImageBuf,
+    Data, ImageBuf, Lens,
 };
+
 use itertools::Itertools;
 use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
@@ -37,6 +38,43 @@ use crate::{
 };
 
 use super::{cache::WebApiCache, local::LocalTrackManager};
+
+#[derive(Debug, Clone, Data, Lens, Deserialize)]
+pub struct TrackCredits {
+    #[serde(rename = "trackUri")]
+    pub track_uri: String,
+    #[serde(rename = "trackTitle")]
+    pub track_title: String,
+    #[serde(rename = "roleCredits")]
+    pub role_credits: Arc<Vec<RoleCredit>>,
+    #[serde(rename = "extendedCredits")]
+    pub extended_credits: Arc<Vec<String>>,
+    #[serde(rename = "sourceNames")]
+    pub source_names: Arc<Vec<String>>,
+}
+
+#[derive(Debug, Clone, Data, Lens, Deserialize)]
+pub struct RoleCredit {
+    #[serde(rename = "roleTitle")]
+    pub role_title: String,
+    pub artists: Arc<Vec<CreditArtist>>,
+}
+
+#[derive(Debug, Clone, Data, Lens, Deserialize)]
+pub struct CreditArtist {
+    pub uri: Option<String>,
+    pub name: String,
+    #[serde(rename = "imageUri")]
+    pub image_uri: Option<String>,
+    #[serde(rename = "externalUrl")]
+    pub external_url: Option<String>,
+    #[serde(rename = "creatorUri")]
+    pub creator_uri: Option<String>,
+    #[serde(default)]
+    pub subroles: Arc<Vec<String>>,
+    #[serde(default)]
+    pub weight: f64,
+}
 
 pub struct WebApi {
     session: SessionService,
@@ -283,6 +321,20 @@ impl WebApi {
         {
             log::error!("failed to read local tracks: {}", err);
         }
+    }
+
+    pub fn get_track_credits(&self, track_id: &str) -> Result<TrackCredits, Error> {
+        let request = self
+            .get(
+                format!("track-credits-view/v0/experimental/{}/credits", track_id),
+                Some("spclient.wg.spotify.com"),
+            )?
+            .set(
+                "client-token",
+                self.session.client_token().unwrap_or_default(),
+            );
+        let response = Self::with_retry(|| Ok(request.clone().call()?))?;
+        Ok(serde_json::from_str(&response.into_string()?)?)
     }
 
     fn load_and_return_home_section(&self, request: Request) -> Result<MixedView, Error> {
@@ -626,6 +678,7 @@ impl WebApi {
         })
     }
 }
+
 static GLOBAL_WEBAPI: OnceCell<Arc<WebApi>> = OnceCell::new();
 
 /// Global instance.
