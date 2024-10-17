@@ -2,13 +2,14 @@ use std::{
     collections::hash_map::DefaultHasher,
     fs::{self, File},
     hash::{Hash, Hasher},
+    num::NonZeroUsize,
     path::PathBuf,
     sync::Arc,
 };
 
 use druid::image;
 use druid::ImageBuf;
-use lru_cache::LruCache;
+use lru::LruCache;
 use parking_lot::Mutex;
 use psst_core::cache::mkdir_if_not_exists;
 
@@ -22,16 +23,16 @@ impl WebApiCache {
         const IMAGE_CACHE_SIZE: usize = 256;
         Self {
             base,
-            images: Mutex::new(LruCache::new(IMAGE_CACHE_SIZE)),
+            images: Mutex::new(LruCache::new(NonZeroUsize::new(IMAGE_CACHE_SIZE).unwrap())),
         }
     }
 
     pub fn get_image(&self, uri: &Arc<str>) -> Option<ImageBuf> {
-        self.images.lock().get_mut(uri).cloned()
+        self.images.lock().get(uri).cloned()
     }
 
     pub fn set_image(&self, uri: Arc<str>, image: ImageBuf) {
-        self.images.lock().insert(uri, image);
+        self.images.lock().put(uri, image);
     }
 
     pub fn get_image_from_disk(&self, uri: &Arc<str>) -> Option<ImageBuf> {

@@ -332,7 +332,7 @@ impl<W: Widget<AppState>> Controller<AppState, W> for Authenticate {
                 data.preferences.auth.result.defer_default();
 
                 let (auth_url, pkce_verifier) = oauth::generate_auth_url(8888);
-                if webbrowser::open(&auth_url).is_err() {
+                if open::that(&auth_url).is_err() {
                     data.error_alert("Failed to open browser");
                     return;
                 }
@@ -522,7 +522,7 @@ fn about_tab_widget() -> impl Widget<AppState> {
         Label::new(psst_core::REMOTE_URL)
             .with_text_color(Color::rgb8(138, 180, 248))
             .on_left_click(|_, _, _, _| {
-                webbrowser::open(psst_core::REMOTE_URL).ok();
+                open::that(psst_core::REMOTE_URL).ok();
             }),
     );
 
