@@ -287,7 +287,7 @@ fn get_dir_size(path: &Path) -> Option<u64> {
         let entry = entry.ok()?;
         let size = if entry.file_type().ok()?.is_dir() {
             get_dir_size(&entry.path())?
-    } else {
+        } else {
             entry.metadata().ok()?.len()
         };
         acc.map(|total| total + size)
