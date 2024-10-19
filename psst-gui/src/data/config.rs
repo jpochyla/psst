@@ -8,8 +8,8 @@ use std::{
 #[cfg(target_family = "unix")]
 use std::os::unix::fs::OpenOptionsExt;
 
-use druid::{Data, Lens, Size};
 use directories::ProjectDirs;
+use druid::{Data, Lens, Size};
 use psst_core::{
     cache::mkdir_if_not_exists,
     connection::Credentials,
@@ -282,23 +282,14 @@ impl Default for SortCriteria {
     }
 }
 
-// Add this function at the end of the file
 fn get_dir_size(path: &Path) -> Option<u64> {
-    let mut total_size = 0;
-    if let Ok(entries) = fs::read_dir(path) {
-        for entry in entries.flatten() {
-            if let Ok(metadata) = entry.metadata() {
-                if metadata.is_file() {
-                    total_size += metadata.len();
-                } else if metadata.is_dir() {
-                    if let Some(size) = get_dir_size(&entry.path()) {
-                        total_size += size;
-                    }
-                }
-            }
-        }
-        Some(total_size)
+    fs::read_dir(path).ok()?.fold(Some(0), |acc, entry| {
+        let entry = entry.ok()?;
+        let size = if entry.file_type().ok()?.is_dir() {
+            get_dir_size(&entry.path())?
     } else {
-        None
-    }
+            entry.metadata().ok()?.len()
+        };
+        acc.map(|total| total + size)
+    })
 }
