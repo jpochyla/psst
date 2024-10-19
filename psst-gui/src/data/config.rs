@@ -283,13 +283,13 @@ impl Default for SortCriteria {
 }
 
 fn get_dir_size(path: &Path) -> Option<u64> {
-    fs::read_dir(path).ok()?.fold(Some(0), |acc, entry| {
+    fs::read_dir(path).ok()?.try_fold(0, |acc, entry| {
         let entry = entry.ok()?;
         let size = if entry.file_type().ok()?.is_dir() {
             get_dir_size(&entry.path())?
         } else {
             entry.metadata().ok()?.len()
         };
-        acc.map(|total| total + size)
+        Some(acc + size)
     })
 }
