@@ -20,15 +20,15 @@ log = { version = "0.4.22" }
 num-bigint = { version = "0.4.6", features = ["rand"] }
 num-traits = { version = "0.2.19" }
 oauth2 = { version = "4.4.2" }
-once_cell = { version = "1.19.0" }
+once_cell = { version = "1.20.2" }
 parking_lot = { version = "0.12.3" }
 quick-protobuf = { version = "0.8.1" }
 rand = { version = "0.8.5" }
 rangemap = { version = "1.5.1" }
-serde = { version = "1.0.209", features = ["derive"] }
-serde_json = { version = "1.0.127" }
+serde = { version = "1.0.210", features = ["derive"] }
+serde_json = { version = "1.0.132" }
 socks = { version = "0.3.4" }
-tempfile = { version = "3.12.0" }
+tempfile = { version = "3.13.0" }
 ureq = { version = "2.10.1", features = ["json"] }
 url = { version = "2.5.2" }
 
