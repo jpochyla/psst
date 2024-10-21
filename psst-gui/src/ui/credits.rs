@@ -1,13 +1,53 @@
+use std::sync::Arc;
+
 use crate::{
     cmd,
     data::{AppState, ArtistLink, Nav},
     ui::theme,
-    webapi::{CreditArtist, RoleCredit},
 };
 use druid::{
-    widget::{Controller, CrossAxisAlignment, Flex, Label, LineBreaking, List, Painter, Scroll},
-    Cursor, Env, Event, EventCtx, LensExt, RenderContext, Target, Widget, WidgetExt, WindowDesc,
+    widget::{Controller, CrossAxisAlignment, Flex, Label, LineBreaking, List, Painter, Scroll}, Cursor, Data, Env, Event, EventCtx, Lens, LensExt, RenderContext, Target, Widget, WidgetExt, WindowDesc
 };
+use serde::Deserialize;
+
+
+#[derive(Debug, Clone, Data, Lens, Deserialize)]
+pub struct TrackCredits {
+    #[serde(rename = "trackUri")]
+    pub track_uri: String,
+    #[serde(rename = "trackTitle")]
+    pub track_title: String,
+    #[serde(rename = "roleCredits")]
+    pub role_credits: Arc<Vec<RoleCredit>>,
+    #[serde(rename = "extendedCredits")]
+    pub extended_credits: Arc<Vec<String>>,
+    #[serde(rename = "sourceNames")]
+    pub source_names: Arc<Vec<String>>,
+}
+
+#[derive(Debug, Clone, Data, Lens, Deserialize)]
+pub struct RoleCredit {
+    #[serde(rename = "roleTitle")]
+    pub role_title: String,
+    pub artists: Arc<Vec<CreditArtist>>,
+}
+
+#[derive(Debug, Clone, Data, Lens, Deserialize)]
+pub struct CreditArtist {
+    pub uri: Option<String>,
+    pub name: String,
+    #[serde(rename = "imageUri")]
+    pub image_uri: Option<String>,
+    #[serde(rename = "externalUrl")]
+    pub external_url: Option<String>,
+    #[serde(rename = "creatorUri")]
+    pub creator_uri: Option<String>,
+    #[serde(default)]
+    pub subroles: Arc<Vec<String>>,
+    #[serde(default)]
+    pub weight: f64,
+}
+
 
 pub fn credits_window(track_title: &str) -> WindowDesc<AppState> {
     let win_size = (theme::grid(50.0), theme::grid(55.0));
@@ -36,13 +76,8 @@ fn credits_widget() -> impl Widget<AppState> {
                 ),
             )
             .with_child(List::new(role_credit_widget).lens(AppState::credits.map(
-                |credits| {
-                    credits
-                        .as_ref()
-                        .map(|c| c.role_credits.clone())
-                        .unwrap_or_default()
-                },
-                |_, _| {},
+                |credits: &Option<TrackCredits>| credits.as_ref().map(|c| c.role_credits.clone()).unwrap_or_default(),
+                |_, _| ()
             )))
             .with_child(
                 Label::new(|data: &AppState, _: &_| {
