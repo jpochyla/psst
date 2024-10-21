@@ -1,12 +1,15 @@
-use std::io::{BufReader, BufWriter};
-use std::{env, env::VarError, fs::File, path::PathBuf};
+use std::{
+    env::{self, VarError},
+    fs::{self, File, OpenOptions},
+    io::{BufReader, BufWriter},
+    path::{Path, PathBuf},
+};
 
-use std::fs::OpenOptions;
 #[cfg(target_family = "unix")]
 use std::os::unix::fs::OpenOptionsExt;
 
+use directories::ProjectDirs;
 use druid::{Data, Lens, Size};
-use platform_dirs::AppDirs;
 use psst_core::{
     cache::mkdir_if_not_exists,
     connection::Credentials,
@@ -15,9 +18,8 @@ use psst_core::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::ui::theme;
-
 use super::{Nav, Promise, QueueBehavior, SliderScrollScale};
+use crate::ui::theme;
 
 #[derive(Clone, Debug, Data, Lens)]
 pub struct Preferences {
@@ -33,7 +35,7 @@ impl Preferences {
     }
 
     pub fn measure_cache_usage() -> Option<u64> {
-        Config::cache_dir().and_then(|path| fs_extra::dir::get_size(path).ok())
+        Config::cache_dir().and_then(|path| get_dir_size(&path))
     }
 }
 
@@ -123,25 +125,23 @@ impl Default for Config {
 }
 
 impl Config {
-    fn app_dirs() -> Option<AppDirs> {
-        const USE_XDG_ON_MACOS: bool = false;
-
-        AppDirs::new(Some(APP_NAME), USE_XDG_ON_MACOS)
+    fn project_dirs() -> Option<ProjectDirs> {
+        ProjectDirs::from("", "", APP_NAME)
     }
 
     pub fn spotify_local_files_file(username: &str) -> Option<PathBuf> {
-        AppDirs::new(Some("spotify"), false).map(|dir| {
+        ProjectDirs::from("", "", "spotify").map(|dirs| {
             let path = format!("Users/{}-user/local-files.bnk", username);
-            dir.config_dir.join(path)
+            dirs.config_dir().join(path)
         })
     }
 
     pub fn cache_dir() -> Option<PathBuf> {
-        Self::app_dirs().map(|dirs| dirs.cache_dir)
+        Self::project_dirs().map(|dirs| dirs.cache_dir().to_path_buf())
     }
 
     pub fn config_dir() -> Option<PathBuf> {
-        Self::app_dirs().map(|dirs| dirs.config_dir)
+        Self::project_dirs().map(|dirs| dirs.config_dir().to_path_buf())
     }
 
     fn config_path() -> Option<PathBuf> {
@@ -280,4 +280,16 @@ impl Default for SortCriteria {
     fn default() -> Self {
         Self::DateAdded
     }
+}
+
+fn get_dir_size(path: &Path) -> Option<u64> {
+    fs::read_dir(path).ok()?.try_fold(0, |acc, entry| {
+        let entry = entry.ok()?;
+        let size = if entry.file_type().ok()?.is_dir() {
+            get_dir_size(&entry.path())?
+        } else {
+            entry.metadata().ok()?.len()
+        };
+        Some(acc + size)
+    })
 }

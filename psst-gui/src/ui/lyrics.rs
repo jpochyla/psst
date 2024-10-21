@@ -77,9 +77,10 @@ fn track_lyrics_widget() -> impl Widget<AppState> {
                     .on_left_click(|ctx, _, c, _| {
                         if c.data.start_time_ms.parse::<u64>().unwrap() != 0 {
                             ctx.submit_command(
-                                cmd::SKIP_TO_POSITION.with(c.data.start_time_ms.parse::<u64>().unwrap())
+                                cmd::SKIP_TO_POSITION
+                                    .with(c.data.start_time_ms.parse::<u64>().unwrap()),
                             )
-                        } 
+                        }
                     })
             })
         },
