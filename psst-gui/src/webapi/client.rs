@@ -949,14 +949,7 @@ impl WebApi {
 
     pub fn get_track_credits(&self, track_id: &str) -> Result<TrackCredits, Error> {
         let request = self
-            .get(
-                format!("track-credits-view/v0/experimental/{}/credits", track_id),
-                Some("spclient.wg.spotify.com"),
-            )?
-            .set(
-                "client-token",
-                self.session.client_token().unwrap_or_default(),
-            );
+            .get(format!("track-credits-view/v0/experimental/{}/credits", track_id),Some("spclient.wg.spotify.com"))?;
         let result: TrackCredits = self.load(request)?;
         Ok(result)
     }
