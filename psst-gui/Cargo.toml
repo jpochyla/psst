@@ -47,7 +47,7 @@ druid-shell = { git = "https://github.com/jpochyla/druid", branch = "psst", feat
   "raw-win-handle",
 ] }
 open = { version = "5.3.0" }
-raw-window-handle = { version = "0.6.2" } # Must stay compatible with Druid
+raw-window-handle = { version = "0.5.2" } # Must stay compatible with Druid
 souvlaki = { version = "0.7.3", default-features = false, features = [
   "use_zbus",
 ] }

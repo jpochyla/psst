@@ -1110,7 +1110,7 @@ dependencies = [
  "objc",
  "once_cell",
  "piet-common",
- "raw-window-handle 0.5.2",
+ "raw-window-handle",
  "scopeguard",
  "time",
  "tracing",
@@ -3521,7 +3521,7 @@ dependencies = [
  "parking_lot",
  "psst-core",
  "rand",
- "raw-window-handle 0.6.2",
+ "raw-window-handle",
  "regex",
  "sanitize_html",
  "serde",
@@ -3674,12 +3674,6 @@ name = "raw-window-handle"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f2ff9a1f06a88b01621b7ae906ef0211290d1c8a168a15542486a8f61c0833b9"
-
-[[package]]
-name = "raw-window-handle"
-version = "0.6.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "20675572f6f24e9e76ef639bc5552774ed45f1c30e2951e1e99c59888861c539"
 
 [[package]]
 name = "rayon"
