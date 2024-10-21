@@ -1,7 +1,6 @@
 use crate::data::config::SortCriteria;
 use crate::data::Track;
 use crate::error::Error;
-use crate::webapi::TrackCredits;
 use crate::{
     cmd,
     controller::{
@@ -16,6 +15,7 @@ use crate::{
         icons, icons::SvgIcon, Border, Empty, MyWidgetExt, Overlay, ThemeScope, ViewDispatcher,
     },
 };
+use credits::TrackCredits;
 use druid::{
     im::Vector,
     widget::{CrossAxisAlignment, Either, Flex, Label, List, Scroll, Slider, Split, ViewSwitcher},
