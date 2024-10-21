@@ -12,6 +12,7 @@ use druid::{
     image::{self, ImageFormat},
     Data, ImageBuf,
 };
+
 use itertools::Itertools;
 use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
@@ -33,11 +34,10 @@ use crate::{
         Playlist, PublicUser, Range, Recommendations, RecommendationsRequest, SearchResults,
         SearchTopic, Show, SpotifyUrl, Track, TrackLines, UserProfile,
     },
-    error::Error,
+    error::Error, ui::credits::TrackCredits,
 };
 
 use super::{cache::WebApiCache, local::LocalTrackManager};
-
 pub struct WebApi {
     session: SessionService,
     agent: Agent,
@@ -626,6 +626,7 @@ impl WebApi {
         })
     }
 }
+
 static GLOBAL_WEBAPI: OnceCell<Arc<WebApi>> = OnceCell::new();
 
 /// Global instance.
@@ -946,6 +947,13 @@ impl WebApi {
         Ok(result)
     }
 
+    pub fn get_track_credits(&self, track_id: &str) -> Result<TrackCredits, Error> {
+        let request = self
+            .get(format!("track-credits-view/v0/experimental/{}/credits", track_id),Some("spclient.wg.spotify.com"))?;
+        let result: TrackCredits = self.load(request)?;
+        Ok(result)
+    }
+    
     pub fn get_lyrics(&self, track_id: String) -> Result<Vector<TrackLines>, Error> {
         #[derive(Default, Debug, Clone, PartialEq, Deserialize, Data)]
         #[serde(rename_all = "camelCase")]
