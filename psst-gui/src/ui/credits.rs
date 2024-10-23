@@ -73,7 +73,7 @@ pub fn credits_widget() -> impl Widget<AppState> {
                     )
                     .padding(theme::grid(2.0))
             },
-            || utils::spinner_widget(),
+            utils::spinner_widget,
         )
         .lens(AppState::credits)
         .controller(CreditsController),
