@@ -27,7 +27,7 @@ pub struct Track {
     pub popularity: Option<u32>,
     #[serde(skip)]
     pub track_pos: usize,
-    pub lyrics: Option<Vector<TrackLines>>,
+    pub lyrics: Option<Arc<[TrackLines]>>,
 }
 
 impl Track {
