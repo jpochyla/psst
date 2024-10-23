@@ -76,11 +76,6 @@ impl SessionService {
         self.shutdown();
     }
 
-    pub fn client_token(&self) -> Option<&str> {
-        // Implement this method to return the client token if available
-        None // Replace with actual implementation
-    }
-
     /// Returns true if a session worker is actively servicing the connected
     /// session.  We return false here after any case of I/O errors or an
     /// explicit session shutdown.

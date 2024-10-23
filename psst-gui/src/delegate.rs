@@ -131,7 +131,7 @@ impl AppDelegate<AppState> for Delegate {
     fn command(
         &mut self,
         ctx: &mut DelegateCtx,
-        _target: Target,
+        target: Target,
         cmd: &Command,
         data: &mut AppState,
         _env: &Env,
@@ -160,12 +160,12 @@ impl AppDelegate<AppState> for Delegate {
             Handled::Yes
         } else if cmd.is(commands::CLOSE_WINDOW) {
             if let Some(window_id) = self.preferences_window {
-                if _target == Target::Window(window_id) {
+                if target == Target::Window(window_id) {
                     self.close_preferences(ctx);
                     return Handled::Yes;
                 }
             } else if let Some(window_id) = self.credits_window {
-                if _target == Target::Window(window_id) {
+                if target == Target::Window(window_id) {
                     self.close_credits(ctx);
                     return Handled::Yes;
                 }
@@ -177,7 +177,7 @@ impl AppDelegate<AppState> for Delegate {
         } else if let Some(text) = cmd.get(cmd::GO_TO_URL) {
             let _ = open::that(text);
             Handled::Yes
-        } else if let Handled::Yes = self.command_image(ctx, _target, cmd, data) {
+        } else if let Handled::Yes = self.command_image(ctx, target, cmd, data) {
             Handled::Yes
         } else if let Some(link) = cmd.get(UNFOLLOW_PLAYLIST_CONFIRM) {
             ctx.submit_command(UNFOLLOW_PLAYLIST.with(link.clone()));
