@@ -46,8 +46,6 @@ pub mod track;
 pub mod user;
 pub mod utils;
 
-pub const SHOW_TRACK_CREDITS: Selector<Arc<Track>> = Selector::new("app.show-track-credits");
-
 pub fn main_window(config: &Config) -> WindowDesc<AppState> {
     let win = WindowDesc::new(root_widget())
         .title(compute_main_window_title)

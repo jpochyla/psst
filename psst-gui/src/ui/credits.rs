@@ -1,8 +1,3 @@
-//! Track credits window and related widgets.
-//!
-//! This module handles displaying detailed credit information for tracks,
-//! including artists, roles, and sources.
-
 use std::sync::Arc;
 
 use crate::{

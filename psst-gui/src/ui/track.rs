@@ -260,12 +260,19 @@ pub fn track_menu(
 
     menu = menu.entry(
         MenuItem::new(
+            LocalizedString::new("menu-item-show-credits").with_placeholder("Show Track Credits"),
+        )
+        .command(cmd::SHOW_CREDITS_WINDOW.with(track.clone())),
+    );
+
+    menu = menu.separator();
+
+    menu = menu.entry(
+        MenuItem::new(
             LocalizedString::new("menu-item-copy-link").with_placeholder("Copy Link to Track"),
         )
         .command(cmd::COPY.with(track.url())),
     );
-
-    menu = menu.separator();
 
     if library.contains_track(track) {
         menu = menu.entry(
@@ -361,13 +368,6 @@ pub fn track_menu(
         );
     }
     menu = menu.entry(playlist_menu);
-
-    menu = menu.entry(
-        MenuItem::new(
-            LocalizedString::new("menu-item-show-credits").with_placeholder("Show Track Credits"),
-        )
-        .command(cmd::SHOW_CREDITS_WINDOW.with(track.clone())),
-    );
 
     menu
 }
