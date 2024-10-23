@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use druid::{
     widget::{CrossAxisAlignment, Either, Flex, Label, ViewSwitcher},
     LensExt, LocalizedString, Menu, MenuItem, Size, TextAlignment, Widget, WidgetExt,
@@ -7,7 +9,6 @@ use psst_core::{
     item_id::{ItemId, ItemIdType},
     player::item::PlaybackItem,
 };
-use std::sync::Arc;
 
 use crate::{
     cmd,

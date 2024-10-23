@@ -202,11 +202,21 @@ impl AppDelegate<AppState> for Delegate {
         id: WindowId,
         data: &mut AppState,
         _env: &Env,
-        _ctx: &mut DelegateCtx,
+        ctx: &mut DelegateCtx,
     ) {
-        if Some(id) == self.credits_window {
+        if self.credits_window == Some(id) {
             self.credits_window = None;
             data.credits = None;
+        }
+        if self.preferences_window == Some(id) {
+            self.preferences_window.take();
+            data.preferences.reset();
+            data.preferences.auth.clear();
+        }
+        if self.main_window == Some(id) {
+            data.config.save();
+            ctx.submit_command(commands::CLOSE_ALL_WINDOWS);
+            ctx.submit_command(commands::QUIT_APP);
         }
     }
 
