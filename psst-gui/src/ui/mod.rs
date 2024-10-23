@@ -474,17 +474,12 @@ fn route_icon_widget() -> impl Widget<Nav> {
         |nav: &Nav, _, _| {
             let icon = |icon: &SvgIcon| icon.scale(theme::ICON_SIZE_MEDIUM);
             match &nav {
-                Nav::Home => Empty.boxed(),
-                Nav::Lyrics => Empty.boxed(),
-                Nav::SavedTracks => Empty.boxed(),
-                Nav::SavedAlbums => Empty.boxed(),
-                Nav::SavedShows => Empty.boxed(),
-                Nav::SearchResults(_) => icon(&icons::SEARCH).boxed(),
+                Nav::Home | Nav::Lyrics | Nav::SavedTracks | Nav::SavedAlbums | Nav::SavedShows => Empty.boxed(),
+                Nav::SearchResults(_) | Nav::Recommendations(_) => icon(&icons::SEARCH).boxed(),
                 Nav::AlbumDetail(_) => icon(&icons::ALBUM).boxed(),
                 Nav::ArtistDetail(_) => icon(&icons::ARTIST).boxed(),
                 Nav::PlaylistDetail(_) => icon(&icons::PLAYLIST).boxed(),
                 Nav::ShowDetail(_) => icon(&icons::PODCAST).boxed(),
-                Nav::Recommendations(_) => icon(&icons::SEARCH).boxed(),
             }
         },
     )
