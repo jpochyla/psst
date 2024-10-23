@@ -1,4 +1,3 @@
-use crate::cmd::SHOW_TRACK_CREDITS;
 use druid::{
     widget::{CrossAxisAlignment, Either, Flex, Label, ViewSwitcher},
     LensExt, LocalizedString, Menu, MenuItem, Size, TextAlignment, Widget, WidgetExt,
@@ -367,7 +366,7 @@ pub fn track_menu(
         MenuItem::new(
             LocalizedString::new("menu-item-show-credits").with_placeholder("Show Track Credits"),
         )
-        .command(SHOW_TRACK_CREDITS.with(track.clone())),
+        .command(cmd::SHOW_CREDITS_WINDOW.with(track.clone())),
     );
 
     menu

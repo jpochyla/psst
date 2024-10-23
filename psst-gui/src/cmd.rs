@@ -69,4 +69,5 @@ pub const SORT_BY_DURATION: Selector = Selector::new("app.sort-by-duration");
 pub const TOGGLE_SORT_ORDER: Selector = Selector::new("app.toggle-sort-order");
 
 // Track credits
-pub const SHOW_TRACK_CREDITS: Selector<Arc<Track>> = Selector::new("app.track.show-credits");
+pub const SHOW_CREDITS_WINDOW: Selector<Arc<Track>> = Selector::new("app.credits-show-window");
+pub const LOAD_TRACK_CREDITS: Selector<Arc<Track>> = Selector::new("app.credits-load");

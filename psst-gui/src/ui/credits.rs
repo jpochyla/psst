@@ -1,15 +1,21 @@
+//! Track credits window and related widgets.
+//!
+//! This module handles displaying detailed credit information for tracks,
+//! including artists, roles, and sources.
+
 use std::sync::Arc;
 
 use crate::{
     cmd,
     data::{AppState, ArtistLink, Nav},
     ui::theme,
+    ui::utils,
 };
 use druid::{
-    widget::{Controller, CrossAxisAlignment, Flex, Label, LineBreaking, List, Painter, Scroll}, Cursor, Data, Env, Event, EventCtx, Lens, LensExt, RenderContext, Target, Widget, WidgetExt, WindowDesc
+    widget::{Controller, CrossAxisAlignment, Flex, Label, List, Maybe, Painter, Scroll},
+    Cursor, Data, Env, Event, EventCtx, Lens, RenderContext, Target, UpdateCtx, Widget, WidgetExt,
 };
 use serde::Deserialize;
-
 
 #[derive(Debug, Clone, Data, Lens, Deserialize)]
 pub struct TrackCredits {
@@ -48,49 +54,34 @@ pub struct CreditArtist {
     pub weight: f64,
 }
 
-
-pub fn credits_window(track_title: &str) -> WindowDesc<AppState> {
-    let win_size = (theme::grid(50.0), theme::grid(55.0));
-
-    WindowDesc::new(credits_widget())
-        .title(format!("Credits: {}", track_title))
-        .window_size(win_size)
-        .resizable(false)
-}
-
-fn credits_widget() -> impl Widget<AppState> {
+pub fn credits_widget() -> impl Widget<AppState> {
     Scroll::new(
-        Flex::column()
-            .cross_axis_alignment(CrossAxisAlignment::Start)
-            .with_child(
-                Flex::column().with_child(
-                    Label::new(|data: &AppState, _: &_| {
-                        data.credits
-                            .as_ref()
-                            .map_or("Credits".to_string(), |c| c.track_title.clone())
-                    })
-                    .with_font(theme::UI_FONT_MEDIUM)
-                    .with_text_size(theme::TEXT_SIZE_LARGE)
+        Maybe::new(
+            || {
+                Flex::column()
+                    .cross_axis_alignment(CrossAxisAlignment::Start)
+                    .with_child(
+                        Label::new(|data: &TrackCredits, _: &_| data.track_title.clone())
+                            .with_font(theme::UI_FONT_MEDIUM)
+                            .with_text_size(theme::TEXT_SIZE_LARGE)
+                            .padding(theme::grid(2.0))
+                            .expand_width(),
+                    )
+                    .with_child(List::new(role_credit_widget).lens(TrackCredits::role_credits))
+                    .with_child(
+                        Label::new(|data: &TrackCredits, _: &_| {
+                            format!("Source: {}", data.source_names.join(", "))
+                        })
+                        .with_text_size(theme::TEXT_SIZE_SMALL)
+                        .with_text_color(theme::PLACEHOLDER_COLOR)
+                        .padding(theme::grid(2.0)),
+                    )
                     .padding(theme::grid(2.0))
-                    .expand_width(),
-                ),
-            )
-            .with_child(List::new(role_credit_widget).lens(AppState::credits.map(
-                |credits: &Option<TrackCredits>| credits.as_ref().map(|c| c.role_credits.clone()).unwrap_or_default(),
-                |_, _| ()
-            )))
-            .with_child(
-                Label::new(|data: &AppState, _: &_| {
-                    data.credits.as_ref().map_or("".to_string(), |c| {
-                        format!("Source: {}", c.source_names.join(", "))
-                    })
-                })
-                .with_text_size(theme::TEXT_SIZE_SMALL)
-                .with_text_color(theme::PLACEHOLDER_COLOR)
-                .with_line_break_mode(LineBreaking::WordWrap)
-                .padding(theme::grid(2.0)),
-            )
-            .padding(theme::grid(2.0)),
+            },
+            || utils::spinner_widget(),
+        )
+        .lens(AppState::credits)
+        .controller(CreditsController),
     )
     .vertical()
     .expand()
@@ -208,5 +199,25 @@ fn capitalize_first(s: &str) -> String {
     match chars.next() {
         None => String::new(),
         Some(f) => f.to_uppercase().collect::<String>() + chars.as_str(),
+    }
+}
+
+/// Controller that handles updating the credits view when data changes
+pub struct CreditsController;
+
+impl<W: Widget<AppState>> Controller<AppState, W> for CreditsController {
+    fn update(
+        &mut self,
+        child: &mut W,
+        ctx: &mut UpdateCtx,
+        old_data: &AppState,
+        data: &AppState,
+        env: &Env,
+    ) {
+        if !old_data.credits.same(&data.credits) {
+            ctx.request_layout();
+            ctx.request_paint();
+        }
+        child.update(ctx, old_data, data, env)
     }
 }

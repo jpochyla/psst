@@ -46,6 +46,8 @@ pub mod track;
 pub mod user;
 pub mod utils;
 
+pub const SHOW_TRACK_CREDITS: Selector<Arc<Track>> = Selector::new("app.show-track-credits");
+
 pub fn main_window(config: &Config) -> WindowDesc<AppState> {
     let win = WindowDesc::new(root_widget())
         .title(compute_main_window_title)
@@ -171,24 +173,21 @@ fn root_widget() -> impl Widget<AppState> {
         .controller(NavController)
         .controller(SortController)
         .on_command_async(
-            crate::cmd::SHOW_TRACK_CREDITS,
-            |track: Arc<Track>| WebApi::global().get_track_credits(&track.id.0.to_base62()),
+            cmd::LOAD_TRACK_CREDITS,
+            |track: Arc<Track>| {
+                log::debug!("Fetching credits for track: {}", track.name);
+                WebApi::global().get_track_credits(&track.id.0.to_base62())
+            },
             |_, data: &mut AppState, _| {
                 data.credits = None;
             },
-            |ctx: &mut druid::EventCtx,
-             data: &mut AppState,
-             (_, result): (Arc<Track>, Result<TrackCredits, Error>)| {
-                match result {
-                    Ok(credits) => {
-                        data.credits = Some(credits.clone());
-                        let window = credits::credits_window(&credits.track_title);
-                        ctx.new_window(window);
-                    }
-                    Err(err) => {
-                        log::error!("Failed to fetch track credits: {:?}", err);
-                        data.error_alert(format!("Failed to fetch track credits: {}", err));
-                    }
+            |_ctx, data, (_track, result): (Arc<Track>, Result<TrackCredits, Error>)| match result {
+                Ok(credits) => {
+                    data.credits = Some(credits);
+                }
+                Err(err) => {
+                    log::error!("Failed to fetch credits for {}: {:?}", _track.name, err);
+                    data.error_alert(format!("Failed to fetch track credits: {}", err));
                 }
             },
         )
