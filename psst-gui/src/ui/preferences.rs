@@ -88,7 +88,7 @@ pub fn preferences_widget() -> impl Widget<AppState> {
                 ctx.submit_command(PROPAGATE_FLAGS);
             }
         })
-        .on_command(PROPAGATE_FLAGS, |_, _, data| {
+        .on_command(PROPAGATE_FLAGS, |_, (), data| {
             data.common_ctx_mut().show_track_cover = data.config.show_track_cover;
         })
         .scroll()

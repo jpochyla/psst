@@ -16,7 +16,7 @@ use serde_json::Value;
 use crate::data::{config::Config, AlbumLink, ArtistLink, Image, Track, TrackId};
 use psst_core::item_id::ItemId;
 
-/**
+/*
  * All local files registered by the Spotify file can be found in the file
  * located at: <Spotify config>/Users/<username>-user/local-files.bnk
  *
