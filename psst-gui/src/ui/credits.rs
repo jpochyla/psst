@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use crate::widget::Empty;
 use crate::{
     cmd,
     data::{AppState, ArtistLink, Nav},
@@ -7,22 +8,21 @@ use crate::{
     ui::utils,
 };
 use druid::{
-    widget::{Controller, CrossAxisAlignment, Flex, Label, List, Maybe, Painter, Scroll},
+    widget::{Controller, CrossAxisAlignment, Either, Flex, Label, List, Maybe, Painter, Scroll},
     Cursor, Data, Env, Event, EventCtx, Lens, RenderContext, Target, UpdateCtx, Widget, WidgetExt,
 };
 use serde::Deserialize;
 
 #[derive(Debug, Clone, Data, Lens, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct TrackCredits {
-    #[serde(rename = "trackUri")]
     pub track_uri: String,
-    #[serde(rename = "trackTitle")]
     pub track_title: String,
-    #[serde(rename = "roleCredits")]
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub role_credits: Arc<Vec<RoleCredit>>,
-    #[serde(rename = "extendedCredits")]
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub extended_credits: Arc<Vec<String>>,
-    #[serde(rename = "sourceNames")]
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub source_names: Arc<Vec<String>>,
 }
 
@@ -62,15 +62,21 @@ pub fn credits_widget() -> impl Widget<AppState> {
                             .padding(theme::grid(2.0))
                             .expand_width(),
                     )
-                    .with_child(List::new(role_credit_widget).lens(TrackCredits::role_credits))
-                    .with_child(
+                    .with_child(Either::new(
+                        |data: &TrackCredits, _| data.role_credits.is_empty(),
+                        Empty,
+                        List::new(role_credit_widget).lens(TrackCredits::role_credits),
+                    ))
+                    .with_child(Either::new(
+                        |data: &TrackCredits, _| data.source_names.is_empty(),
+                        Empty,
                         Label::new(|data: &TrackCredits, _: &_| {
                             format!("Source: {}", data.source_names.join(", "))
                         })
                         .with_text_size(theme::TEXT_SIZE_SMALL)
                         .with_text_color(theme::PLACEHOLDER_COLOR)
                         .padding(theme::grid(2.0)),
-                    )
+                    ))
                     .padding(theme::grid(2.0))
             },
             utils::spinner_widget,
@@ -83,18 +89,22 @@ pub fn credits_widget() -> impl Widget<AppState> {
 }
 
 fn role_credit_widget() -> impl Widget<RoleCredit> {
-    Flex::column()
-        .cross_axis_alignment(CrossAxisAlignment::Start)
-        .with_child(
-            Label::new(|role: &RoleCredit, _: &_| capitalize_first(&role.role_title))
-                .with_text_size(theme::TEXT_SIZE_NORMAL)
-                .padding((theme::grid(2.0), theme::grid(1.0))),
-        )
-        .with_child(
-            List::new(credit_artist_widget)
-                .lens(RoleCredit::artists)
-                .padding((theme::grid(2.0), 0.0, theme::grid(2.0), 0.0)),
-        )
+    Either::new(
+        |role: &RoleCredit, _| role.artists.is_empty(),
+        Empty,
+        Flex::column()
+            .cross_axis_alignment(CrossAxisAlignment::Start)
+            .with_child(
+                Label::new(|role: &RoleCredit, _: &_| capitalize_first(&role.role_title))
+                    .with_text_size(theme::TEXT_SIZE_NORMAL)
+                    .padding((theme::grid(2.0), theme::grid(1.0))),
+            )
+            .with_child(
+                List::new(credit_artist_widget)
+                    .lens(RoleCredit::artists)
+                    .padding((theme::grid(2.0), 0.0, theme::grid(2.0), 0.0)),
+            ),
+    )
 }
 
 fn credit_artist_widget() -> impl Widget<CreditArtist> {

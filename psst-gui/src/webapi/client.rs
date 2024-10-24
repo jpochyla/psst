@@ -34,7 +34,8 @@ use crate::{
         Playlist, PublicUser, Range, Recommendations, RecommendationsRequest, SearchResults,
         SearchTopic, Show, SpotifyUrl, Track, TrackLines, UserProfile,
     },
-    error::Error, ui::credits::TrackCredits,
+    error::Error,
+    ui::credits::TrackCredits,
 };
 
 use super::{cache::WebApiCache, local::LocalTrackManager};
@@ -948,12 +949,14 @@ impl WebApi {
     }
 
     pub fn get_track_credits(&self, track_id: &str) -> Result<TrackCredits, Error> {
-        let request = self
-            .get(format!("track-credits-view/v0/experimental/{}/credits", track_id),Some("spclient.wg.spotify.com"))?;
+        let request = self.get(
+            format!("track-credits-view/v0/experimental/{}/credits", track_id),
+            Some("spclient.wg.spotify.com"),
+        )?;
         let result: TrackCredits = self.load(request)?;
         Ok(result)
     }
-    
+
     pub fn get_lyrics(&self, track_id: String) -> Result<Vector<TrackLines>, Error> {
         #[derive(Default, Debug, Clone, PartialEq, Deserialize, Data)]
         #[serde(rename_all = "camelCase")]
