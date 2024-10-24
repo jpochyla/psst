@@ -61,6 +61,7 @@ pub use crate::data::{
     user::{PublicUser, UserProfile},
     utils::{Cached, Float64, Image, Page},
 };
+use crate::ui::credits::TrackCredits;
 
 pub const ALERT_DURATION: Duration = Duration::from_secs(5);
 
@@ -86,6 +87,7 @@ pub struct AppState {
     pub finder: Finder,
     pub added_queue: Vector<QueueEntry>,
     pub lyrics: Promise<Vector<TrackLines>>,
+    pub credits: Option<TrackCredits>,
 }
 
 impl AppState {
@@ -169,6 +171,7 @@ impl AppState {
             alerts: Vector::new(),
             finder: Finder::new(),
             lyrics: Promise::Empty,
+            credits: None,
         }
     }
 }
