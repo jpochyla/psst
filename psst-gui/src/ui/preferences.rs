@@ -329,7 +329,6 @@ impl<W: Widget<AppState>> Controller<AppState, W> for Authenticate {
     ) {
         match event {
             Event::Command(cmd) if cmd.is(Self::REQUEST) => {
-                log::info!("Received Authenticate::REQUEST command");
                 data.preferences.auth.result.defer_default();
 
                 let (auth_url, pkce_verifier) = oauth::generate_auth_url(8888);
@@ -368,7 +367,7 @@ impl<W: Widget<AppState>> Controller<AppState, W> for Authenticate {
                                         return;
                                     }
                                     Err(e) if retries > 1 => {
-                                        log::warn!("Authentication failed, retrying: {:?}", e);
+                                        log::warn!("authentication failed, retrying: {:?}", e);
                                         retries -= 1;
                                     }
                                     Err(e) => {
@@ -391,7 +390,6 @@ impl<W: Widget<AppState>> Controller<AppState, W> for Authenticate {
                 ctx.set_handled();
             }
             Event::Command(cmd) if cmd.is(Self::RESPONSE) => {
-                log::info!("Received Authenticate::RESPONSE command");
                 self.thread.take();
 
                 let result = cmd

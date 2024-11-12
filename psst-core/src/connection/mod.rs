@@ -102,11 +102,11 @@ impl Transport {
     pub fn resolve_ap_with_fallback(proxy_url: Option<&str>) -> Vec<String> {
         match Self::resolve_ap(proxy_url) {
             Ok(ap_list) => {
-                log::info!("Successfully resolved {} access points", ap_list.len());
+                log::info!("successfully resolved {} access points", ap_list.len());
                 ap_list
             }
             Err(err) => {
-                log::error!("Error while resolving APs, using fallback: {:?}", err);
+                log::error!("error while resolving APs, using fallback: {:?}", err);
                 vec![AP_FALLBACK.into()]
             }
         }
@@ -119,20 +119,20 @@ impl Transport {
         }
 
         let agent = default_ureq_agent_builder(proxy_url)?.build();
-        log::info!("Requesting AP list from {}", AP_RESOLVE_ENDPOINT);
+        log::info!("requesting AP list from {}", AP_RESOLVE_ENDPOINT);
         let data: APResolveData = agent.get(AP_RESOLVE_ENDPOINT).call()?.into_json()?;
         if data.ap_list.is_empty() {
-            log::warn!("Received empty AP list from server");
+            log::warn!("received empty AP list from server");
             Err(Error::UnexpectedResponse)
         } else {
-            log::info!("Received {} APs from server", data.ap_list.len());
+            log::info!("received {} APs from server", data.ap_list.len());
             Ok(data.ap_list)
         }
     }
 
     pub fn connect(ap_list: &[String], proxy_url: Option<&str>) -> Result<Self, Error> {
         log::info!(
-            "Attempting to connect using {} access points",
+            "attempting to connect using {} access points",
             ap_list.len()
         );
         for (index, ap) in ap_list.iter().enumerate() {
@@ -141,7 +141,7 @@ impl Transport {
                 match Self::stream_through_proxy(ap, url) {
                     Ok(s) => s,
                     Err(e) => {
-                        log::warn!("Failed to connect to AP {} through proxy: {:?}", ap, e);
+                        log::warn!("failed to connect to AP {} through proxy: {:?}", ap, e);
                         continue;
                     }
                 }
@@ -149,18 +149,18 @@ impl Transport {
                 match Self::stream_without_proxy(ap) {
                     Ok(s) => s,
                     Err(e) => {
-                        log::warn!("Failed to connect to AP {} without proxy: {:?}", ap, e);
+                        log::warn!("failed to connect to AP {} without proxy: {:?}", ap, e);
                         continue;
                     }
                 }
             };
             if let Err(err) = stream.set_write_timeout(Some(NET_IO_TIMEOUT)) {
-                log::warn!("Failed to set TCP write timeout: {:?}", err);
+                log::warn!("failed to set TCP write timeout: {:?}", err);
             }
-            log::info!("Successfully connected to AP: {}", ap);
+            log::info!("successfully connected to AP: {}", ap);
             return Self::exchange_keys(stream);
         }
-        log::error!("Failed to connect to any access point");
+        log::error!("failed to connect to any access point");
         Err(Error::ConnectionFailed)
     }
 

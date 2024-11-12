@@ -223,7 +223,7 @@ impl PlaybackController {
     fn send(&mut self, event: PlayerEvent) {
         if let Some(s) = &self.sender {
             s.send(event)
-                .map_err(|e| log::error!("Error sending message: {:?}", e))
+                .map_err(|e| log::error!("error sending message: {:?}", e))
                 .ok();
         }
     }
