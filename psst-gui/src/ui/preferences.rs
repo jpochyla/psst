@@ -347,14 +347,37 @@ impl<W: Widget<AppState>> Controller<AppState, W> for Authenticate {
                     ) {
                         Ok(code) => {
                             let token = oauth::exchange_code_for_token(8888, code, pkce_verifier);
-                            let response =
-                                Authentication::authenticate_and_get_credentials(SessionConfig {
-                                    login_creds: Credentials::from_access_token(token),
-                                    ..config
-                                });
-                            event_sink
-                                .submit_command(Self::RESPONSE, response, widget_id)
-                                .unwrap();
+                            let mut retries = 3;
+                            while retries > 0 {
+                                let response = Authentication::authenticate_and_get_credentials(
+                                    SessionConfig {
+                                        login_creds: Credentials::from_access_token(token.clone()),
+                                        ..config.clone()
+                                    },
+                                );
+                                match response {
+                                    Ok(credentials) => {
+                                        event_sink
+                                            .submit_command(
+                                                Self::RESPONSE,
+                                                Ok(credentials),
+                                                widget_id,
+                                            )
+                                            .unwrap();
+                                        return;
+                                    }
+                                    Err(e) if retries > 1 => {
+                                        log::warn!("authentication failed, retrying: {:?}", e);
+                                        retries -= 1;
+                                    }
+                                    Err(e) => {
+                                        event_sink
+                                            .submit_command(Self::RESPONSE, Err(e), widget_id)
+                                            .unwrap();
+                                        return;
+                                    }
+                                }
+                            }
                         }
                         Err(e) => {
                             event_sink

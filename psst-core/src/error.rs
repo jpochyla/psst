@@ -7,6 +7,7 @@ pub enum Error {
     MediaFileNotFound,
     ProxyUrlInvalid,
     AuthFailed { code: i32 },
+    ConnectionFailed,
     JsonError(Box<dyn error::Error + Send>),
     AudioFetchingError(Box<dyn error::Error + Send>),
     AudioDecodingError(Box<dyn error::Error + Send>),
@@ -40,6 +41,7 @@ impl fmt::Display for Error {
                 17 => write!(f, "Authentication failed: application banned"),
                 _ => write!(f, "Authentication failed with error code {}", code),
             },
+            Self::ConnectionFailed => write!(f, "Failed to connect to any access point"),
             Self::ResamplingError(code) => {
                 write!(f, "Resampling failed with error code {}", code)
             }

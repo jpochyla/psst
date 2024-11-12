@@ -133,10 +133,8 @@ impl SessionConnection {
     pub fn open(config: SessionConfig) -> Result<Self, Error> {
         // Connect to the server and exchange keys.
         let proxy_url = config.proxy_url.as_deref();
-        let ap_url = Transport::resolve_ap_with_fallback(proxy_url);
-        let mut transport = Transport::connect(&ap_url, proxy_url)?;
-        // Authenticate with provided credentials (either username/password, or saved,
-        // reusable credential blob from an earlier run).
+        let ap_list = Transport::resolve_ap_with_fallback(proxy_url);
+        let mut transport = Transport::connect(&ap_list, proxy_url)?;
         let credentials = transport.authenticate(config.login_creds)?;
         Ok(Self {
             credentials,

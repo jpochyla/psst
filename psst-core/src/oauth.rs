@@ -15,10 +15,10 @@ pub fn get_authcode_listener(
     socket_address: SocketAddr,
     timeout: Duration,
 ) -> Result<AuthorizationCode, String> {
-    log::info!("Starting OAuth listener on {:?}", socket_address);
+    log::info!("starting OAuth listener on {:?}", socket_address);
     let listener = TcpListener::bind(socket_address)
         .map_err(|e| format!("Failed to bind to address: {}", e))?;
-    log::info!("Listener bound successfully");
+    log::info!("listener bound successfully");
 
     let (tx, rx) = mpsc::channel();
 
