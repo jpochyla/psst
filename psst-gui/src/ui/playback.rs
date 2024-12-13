@@ -4,8 +4,8 @@ use druid::{
     kurbo::{Affine, BezPath},
     widget::{CrossAxisAlignment, Either, Flex, Label, LineBreaking, Spinner, ViewSwitcher},
     BoxConstraints, Cursor, Data, Env, Event, EventCtx, LayoutCtx, LensExt, LifeCycle,
-    LifeCycleCtx, MouseButton, PaintCtx, Point, Rect, RenderContext, Size, UpdateCtx, Widget,
-    WidgetExt, WidgetPod,
+    LifeCycleCtx, MouseButton, PaintCtx, Point, Rect, RenderContext, Selector, Size, UpdateCtx,
+    Widget, WidgetExt, WidgetPod,
 };
 use itertools::Itertools;
 
@@ -23,6 +23,8 @@ use crate::{
 };
 
 use super::{episode, library, theme, track, utils};
+
+pub const SHOW_ARTWORK: Selector<()> = Selector::new("app.playback.show-artwork");
 
 pub fn panel_widget() -> impl Widget<AppState> {
     let seek_bar = Maybe::or_empty(SeekBar::new).lens(Playback::now_playing);
@@ -168,6 +170,9 @@ fn cover_widget(size: f64) -> impl Widget<NowPlaying> {
     })
     .fix_size(size, size)
     .clip(Size::new(size, size).to_rounded_rect(4.0))
+    .on_left_click(|ctx, _, _, _| {
+        ctx.submit_command(SHOW_ARTWORK);
+    })
 }
 
 fn playback_origin_icon(origin: &PlaybackOrigin) -> &'static SvgIcon {

@@ -12,7 +12,8 @@ use crate::{
     },
     webapi::WebApi,
     widget::{
-        icons, icons::SvgIcon, Border, Empty, MyWidgetExt, Overlay, ThemeScope, ViewDispatcher,
+        icons, icons::SvgIcon, Border, Empty, MyWidgetExt, Overlay, RemoteImage, ThemeScope,
+        ViewDispatcher,
     },
 };
 use credits::TrackCredits;
@@ -98,6 +99,19 @@ pub fn account_setup_window() -> WindowDesc<AppState> {
     }
 }
 
+pub fn artwork_window() -> WindowDesc<AppState> {
+    let win = WindowDesc::new(artwork_widget())
+        .window_size((theme::grid(50.0), theme::grid(50.0)))
+        .resizable(false)
+        .show_title(false)
+        .transparent_titlebar(true);
+    if cfg!(target_os = "macos") {
+        win.menu(menu::main_menu)
+    } else {
+        win
+    }
+}
+
 fn preferences_widget() -> impl Widget<AppState> {
     ThemeScope::new(
         preferences::preferences_widget()
@@ -112,6 +126,23 @@ fn account_setup_widget() -> impl Widget<AppState> {
             .background(theme::BACKGROUND_DARK)
             .expand(),
     )
+}
+
+fn artwork_widget() -> impl Widget<AppState> {
+    RemoteImage::new(utils::placeholder_widget(), move |data: &AppState, _| {
+        let url = data
+            .playback
+            .now_playing
+            .as_ref()
+            .and_then(|np| {
+                let url = np.cover_image_url(500.0, 500.0);
+                url
+            })
+            .map(|url| url.into());
+        url
+    })
+    .expand() // Fill the entire window
+    .background(theme::BACKGROUND_DARK)
 }
 
 fn root_widget() -> impl Widget<AppState> {
@@ -497,7 +528,9 @@ fn route_icon_widget() -> impl Widget<Nav> {
         |nav: &Nav, _, _| {
             let icon = |icon: &SvgIcon| icon.scale(theme::ICON_SIZE_MEDIUM);
             match &nav {
-                Nav::Home | Nav::Lyrics | Nav::SavedTracks | Nav::SavedAlbums | Nav::SavedShows => Empty.boxed(),
+                Nav::Home | Nav::Lyrics | Nav::SavedTracks | Nav::SavedAlbums | Nav::SavedShows => {
+                    Empty.boxed()
+                }
                 Nav::SearchResults(_) | Nav::Recommendations(_) => icon(&icons::SEARCH).boxed(),
                 Nav::AlbumDetail(_) => icon(&icons::ALBUM).boxed(),
                 Nav::ArtistDetail(_) => icon(&icons::ARTIST).boxed(),
