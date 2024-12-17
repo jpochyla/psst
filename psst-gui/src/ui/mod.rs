@@ -100,11 +100,32 @@ pub fn account_setup_window() -> WindowDesc<AppState> {
 }
 
 pub fn artwork_window() -> WindowDesc<AppState> {
+    let win_size = (theme::grid(50.0), theme::grid(50.0));
+
+    // On Windows, the window size includes the titlebar
+    let win_size = if cfg!(target_os = "windows") {
+        const WINDOWS_TITLEBAR_OFFSET: f64 = 56.0;
+        (win_size.0, win_size.1 + WINDOWS_TITLEBAR_OFFSET)
+    } else {
+        win_size
+    };
+
     let win = WindowDesc::new(artwork_widget())
-        .window_size((theme::grid(50.0), theme::grid(50.0)))
+        .window_size(win_size)
         .resizable(false)
         .show_title(false)
-        .transparent_titlebar(true);
+        .transparent_titlebar(true)
+        .title(|data: &AppState, _env: &_| {
+            data.playback
+                .now_playing
+                .as_ref()
+                .map(|np| match &np.item {
+                    Playable::Track(track) => format!("{} - {}", track.artist_name(), track.name),
+                    Playable::Episode(episode) => episode.name.to_string(),
+                })
+                .unwrap_or_else(|| "Now Playing".to_string())
+        });
+
     if cfg!(target_os = "macos") {
         win.menu(menu::main_menu)
     } else {
