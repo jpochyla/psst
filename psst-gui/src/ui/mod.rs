@@ -104,7 +104,7 @@ pub fn artwork_window() -> WindowDesc<AppState> {
 
     // On Windows, the window size includes the titlebar, so we need to account for it
     let win_size = if cfg!(target_os = "windows") {
-        const WINDOWS_TITLEBAR_OFFSET: f64 = 30.0; // Standard Windows titlebar height
+        const WINDOWS_TITLEBAR_OFFSET: f64 = 28.0; // Standard Windows titlebar height
         (win_size.0, win_size.1 + WINDOWS_TITLEBAR_OFFSET)
     } else {
         win_size
