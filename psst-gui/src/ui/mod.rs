@@ -102,9 +102,9 @@ pub fn account_setup_window() -> WindowDesc<AppState> {
 pub fn artwork_window() -> WindowDesc<AppState> {
     let win_size = (theme::grid(50.0), theme::grid(50.0));
 
-    // On Windows, the window size includes the titlebar
+    // On Windows, the window size includes the titlebar, so we need to account for it
     let win_size = if cfg!(target_os = "windows") {
-        const WINDOWS_TITLEBAR_OFFSET: f64 = 56.0;
+        const WINDOWS_TITLEBAR_OFFSET: f64 = 32.0; // Standard Windows titlebar height
         (win_size.0, win_size.1 + WINDOWS_TITLEBAR_OFFSET)
     } else {
         win_size
@@ -120,7 +120,7 @@ pub fn artwork_window() -> WindowDesc<AppState> {
                 .now_playing
                 .as_ref()
                 .map(|np| match &np.item {
-                    Playable::Track(track) => format!("{} - {}", track.artist_name(), track.name),
+                    Playable::Track(track) => format!("{} - {}", track.album_name(), track.artist_name()),
                     Playable::Episode(episode) => episode.name.to_string(),
                 })
                 .unwrap_or_else(|| "Now Playing".to_string())
