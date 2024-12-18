@@ -259,7 +259,7 @@ impl AppDelegate<AppState> for Delegate {
                     data.config.window_size = size;
                 }
             }
-        } else if self.preferences_window == Some(window_id) {
+        } else if self.preferences_window == Some(window_id) || self.artwork_window == Some(window_id) {
             if let Event::KeyDown(key_event) = &event {
                 if key_event.key == druid::KbKey::Escape {
                     ctx.submit_command(commands::CLOSE_WINDOW.to(window_id));
