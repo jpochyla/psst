@@ -12,7 +12,8 @@ use crate::{
     },
     webapi::WebApi,
     widget::{
-        icons, icons::SvgIcon, Border, Empty, MyWidgetExt, Overlay, ThemeScope, ViewDispatcher,
+        icons, icons::SvgIcon, Border, Empty, MyWidgetExt, Overlay, RemoteImage, ThemeScope,
+        ViewDispatcher,
     },
 };
 use credits::TrackCredits;
@@ -98,6 +99,42 @@ pub fn account_setup_window() -> WindowDesc<AppState> {
     }
 }
 
+pub fn artwork_window() -> WindowDesc<AppState> {
+    let win_size = (theme::grid(50.0), theme::grid(50.0));
+
+    // On Windows, the window size includes the titlebar, so we need to account for it
+    let win_size = if cfg!(target_os = "windows") {
+        const WINDOWS_TITLEBAR_OFFSET: f64 = 24.0; // Standard Windows titlebar height
+        (win_size.0, win_size.1 + WINDOWS_TITLEBAR_OFFSET)
+    } else {
+        win_size
+    };
+
+    let win = WindowDesc::new(artwork_widget())
+        .window_size(win_size)
+        .resizable(false)
+        .show_title(false)
+        .transparent_titlebar(true)
+        .title(|data: &AppState, _env: &_| {
+            data.playback
+                .now_playing
+                .as_ref()
+                .map(|np| match &np.item {
+                    Playable::Track(track) => {
+                        format!("{} - {}", track.album_name(), track.artist_name())
+                    }
+                    Playable::Episode(episode) => episode.name.to_string(),
+                })
+                .unwrap_or_else(|| "Now Playing".to_string())
+        });
+
+    if cfg!(target_os = "macos") {
+        win.menu(menu::main_menu)
+    } else {
+        win
+    }
+}
+
 fn preferences_widget() -> impl Widget<AppState> {
     ThemeScope::new(
         preferences::preferences_widget()
@@ -112,6 +149,23 @@ fn account_setup_widget() -> impl Widget<AppState> {
             .background(theme::BACKGROUND_DARK)
             .expand(),
     )
+}
+
+fn artwork_widget() -> impl Widget<AppState> {
+    RemoteImage::new(utils::placeholder_widget(), move |data: &AppState, _| {
+        let url = data
+            .playback
+            .now_playing
+            .as_ref()
+            .and_then(|np| {
+                let url = np.cover_image_url(500.0, 500.0);
+                url
+            })
+            .map(|url| url.into());
+        url
+    })
+    .expand() // Fill the entire window
+    .background(theme::BACKGROUND_DARK)
 }
 
 fn root_widget() -> impl Widget<AppState> {
@@ -497,7 +551,9 @@ fn route_icon_widget() -> impl Widget<Nav> {
         |nav: &Nav, _, _| {
             let icon = |icon: &SvgIcon| icon.scale(theme::ICON_SIZE_MEDIUM);
             match &nav {
-                Nav::Home | Nav::Lyrics | Nav::SavedTracks | Nav::SavedAlbums | Nav::SavedShows => Empty.boxed(),
+                Nav::Home | Nav::Lyrics | Nav::SavedTracks | Nav::SavedAlbums | Nav::SavedShows => {
+                    Empty.boxed()
+                }
                 Nav::SearchResults(_) | Nav::Recommendations(_) => icon(&icons::SEARCH).boxed(),
                 Nav::AlbumDetail(_) => icon(&icons::ALBUM).boxed(),
                 Nav::ArtistDetail(_) => icon(&icons::ARTIST).boxed(),
