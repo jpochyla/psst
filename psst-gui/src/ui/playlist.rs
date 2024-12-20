@@ -447,10 +447,7 @@ pub fn detail_widget() -> impl Widget<AppState> {
     )
 }
 
-fn sort_playlist(
-    data: &AppState,
-    result: Result<Vector<Arc<Track>>, Error>,
-) -> Vector<Arc<Track>> {
+fn sort_playlist(data: &AppState, result: Result<Vector<Arc<Track>>, Error>) -> Vector<Arc<Track>> {
     let sort_criteria = data.config.sort_criteria;
     let sort_order = data.config.sort_order;
 

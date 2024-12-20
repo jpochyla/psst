@@ -10,7 +10,7 @@ use druid::{
 use itertools::Itertools;
 
 use crate::{
-    cmd::{self, ADD_TO_QUEUE, TOGGLE_LYRICS},
+    cmd::{self, ADD_TO_QUEUE, SHOW_ARTWORK, TOGGLE_LYRICS},
     controller::PlaybackController,
     data::{
         AppState, AudioAnalysis, Episode, NowPlaying, Playable, PlayableMatcher, Playback,
@@ -168,6 +168,9 @@ fn cover_widget(size: f64) -> impl Widget<NowPlaying> {
     })
     .fix_size(size, size)
     .clip(Size::new(size, size).to_rounded_rect(4.0))
+    .on_left_click(|ctx, _, _, _| {
+        ctx.submit_command(SHOW_ARTWORK);
+    })
 }
 
 fn playback_origin_icon(origin: &PlaybackOrigin) -> &'static SvgIcon {

@@ -71,3 +71,6 @@ pub const TOGGLE_SORT_ORDER: Selector = Selector::new("app.toggle-sort-order");
 // Track credits
 pub const SHOW_CREDITS_WINDOW: Selector<Arc<Track>> = Selector::new("app.credits-show-window");
 pub const LOAD_TRACK_CREDITS: Selector<Arc<Track>> = Selector::new("app.credits-load");
+
+// Artwork
+pub const SHOW_ARTWORK: Selector = Selector::new("app.show-artwork");

@@ -20,6 +20,7 @@ pub struct Delegate {
     main_window: Option<WindowId>,
     preferences_window: Option<WindowId>,
     credits_window: Option<WindowId>,
+    artwork_window: Option<WindowId>,
     image_pool: ThreadPool,
     size_updated: bool,
 }
@@ -32,6 +33,7 @@ impl Delegate {
             main_window: None,
             preferences_window: None,
             credits_window: None,
+            artwork_window: None,
             image_pool: ThreadPool::with_name("image_loading".into(), MAX_IMAGE_THREADS),
             size_updated: false,
         }
@@ -125,6 +127,19 @@ impl Delegate {
             }
         }
     }
+
+    fn show_artwork(&mut self, ctx: &mut DelegateCtx) {
+        match self.artwork_window {
+            Some(id) => {
+                ctx.submit_command(commands::SHOW_WINDOW.to(id));
+            }
+            None => {
+                let window = ui::artwork_window();
+                self.artwork_window.replace(window.id);
+                ctx.new_window(window);
+            }
+        }
+    }
 }
 
 impl AppDelegate<AppState> for Delegate {
@@ -192,6 +207,9 @@ impl AppDelegate<AppState> for Delegate {
         } else if cmd.is(commands::QUIT_APP) {
             data.config.save();
             Handled::No
+        } else if cmd.is(crate::cmd::SHOW_ARTWORK) {
+            self.show_artwork(ctx);
+            Handled::Yes
         } else {
             Handled::No
         }
@@ -218,6 +236,9 @@ impl AppDelegate<AppState> for Delegate {
             ctx.submit_command(commands::CLOSE_ALL_WINDOWS);
             ctx.submit_command(commands::QUIT_APP);
         }
+        if self.artwork_window == Some(id) {
+            self.artwork_window = None;
+        }
     }
 
     fn event(
@@ -237,7 +258,13 @@ impl AppDelegate<AppState> for Delegate {
                     data.config.window_size = size;
                 }
             }
-        } else if self.preferences_window == Some(window_id) {
+        } else if [
+            self.preferences_window,
+            self.artwork_window,
+            self.credits_window,
+        ]
+        .contains(&Some(window_id))
+        {
             if let Event::KeyDown(key_event) = &event {
                 if key_event.key == druid::KbKey::Escape {
                     ctx.submit_command(commands::CLOSE_WINDOW.to(window_id));
