@@ -89,7 +89,7 @@ fn uniquely_yours_results_widget() -> impl Widget<WithCtx<MixedView>> {
                 Label::new("Uniquely yours")
                     .with_text_size(theme::grid(2.5))
                     .align_left()
-                    .padding((theme::grid(1.5), 0.0)),
+                    .padding((theme::grid(1.5), theme::grid(1.5))),
             )
             .with_child(
                 Scroll::new(Flex::row().with_child(playlist_results_widget())).align_left(),
