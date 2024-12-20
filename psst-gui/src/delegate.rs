@@ -4,7 +4,6 @@ use druid::{
 };
 use threadpool::ThreadPool;
 
-use crate::ui::playback;
 use crate::ui::playlist::{
     RENAME_PLAYLIST, RENAME_PLAYLIST_CONFIRM, UNFOLLOW_PLAYLIST, UNFOLLOW_PLAYLIST_CONFIRM,
 };
@@ -208,7 +207,7 @@ impl AppDelegate<AppState> for Delegate {
         } else if cmd.is(commands::QUIT_APP) {
             data.config.save();
             Handled::No
-        } else if cmd.is(playback::SHOW_ARTWORK) {
+        } else if cmd.is(crate::cmd::SHOW_ARTWORK) {
             self.show_artwork(ctx);
             Handled::Yes
         } else {
@@ -259,7 +258,13 @@ impl AppDelegate<AppState> for Delegate {
                     data.config.window_size = size;
                 }
             }
-        } else if self.preferences_window == Some(window_id) || self.artwork_window == Some(window_id) || self.credits_window == Some(window_id) {
+        } else if [
+            self.preferences_window,
+            self.artwork_window,
+            self.credits_window,
+        ]
+        .contains(&Some(window_id))
+        {
             if let Event::KeyDown(key_event) = &event {
                 if key_event.key == druid::KbKey::Escape {
                     ctx.submit_command(commands::CLOSE_WINDOW.to(window_id));

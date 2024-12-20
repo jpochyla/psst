@@ -4,13 +4,13 @@ use druid::{
     kurbo::{Affine, BezPath},
     widget::{CrossAxisAlignment, Either, Flex, Label, LineBreaking, Spinner, ViewSwitcher},
     BoxConstraints, Cursor, Data, Env, Event, EventCtx, LayoutCtx, LensExt, LifeCycle,
-    LifeCycleCtx, MouseButton, PaintCtx, Point, Rect, RenderContext, Selector, Size, UpdateCtx,
-    Widget, WidgetExt, WidgetPod,
+    LifeCycleCtx, MouseButton, PaintCtx, Point, Rect, RenderContext, Size, UpdateCtx, Widget,
+    WidgetExt, WidgetPod,
 };
 use itertools::Itertools;
 
 use crate::{
-    cmd::{self, ADD_TO_QUEUE, TOGGLE_LYRICS},
+    cmd::{self, ADD_TO_QUEUE, SHOW_ARTWORK, TOGGLE_LYRICS},
     controller::PlaybackController,
     data::{
         AppState, AudioAnalysis, Episode, NowPlaying, Playable, PlayableMatcher, Playback,
@@ -23,8 +23,6 @@ use crate::{
 };
 
 use super::{episode, library, theme, track, utils};
-
-pub const SHOW_ARTWORK: Selector<()> = Selector::new("app.playback.show-artwork");
 
 pub fn panel_widget() -> impl Widget<AppState> {
     let seek_bar = Maybe::or_empty(SeekBar::new).lens(Playback::now_playing);
