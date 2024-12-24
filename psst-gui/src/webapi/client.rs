@@ -128,8 +128,7 @@ impl WebApi {
     /// Send a request with a empty JSON object, throw away the response body.
     /// Use for POST/PUT/DELETE requests.
     fn send_empty_json(&self, request: Request) -> Result<(), Error> {
-        Self::with_retry(|| Ok(request.clone().send_string("{}")?))
-            .map(|_| ())
+        Self::with_retry(|| Ok(request.clone().send_string("{}")?)).map(|_| ())
     }
 
     /// Send a request and return the deserialized JSON body.  Use for GET
@@ -486,15 +485,13 @@ impl WebApi {
                                     },
                                 )),
                                 description: {
-                                    let desc = sanitize_str(
-                                        &DEFAULT,
+                                    let desc = Self::sanitize_and_clean_description(
                                         item.content
                                             .data
                                             .description
                                             .as_deref()
                                             .unwrap_or_default(),
-                                    )
-                                    .unwrap_or_default();
+                                    );
                                     // This is roughly 3 lines of description, truncated if too long
                                     if desc.chars().count() > 55 {
                                         desc.chars().take(52).collect::<String>() + "..."
@@ -513,13 +510,14 @@ impl WebApi {
                                 ),
                                 owner: PublicUser {
                                     id: Arc::from(""),
-                                    display_name: Arc::from(item
-                                        .content
-                                        .data
-                                        .owner_v2
-                                        .as_ref()
-                                        .map(|owner| owner.data.name.as_str())
-                                        .unwrap_or_default())
+                                    display_name: Arc::from(
+                                        item.content
+                                            .data
+                                            .owner_v2
+                                            .as_ref()
+                                            .map(|owner| owner.data.name.as_str())
+                                            .unwrap_or_default(),
+                                    ),
                                 },
                                 collaborative: false,
                             });
@@ -622,6 +620,12 @@ impl WebApi {
             albums: album,
             shows: show,
         })
+    }
+
+    fn sanitize_and_clean_description(description: &str) -> String {
+        let sanitized = sanitize_str(&DEFAULT, description).unwrap_or_default();
+        // Replace HTML entities with their actual characters
+        sanitized.replace("&amp;", "&")
     }
 }
 
@@ -1200,7 +1204,17 @@ impl WebApi {
     // https://developer.spotify.com/documentation/web-api/reference/get-a-list-of-current-users-playlists
     pub fn get_playlists(&self) -> Result<Vector<Playlist>, Error> {
         let request = self.get("v1/me/playlists", None)?;
-        let result = self.load_all_pages(request)?;
+        let result: Vector<Playlist> = self.load_all_pages(request)?;
+
+        let result = result
+            .into_iter()
+            .map(|mut playlist| {
+                playlist.description =
+                    Self::sanitize_and_clean_description(&playlist.description).into();
+                playlist
+            })
+            .collect();
+
         Ok(result)
     }
 
@@ -1219,7 +1233,8 @@ impl WebApi {
     // https://developer.spotify.com/documentation/web-api/reference/get-playlist
     pub fn get_playlist(&self, id: &str) -> Result<Playlist, Error> {
         let request = self.get(format!("v1/playlists/{}", id), None)?;
-        let result = self.load(request)?;
+        let mut result: Playlist = self.load(request)?;
+        result.description = Self::sanitize_and_clean_description(&result.description).into();
         Ok(result)
     }
 
@@ -1318,14 +1333,24 @@ impl WebApi {
         let artists = result.artists.map_or_else(Vector::new, |page| page.items);
         let albums = result.albums.map_or_else(Vector::new, |page| page.items);
         let tracks = result.tracks.map_or_else(Vector::new, |page| page.items);
-        let playlist = result.playlists.map_or_else(Vector::new, |page| page.items);
+        let playlists = result.playlists.map_or_else(Vector::new, |page| {
+            page.items
+                .into_iter()
+                .map(|mut playlist| {
+                    playlist.description =
+                        Self::sanitize_and_clean_description(&playlist.description).into();
+                    playlist
+                })
+                .collect()
+        });
         let shows = result.shows.map_or_else(Vector::new, |page| page.items);
+
         Ok(SearchResults {
             query: query.into(),
             artists,
             albums,
             tracks,
-            playlists: playlist,
+            playlists,
             shows,
         })
     }
