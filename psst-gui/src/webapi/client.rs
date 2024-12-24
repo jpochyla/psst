@@ -1335,7 +1335,7 @@ impl WebApi {
             SpotifyUrl::Playlist(id) => Nav::PlaylistDetail(self.get_playlist(id)?.link()),
             SpotifyUrl::Artist(id) => Nav::ArtistDetail(self.get_artist(id)?.link()),
             SpotifyUrl::Album(id) => Nav::AlbumDetail(self.get_album(id)?.data.link(), None),
-            SpotifyUrl::Show(id) => Nav::ShowDetail(self.get_show_detail(id)?.link()),
+            SpotifyUrl::Show(id) => Nav::AlbumDetail(self.get_album(id)?.data.link(), None),
             SpotifyUrl::Track(id) => {
                 let track = self.get_track(id)?;
                 let album = track.album.clone().ok_or_else(|| {
@@ -1345,11 +1345,6 @@ impl WebApi {
             }
         };
         Ok(nav)
-    }
-
-    pub fn get_show_detail(&self, id: &str) -> Result<Arc<Show>, Error> {
-        let request = self.get(format!("v1/shows/{}", id), None)?;
-        self.load(request)
     }
 }
 
