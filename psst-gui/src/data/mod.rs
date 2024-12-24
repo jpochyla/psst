@@ -103,6 +103,7 @@ impl AppState {
             now_playing: None,
             library: Arc::clone(&library),
             show_track_cover: config.show_track_cover,
+            nav: Nav::Home,
         });
         let playback = Playback {
             state: PlaybackState::Stopped,
@@ -182,13 +183,28 @@ impl AppState {
             let previous: Nav = mem::replace(&mut self.nav, nav.to_owned());
             self.history.push_back(previous);
             self.config.last_route.replace(nav.to_owned());
+
+            Arc::make_mut(&mut self.common_ctx).nav = nav.to_owned();
         }
     }
 
     pub fn navigate_back(&mut self) {
-        if let Some(nav) = self.history.pop_back() {
+        if let Some(mut nav) = self.history.pop_back() {
+            if let Nav::SearchResults(query) = &nav {
+                if SpotifyUrl::parse(query).is_some() {
+                    if let Some(prev_nav) = self.history.pop_back() {
+                        nav = prev_nav;
+                    }
+                }
+            }
+
+            if let Nav::AlbumDetail(album, _) = nav {
+                nav = Nav::AlbumDetail(album, None);
+            }
+
             self.config.last_route.replace(nav.clone());
-            self.nav = nav;
+            self.nav = nav.clone();
+            Arc::make_mut(&mut self.common_ctx).nav = nav;
         }
     }
 
@@ -518,6 +534,7 @@ pub struct CommonCtx {
     pub now_playing: Option<Playable>,
     pub library: Arc<Library>,
     pub show_track_cover: bool,
+    pub nav: Nav,
 }
 
 impl CommonCtx {
