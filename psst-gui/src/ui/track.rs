@@ -178,20 +178,15 @@ pub fn playable_widget(track: &Track, display: Display) -> impl Widget<PlayRow<A
         .with_child(saved)
         .padding(theme::grid(1.0))
         .link()
-        .active(|row: &PlayRow<Arc<Track>>, _env: &Env| match &row.ctx.nav {
-            Nav::AlbumDetail(_, Some(target_id)) => *target_id == row.item.id,
-            _ => {
-                if row.is_playing {
-                    true
-                } else if let Some(playable) = &row.ctx.now_playing {
-                    match playable {
-                        Playable::Track(track) => track.id == row.item.id,
-                        _ => false,
-                    }
-                } else {
-                    false
-                }
+        .active(|row: &PlayRow<Arc<Track>>, _env: &Env| {
+            // Check if this track is the target of album detail navigation
+            if let Nav::AlbumDetail(_, Some(target_id)) = &row.ctx.nav {
+                return *target_id == row.item.id;
             }
+            // Otherwise check if it's playing or is the current track
+            row.is_playing || row.ctx.now_playing.as_ref().map_or(false, |playable| {
+                matches!(playable, Playable::Track(track) if track.id == row.item.id)
+            })
         })
         .rounded(theme::BUTTON_BORDER_RADIUS)
         .context_menu(track_row_menu)

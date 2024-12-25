@@ -179,12 +179,11 @@ impl AppState {
 
 impl AppState {
     pub fn navigate(&mut self, nav: &Nav) {
-        if &self.nav != nav {
-            let previous: Nav = mem::replace(&mut self.nav, nav.to_owned());
-            self.history.push_back(previous);
-            self.config.last_route.replace(nav.to_owned());
-
-            Arc::make_mut(&mut self.common_ctx).nav = nav.to_owned();
+        if nav != &self.nav {
+            self.history.push_back(self.nav.clone());
+            self.config.last_route.replace(nav.clone());
+            self.nav = nav.clone();
+            Arc::make_mut(&mut self.common_ctx).nav = nav.clone();
         }
     }
 

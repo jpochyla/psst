@@ -105,7 +105,6 @@ impl SpotifyUrl {
         let mut segments = url.path_segments()?;
         let entity = segments.next()?;
         let id = segments.next()?;
-        log::info!("url: {:?}", url);
         match entity {
             "playlist" => Some(Self::Playlist(id.into())),
             "artist" => Some(Self::Artist(id.into())),
