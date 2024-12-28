@@ -1204,15 +1204,6 @@ impl WebApi {
     pub fn get_playlists(&self) -> Result<Vector<Playlist>, Error> {
         let request = self.get("v1/me/playlists", None)?;
         let result: Vector<Playlist> = self.load_all_pages(request)?;
-
-        let result = result
-            .into_iter()
-            .map(|mut playlist| {
-                playlist.description = Self::sanitize_html(&playlist.description).into();
-                playlist
-            })
-            .collect();
-
         Ok(result)
     }
 
@@ -1231,8 +1222,7 @@ impl WebApi {
     // https://developer.spotify.com/documentation/web-api/reference/get-playlist
     pub fn get_playlist(&self, id: &str) -> Result<Playlist, Error> {
         let request = self.get(format!("v1/playlists/{}", id), None)?;
-        let mut result: Playlist = self.load(request)?;
-        result.description = Self::sanitize_html(&result.description).into();
+        let result: Playlist = self.load(request)?;
         Ok(result)
     }
 
