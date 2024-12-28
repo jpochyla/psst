@@ -179,11 +179,11 @@ impl AppState {
 
 impl AppState {
     pub fn navigate(&mut self, nav: &Nav) {
-        if nav != &self.nav {
-            self.history.push_back(self.nav.clone());
-            self.config.last_route.replace(nav.clone());
-            self.nav = nav.clone();
-            Arc::make_mut(&mut self.common_ctx).nav = nav.clone();
+        if &self.nav != nav {
+            let previous = mem::replace(&mut self.nav, nav.to_owned());
+            self.history.push_back(previous);
+            self.config.last_route.replace(nav.to_owned());
+            Arc::make_mut(&mut self.common_ctx).nav = nav.to_owned();
         }
     }
 
@@ -191,9 +191,7 @@ impl AppState {
         if let Some(mut nav) = self.history.pop_back() {
             if let Nav::SearchResults(query) = &nav {
                 if SpotifyUrl::parse(query).is_some() {
-                    if let Some(prev_nav) = self.history.pop_back() {
-                        nav = prev_nav;
-                    }
+                    nav = self.history.pop_back().unwrap_or(Nav::Home);
                 }
             }
 
@@ -201,9 +199,9 @@ impl AppState {
                 nav = Nav::AlbumDetail(album, None);
             }
 
-            self.config.last_route.replace(nav.clone());
-            self.nav = nav.clone();
-            Arc::make_mut(&mut self.common_ctx).nav = nav;
+            self.nav = nav;
+            self.config.last_route.replace(self.nav.to_owned());
+            Arc::make_mut(&mut self.common_ctx).nav = self.nav.clone();
         }
     }
 
