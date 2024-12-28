@@ -128,8 +128,7 @@ impl WebApi {
     /// Send a request with a empty JSON object, throw away the response body.
     /// Use for POST/PUT/DELETE requests.
     fn send_empty_json(&self, request: Request) -> Result<(), Error> {
-        Self::with_retry(|| Ok(request.clone().send_string("{}")?))
-            .map(|_| ())
+        Self::with_retry(|| Ok(request.clone().send_string("{}")?)).map(|_| ())
     }
 
     /// Send a request and return the deserialized JSON body.  Use for GET
@@ -513,13 +512,14 @@ impl WebApi {
                                 ),
                                 owner: PublicUser {
                                     id: Arc::from(""),
-                                    display_name: Arc::from(item
-                                        .content
-                                        .data
-                                        .owner_v2
-                                        .as_ref()
-                                        .map(|owner| owner.data.name.as_str())
-                                        .unwrap_or_default())
+                                    display_name: Arc::from(
+                                        item.content
+                                            .data
+                                            .owner_v2
+                                            .as_ref()
+                                            .map(|owner| owner.data.name.as_str())
+                                            .unwrap_or_default(),
+                                    ),
                                 },
                                 collaborative: false,
                             });
@@ -1334,14 +1334,15 @@ impl WebApi {
         let nav = match link {
             SpotifyUrl::Playlist(id) => Nav::PlaylistDetail(self.get_playlist(id)?.link()),
             SpotifyUrl::Artist(id) => Nav::ArtistDetail(self.get_artist(id)?.link()),
-            SpotifyUrl::Album(id) => Nav::AlbumDetail(self.get_album(id)?.data.link()),
-            SpotifyUrl::Show(id) => Nav::AlbumDetail(self.get_album(id)?.data.link()),
-            SpotifyUrl::Track(id) => Nav::AlbumDetail(
-                // TODO: We should highlight the exact track in the album.
-                self.get_track(id)?.album.clone().ok_or_else(|| {
+            SpotifyUrl::Album(id) => Nav::AlbumDetail(self.get_album(id)?.data.link(), None),
+            SpotifyUrl::Show(id) => Nav::AlbumDetail(self.get_album(id)?.data.link(), None),
+            SpotifyUrl::Track(id) => {
+                let track = self.get_track(id)?;
+                let album = track.album.clone().ok_or_else(|| {
                     Error::WebApiError("Track was found but has no album".to_string())
-                })?,
-            ),
+                })?;
+                Nav::AlbumDetail(album, Some(track.id))
+            }
         };
         Ok(nav)
     }

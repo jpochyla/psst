@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use druid::{
     widget::{CrossAxisAlignment, Either, Flex, Label, ViewSwitcher},
-    LensExt, LocalizedString, Menu, MenuItem, Size, TextAlignment, Widget, WidgetExt,
+    Env, LensExt, LocalizedString, Menu, MenuItem, Size, TextAlignment, Widget, WidgetExt,
 };
 use psst_core::{
     audio::normalize::NormalizationLevel,
@@ -13,8 +13,8 @@ use psst_core::{
 use crate::{
     cmd,
     data::{
-        AppState, Library, Nav, PlaybackOrigin, PlaylistAddTrack, PlaylistRemoveTrack, QueueEntry,
-        RecommendationsRequest, Track,
+        AppState, Library, Nav, Playable, PlaybackOrigin, PlaylistAddTrack, PlaylistRemoveTrack,
+        QueueEntry, RecommendationsRequest, Track,
     },
     ui::playlist,
     widget::{icons, Empty, MyWidgetExt, RemoteImage},
@@ -178,7 +178,16 @@ pub fn playable_widget(track: &Track, display: Display) -> impl Widget<PlayRow<A
         .with_child(saved)
         .padding(theme::grid(1.0))
         .link()
-        .active(|row, _| row.is_playing)
+        .active(|row: &PlayRow<Arc<Track>>, _env: &Env| {
+            // Check if this track is the target of album detail navigation
+            if let Nav::AlbumDetail(_, Some(target_id)) = &row.ctx.nav {
+                return *target_id == row.item.id;
+            }
+            // Otherwise check if it's playing or is the current track
+            row.is_playing || row.ctx.now_playing.as_ref().map_or(false, |playable| {
+                matches!(playable, Playable::Track(track) if track.id == row.item.id)
+            })
+        })
         .rounded(theme::BUTTON_BORDER_RADIUS)
         .context_menu(track_row_menu)
 }
@@ -245,7 +254,7 @@ pub fn track_menu(
             MenuItem::new(
                 LocalizedString::new("menu-item-show-album").with_placeholder("Go to Album"),
             )
-            .command(cmd::NAVIGATE.with(Nav::AlbumDetail(album_link.to_owned()))),
+            .command(cmd::NAVIGATE.with(Nav::AlbumDetail(album_link.to_owned(), None))),
         );
     }
 

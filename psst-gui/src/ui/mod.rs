@@ -555,7 +555,7 @@ fn route_icon_widget() -> impl Widget<Nav> {
                     Empty.boxed()
                 }
                 Nav::SearchResults(_) | Nav::Recommendations(_) => icon(&icons::SEARCH).boxed(),
-                Nav::AlbumDetail(_) => icon(&icons::ALBUM).boxed(),
+                Nav::AlbumDetail(_, _) => icon(&icons::ALBUM).boxed(),
                 Nav::ArtistDetail(_) => icon(&icons::ARTIST).boxed(),
                 Nav::PlaylistDetail(_) => icon(&icons::PLAYLIST).boxed(),
                 Nav::ShowDetail(_) => icon(&icons::PODCAST).boxed(),

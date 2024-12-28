@@ -34,7 +34,7 @@ impl NavController {
                     ctx.submit_command(search::LOAD_RESULTS.with(query.to_owned()));
                 }
             }
-            Nav::AlbumDetail(link) => {
+            Nav::AlbumDetail(link, _) => {
                 if !data.album_detail.album.contains(link) {
                     ctx.submit_command(album::LOAD_DETAIL.with(link.to_owned()));
                 }

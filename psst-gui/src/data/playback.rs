@@ -122,7 +122,7 @@ impl PlaybackOrigin {
         match &self {
             PlaybackOrigin::Home => Nav::Home,
             PlaybackOrigin::Library => Nav::SavedTracks,
-            PlaybackOrigin::Album(link) => Nav::AlbumDetail(link.clone()),
+            PlaybackOrigin::Album(link) => Nav::AlbumDetail(link.clone(), None),
             PlaybackOrigin::Artist(link) => Nav::ArtistDetail(link.clone()),
             PlaybackOrigin::Playlist(link) => Nav::PlaylistDetail(link.clone()),
             PlaybackOrigin::Show(link) => Nav::ShowDetail(link.clone()),
