@@ -485,7 +485,7 @@ impl WebApi {
                                     },
                                 )),
                                 description: {
-                                    let desc = Self::sanitize_and_clean_description(
+                                    let desc = Self::sanitize_html(
                                         item.content
                                             .data
                                             .description
@@ -622,9 +622,8 @@ impl WebApi {
         })
     }
 
-    fn sanitize_and_clean_description(description: &str) -> String {
+    fn sanitize_html(description: &str) -> String {
         let sanitized = sanitize_str(&DEFAULT, description).unwrap_or_default();
-        // Replace HTML entities with their actual characters
         sanitized.replace("&amp;", "&")
     }
 }
@@ -1209,8 +1208,7 @@ impl WebApi {
         let result = result
             .into_iter()
             .map(|mut playlist| {
-                playlist.description =
-                    Self::sanitize_and_clean_description(&playlist.description).into();
+                playlist.description = Self::sanitize_html(&playlist.description).into();
                 playlist
             })
             .collect();
@@ -1234,7 +1232,7 @@ impl WebApi {
     pub fn get_playlist(&self, id: &str) -> Result<Playlist, Error> {
         let request = self.get(format!("v1/playlists/{}", id), None)?;
         let mut result: Playlist = self.load(request)?;
-        result.description = Self::sanitize_and_clean_description(&result.description).into();
+        result.description = Self::sanitize_html(&result.description).into();
         Ok(result)
     }
 
@@ -1337,8 +1335,7 @@ impl WebApi {
             page.items
                 .into_iter()
                 .map(|mut playlist| {
-                    playlist.description =
-                        Self::sanitize_and_clean_description(&playlist.description).into();
+                    playlist.description = Self::sanitize_html(&playlist.description).into();
                     playlist
                 })
                 .collect()
