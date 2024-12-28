@@ -16,8 +16,6 @@ use druid::{
 use itertools::Itertools;
 use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
-use sanitize_html::rules::predefined::DEFAULT;
-use sanitize_html::sanitize_str;
 use serde::{de::DeserializeOwned, Deserialize};
 use serde_json::json;
 use ureq::{Agent, Request, Response};
@@ -39,6 +37,9 @@ use crate::{
 };
 
 use super::{cache::WebApiCache, local::LocalTrackManager};
+use sanitize_html::rules::predefined::DEFAULT;
+use sanitize_html::sanitize_str;
+
 pub struct WebApi {
     session: SessionService,
     agent: Agent,
@@ -485,23 +486,21 @@ impl WebApi {
                                     },
                                 )),
                                 description: {
-                                    let desc = sanitize_str(
-                                        &DEFAULT,
-                                        item.content
-                                            .data
-                                            .description
-                                            .as_deref()
-                                            .unwrap_or_default(),
-                                    )
-                                    .unwrap_or_default();
+                                    let desc = item
+                                        .content
+                                        .data
+                                        .description
+                                        .as_deref()
+                                        .unwrap_or_default()
+                                        .to_string();
                                     // This is roughly 3 lines of description, truncated if too long
                                     if desc.chars().count() > 55 {
                                         desc.chars().take(52).collect::<String>() + "..."
                                     } else {
                                         desc
                                     }
-                                    .into()
-                                },
+                                }
+                                .into(),
                                 track_count: item.content.data.attributes.as_ref().and_then(
                                     |attrs| {
                                         attrs
@@ -1200,7 +1199,7 @@ impl WebApi {
     // https://developer.spotify.com/documentation/web-api/reference/get-a-list-of-current-users-playlists
     pub fn get_playlists(&self) -> Result<Vector<Playlist>, Error> {
         let request = self.get("v1/me/playlists", None)?;
-        let result = self.load_all_pages(request)?;
+        let result: Vector<Playlist> = self.load_all_pages(request)?;
         Ok(result)
     }
 
@@ -1219,7 +1218,7 @@ impl WebApi {
     // https://developer.spotify.com/documentation/web-api/reference/get-playlist
     pub fn get_playlist(&self, id: &str) -> Result<Playlist, Error> {
         let request = self.get(format!("v1/playlists/{}", id), None)?;
-        let result = self.load(request)?;
+        let result: Playlist = self.load(request)?;
         Ok(result)
     }
 
@@ -1318,14 +1317,15 @@ impl WebApi {
         let artists = result.artists.map_or_else(Vector::new, |page| page.items);
         let albums = result.albums.map_or_else(Vector::new, |page| page.items);
         let tracks = result.tracks.map_or_else(Vector::new, |page| page.items);
-        let playlist = result.playlists.map_or_else(Vector::new, |page| page.items);
+        let playlists = result.playlists.map_or_else(Vector::new, |page| page.items);
         let shows = result.shows.map_or_else(Vector::new, |page| page.items);
+
         Ok(SearchResults {
             query: query.into(),
             artists,
             albums,
             tracks,
-            playlists: playlist,
+            playlists,
             shows,
         })
     }
