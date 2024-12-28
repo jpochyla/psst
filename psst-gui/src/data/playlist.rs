@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
 use druid::{im::Vector, Data, Lens};
-use serde::{Deserialize, Deserializer, Serialize};
 use sanitize_html::rules::predefined::DEFAULT;
 use sanitize_html::sanitize_str;
+use serde::{Deserialize, Deserializer, Serialize};
 
 use crate::data::{user::PublicUser, Image, Promise, Track, TrackId};
 
@@ -31,7 +31,7 @@ pub struct Playlist {
     pub name: Arc<str>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub images: Option<Vector<Image>>,
-    #[serde(deserialize_with = "deserialize_sanitized_description")]
+    #[serde(deserialize_with = "deserialize_description")]
     pub description: Arc<str>,
     #[serde(rename = "tracks")]
     #[serde(deserialize_with = "deserialize_track_count")]
@@ -93,7 +93,7 @@ where
     Ok(PlaylistTracksRef::deserialize(deserializer)?.total)
 }
 
-fn deserialize_sanitized_description<'de, D>(deserializer: D) -> Result<Arc<str>, D::Error>
+fn deserialize_description<'de, D>(deserializer: D) -> Result<Arc<str>, D::Error>
 where
     D: Deserializer<'de>,
 {

@@ -16,8 +16,6 @@ use druid::{
 use itertools::Itertools;
 use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
-use sanitize_html::rules::predefined::DEFAULT;
-use sanitize_html::sanitize_str;
 use serde::{de::DeserializeOwned, Deserialize};
 use serde_json::json;
 use ureq::{Agent, Request, Response};
@@ -39,6 +37,9 @@ use crate::{
 };
 
 use super::{cache::WebApiCache, local::LocalTrackManager};
+use sanitize_html::rules::predefined::DEFAULT;
+use sanitize_html::sanitize_str;
+
 pub struct WebApi {
     session: SessionService,
     agent: Agent,
@@ -485,21 +486,21 @@ impl WebApi {
                                     },
                                 )),
                                 description: {
-                                    let desc = Self::sanitize_html(
-                                        item.content
-                                            .data
-                                            .description
-                                            .as_deref()
-                                            .unwrap_or_default(),
-                                    );
+                                    let desc = item
+                                        .content
+                                        .data
+                                        .description
+                                        .as_deref()
+                                        .unwrap_or_default()
+                                        .to_string();
                                     // This is roughly 3 lines of description, truncated if too long
                                     if desc.chars().count() > 55 {
                                         desc.chars().take(52).collect::<String>() + "..."
                                     } else {
                                         desc
                                     }
-                                    .into()
-                                },
+                                }
+                                .into(),
                                 track_count: item.content.data.attributes.as_ref().and_then(
                                     |attrs| {
                                         attrs
@@ -620,11 +621,6 @@ impl WebApi {
             albums: album,
             shows: show,
         })
-    }
-
-    fn sanitize_html(description: &str) -> String {
-        let sanitized = sanitize_str(&DEFAULT, description).unwrap_or_default();
-        sanitized.replace("&amp;", "&")
     }
 }
 
@@ -1321,15 +1317,7 @@ impl WebApi {
         let artists = result.artists.map_or_else(Vector::new, |page| page.items);
         let albums = result.albums.map_or_else(Vector::new, |page| page.items);
         let tracks = result.tracks.map_or_else(Vector::new, |page| page.items);
-        let playlists = result.playlists.map_or_else(Vector::new, |page| {
-            page.items
-                .into_iter()
-                .map(|mut playlist| {
-                    playlist.description = Self::sanitize_html(&playlist.description).into();
-                    playlist
-                })
-                .collect()
-        });
+        let playlists = result.playlists.map_or_else(Vector::new, |page| page.items);
         let shows = result.shows.map_or_else(Vector::new, |page| page.items);
 
         Ok(SearchResults {
