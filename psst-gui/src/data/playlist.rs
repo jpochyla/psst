@@ -1,10 +1,9 @@
 use std::sync::Arc;
 
 use druid::{im::Vector, Data, Lens};
-use sanitize_html::rules::predefined::DEFAULT;
-use sanitize_html::sanitize_str;
 use serde::{Deserialize, Deserializer, Serialize};
 
+use crate::data::utils::sanitize_html_string;
 use crate::data::{user::PublicUser, Image, Promise, Track, TrackId};
 
 #[derive(Clone, Debug, Data, Lens)]
@@ -98,6 +97,5 @@ where
     D: Deserializer<'de>,
 {
     let description: String = String::deserialize(deserializer)?;
-    let sanitized = sanitize_str(&DEFAULT, &description).unwrap_or_default();
-    Ok(Arc::from(sanitized.replace("&amp;", "&")))
+    Ok(sanitize_html_string(&description))
 }

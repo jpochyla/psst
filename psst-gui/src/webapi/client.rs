@@ -26,6 +26,7 @@ use psst_core::{
 };
 
 use crate::{
+    data::utils::sanitize_html_string,
     data::{
         self, Album, AlbumType, Artist, ArtistAlbums, ArtistInfo, ArtistLink, ArtistStats,
         AudioAnalysis, Cached, Episode, EpisodeId, EpisodeLink, Image, MixedView, Nav, Page,
@@ -486,21 +487,21 @@ impl WebApi {
                                     },
                                 )),
                                 description: {
-                                    let desc = item
-                                        .content
-                                        .data
-                                        .description
-                                        .as_deref()
-                                        .unwrap_or_default()
-                                        .to_string();
+                                    let desc = sanitize_html_string(
+                                        item.content
+                                            .data
+                                            .description
+                                            .as_deref()
+                                            .unwrap_or_default(),
+                                    );
+
                                     // This is roughly 3 lines of description, truncated if too long
                                     if desc.chars().count() > 55 {
-                                        desc.chars().take(52).collect::<String>() + "..."
+                                        Arc::from(desc.chars().take(52).collect::<String>() + "...")
                                     } else {
                                         desc
                                     }
-                                }
-                                .into(),
+                                },
                                 track_count: item.content.data.attributes.as_ref().and_then(
                                     |attrs| {
                                         attrs
