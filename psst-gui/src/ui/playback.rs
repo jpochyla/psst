@@ -180,7 +180,7 @@ fn cover_widget(size: f64) -> impl Widget<NowPlaying> {
                     menu = menu.entry(
                         MenuItem::new(
                             LocalizedString::new("menu-item-download-artwork")
-                                .with_placeholder("Download Album Artwork"),
+                                .with_placeholder("Download Cover"),
                         )
                         .command(
                             super::album::DOWNLOAD_ARTWORK

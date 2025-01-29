@@ -8,8 +8,10 @@ use druid::{
 use crate::{
     cmd,
     data::{
-        Album, AlbumDetail, AlbumLink, AppState, ArtistLink, Cached, Ctx, Library, Nav, WithCtx,
+        Album, AlbumDetail, AlbumLink, AppState, ArtistLink, Cached, Ctx, Library, Nav, Playable,
+        PlaybackOrigin, WithCtx,
     },
+    ui::playable::PlayableIter,
     webapi::WebApi,
     widget::{icons, Async, MyWidgetExt, RemoteImage},
 };
@@ -234,4 +236,20 @@ fn album_menu(album: &Arc<Album>, library: &Arc<Library>) -> Menu<AppState> {
     }
 
     menu
+}
+
+impl PlayableIter for Arc<Album> {
+    fn origin(&self) -> PlaybackOrigin {
+        PlaybackOrigin::Album(self.link())
+    }
+
+    fn for_each(&self, mut cb: impl FnMut(Playable, usize)) {
+        for (position, track) in self.clone().into_tracks_with_context().iter().enumerate() {
+            cb(Playable::Track(track.clone()), position);
+        }
+    }
+
+    fn count(&self) -> usize {
+        self.tracks.len()
+    }
 }

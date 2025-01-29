@@ -172,7 +172,7 @@ fn artwork_widget() -> impl Widget<AppState> {
                         menu = menu.entry(
                             MenuItem::new(
                                 LocalizedString::new("menu-item-download-artwork")
-                                    .with_placeholder("Download Album Artwork"),
+                                    .with_placeholder("Download Cover"),
                             )
                             .command(
                                 album::DOWNLOAD_ARTWORK
