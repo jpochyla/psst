@@ -19,8 +19,6 @@ use crate::{
 use super::{artist, library, playable, theme, track, utils};
 
 pub const LOAD_DETAIL: Selector<AlbumLink> = Selector::new("app.album.load-detail");
-pub const DOWNLOAD_ARTWORK: Selector<(String, String)> =
-    Selector::new("app.album.download-artwork");
 
 pub fn detail_widget() -> impl Widget<AppState> {
     Async::new(

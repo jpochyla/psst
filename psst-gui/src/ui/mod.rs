@@ -17,7 +17,8 @@ use crate::{
     },
 };
 use credits::TrackCredits;
-use druid::LocalizedString;
+use druid::widget::Controller;
+use druid::KbKey;
 use druid::{
     im::Vector,
     widget::{CrossAxisAlignment, Either, Flex, Label, List, Scroll, Slider, Split, ViewSwitcher},
@@ -47,6 +48,8 @@ pub mod theme;
 pub mod track;
 pub mod user;
 pub mod utils;
+
+pub const DOWNLOAD_ARTWORK: Selector<(String, String)> = Selector::new("app.artwork.download");
 
 pub fn main_window(config: &Config) -> WindowDesc<AppState> {
     let win = WindowDesc::new(root_widget())
@@ -152,7 +155,48 @@ fn account_setup_widget() -> impl Widget<AppState> {
     )
 }
 
-fn artwork_widget() -> impl Widget<AppState> {
+struct ArtworkController;
+
+impl<W: Widget<AppState>> Controller<AppState, W> for ArtworkController {
+    fn event(
+        &mut self,
+        child: &mut W,
+        ctx: &mut druid::EventCtx,
+        event: &druid::Event,
+        data: &mut AppState,
+        env: &druid::Env,
+    ) {
+        if let druid::Event::WindowConnected = event {
+            ctx.request_focus();
+            ctx.set_handled();
+        }
+
+        if let druid::Event::KeyDown(key_event) = event {
+            // Handle D key for download
+            if key_event.key == KbKey::Character('d'.into()) {
+                if let Some(np) = &data.playback.now_playing {
+                    if let Some((url, _)) = np.cover_image_metadata() {
+                        let title = match &np.item {
+                            Playable::Track(track) => track
+                                .album
+                                .as_ref()
+                                .map(|a| a.name.as_ref())
+                                .unwrap_or("Unknown Album"),
+                            Playable::Episode(episode) => episode.show.name.as_ref(),
+                        };
+                        ctx.submit_command(
+                            DOWNLOAD_ARTWORK.with((url.to_string(), title.to_string())),
+                        );
+                        ctx.set_handled();
+                    }
+                }
+            }
+        }
+        child.event(ctx, event, data, env);
+    }
+}
+
+pub fn artwork_widget() -> impl Widget<AppState> {
     RemoteImage::new(utils::placeholder_widget(), move |data: &AppState, _| {
         data.playback
             .now_playing
@@ -162,29 +206,7 @@ fn artwork_widget() -> impl Widget<AppState> {
     })
     .expand()
     .background(theme::BACKGROUND_DARK)
-    .context_menu(|data: &AppState| {
-        let mut menu = Menu::empty();
-        if let Some(np) = &data.playback.now_playing {
-            if let Playable::Track(track) = &np.item {
-                if let Some(album) = track.album.as_ref() {
-                    // Get largest available image
-                    if let Some((image_url, _)) = np.cover_image_metadata() {
-                        menu = menu.entry(
-                            MenuItem::new(
-                                LocalizedString::new("menu-item-download-artwork")
-                                    .with_placeholder("Download Cover"),
-                            )
-                            .command(
-                                album::DOWNLOAD_ARTWORK
-                                    .with((image_url.to_string(), album.name.to_string())),
-                            ),
-                        );
-                    }
-                }
-            }
-        }
-        menu
-    })
+    .controller(ArtworkController)
 }
 
 fn root_widget() -> impl Widget<AppState> {

@@ -1,4 +1,4 @@
-pub mod album;
+mod album;
 mod artist;
 pub mod config;
 mod ctx;
@@ -484,11 +484,6 @@ impl Library {
                 playlist.track_count = playlist.track_count.map(|count| count.saturating_sub(1));
             }
         }
-    }
-
-    pub fn get_album(&self, id: &str) -> Option<&Arc<Album>> {
-        self.saved_albums.resolved()
-            .and_then(|albums| albums.albums.iter().find(|a| a.id.as_ref() == id))
     }
 }
 

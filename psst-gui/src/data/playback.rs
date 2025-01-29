@@ -106,17 +106,26 @@ impl NowPlaying {
 
     pub fn cover_image_metadata(&self) -> Option<(&str, (u32, u32))> {
         match &self.item {
-            Playable::Track(track) => {
-                track.album.as_ref().map(|album_link| {
-                    // Use floating point values for image dimensions
-                    album_link.image(0.0, 0.0) // Use any size since we just need the URL
-                        .map(|img| (&*img.url, (img.width.unwrap_or(0) as u32, img.height.unwrap_or(0) as u32)))
-                }).flatten()
-            }
-            Playable::Episode(episode) =>
-                // Use get(0) instead of first() for Vector type
-                episode.images.get(0)
-                    .map(|img| (&*img.url, (img.width.unwrap_or(0) as u32, img.height.unwrap_or(0) as u32)))
+            Playable::Track(track) => track.album.as_ref().and_then(|album| {
+                album.images.get(0).map(|img| {
+                    (
+                        &*img.url,
+                        (
+                            img.width.unwrap_or(0) as u32,
+                            img.height.unwrap_or(0) as u32,
+                        ),
+                    )
+                })
+            }),
+            Playable::Episode(episode) => episode.images.get(0).map(|img| {
+                (
+                    &*img.url,
+                    (
+                        img.width.unwrap_or(0) as u32,
+                        img.height.unwrap_or(0) as u32,
+                    ),
+                )
+            }),
         }
     }
 }

@@ -12,7 +12,7 @@ use druid::{
 use crate::{
     cmd,
     data::{
-        Album, ArtistTracks, CommonCtx, FindQuery, MatchFindQuery, Playable, PlaybackOrigin,
+        ArtistTracks, CommonCtx, FindQuery, MatchFindQuery, Playable, PlaybackOrigin,
         PlaybackPayload, PlaylistTracks, Recommendations, SavedTracks, SearchResults, ShowEpisodes,
         Track, WithCtx,
     },
