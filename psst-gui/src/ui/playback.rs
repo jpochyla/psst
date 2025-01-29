@@ -4,8 +4,8 @@ use druid::{
     kurbo::{Affine, BezPath},
     widget::{CrossAxisAlignment, Either, Flex, Label, LineBreaking, Spinner, ViewSwitcher},
     BoxConstraints, Cursor, Data, Env, Event, EventCtx, LayoutCtx, LensExt, LifeCycle,
-    LifeCycleCtx, MouseButton, PaintCtx, Point, Rect, RenderContext, Size, UpdateCtx, Widget,
-    WidgetExt, WidgetPod,
+    LifeCycleCtx, LocalizedString, Menu, MenuItem, MouseButton, PaintCtx, Point, Rect,
+    RenderContext, Size, UpdateCtx, Widget, WidgetExt, WidgetPod,
 };
 use itertools::Itertools;
 
@@ -168,8 +168,29 @@ fn cover_widget(size: f64) -> impl Widget<NowPlaying> {
     })
     .fix_size(size, size)
     .clip(Size::new(size, size).to_rounded_rect(4.0))
+    .link()
     .on_left_click(|ctx, _, _, _| {
         ctx.submit_command(SHOW_ARTWORK);
+    })
+    .context_menu(|np: &NowPlaying| {
+        let mut menu = Menu::empty();
+        if let Playable::Track(track) = &np.item {
+            if let Some(album) = track.album.as_ref() {
+                if let Some((image_url, _)) = np.cover_image_metadata() {
+                    menu = menu.entry(
+                        MenuItem::new(
+                            LocalizedString::new("menu-item-download-artwork")
+                                .with_placeholder("Download Album Artwork"),
+                        )
+                        .command(
+                            super::album::DOWNLOAD_ARTWORK
+                                .with((image_url.to_string(), album.name.to_string())),
+                        ),
+                    );
+                }
+            }
+        }
+        menu
     })
 }
 

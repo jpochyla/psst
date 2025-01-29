@@ -17,6 +17,7 @@ use crate::{
     },
 };
 use credits::TrackCredits;
+use druid::LocalizedString;
 use druid::{
     im::Vector,
     widget::{CrossAxisAlignment, Either, Flex, Label, List, Scroll, Slider, Split, ViewSwitcher},
@@ -153,19 +154,37 @@ fn account_setup_widget() -> impl Widget<AppState> {
 
 fn artwork_widget() -> impl Widget<AppState> {
     RemoteImage::new(utils::placeholder_widget(), move |data: &AppState, _| {
-        let url = data
-            .playback
+        data.playback
             .now_playing
             .as_ref()
-            .and_then(|np| {
-                let url = np.cover_image_url(500.0, 500.0);
-                url
-            })
-            .map(|url| url.into());
-        url
+            .and_then(|np| np.cover_image_url(500.0, 500.0))
+            .map(|url| url.into())
     })
-    .expand() // Fill the entire window
+    .expand()
     .background(theme::BACKGROUND_DARK)
+    .context_menu(|data: &AppState| {
+        let mut menu = Menu::empty();
+        if let Some(np) = &data.playback.now_playing {
+            if let Playable::Track(track) = &np.item {
+                if let Some(album) = track.album.as_ref() {
+                    // Get largest available image
+                    if let Some((image_url, _)) = np.cover_image_metadata() {
+                        menu = menu.entry(
+                            MenuItem::new(
+                                LocalizedString::new("menu-item-download-artwork")
+                                    .with_placeholder("Download Album Artwork"),
+                            )
+                            .command(
+                                album::DOWNLOAD_ARTWORK
+                                    .with((image_url.to_string(), album.name.to_string())),
+                            ),
+                        );
+                    }
+                }
+            }
+        }
+        menu
+    })
 }
 
 fn root_widget() -> impl Widget<AppState> {

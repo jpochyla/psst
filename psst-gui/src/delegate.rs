@@ -1,9 +1,13 @@
+use directories::UserDirs;
 use druid::{
     commands, AppDelegate, Application, Command, DelegateCtx, Env, Event, Handled, Target,
     WindowDesc, WindowId,
 };
+use std::fs;
+use std::io::Read;
 use threadpool::ThreadPool;
 
+use crate::ui::album::DOWNLOAD_ARTWORK;
 use crate::ui::playlist::{
     RENAME_PLAYLIST, RENAME_PLAYLIST_CONFIRM, UNFOLLOW_PLAYLIST, UNFOLLOW_PLAYLIST_CONFIRM,
 };
@@ -209,6 +213,31 @@ impl AppDelegate<AppState> for Delegate {
             Handled::No
         } else if cmd.is(crate::cmd::SHOW_ARTWORK) {
             self.show_artwork(ctx);
+            Handled::Yes
+        } else if let Some((url, album_name)) = cmd.get::<(String, String)>(DOWNLOAD_ARTWORK) {
+            // Get user's download directory
+            if let Some(user_dirs) = UserDirs::new() {
+                if let Some(download_dir) = user_dirs.download_dir() {
+                    // Sanitize album name for filename
+                    let safe_name =
+                        album_name.replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|'], "_");
+                    let file_name = format!("{}_cover.jpg", safe_name);
+                    let path = download_dir.join(file_name);
+
+                    // Download the image
+                    if let Ok(response) = ureq::get(url).call() {
+                        if let Ok(bytes) = response
+                            .into_reader()
+                            .bytes()
+                            .collect::<Result<Vec<_>, _>>()
+                        {
+                            if fs::write(&path, bytes).is_ok() {
+                                log::info!("Downloaded album artwork to {:?}", path);
+                            }
+                        }
+                    }
+                }
+            }
             Handled::Yes
         } else {
             Handled::No

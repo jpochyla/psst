@@ -17,6 +17,8 @@ use crate::{
 use super::{artist, library, playable, theme, track, utils};
 
 pub const LOAD_DETAIL: Selector<AlbumLink> = Selector::new("app.album.load-detail");
+pub const DOWNLOAD_ARTWORK: Selector<(String, String)> =
+    Selector::new("app.album.download-artwork");
 
 pub fn detail_widget() -> impl Widget<AppState> {
     Async::new(
@@ -194,7 +196,7 @@ fn album_menu(album: &Arc<Album>, library: &Arc<Library>) -> Menu<AppState> {
         let more_than_one_artist = album.artists.len() > 1;
         let title = if more_than_one_artist {
             LocalizedString::new("menu-item-show-artist-name")
-                .with_placeholder(format!("Go to Artist “{}”", artist_link.name))
+                .with_placeholder(format!("Go to Artist \"{}\"", artist_link.name))
         } else {
             LocalizedString::new("menu-item-show-artist").with_placeholder("Go to Artist")
         };
