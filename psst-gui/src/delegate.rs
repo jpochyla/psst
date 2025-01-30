@@ -222,16 +222,19 @@ impl AppDelegate<AppState> for Delegate {
                 if let Some(download_dir) = user_dirs.download_dir() {
                     let path = download_dir.join(file_name);
 
-                    if let Ok(response) = ureq::get(url).call() {
-                        if let Ok(bytes) = response
-                            .into_reader()
-                            .bytes()
-                            .collect::<Result<Vec<_>, _>>()
-                        {
-                            if fs::write(&path, bytes).is_ok() {
-                                data.info_alert("Cover saved to Downloads folder.");
-                            }
-                        }
+                    match ureq::get(url)
+                        .call()
+                        .and_then(|response| {
+                            response
+                                .into_reader()
+                                .bytes()
+                                .collect::<Result<Vec<_>, _>>()
+                                .map_err(|e| e.into())
+                        })
+                        .and_then(|bytes| fs::write(&path, bytes).map_err(|e| e.into()))
+                    {
+                        Ok(_) => data.info_alert("Cover saved to Downloads folder."),
+                        Err(_) => data.error_alert("Failed to download and save artwork"),
                     }
                 }
             }

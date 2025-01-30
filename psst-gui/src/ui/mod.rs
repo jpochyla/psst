@@ -201,7 +201,7 @@ pub fn artwork_widget() -> impl Widget<AppState> {
         data.playback
             .now_playing
             .as_ref()
-            .and_then(|np| np.cover_image_url(500.0, 500.0))
+            .and_then(|np| np.cover_image_url(512.0, 512.0))
             .map(|url| url.into())
     })
     .expand()
