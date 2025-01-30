@@ -187,11 +187,11 @@ impl LocalTrackManager {
             .artists
             .iter()
             .next()
-            .map_or(false, |t2_artist| t2_artist.name != t1.artist);
+            .is_some_and(|t2_artist| t2_artist.name != t1.artist);
         let album_mismatch = t2
             .album
             .as_ref()
-            .map_or(false, |t2_album| t2_album.name != t1.album);
+            .is_some_and(|t2_album| t2_album.name != t1.album);
         !(artist_mismatch || album_mismatch)
     }
 }

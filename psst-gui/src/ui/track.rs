@@ -184,7 +184,7 @@ pub fn playable_widget(track: &Track, display: Display) -> impl Widget<PlayRow<A
                 return *target_id == row.item.id;
             }
             // Otherwise check if it's playing or is the current track
-            row.is_playing || row.ctx.now_playing.as_ref().map_or(false, |playable| {
+            row.is_playing || row.ctx.now_playing.as_ref().is_some_and(|playable| {
                 matches!(playable, Playable::Track(track) if track.id == row.item.id)
             })
         })
@@ -239,7 +239,7 @@ pub fn track_menu(
         let more_than_one_artist = track.artists.len() > 1;
         let title = if more_than_one_artist {
             LocalizedString::new("menu-item-show-artist-name")
-                .with_placeholder(format!("Go to Artist “{}”", artist_link.name))
+                .with_placeholder(format!("Go to Artist \"{}\"", artist_link.name))
         } else {
             LocalizedString::new("menu-item-show-artist").with_placeholder("Go to Artist")
         };
