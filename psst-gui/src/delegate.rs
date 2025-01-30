@@ -1,13 +1,17 @@
+use directories::UserDirs;
 use druid::{
     commands, AppDelegate, Application, Command, DelegateCtx, Env, Event, Handled, Target,
     WindowDesc, WindowId,
 };
+use std::fs;
+use std::io::Read;
 use threadpool::ThreadPool;
 
 use crate::ui::playlist::{
     RENAME_PLAYLIST, RENAME_PLAYLIST_CONFIRM, UNFOLLOW_PLAYLIST, UNFOLLOW_PLAYLIST_CONFIRM,
 };
 use crate::ui::theme;
+use crate::ui::DOWNLOAD_ARTWORK;
 use crate::{
     cmd,
     data::{AppState, Config},
@@ -209,6 +213,31 @@ impl AppDelegate<AppState> for Delegate {
             Handled::No
         } else if cmd.is(crate::cmd::SHOW_ARTWORK) {
             self.show_artwork(ctx);
+            Handled::Yes
+        } else if let Some((url, title)) = cmd.get(DOWNLOAD_ARTWORK) {
+            let safe_title = title.replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|'], "_");
+            let file_name = format!("{} cover.jpg", safe_title);
+
+            if let Some(user_dirs) = UserDirs::new() {
+                if let Some(download_dir) = user_dirs.download_dir() {
+                    let path = download_dir.join(file_name);
+
+                    match ureq::get(url)
+                        .call()
+                        .and_then(|response| {
+                            response
+                                .into_reader()
+                                .bytes()
+                                .collect::<Result<Vec<_>, _>>()
+                                .map_err(|e| e.into())
+                        })
+                        .and_then(|bytes| fs::write(&path, bytes).map_err(|e| e.into()))
+                    {
+                        Ok(_) => data.info_alert("Cover saved to Downloads folder."),
+                        Err(_) => data.error_alert("Failed to download and save artwork"),
+                    }
+                }
+            }
             Handled::Yes
         } else {
             Handled::No

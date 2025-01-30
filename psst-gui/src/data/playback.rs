@@ -103,6 +103,31 @@ impl NowPlaying {
             Playable::Episode(episode) => Some(&episode.image(width, height)?.url),
         }
     }
+
+    pub fn cover_image_metadata(&self) -> Option<(&str, (u32, u32))> {
+        match &self.item {
+            Playable::Track(track) => track.album.as_ref().and_then(|album| {
+                album.images.get(0).map(|img| {
+                    (
+                        &*img.url,
+                        (
+                            img.width.unwrap_or(0) as u32,
+                            img.height.unwrap_or(0) as u32,
+                        ),
+                    )
+                })
+            }),
+            Playable::Episode(episode) => episode.images.get(0).map(|img| {
+                (
+                    &*img.url,
+                    (
+                        img.width.unwrap_or(0) as u32,
+                        img.height.unwrap_or(0) as u32,
+                    ),
+                )
+            }),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Data)]

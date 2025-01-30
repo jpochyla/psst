@@ -81,6 +81,18 @@ impl Album {
     pub fn has_explicit(&self) -> bool {
         self.tracks.iter().any(|t| t.explicit)
     }
+
+    pub fn into_tracks_with_context(self: Arc<Self>) -> Vector<Arc<Track>> {
+        let album_link = self.link();
+        self.tracks
+            .iter()
+            .map(|track| {
+                let mut track = track.as_ref().clone();
+                track.album = Some(album_link.clone());
+                Arc::new(track)
+            })
+            .collect()
+    }
 }
 
 #[derive(Clone, Debug, Data, Lens, Eq, PartialEq, Hash, Deserialize, Serialize)]
