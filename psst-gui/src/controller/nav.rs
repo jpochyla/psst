@@ -4,6 +4,7 @@ use crate::{
     ui::{album, artist, library, lyrics, playlist, recommend, search, show},
 };
 use druid::widget::{prelude::*, Controller};
+use druid::Code;
 
 pub struct NavController;
 
@@ -112,6 +113,11 @@ where
             }
             Event::MouseDown(cmd) if cmd.button.is_x1() => {
                 data.navigate_back();
+                ctx.set_handled();
+                self.load_route_data(ctx, data);
+            }
+            Event::KeyDown(key) if key.mods.meta() && key.code == Code::KeyR => {
+                data.refresh();
                 ctx.set_handled();
                 self.load_route_data(ctx, data);
             }
