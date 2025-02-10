@@ -455,7 +455,8 @@ fn volume_slider() -> impl Widget<AppState> {
         .with_child(
             Label::dynamic(|&volume: &f64, _| format!("{}%", (volume * 100.0).floor()))
                 .with_text_color(theme::PLACEHOLDER_COLOR)
-                .with_text_size(theme::TEXT_SIZE_SMALL),
+                .with_text_size(theme::TEXT_SIZE_SMALL)
+                .fix_width(theme::grid(4.0)),
         )
         .padding((theme::grid(2.0), 0.0))
         .on_debounce(SAVE_DELAY, |ctx, _, _| ctx.submit_command(SAVE_TO_CONFIG))
