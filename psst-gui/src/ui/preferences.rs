@@ -386,7 +386,6 @@ impl<W: Widget<AppState>> Controller<AppState, W> for Authenticate {
 
                 if open::that(&auth_url).is_err() {
                     data.error_alert("Failed to open browser");
-                    return;
                 }
             }
             Event::Command(cmd) if cmd.is(Self::RESPONSE) => {
