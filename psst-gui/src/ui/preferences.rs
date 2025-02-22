@@ -332,11 +332,6 @@ impl<W: Widget<AppState>> Controller<AppState, W> for Authenticate {
                 data.preferences.auth.result.defer_default();
 
                 let (auth_url, pkce_verifier) = oauth::generate_auth_url(8888);
-                if open::that(&auth_url).is_err() {
-                    data.error_alert("Failed to open browser");
-                    return;
-                }
-
                 let config = data.preferences.auth.session_config();
                 let widget_id = ctx.widget_id();
                 let event_sink = ctx.get_external_handle();
@@ -388,6 +383,10 @@ impl<W: Widget<AppState>> Controller<AppState, W> for Authenticate {
                 });
                 self.thread.replace(thread);
                 ctx.set_handled();
+
+                if open::that(&auth_url).is_err() {
+                    data.error_alert("Failed to open browser");
+                }
             }
             Event::Command(cmd) if cmd.is(Self::RESPONSE) => {
                 self.thread.take();
