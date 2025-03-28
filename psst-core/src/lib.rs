@@ -18,5 +18,6 @@ pub mod player;
 pub mod session;
 pub mod util;
 pub mod oauth;
+pub mod lastfm;
 
 pub use psst_protocol as protocol;

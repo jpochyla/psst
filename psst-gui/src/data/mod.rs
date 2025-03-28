@@ -487,6 +487,18 @@ impl Library {
     }
 }
 
+impl Default for Library {
+    fn default() -> Self {
+        Library {
+            user_profile: Promise::Empty,
+            playlists: Promise::Empty,
+            saved_albums: Promise::Empty,
+            saved_tracks: Promise::Empty,
+            saved_shows: Promise::Empty,
+        }
+    }
+}
+
 #[derive(Clone, Default, Data, Lens)]
 pub struct SavedTracks {
     pub tracks: Vector<Arc<Track>>,

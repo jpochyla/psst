@@ -20,6 +20,7 @@ use serde::{Deserialize, Serialize};
 
 use super::{Nav, Promise, QueueBehavior, SliderScrollScale};
 use crate::ui::theme;
+use psst_core::lastfm::LastFmClient;
 
 #[derive(Clone, Debug, Data, Lens)]
 pub struct Preferences {
@@ -45,6 +46,7 @@ pub enum PreferencesTab {
     Account,
     Cache,
     About,
+    Scrobbler,
 }
 
 #[derive(Clone, Debug, Data, Lens)]
@@ -102,6 +104,10 @@ pub struct Config {
     pub sort_criteria: SortCriteria,
     pub paginated_limit: usize,
     pub seek_duration: usize,
+    pub lastfm_api_key: Option<String>,
+    pub lastfm_api_secret: Option<String>,
+    pub lastfm_username: Option<String>,
+    pub lastfm_password: Option<String>,
 }
 
 impl Default for Config {
@@ -120,6 +126,10 @@ impl Default for Config {
             sort_criteria: Default::default(),
             paginated_limit: 500,
             seek_duration: 10,
+            lastfm_api_key: None,
+            lastfm_api_secret: None,
+            lastfm_username: None,
+            lastfm_password: None,
         }
     }
 }
@@ -221,6 +231,27 @@ impl Config {
             },
             Some,
         )
+    }
+
+    pub fn try_authenticate_lastfm(&self) {
+        if let (Some(api_key), Some(api_secret), Some(username), Some(password)) = (
+            &self.lastfm_api_key,
+            &self.lastfm_api_secret,
+            &self.lastfm_username,
+            &self.lastfm_password,
+        ) {
+            let mut client = LastFmClient::default();
+            if let Err(err) = client.authenticate_with_config(
+                Some(api_key),
+                Some(api_secret),
+                Some(username),
+                Some(password),
+            ) {
+                log::error!("Failed to authenticate Last.fm: {}", err);
+            }
+        } else {
+            log::info!("Incomplete Last.fm information, skipping authentication.");
+        }
     }
 }
 

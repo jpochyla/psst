@@ -24,6 +24,8 @@ use psst_core::{connection::Credentials, oauth, session::SessionConfig};
 
 use super::{icons::SvgIcon, theme};
 
+use psst_core::lastfm::LastFmClient;
+
 pub fn account_setup_widget() -> impl Widget<AppState> {
     Flex::column()
         .must_fill_main_axis(true)
@@ -68,6 +70,7 @@ pub fn preferences_widget() -> impl Widget<AppState> {
                     }
                     PreferencesTab::Cache => cache_tab_widget().boxed(),
                     PreferencesTab::About => about_tab_widget().boxed(),
+                    PreferencesTab::Scrobbler => scrobbler_tab_widget().boxed(),
                 },
             )
             .padding(theme::grid(4.0))
@@ -128,6 +131,12 @@ fn tabs_widget() -> impl Widget<AppState> {
             "About",
             &icons::HEART,
             PreferencesTab::About,
+        ))
+        .with_default_spacer()
+        .with_child(tab_link_widget(
+            "Scrobbler",
+            &icons::HEART,
+            PreferencesTab::Scrobbler,
         ))
 }
 
@@ -530,6 +539,7 @@ impl<W: Widget<Preferences>> Controller<Preferences, W> for MeasureCacheSize {
     }
 }
 
+
 fn about_tab_widget() -> impl Widget<AppState> {
     // Build Info
     let commit_hash = Flex::row()
@@ -556,4 +566,92 @@ fn about_tab_widget() -> impl Widget<AppState> {
         .with_child(commit_hash)
         .with_child(build_time)
         .with_child(remote_url)
+}
+
+fn scrobbler_tab_widget() -> impl Widget<AppState> {
+    Flex::column()
+        .cross_axis_alignment(CrossAxisAlignment::Start)
+        .must_fill_main_axis(true)
+        .with_child(
+            Label::new("Please insert your Last.fm credentials.")
+                .with_font(theme::UI_FONT_MEDIUM)
+                .with_line_break_mode(LineBreaking::WordWrap),
+        )
+        .with_spacer(theme::grid(2.0))
+        .with_child(
+            Label::new(
+                "Psst connects only to the official servers and does not store your password.",
+            )
+            .with_text_color(theme::PLACEHOLDER_COLOR)
+            .with_line_break_mode(LineBreaking::WordWrap),
+        )
+        .with_spacer(theme::grid(2.0))
+        .with_child(
+            Flex::row()
+                .with_child(Label::new("API Key:").with_font(theme::UI_FONT_MEDIUM))
+                .with_spacer(theme::grid(1.0))
+                .with_child(
+                    TextBox::new()
+                        .lens(AppState::config.then(Config::lastfm_api_key.map(
+                            |opt| opt.clone().unwrap_or_default(),
+                            |opt, value| *opt = Some(value),
+                        ))),
+                ),
+        )
+        .with_spacer(theme::grid(1.0))
+        .with_child(
+            Flex::row()
+                .with_child(Label::new("API Secret:").with_font(theme::UI_FONT_MEDIUM))
+                .with_spacer(theme::grid(1.0))
+                .with_child(
+                    TextBox::new()
+                        .lens(AppState::config.then(Config::lastfm_api_secret.map(
+                            |opt| opt.clone().unwrap_or_default(),
+                            |opt, value| *opt = Some(value),
+                        ))),
+                ),
+        )
+        .with_spacer(theme::grid(1.0))
+        .with_child(
+            Flex::row()
+                .with_child(Label::new("Username:").with_font(theme::UI_FONT_MEDIUM))
+                .with_spacer(theme::grid(1.0))
+                .with_child(
+                    TextBox::new()
+                        .lens(AppState::config.then(Config::lastfm_username.map(
+                            |opt| opt.clone().unwrap_or_default(),
+                            |opt, value| *opt = Some(value),
+                        ))),
+                ),
+        )
+        .with_spacer(theme::grid(1.0))
+        .with_child(
+            Flex::row()
+                .with_child(Label::new("Password:").with_font(theme::UI_FONT_MEDIUM))
+                .with_spacer(theme::grid(1.0))
+                .with_child(
+                    TextBox::new()
+                        .lens(AppState::config.then(Config::lastfm_password.map(
+                            |opt| opt.clone().unwrap_or_default(),
+                            |opt, value| *opt = Some(value),
+                        ))),
+                ),
+        )
+        .with_spacer(theme::grid(2.0))
+        .with_child(
+            Button::new("Test Auth").on_click(|_ctx, data: &mut AppState, _| {
+                let mut lastfm_session = LastFmClient::default();
+                let result = LastFmClient::authenticate_with_config(
+                    &mut lastfm_session,
+                    data.config.lastfm_api_key.as_deref(),
+                    data.config.lastfm_api_secret.as_deref(),
+                    data.config.lastfm_username.as_deref(),
+                    data.config.lastfm_password.as_deref(),
+                );
+                match result {
+                    Ok(_) => println!("Authentication successful!"),
+                    Err(e) => eprintln!("Authentication failed: {}", e),
+                }
+            }),
+        )
 }

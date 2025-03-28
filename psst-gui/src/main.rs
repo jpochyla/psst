@@ -31,7 +31,12 @@ fn main() {
     )
     .init();
 
+    // Load configuration
     let config = Config::load().unwrap_or_default();
+
+    // Attempt Last.fm authentication on startup
+    config.try_authenticate_lastfm();
+
     let paginated_limit = config.paginated_limit;
     let state = AppState::default_with_config(config);
     WebApi::new(

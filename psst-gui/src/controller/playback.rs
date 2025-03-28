@@ -1,6 +1,7 @@
 use std::{
     thread::{self, JoinHandle},
     time::Duration,
+    sync::Arc,
 };
 
 use crossbeam_channel::Sender;
@@ -15,6 +16,7 @@ use psst_core::{
     cdn::Cdn,
     player::{item::PlaybackItem, PlaybackConfig, Player, PlayerCommand, PlayerEvent},
     session::SessionService,
+    lastfm::LastFmClient,
 };
 use souvlaki::{
     MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback, MediaPosition, PlatformConfig,
@@ -25,7 +27,7 @@ use crate::{
     data::Nav,
     data::{
         AppState, Config, NowPlaying, Playback, PlaybackOrigin, PlaybackState, QueueBehavior,
-        QueueEntry,
+        QueueEntry, Library, Playable,
     },
     ui::lyrics,
 };
@@ -228,7 +230,25 @@ impl PlaybackController {
         }
     }
 
-    fn play(&mut self, items: &Vector<QueueEntry>, position: usize) {
+    fn report_now_playing(&self, playback: &Playback, lastfm_client: &LastFmClient) {
+        if let Some(now_playing) = &playback.now_playing {
+            if let Playable::Track(track) = &now_playing.item {
+                let artist_name = track.artist_name(); // Store the Arc<str> in a variable
+                let artist = artist_name.as_ref(); // Convert Arc<str> to &str
+                let title_name = track.name.clone(); // Store the Arc<str> in a variable
+                let title = title_name.as_ref(); // Convert Arc<str> to &str
+                let album = track.album.as_ref().map(|album| album.name.as_ref());
+
+                if let Err(e) = lastfm_client.nowplaying_song(artist, title, album) {
+                    log::warn!("Failed to report 'Now Playing' to Last.fm: {}", e);
+                } else {
+                    log::info!("Reported 'Now Playing' to Last.fm: {} - {}", artist, title);
+                }
+            }
+        }
+    }
+
+    fn play(&mut self, items: &Vector<QueueEntry>, position: usize, lastfm_client: &LastFmClient) {
         let playback_items = items.iter().map(|queued| PlaybackItem {
             item_id: queued.item.id(),
             norm_level: match queued.origin {
@@ -249,6 +269,23 @@ impl PlaybackController {
             items: playback_items_vec,
             position,
         }));
+
+        // Report "Now Playing" to Last.fm
+        if let Some(now_playing) = items.get(position) {
+            let playback = Playback {
+                now_playing: Some(NowPlaying {
+                    item: now_playing.item.clone(),
+                    origin: now_playing.origin.clone(),
+                    progress: Duration::default(),
+                    library: Arc::new(Library::default()), // Ensure Library implements Default
+                }),
+                state: PlaybackState::Playing,
+                queue_behavior: QueueBehavior::Sequential,
+                queue: items.clone(),
+                volume: 1.0,
+            };
+            self.report_now_playing(&playback, lastfm_client);
+        }
     }
 
     fn pause(&mut self) {
@@ -403,7 +440,9 @@ where
                         item: item.to_owned(),
                     })
                     .collect();
-                self.play(&data.playback.queue, payload.position);
+
+                let lastfm_client = LastFmClient::default();
+                self.play(&data.playback.queue, payload.position, &lastfm_client);
                 ctx.set_handled();
             }
             Event::Command(cmd) if cmd.is(cmd::PLAY_PAUSE) => {
@@ -453,7 +492,6 @@ where
             Event::Command(cmd) if cmd.is(cmd::SKIP_TO_POSITION) => {
                 let location = cmd.get_unchecked(cmd::SKIP_TO_POSITION);
                 self.seek(Duration::from_millis(*location));
-
                 ctx.set_handled();
             }
             // Keyboard shortcuts.
@@ -485,7 +523,6 @@ where
                 data.playback.volume = (data.playback.volume - 0.1).max(0.0);
                 ctx.set_handled();
             }
-            //
             _ => child.event(ctx, event, data, env),
         }
     }
