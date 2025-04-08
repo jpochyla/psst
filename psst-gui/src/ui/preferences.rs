@@ -640,7 +640,7 @@ fn scrobbler_tab_widget() -> impl Widget<AppState> {
         .with_spacer(theme::grid(2.0))
         .with_child(
             Button::new("Test Auth").on_click(|_ctx, data: &mut AppState, _| {
-                let mut lastfm_session = LastFmClient::default();
+                let mut lastfm_session = LastFmClient;
                 let result = LastFmClient::authenticate_with_config(
                     &mut lastfm_session,
                     data.config.lastfm_api_key.as_deref(),

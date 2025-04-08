@@ -89,15 +89,9 @@ impl Authentication {
         username: Option<&str>,
         password: Option<&str>,
     ) -> Result<(), String> {
-        let mut client = LastFmClient::default();
-        let result = client.authenticate_with_config(api_key, api_secret, username, password);
+        let mut client = LastFmClient;
+        client.authenticate_with_config(api_key, api_secret, username, password)
 
-        if result.is_ok() {
-            let mut global_client = LASTFM_CLIENT.lock().unwrap();
-            *global_client = Some(client);
-        }
-
-        result
     }
 }
 
@@ -258,7 +252,7 @@ impl Config {
             &self.lastfm_username,
             &self.lastfm_password,
         ) {
-            let mut client = LastFmClient::default();
+            let mut client = LastFmClient;
             if let Err(err) = client.authenticate_with_config(
                 Some(api_key),
                 Some(api_secret),

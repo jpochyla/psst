@@ -441,7 +441,7 @@ where
                     })
                     .collect();
 
-                let lastfm_client = LastFmClient::default();
+                let lastfm_client = LastFmClient;
                 self.play(&data.playback.queue, payload.position, &lastfm_client);
                 ctx.set_handled();
             }

@@ -1,35 +1,35 @@
 extern crate rustfm_scrobble_proxy;
+use once_cell::sync::OnceCell;
 use rustfm_scrobble_proxy::{Scrobble, Scrobbler};
-use lazy_static::lazy_static;
-use std::sync::{Arc, Mutex};
 
-lazy_static! {
-    static ref LASTFM_CLIENT: Mutex<Option<LastFmClient>> = Mutex::new(None);
+thread_local! {
+    static LASTFM_CLIENT: OnceCell<Scrobbler> = OnceCell::new();
 }
 
-pub struct LastFmClient {
-    local_scrobbler: Scrobbler,
-}
+pub struct LastFmClient;
 
 impl LastFmClient {
-    pub fn default() -> Self {
-        LastFmClient {
-            local_scrobbler: Scrobbler::new("API_KEY", "API_SECRET"),
-        }
-    }
-
     pub fn scrobble_song(&self, artist: &str, title: &str, album: Option<&str>) -> Result<(), String> {
         let song = Scrobble::new(artist, title, album);
-        self.local_scrobbler.scrobble(&song).map(|_| ()).map_err(|e| e.to_string())
-    }
 
-    pub fn is_authenticated(&self) -> bool {
-        self.local_scrobbler.session_key().is_some()
+        LASTFM_CLIENT.with(|client| {
+            if let Some(client) = client.get() {
+                client.scrobble(&song).map(|_| ()).map_err(|e| e.to_string())
+            } else {
+                Err("LastFmClient is not initialized.".to_string())
+            }
+        })
     }
 
     pub fn nowplaying_song(&self, artist: &str, title: &str, album: Option<&str>) -> Result<(), String> {
         let song = Scrobble::new(artist, title, album);
-        self.local_scrobbler.now_playing(&song).map(|_| ()).map_err(|e| e.to_string())
+        LASTFM_CLIENT.with(|client| {
+            if let Some(client) = client.get() {
+                client.now_playing(&song).map(|_| ()).map_err(|e| e.to_string())
+            } else {
+                Err("LastFmClient is not initialized.".to_string())
+            }
+        })
     }
 
     pub fn save_credentials(&self, username: &str, password: &str) -> Result<(), String> {
@@ -47,25 +47,18 @@ impl LastFmClient {
         if let (Some(api_key), Some(api_secret), Some(username), Some(password)) =
             (api_key, api_secret, username, password)
         {
-            self.local_scrobbler = Scrobbler::new(api_key, api_secret);
-            self.local_scrobbler.authenticate_with_password(username, password);
+            let mut scrobbler = Scrobbler::new(api_key, api_secret);
+            scrobbler.authenticate_with_password(username, password);
 
             // Store the authenticated client globally
-            let mut client = LASTFM_CLIENT.lock().unwrap();
-            *client = Some(LastFmClient {
-                local_scrobbler: Scrobbler::new(api_key, api_secret),
-            });
+            LASTFM_CLIENT.with(|client| {
+                client.set(scrobbler).map_err(|_| "Failed to set LastFmClient".to_string())
+            })?;
+            log::info!("Authenticated with Last.fm successfully.");
 
             Ok(())
         } else {
             Err("Please fill in all required fields.".to_string())
         }
-    }
-
-    pub fn get_global_client() -> Option<Arc<Mutex<LastFmClient>>> {
-        let client = LASTFM_CLIENT.lock().unwrap();
-        client.as_ref().map(|c| Arc::new(Mutex::new(LastFmClient {
-            local_scrobbler: Scrobbler::new("API_KEY", "API_SECRET"),
-        })))
     }
 }
