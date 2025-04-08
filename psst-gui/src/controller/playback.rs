@@ -37,15 +37,19 @@ pub struct PlaybackController {
     thread: Option<JoinHandle<()>>,
     output: Option<DefaultAudioOutput>,
     media_controls: Option<MediaControls>,
+    has_scrobbled: bool
 }
 
+
 impl PlaybackController {
+
     pub fn new() -> Self {
         Self {
             sender: None,
             thread: None,
             output: None,
             media_controls: None,
+            has_scrobbled: false,
         }
     }
 
@@ -248,6 +252,30 @@ impl PlaybackController {
         }
     }
 
+    fn report_scrobble(&mut self, playback: &Playback, lastfm_client: &LastFmClient) {
+        if let Some(now_playing) = &playback.now_playing {
+            if let Playable::Track(track) = &now_playing.item {
+                let artist_name = track.artist_name();
+                let artist = artist_name.as_ref();
+                let title_name = track.name.clone();
+                let title = title_name.as_ref();
+                let album = track.album.as_ref().map(|album| album.name.as_ref());
+
+                // Check if the song has been played for more than half its duration
+                if now_playing.progress >= track.duration / 2 && !self.has_scrobbled { 
+                    if let Err(e) = lastfm_client.scrobble_song(artist, title, album) {
+                        log::warn!("Failed to scrobble to Last.fm: {}", e);
+                    } else {
+                        log::info!("Scrobbled to Last.fm: {} - {}", artist, title);
+                    }
+                    self.has_scrobbled = true;
+                }
+            
+            }
+        }
+    }
+
+
     fn play(&mut self, items: &Vector<QueueEntry>, position: usize, lastfm_client: &LastFmClient) {
         let playback_items = items.iter().map(|queued| PlaybackItem {
             item_id: queued.item.id(),
@@ -284,6 +312,7 @@ impl PlaybackController {
                 queue: items.clone(),
                 volume: 1.0,
             };
+            self.has_scrobbled = false;
             self.report_now_playing(&playback, lastfm_client);
         }
     }
@@ -407,6 +436,9 @@ where
             Event::Command(cmd) if cmd.is(cmd::PLAYBACK_PROGRESS) => {
                 let progress = cmd.get_unchecked(cmd::PLAYBACK_PROGRESS);
                 data.progress_playback(progress.to_owned());
+
+                let lastfm_client = LastFmClient; // Initialize LastFmClient
+                self.report_scrobble(&data.playback, &lastfm_client);
                 self.update_media_control_playback(&data.playback);
                 ctx.set_handled();
             }
@@ -441,7 +473,7 @@ where
                     })
                     .collect();
 
-                let lastfm_client = LastFmClient;
+                let lastfm_client = LastFmClient; // Initialize LastFmClient
                 self.play(&data.playback.queue, payload.position, &lastfm_client);
                 ctx.set_handled();
             }
