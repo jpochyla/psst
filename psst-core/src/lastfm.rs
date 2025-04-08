@@ -1,9 +1,11 @@
 extern crate rustfm_scrobble_proxy;
-use once_cell::sync::OnceCell;
-use rustfm_scrobble_proxy::{Scrobble, Scrobbler};
+use rustfm_scrobble_proxy::{Scrobble, Scrobbler, ScrobblerError};
+use std::cell::RefCell;
+use crate::error::Error;
+
 
 thread_local! {
-    static LASTFM_CLIENT: OnceCell<Scrobbler> = OnceCell::new();
+    static LASTFM_CLIENT: RefCell<Option<Scrobbler>> = RefCell::new(None); //Stores the auth as a thread local variable
 }
 
 pub struct LastFmClient;
@@ -13,7 +15,7 @@ impl LastFmClient {
         let song = Scrobble::new(artist, title, album);
 
         LASTFM_CLIENT.with(|client| {
-            if let Some(client) = client.get() {
+            if let Some(client) = &*client.borrow() {
                 client.scrobble(&song).map(|_| ()).map_err(|e| e.to_string())
             } else {
                 Err("LastFmClient is not initialized.".to_string())
@@ -24,7 +26,7 @@ impl LastFmClient {
     pub fn nowplaying_song(&self, artist: &str, title: &str, album: Option<&str>) -> Result<(), String> {
         let song = Scrobble::new(artist, title, album);
         LASTFM_CLIENT.with(|client| {
-            if let Some(client) = client.get() {
+            if let Some(client) = &*client.borrow() {
                 client.now_playing(&song).map(|_| ()).map_err(|e| e.to_string())
             } else {
                 Err("LastFmClient is not initialized.".to_string())
@@ -43,22 +45,30 @@ impl LastFmClient {
         api_secret: Option<&str>,
         username: Option<&str>,
         password: Option<&str>,
-    ) -> Result<(), String> {
+    ) -> Result<(), Error> {
         if let (Some(api_key), Some(api_secret), Some(username), Some(password)) =
             (api_key, api_secret, username, password)
         {
             let mut scrobbler = Scrobbler::new(api_key, api_secret);
-            scrobbler.authenticate_with_password(username, password);
+            scrobbler.authenticate_with_password(username, password)?;
 
             // Store the authenticated client globally
             LASTFM_CLIENT.with(|client| {
-                client.set(scrobbler).map_err(|_| "Failed to set LastFmClient".to_string())
-            })?;
+                let mut client = client.borrow_mut();
+                *client = Some(scrobbler);
+            });
             log::info!("Authenticated with Last.fm successfully.");
 
             Ok(())
         } else {
-            Err("Please fill in all required fields.".to_string())
+            Ok(())
         }
+    }
+}
+
+//Stinky error implementation
+impl From<ScrobblerError> for Error{
+    fn from(value: ScrobblerError) -> Self {
+        Self::ScrobblerError(Box::new(value))
     }
 }

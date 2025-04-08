@@ -13,6 +13,7 @@ pub enum Error {
     AudioDecodingError(Box<dyn error::Error + Send>),
     AudioOutputError(Box<dyn error::Error + Send>),
     AudioProbeError(Box<dyn error::Error + Send>),
+    ScrobblerError(Box<dyn error::Error + Send>),
     ResamplingError(i32),
     IoError(io::Error),
     SendError,
@@ -49,6 +50,7 @@ impl fmt::Display for Error {
             | Self::AudioFetchingError(err)
             | Self::AudioDecodingError(err)
             | Self::AudioOutputError(err)
+            | Self::ScrobblerError(err)
             | Self::AudioProbeError(err) => err.fmt(f),
             Self::IoError(err) => err.fmt(f),
             Self::SendError => write!(f, "Failed to send into a channel"),

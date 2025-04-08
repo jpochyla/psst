@@ -649,8 +649,8 @@ fn scrobbler_tab_widget() -> impl Widget<AppState> {
                     data.config.lastfm_password.as_deref(),
                 );
                 match result {
-                    Ok(_) => println!("Authentication successful!"),
-                    Err(e) => eprintln!("Authentication failed: {}", e),
+                    Ok(_) => log::info!("Authentication successful!"),
+                    Err(e) => log::warn!("Authentication failed: {}", e),
                 }
             }),
         )
