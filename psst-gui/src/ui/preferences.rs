@@ -135,7 +135,7 @@ fn tabs_widget() -> impl Widget<AppState> {
         .with_default_spacer()
         .with_child(tab_link_widget(
             "Scrobbler",
-            &icons::HEART,
+            &icons::LASTFM,
             PreferencesTab::Scrobbler,
         ))
 }
