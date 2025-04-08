@@ -14,6 +14,7 @@ cubeb = ["psst-core/cubeb"]
 
 [dependencies]
 psst-core = { path = "../psst-core" }
+lazy_static = "1.4"
 
 # Common
 crossbeam-channel = { version = "0.5.13" }

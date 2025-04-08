@@ -81,6 +81,24 @@ impl Authentication {
         self.username.clear();
         self.password.clear();
     }
+
+    pub fn authenticate_and_store_global(
+        &self,
+        api_key: Option<&str>,
+        api_secret: Option<&str>,
+        username: Option<&str>,
+        password: Option<&str>,
+    ) -> Result<(), String> {
+        let mut client = LastFmClient::default();
+        let result = client.authenticate_with_config(api_key, api_secret, username, password);
+
+        if result.is_ok() {
+            let mut global_client = LASTFM_CLIENT.lock().unwrap();
+            *global_client = Some(client);
+        }
+
+        result
+    }
 }
 
 const APP_NAME: &str = "Psst";

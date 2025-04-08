@@ -12,6 +12,7 @@ time = { version = "0.3.36", features = ["local-offset"] }
 [dependencies]
 psst-protocol = { path = "../psst-protocol" }
 rustfm-scrobble-proxy = "2.0.0"
+lazy_static = "1.4"
 
 # Common
 byteorder = { version = "1.5.0" }
