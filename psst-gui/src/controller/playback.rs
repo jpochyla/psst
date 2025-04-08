@@ -1,7 +1,6 @@
 use std::{
     thread::{self, JoinHandle},
     time::Duration,
-    sync::Arc,
 };
 
 use crossbeam_channel::Sender;
@@ -11,12 +10,7 @@ use druid::{
     Code, ExtEventSink, InternalLifeCycle, KbKey, WindowHandle,
 };
 use psst_core::{
-    audio::{normalize::NormalizationLevel, output::DefaultAudioOutput},
-    cache::Cache,
-    cdn::Cdn,
-    player::{item::PlaybackItem, PlaybackConfig, Player, PlayerCommand, PlayerEvent},
-    session::SessionService,
-    lastfm::LastFmClient,
+    audio::{normalize::NormalizationLevel, output::DefaultAudioOutput}, cache::Cache, cdn::Cdn, lastfm::{LastFmClient}, player::{item::PlaybackItem, PlaybackConfig, Player, PlayerCommand, PlayerEvent}, session::SessionService
 };
 use souvlaki::{
     MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback, MediaPosition, PlatformConfig,
@@ -27,7 +21,7 @@ use crate::{
     data::Nav,
     data::{
         AppState, Config, NowPlaying, Playback, PlaybackOrigin, PlaybackState, QueueBehavior,
-        QueueEntry, Library, Playable,
+        QueueEntry, Playable,
     },
     ui::lyrics,
 };
@@ -92,11 +86,14 @@ impl PlaybackController {
                         .submit_command(cmd::PLAYBACK_LOADING, item.item_id, widget_id)
                         .unwrap();
                 }
-                PlayerEvent::Playing { path, position } => {
+                PlayerEvent::Playing { path, position} => {
+                    // log::info!("playing: {:?}", path);
                     let progress = position.to_owned();
                     event_sink
                         .submit_command(cmd::PLAYBACK_PLAYING, (path.item_id, progress), widget_id)
                         .unwrap();
+
+                    
                 }
                 PlayerEvent::Pausing { .. } => {
                     event_sink
@@ -234,7 +231,8 @@ impl PlaybackController {
         }
     }
 
-    fn report_now_playing(&self, playback: &Playback, lastfm_client: &LastFmClient) {
+    fn report_now_playing(&mut self, playback: &Playback) {
+        let lastfm_client = LastFmClient; // Initialize LastFmClient
         if let Some(now_playing) = &playback.now_playing {
             if let Playable::Track(track) = &now_playing.item {
                 let artist_name = track.artist_name(); // Store the Arc<str> in a variable
@@ -252,7 +250,7 @@ impl PlaybackController {
         }
     }
 
-    fn report_scrobble(&mut self, playback: &Playback, lastfm_client: &LastFmClient) {
+    fn report_scrobble(&mut self, playback: &Playback) {
         if let Some(now_playing) = &playback.now_playing {
             if let Playable::Track(track) = &now_playing.item {
                 let artist_name = track.artist_name();
@@ -263,7 +261,7 @@ impl PlaybackController {
 
                 // Check if the song has been played for more than half its duration
                 if now_playing.progress >= track.duration / 2 && !self.has_scrobbled { 
-                    if let Err(e) = lastfm_client.scrobble_song(artist, title, album) {
+                    if let Err(e) = LastFmClient.scrobble_song(artist, title, album) {
                         log::warn!("Failed to scrobble to Last.fm: {}", e);
                     } else {
                         log::info!("Scrobbled to Last.fm: {} - {}", artist, title);
@@ -276,7 +274,7 @@ impl PlaybackController {
     }
 
 
-    fn play(&mut self, items: &Vector<QueueEntry>, position: usize, lastfm_client: &LastFmClient) {
+    fn play(&mut self, items: &Vector<QueueEntry>, position: usize) {
         let playback_items = items.iter().map(|queued| PlaybackItem {
             item_id: queued.item.id(),
             norm_level: match queued.origin {
@@ -298,23 +296,23 @@ impl PlaybackController {
             position,
         }));
 
-        // Report "Now Playing" to Last.fm
-        if let Some(now_playing) = items.get(position) {
-            let playback = Playback {
-                now_playing: Some(NowPlaying {
-                    item: now_playing.item.clone(),
-                    origin: now_playing.origin.clone(),
-                    progress: Duration::default(),
-                    library: Arc::new(Library::default()), // Ensure Library implements Default
-                }),
-                state: PlaybackState::Playing,
-                queue_behavior: QueueBehavior::Sequential,
-                queue: items.clone(),
-                volume: 1.0,
-            };
-            self.has_scrobbled = false;
-            self.report_now_playing(&playback, lastfm_client);
-        }
+        // // Report "Now Playing" to Last.fm
+        // if let Some(now_playing) = items.get(position) {
+        //     let playback = Playback {
+        //         now_playing: Some(NowPlaying {
+        //             item: now_playing.item.clone(),
+        //             origin: now_playing.origin.clone(),
+        //             progress: Duration::default(),
+        //             library: Arc::new(Library::default()), // Ensure Library implements Default
+        //         }),
+        //         state: PlaybackState::Playing,
+        //         queue_behavior: QueueBehavior::Sequential,
+        //         queue: items.clone(),
+        //         volume: 1.0,
+        //     };
+        //     self.has_scrobbled = false;
+        //     self.report_now_playing(&playback);
+        //}
     }
 
     fn pause(&mut self) {
@@ -382,10 +380,11 @@ impl PlaybackController {
         }));
     }
 
-    fn update_lyrics(&self, ctx: &mut EventCtx, data: &AppState, now_playing: &NowPlaying) {
+    fn update_lyrics(&mut self, ctx: &mut EventCtx, data: &AppState, now_playing: &NowPlaying) {
         if matches!(data.nav, Nav::Lyrics) {
             ctx.submit_command(lyrics::SHOW_LYRICS.with(now_playing.clone()));
         }
+
     }
 }
 
@@ -421,6 +420,10 @@ where
             Event::Command(cmd) if cmd.is(cmd::PLAYBACK_PLAYING) => {
                 let (item, progress) = cmd.get_unchecked(cmd::PLAYBACK_PLAYING);
 
+                // log::info!("playing item: {:?}", item);
+                self.has_scrobbled = false;
+                self.report_now_playing(&data.playback);
+
                 if let Some(queued) = data.queued_entry(*item) {
                     data.start_playback(queued.item, queued.origin, progress.to_owned());
                     self.update_media_control_playback(&data.playback);
@@ -437,8 +440,7 @@ where
                 let progress = cmd.get_unchecked(cmd::PLAYBACK_PROGRESS);
                 data.progress_playback(progress.to_owned());
 
-                let lastfm_client = LastFmClient; // Initialize LastFmClient
-                self.report_scrobble(&data.playback, &lastfm_client);
+                self.report_scrobble(&data.playback);
                 self.update_media_control_playback(&data.playback);
                 ctx.set_handled();
             }
@@ -473,8 +475,7 @@ where
                     })
                     .collect();
 
-                let lastfm_client = LastFmClient; // Initialize LastFmClient
-                self.play(&data.playback.queue, payload.position, &lastfm_client);
+                self.play(&data.playback.queue, payload.position);
                 ctx.set_handled();
             }
             Event::Command(cmd) if cmd.is(cmd::PLAY_PAUSE) => {

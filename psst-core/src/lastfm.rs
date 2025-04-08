@@ -5,38 +5,35 @@ use crate::error::Error;
 
 
 thread_local! {
-    static LASTFM_CLIENT: RefCell<Option<Scrobbler>> = RefCell::new(None); //Stores the auth as a thread local variable
+    static LASTFM_CLIENT: RefCell<Option<Scrobbler>> = const { RefCell::new(None)}; //Stores the auth as a thread local variable
 }
 
 pub struct LastFmClient;
 
 impl LastFmClient {
-    pub fn scrobble_song(&self, artist: &str, title: &str, album: Option<&str>) -> Result<(), String> {
+    pub fn scrobble_song(&self, artist: &str, title: &str, album: Option<&str>) -> Result<(), Error> {
         let song = Scrobble::new(artist, title, album);
 
         LASTFM_CLIENT.with(|client| {
             if let Some(client) = &*client.borrow() {
-                client.scrobble(&song).map(|_| ()).map_err(|e| e.to_string())
+                client.scrobble(&song).map(|_| ())?
             } else {
-                Err("LastFmClient is not initialized.".to_string())
+                log::warn!("LastFmClient is not initialized.");   
             }
+            Ok(())
         })
     }
 
-    pub fn nowplaying_song(&self, artist: &str, title: &str, album: Option<&str>) -> Result<(), String> {
+    pub fn nowplaying_song(&self, artist: &str, title: &str, album: Option<&str>) -> Result<(), Error> {
         let song = Scrobble::new(artist, title, album);
         LASTFM_CLIENT.with(|client| {
             if let Some(client) = &*client.borrow() {
-                client.now_playing(&song).map(|_| ()).map_err(|e| e.to_string())
+                client.now_playing(&song).map(|_| ())?
             } else {
-                Err("LastFmClient is not initialized.".to_string())
+                log::warn!("LastFmClient is not initialized.");
             }
+            Ok(())
         })
-    }
-
-    pub fn save_credentials(&self, username: &str, password: &str) -> Result<(), String> {
-        log::info!("Saving credentials: username: {} and password: {}", username, password);
-        Ok(())
     }
 
     pub fn authenticate_with_config(
