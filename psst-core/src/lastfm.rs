@@ -11,9 +11,9 @@ thread_local! {
 pub struct LastFmClient;
 
 impl LastFmClient {
+    //Used to scrobble a song
     pub fn scrobble_song(&self, artist: &str, title: &str, album: Option<&str>) -> Result<(), Error> {
         let song = Scrobble::new(artist, title, album);
-
         LASTFM_CLIENT.with(|client| {
             if let Some(client) = &*client.borrow() {
                 client.scrobble(&song).map(|_| ())?
@@ -23,7 +23,7 @@ impl LastFmClient {
             Ok(())
         })
     }
-
+    //Used set a song as now playing
     pub fn nowplaying_song(&self, artist: &str, title: &str, album: Option<&str>) -> Result<(), Error> {
         let song = Scrobble::new(artist, title, album);
         LASTFM_CLIENT.with(|client| {
@@ -35,7 +35,7 @@ impl LastFmClient {
             Ok(())
         })
     }
-
+    //Handles authentication with lastfm servers and stores the auth
     pub fn authenticate_with_config(
         &mut self,
         api_key: Option<&str>,
@@ -55,15 +55,15 @@ impl LastFmClient {
                 *client = Some(scrobbler);
             });
             log::info!("Authenticated with Last.fm successfully.");
-
-            Ok(())
-        } else {
-            Ok(())
         }
+        else {
+            log::warn!("Missing authentication parameters.");
+        }
+        Ok(())
     }
 }
 
-//Stinky error implementation
+//Error handler
 impl From<ScrobblerError> for Error{
     fn from(value: ScrobblerError) -> Self {
         Self::ScrobblerError(Box::new(value))

@@ -31,7 +31,7 @@ pub struct PlaybackController {
     thread: Option<JoinHandle<()>>,
     output: Option<DefaultAudioOutput>,
     media_controls: Option<MediaControls>,
-    has_scrobbled: bool
+    has_scrobbled: bool //Used to scrobble the current song once
 }
 
 
@@ -43,7 +43,7 @@ impl PlaybackController {
             thread: None,
             output: None,
             media_controls: None,
-            has_scrobbled: false,
+            has_scrobbled: false, //Default value set as unscrobbled
         }
     }
 
@@ -87,7 +87,6 @@ impl PlaybackController {
                         .unwrap();
                 }
                 PlayerEvent::Playing { path, position} => {
-                    // log::info!("playing: {:?}", path);
                     let progress = position.to_owned();
                     event_sink
                         .submit_command(cmd::PLAYBACK_PLAYING, (path.item_id, progress), widget_id)
@@ -232,7 +231,6 @@ impl PlaybackController {
     }
 
     fn report_now_playing(&mut self, playback: &Playback) {
-        let lastfm_client = LastFmClient; // Initialize LastFmClient
         if let Some(now_playing) = &playback.now_playing {
             if let Playable::Track(track) = &now_playing.item {
                 let artist_name = track.artist_name(); // Store the Arc<str> in a variable
@@ -241,7 +239,7 @@ impl PlaybackController {
                 let title = title_name.as_ref(); // Convert Arc<str> to &str
                 let album = track.album.as_ref().map(|album| album.name.as_ref());
 
-                if let Err(e) = lastfm_client.nowplaying_song(artist, title, album) {
+                if let Err(e) = LastFmClient.nowplaying_song(artist, title, album) {
                     log::warn!("Failed to report 'Now Playing' to Last.fm: {}", e);
                 } else {
                     log::info!("Reported 'Now Playing' to Last.fm: {} - {}", artist, title);
@@ -266,7 +264,7 @@ impl PlaybackController {
                     } else {
                         log::info!("Scrobbled to Last.fm: {} - {}", artist, title);
                     }
-                    self.has_scrobbled = true;
+                    self.has_scrobbled = true; //Song has been scrobbled
                 }
             
             }
@@ -295,24 +293,6 @@ impl PlaybackController {
             items: playback_items_vec,
             position,
         }));
-
-        // // Report "Now Playing" to Last.fm
-        // if let Some(now_playing) = items.get(position) {
-        //     let playback = Playback {
-        //         now_playing: Some(NowPlaying {
-        //             item: now_playing.item.clone(),
-        //             origin: now_playing.origin.clone(),
-        //             progress: Duration::default(),
-        //             library: Arc::new(Library::default()), // Ensure Library implements Default
-        //         }),
-        //         state: PlaybackState::Playing,
-        //         queue_behavior: QueueBehavior::Sequential,
-        //         queue: items.clone(),
-        //         volume: 1.0,
-        //     };
-        //     self.has_scrobbled = false;
-        //     self.report_now_playing(&playback);
-        //}
     }
 
     fn pause(&mut self) {
@@ -420,9 +400,8 @@ where
             Event::Command(cmd) if cmd.is(cmd::PLAYBACK_PLAYING) => {
                 let (item, progress) = cmd.get_unchecked(cmd::PLAYBACK_PLAYING);
 
-                // log::info!("playing item: {:?}", item);
-                self.has_scrobbled = false;
-                self.report_now_playing(&data.playback);
+                self.has_scrobbled = false; //Song has changed, so we are resetting the has_scrobbled value to unscrobbled
+                self.report_now_playing(&data.playback); // Reports song has now playing. Song data is contain in &data.playback
 
                 if let Some(queued) = data.queued_entry(*item) {
                     data.start_playback(queued.item, queued.origin, progress.to_owned());
@@ -440,7 +419,7 @@ where
                 let progress = cmd.get_unchecked(cmd::PLAYBACK_PROGRESS);
                 data.progress_playback(progress.to_owned());
 
-                self.report_scrobble(&data.playback);
+                self.report_scrobble(&data.playback); //Calls the report_scrobble function every seconds, however, no api calls are made until the necessary condition is met (played for more than half the song)
                 self.update_media_control_playback(&data.playback);
                 ctx.set_handled();
             }
