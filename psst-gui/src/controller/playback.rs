@@ -86,13 +86,11 @@ impl PlaybackController {
                         .submit_command(cmd::PLAYBACK_LOADING, item.item_id, widget_id)
                         .unwrap();
                 }
-                PlayerEvent::Playing { path, position} => {
+                PlayerEvent::Playing { path, position } => {
                     let progress = position.to_owned();
                     event_sink
                         .submit_command(cmd::PLAYBACK_PLAYING, (path.item_id, progress), widget_id)
                         .unwrap();
-
-                    
                 }
                 PlayerEvent::Pausing { .. } => {
                     event_sink
