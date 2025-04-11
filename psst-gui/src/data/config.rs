@@ -27,6 +27,7 @@ pub struct Preferences {
     pub active: PreferencesTab,
     pub cache_size: Promise<u64, (), ()>,
     pub auth: Authentication,
+    pub lastfm_auth_result: Option<String>,
 }
 
 impl Preferences {
@@ -46,7 +47,6 @@ pub enum PreferencesTab {
     Account,
     Cache,
     About,
-    Scrobbler,
 }
 
 #[derive(Clone, Debug, Data, Lens)]
@@ -58,6 +58,15 @@ pub struct Authentication {
 }
 
 impl Authentication {
+    pub fn new() -> Self {
+        Self {
+            username: String::new(),
+            password: String::new(),
+            access_token: String::new(),
+            result: Promise::Empty,
+        }
+    }
+
     pub fn session_config(&self) -> SessionConfig {
         SessionConfig {
             login_creds: if !self.access_token.is_empty() {

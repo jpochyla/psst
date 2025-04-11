@@ -19,7 +19,6 @@ pub struct Playback {
     pub volume: f64,
 }
 
-
 #[derive(Clone, Debug, Data, Lens)]
 pub struct QueueEntry {
     pub item: Playable,

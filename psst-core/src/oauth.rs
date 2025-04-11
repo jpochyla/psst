@@ -99,16 +99,16 @@ pub fn exchange_code_for_token(
     redirect_port: u16,
     code: AuthorizationCode,
     pkce_verifier: PkceCodeVerifier,
-) -> String {
+) -> Result<String, String> {
     let client = create_spotify_oauth_client(redirect_port);
 
     let token_response = client
         .exchange_code(code)
         .set_pkce_verifier(pkce_verifier)
         .request(http_client)
-        .expect("Failed to exchange code for token");
+        .map_err(|e| format!("Failed to exchange code for token: {}", e))?;
 
-    token_response.access_token().secret().to_string()
+    Ok(token_response.access_token().secret().to_string())
 }
 
 fn get_scopes() -> Vec<Scope> {

@@ -126,6 +126,7 @@ impl AppState {
                     result: Promise::Empty,
                 },
                 cache_size: Promise::Empty,
+                lastfm_auth_result: None,
             },
             playback,
             added_queue: Vector::new(),
