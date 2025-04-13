@@ -413,7 +413,8 @@ where
             Event::Command(cmd) if cmd.is(cmd::PLAYBACK_PLAYING) => {
                 let (item, progress) = cmd.get_unchecked(cmd::PLAYBACK_PLAYING);
 
-                self.has_scrobbled = false; //Song has changed, so we are resetting the has_scrobbled value to unscrobbled
+                //Song has changed, so we reset the has_scrobbled value
+                self.has_scrobbled = false;
                 self.report_now_playing(&data.playback);
 
                 if let Some(queued) = data.queued_entry(*item) {
