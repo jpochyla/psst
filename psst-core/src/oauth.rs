@@ -62,7 +62,7 @@ pub fn listen_for_callback_parameter(
     };
 
     // 5. Wait for thread completion
-    if let Err(_) = handle.join() {
+    if handle.join().is_err() {
         log::warn!("Thread join failed, but continuing with result");
     }
 
