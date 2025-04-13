@@ -55,43 +55,37 @@ impl Delegate {
         this
     }
 
-    fn show_main(&mut self, config: &Config, ctx: &mut DelegateCtx) {
-        match self.main_window {
-            Some(id) => {
-                ctx.submit_command(commands::SHOW_WINDOW.to(id));
-            }
-            None => {
-                let window = ui::main_window(config);
-                self.main_window.replace(window.id);
-                ctx.new_window(window);
-            }
+    fn show_or_create_window<F>(
+        window_id_option: &mut Option<WindowId>,
+        create_window_fn: F,
+        ctx: &mut DelegateCtx,
+    ) where
+        F: FnOnce() -> WindowDesc<AppState>,
+    {
+        if let Some(id) = window_id_option {
+            ctx.submit_command(commands::SHOW_WINDOW.to(*id));
+        } else {
+            let window = create_window_fn();
+            *window_id_option = Some(window.id);
+            ctx.new_window(window);
         }
+    }
+
+    fn show_main(&mut self, config: &Config, ctx: &mut DelegateCtx) {
+        let config_clone = config.clone();
+        Self::show_or_create_window(
+            &mut self.main_window,
+            || ui::main_window(&config_clone),
+            ctx,
+        );
     }
 
     fn show_account_setup(&mut self, ctx: &mut DelegateCtx) {
-        match self.preferences_window {
-            Some(id) => {
-                ctx.submit_command(commands::SHOW_WINDOW.to(id));
-            }
-            None => {
-                let window = ui::account_setup_window();
-                self.preferences_window.replace(window.id);
-                ctx.new_window(window);
-            }
-        }
+        Self::show_or_create_window(&mut self.preferences_window, ui::account_setup_window, ctx);
     }
 
     fn show_preferences(&mut self, ctx: &mut DelegateCtx) {
-        match self.preferences_window {
-            Some(id) => {
-                ctx.submit_command(commands::SHOW_WINDOW.to(id));
-            }
-            None => {
-                let window = ui::preferences_window();
-                self.preferences_window.replace(window.id);
-                ctx.new_window(window);
-            }
-        }
+        Self::show_or_create_window(&mut self.preferences_window, ui::preferences_window, ctx);
     }
 
     fn close_all_windows(&mut self, ctx: &mut DelegateCtx) {
@@ -133,16 +127,7 @@ impl Delegate {
     }
 
     fn show_artwork(&mut self, ctx: &mut DelegateCtx) {
-        match self.artwork_window {
-            Some(id) => {
-                ctx.submit_command(commands::SHOW_WINDOW.to(id));
-            }
-            None => {
-                let window = ui::artwork_window();
-                self.artwork_window.replace(window.id);
-                ctx.new_window(window);
-            }
-        }
+        Self::show_or_create_window(&mut self.artwork_window, ui::artwork_window, ctx);
     }
 }
 
@@ -280,7 +265,6 @@ impl AppDelegate<AppState> for Delegate {
     ) -> Option<Event> {
         if self.main_window == Some(window_id) {
             if let Event::WindowSize(size) = event {
-                // This is a little hacky, but without it, the window will slowly get smaller each time the application is opened.
                 if !self.size_updated {
                     self.size_updated = true;
                 } else {

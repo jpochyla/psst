@@ -16,8 +16,8 @@ Contributions are welcome!
 GitHub Actions automatically creates builds when new commits are pushed to the `main` branch.
 You can download the prebuilt binaries for x86_64 Windows, Linux (Ubuntu), and macOS.
 
-| Platform                                                                                                            |
-| ------------------------------------------------------------------------------------------------------------------- |
+| Platform                                                                                                          |
+| ----------------------------------------------------------------------------------------------------------------- |
 | [Linux (x86_64)](https://nightly.link/jpochyla/psst/workflows/build/main/psst-gui-x86_64-unknown-linux-gnu.zip)   |
 | [Linux (aarch64)](https://nightly.link/jpochyla/psst/workflows/build/main/psst-gui-aarch64-unknown-linux-gnu.zip) |
 | [Debian Package (amd64)](https://nightly.link/jpochyla/psst/workflows/build/main/psst-deb-amd64.zip)              |

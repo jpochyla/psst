@@ -28,6 +28,8 @@ pub struct Preferences {
     pub cache_size: Promise<u64, (), ()>,
     pub auth: Authentication,
     pub lastfm_auth_result: Option<String>,
+    pub lastfm_api_key_input: String,
+    pub lastfm_api_secret_input: String,
 }
 
 impl Preferences {
@@ -125,10 +127,7 @@ pub struct Config {
     pub sort_criteria: SortCriteria,
     pub paginated_limit: usize,
     pub seek_duration: usize,
-    pub lastfm_api_key: Option<String>,
-    pub lastfm_api_secret: Option<String>,
-    pub lastfm_username: Option<String>,
-    pub lastfm_password: Option<String>,
+    pub lastfm_session_key: Option<String>,
 }
 
 impl Default for Config {
@@ -147,10 +146,7 @@ impl Default for Config {
             sort_criteria: Default::default(),
             paginated_limit: 500,
             seek_duration: 10,
-            lastfm_api_key: None,
-            lastfm_api_secret: None,
-            lastfm_username: None,
-            lastfm_password: None,
+            lastfm_session_key: None,
         }
     }
 }
@@ -255,23 +251,19 @@ impl Config {
     }
 
     pub fn try_authenticate_lastfm(&self) {
-        if let (Some(api_key), Some(api_secret), Some(username), Some(password)) = (
-            &self.lastfm_api_key,
-            &self.lastfm_api_secret,
-            &self.lastfm_username,
-            &self.lastfm_password,
-        ) {
-            let mut client = LastFmClient;
-            if let Err(err) = client.authenticate_with_config(
-                Some(api_key),
-                Some(api_secret),
-                Some(username),
-                Some(password),
-            ) {
-                log::error!("Failed to authenticate Last.fm: {}", err);
-            }
+        if let Some(_session_key) = &self.lastfm_session_key {
+            let _client = LastFmClient;
+            // Authenticate_with_config now only needs the session key (internally)
+            // Note: authenticate_with_config still needs API key/secret passed in its current form,
+            // but since we don't store them anymore, this auth call might need refactoring
+            // or we skip calling it entirely here, as validity is checked on use.
+            // For now, let's comment out the call as we don't have key/secret.
+            // if let Err(err) = client.authenticate_with_config(None, None, Some(session_key)) {
+            //     log::error!("Failed to authenticate Last.fm on startup: {}", err);
+            // }
+            log::info!("Last.fm session key found. Will authenticate on first use.");
         } else {
-            log::info!("Incomplete Last.fm information, skipping authentication.");
+            log::info!("No Last.fm session key found, skipping authentication.");
         }
     }
 }
