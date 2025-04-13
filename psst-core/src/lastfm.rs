@@ -1,8 +1,7 @@
 extern crate rustfm_scrobble_proxy;
+use crate::error::Error;
 use rustfm_scrobble_proxy::{Scrobble, Scrobbler, ScrobblerError};
 use std::cell::RefCell;
-use crate::error::Error;
-
 
 thread_local! {
     static LASTFM_CLIENT: RefCell<Option<Scrobbler>> = const { RefCell::new(None)}; //Stores the auth as a thread local variable
@@ -11,20 +10,29 @@ thread_local! {
 pub struct LastFmClient;
 
 impl LastFmClient {
-    //Used to scrobble a song
-    pub fn scrobble_song(&self, artist: &str, title: &str, album: Option<&str>) -> Result<(), Error> {
+    pub fn scrobble_song(
+        &self,
+        artist: &str,
+        title: &str,
+        album: Option<&str>,
+    ) -> Result<(), Error> {
         let song = Scrobble::new(artist, title, album);
         LASTFM_CLIENT.with(|client| {
             if let Some(client) = &*client.borrow() {
                 client.scrobble(&song).map(|_| ())?
             } else {
-                log::warn!("LastFmClient is not initialized.");   
+                log::warn!("LastFmClient is not initialized.");
             }
             Ok(())
         })
     }
-    //Used set a song as now playing
-    pub fn nowplaying_song(&self, artist: &str, title: &str, album: Option<&str>) -> Result<(), Error> {
+
+    pub fn now_playing_song(
+        &self,
+        artist: &str,
+        title: &str,
+        album: Option<&str>,
+    ) -> Result<(), Error> {
         let song = Scrobble::new(artist, title, album);
         LASTFM_CLIENT.with(|client| {
             if let Some(client) = &*client.borrow() {
@@ -35,7 +43,7 @@ impl LastFmClient {
             Ok(())
         })
     }
-    //Handles authentication with lastfm servers and stores the auth
+
     pub fn authenticate_with_config(
         &mut self,
         api_key: Option<&str>,
@@ -55,16 +63,14 @@ impl LastFmClient {
                 *client = Some(scrobbler);
             });
             log::info!("Authenticated with Last.fm successfully.");
-        }
-        else {
+        } else {
             log::warn!("Missing authentication parameters.");
         }
         Ok(())
     }
 }
 
-//Error handler
-impl From<ScrobblerError> for Error{
+impl From<ScrobblerError> for Error {
     fn from(value: ScrobblerError) -> Self {
         Self::ScrobblerError(Box::new(value))
     }

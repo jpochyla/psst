@@ -349,85 +349,29 @@ fn account_tab_widget(tab: AccountTab) -> impl Widget<AppState> {
                     .with_line_break_mode(LineBreaking::WordWrap),
             )
             .with_spacer(theme::grid(2.0))
-            .with_child(
-                Flex::row()
-                    .cross_axis_alignment(CrossAxisAlignment::Center)
-                    .with_child(
-                        SizedBox::new(Label::new("API Key:"))
-                            .width(theme::grid(12.0))
-                            .align_left(),
-                    )
-                    .with_flex_child(
-                        TextBox::new()
-                            .with_placeholder("Enter your Last.fm API Key")
-                            .lens(AppState::config.then(Config::lastfm_api_key.map(
-                                |opt| opt.clone().unwrap_or_default(),
-                                |opt, value| *opt = Some(value).filter(|v| !v.is_empty()),
-                            )))
-                            .fix_width(theme::grid(30.0)),
-                        1.0,
-                    ),
-            )
+            .with_child(aligned_input_row(
+                "API Key:",
+                "Enter your Last.fm API Key",
+                Config::lastfm_api_key,
+            ))
             .with_default_spacer()
-            .with_child(
-                Flex::row()
-                    .cross_axis_alignment(CrossAxisAlignment::Center)
-                    .with_child(
-                        SizedBox::new(Label::new("API Secret:"))
-                            .width(theme::grid(12.0))
-                            .align_left(),
-                    )
-                    .with_flex_child(
-                        TextBox::new()
-                            .with_placeholder("Enter your Last.fm API Secret")
-                            .lens(AppState::config.then(Config::lastfm_api_secret.map(
-                                |opt| opt.clone().unwrap_or_default(),
-                                |opt, value| *opt = Some(value).filter(|v| !v.is_empty()),
-                            )))
-                            .fix_width(theme::grid(30.0)),
-                        1.0,
-                    ),
-            )
+            .with_child(aligned_input_row(
+                "API Secret:",
+                "Enter your Last.fm API Secret",
+                Config::lastfm_api_secret,
+            ))
             .with_default_spacer()
-            .with_child(
-                Flex::row()
-                    .cross_axis_alignment(CrossAxisAlignment::Center)
-                    .with_child(
-                        SizedBox::new(Label::new("Username:"))
-                            .width(theme::grid(12.0))
-                            .align_left(),
-                    )
-                    .with_flex_child(
-                        TextBox::new()
-                            .with_placeholder("Enter your Last.fm Username")
-                            .lens(AppState::config.then(Config::lastfm_username.map(
-                                |opt| opt.clone().unwrap_or_default(),
-                                |opt, value| *opt = Some(value).filter(|v| !v.is_empty()),
-                            )))
-                            .fix_width(theme::grid(30.0)),
-                        1.0,
-                    ),
-            )
+            .with_child(aligned_input_row(
+                "Username:",
+                "Enter your Last.fm Username",
+                Config::lastfm_username,
+            ))
             .with_default_spacer()
-            .with_child(
-                Flex::row()
-                    .cross_axis_alignment(CrossAxisAlignment::Center)
-                    .with_child(
-                        SizedBox::new(Label::new("Password:"))
-                            .width(theme::grid(12.0))
-                            .align_left(),
-                    )
-                    .with_flex_child(
-                        TextBox::new()
-                            .with_placeholder("Enter your Last.fm Password")
-                            .lens(AppState::config.then(Config::lastfm_password.map(
-                                |opt| opt.clone().unwrap_or_default(),
-                                |opt, value| *opt = Some(value).filter(|v| !v.is_empty()),
-                            )))
-                            .fix_width(theme::grid(30.0)),
-                        1.0,
-                    ),
-            )
+            .with_child(aligned_input_row(
+                "Password:",
+                "Enter your Last.fm Password",
+                Config::lastfm_password,
+            ))
             .with_spacer(theme::grid(2.0))
             .with_child(
                 Button::new("Test Credentials").on_click(|_ctx, data: &mut AppState, _| {
@@ -589,6 +533,30 @@ impl<W: Widget<AppState>> Controller<AppState, W> for Authenticate {
             }
         }
     }
+}
+
+fn aligned_input_row<L: Lens<Config, Option<String>> + Clone + 'static>(
+    label: &str,
+    placeholder: &str,
+    lens: L,
+) -> impl Widget<AppState> {
+    Flex::row()
+        .cross_axis_alignment(CrossAxisAlignment::Center)
+        .with_child(
+            SizedBox::new(Label::new(label))
+                .width(theme::grid(12.0))
+                .align_left(),
+        )
+        .with_flex_child(
+            TextBox::new()
+                .with_placeholder(placeholder)
+                .lens(AppState::config.then(lens.map(
+                    |opt| opt.clone().unwrap_or_default(),
+                    |opt, value| *opt = Some(value).filter(|v| !v.is_empty()),
+                )))
+                .fix_width(theme::grid(30.0)),
+            1.0,
+        )
 }
 
 fn cache_tab_widget() -> impl Widget<AppState> {

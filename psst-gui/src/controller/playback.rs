@@ -10,7 +10,12 @@ use druid::{
     Code, ExtEventSink, InternalLifeCycle, KbKey, WindowHandle,
 };
 use psst_core::{
-    audio::{normalize::NormalizationLevel, output::DefaultAudioOutput}, cache::Cache, cdn::Cdn, lastfm::{LastFmClient}, player::{item::PlaybackItem, PlaybackConfig, Player, PlayerCommand, PlayerEvent}, session::SessionService
+    audio::{normalize::NormalizationLevel, output::DefaultAudioOutput},
+    cache::Cache,
+    cdn::Cdn,
+    lastfm::LastFmClient,
+    player::{item::PlaybackItem, PlaybackConfig, Player, PlayerCommand, PlayerEvent},
+    session::SessionService,
 };
 use souvlaki::{
     MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback, MediaPosition, PlatformConfig,
@@ -20,8 +25,8 @@ use crate::{
     cmd,
     data::Nav,
     data::{
-        AppState, Config, NowPlaying, Playback, PlaybackOrigin, PlaybackState, QueueBehavior,
-        QueueEntry, Playable,
+        AppState, Config, NowPlaying, Playable, Playback, PlaybackOrigin, PlaybackState,
+        QueueBehavior, QueueEntry,
     },
     ui::lyrics,
 };
@@ -31,12 +36,10 @@ pub struct PlaybackController {
     thread: Option<JoinHandle<()>>,
     output: Option<DefaultAudioOutput>,
     media_controls: Option<MediaControls>,
-    has_scrobbled: bool //Used to scrobble the current song once
+    has_scrobbled: bool, //Used to scrobble the current song once
 }
 
-
 impl PlaybackController {
-
     pub fn new() -> Self {
         Self {
             sender: None,
@@ -231,13 +234,13 @@ impl PlaybackController {
     fn report_now_playing(&mut self, playback: &Playback) {
         if let Some(now_playing) = &playback.now_playing {
             if let Playable::Track(track) = &now_playing.item {
-                let artist_name = track.artist_name(); // Store the Arc<str> in a variable
-                let artist = artist_name.as_ref(); // Convert Arc<str> to &str
-                let title_name = track.name.clone(); // Store the Arc<str> in a variable
-                let title = title_name.as_ref(); // Convert Arc<str> to &str
+                let artist_name = track.artist_name();
+                let artist = artist_name.as_ref();
+                let title_name = track.name.clone();
+                let title = title_name.as_ref();
                 let album = track.album.as_ref().map(|album| album.name.as_ref());
 
-                if let Err(e) = LastFmClient.nowplaying_song(artist, title, album) {
+                if let Err(e) = LastFmClient.now_playing_song(artist, title, album) {
                     log::warn!("Failed to report 'Now Playing' to Last.fm: {}", e);
                 } else {
                     log::info!("Reported 'Now Playing' to Last.fm: {} - {}", artist, title);
@@ -256,7 +259,7 @@ impl PlaybackController {
                 let album = track.album.as_ref().map(|album| album.name.as_ref());
 
                 // Check if the song has been played for more than half its duration
-                if now_playing.progress >= track.duration / 2 && !self.has_scrobbled { 
+                if now_playing.progress >= track.duration / 2 && !self.has_scrobbled {
                     if let Err(e) = LastFmClient.scrobble_song(artist, title, album) {
                         log::warn!("Failed to scrobble to Last.fm: {}", e);
                     } else {
@@ -264,11 +267,9 @@ impl PlaybackController {
                     }
                     self.has_scrobbled = true; //Song has been scrobbled
                 }
-            
             }
         }
     }
-
 
     fn play(&mut self, items: &Vector<QueueEntry>, position: usize) {
         let playback_items = items.iter().map(|queued| PlaybackItem {
@@ -362,7 +363,6 @@ impl PlaybackController {
         if matches!(data.nav, Nav::Lyrics) {
             ctx.submit_command(lyrics::SHOW_LYRICS.with(now_playing.clone()));
         }
-
     }
 }
 

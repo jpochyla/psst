@@ -25,7 +25,6 @@ use crate::{
     error::Error,
 };
 
-
 use super::{
     file::{MediaFile, MediaPath},
     LoadedPlaybackItem, PlayerEvent,
@@ -74,7 +73,6 @@ impl PlaybackManager {
             self.sink.play(source);
         }
         self.sink.resume();
-        
     }
 
     pub fn seek(&self, position: Duration) {

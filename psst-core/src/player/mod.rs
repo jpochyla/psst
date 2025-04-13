@@ -6,7 +6,6 @@ mod worker;
 
 use std::{mem, thread, thread::JoinHandle, time::Duration};
 
-
 use crossbeam_channel::{unbounded, Receiver, Sender};
 
 use crate::{
@@ -296,9 +295,8 @@ impl Player {
         self.playback_mgr.play(loaded_item);
         self.state = PlayerState::Playing { path, position };
         self.sender
-            .send(PlayerEvent::Playing { path, position})
+            .send(PlayerEvent::Playing { path, position })
             .unwrap();
-
     }
 
     fn pause(&mut self) {
