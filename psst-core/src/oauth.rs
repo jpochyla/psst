@@ -22,11 +22,24 @@ pub fn listen_for_callback_parameter(
         parameter_name,
         socket_address
     );
-    let listener = TcpListener::bind(socket_address)?;
-    log::info!("listener bound successfully");
 
+    // Create a simpler, linear flow
+    // 1. Bind the listener
+    let listener = match TcpListener::bind(socket_address) {
+        Ok(l) => {
+            log::info!("listener bound successfully");
+            l
+        }
+        Err(e) => {
+            log::error!("Failed to bind listener: {}", e);
+            return Err(Error::IoError(e));
+        }
+    };
+
+    // 2. Set up the channel for communication
     let (tx, rx) = mpsc::channel::<Result<String, Error>>();
 
+    // 3. Spawn the thread
     let handle = std::thread::spawn(move || {
         if let Ok((mut stream, _)) = listener.accept() {
             handle_callback_connection(&mut stream, &tx, parameter_name);
@@ -39,10 +52,21 @@ pub fn listen_for_callback_parameter(
         }
     });
 
-    let result = rx.recv_timeout(timeout)?;
+    // 4. Wait for the result with timeout
+    let result = match rx.recv_timeout(timeout) {
+        Ok(r) => r,
+        Err(e) => {
+            log::error!("Timed out or channel error: {}", e);
+            return Err(Error::from(e));
+        }
+    };
 
-    handle.join().map_err(|_| Error::JoinError)?;
+    // 5. Wait for thread completion
+    if let Err(_) = handle.join() {
+        log::warn!("Thread join failed, but continuing with result");
+    }
 
+    // 6. Return the result
     result
 }
 

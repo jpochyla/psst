@@ -350,11 +350,6 @@ fn account_tab_widget(tab: AccountTab) -> impl Widget<AppState> {
                         // --- Connected View ---
                         Flex::column()
                             .cross_axis_alignment(CrossAxisAlignment::Start)
-                            .with_child(
-                                Label::new("Status: Connected")
-                                    .with_text_color(druid::Color::GREEN),
-                            )
-                            .with_spacer(theme::grid(1.0))
                             .with_child(Button::new("Disconnect").on_click(
                                 |_ctx, data: &mut AppState, _| {
                                     data.config.lastfm_session_key = None;
@@ -464,6 +459,61 @@ impl Authenticate {
         });
         Some(thread)
     }
+
+    // Helper method to simplify Spotify authentication flow
+    fn start_spotify_auth(&mut self, ctx: &mut EventCtx, data: &mut AppState) {
+        // Set authentication to in-progress state
+        data.preferences.auth.result.defer_default();
+
+        // Generate auth URL and store PKCE verifier
+        let (auth_url, pkce_verifier) = oauth::generate_auth_url(8888);
+        let config = data.preferences.auth.session_config(); // Keep config local
+
+        // Spawn authentication thread
+        self.spotify_thread = Authenticate::spawn_auth_thread(
+            ctx,
+            move || {
+                // Listen for authorization code
+                let code = oauth::get_authcode_listener(
+                    SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8888),
+                    Duration::from_secs(300),
+                )
+                .map_err(|e| e.to_string())?;
+
+                // Exchange code for access token
+                let token = oauth::exchange_code_for_token(8888, code, pkce_verifier);
+
+                // Try to authenticate with token, with retries
+                let mut retries = 3;
+                while retries > 0 {
+                    match Authentication::authenticate_and_get_credentials(SessionConfig {
+                        login_creds: Credentials::from_access_token(token.clone()),
+                        ..config.clone()
+                    }) {
+                        Ok(credentials) => return Ok(credentials),
+                        Err(e) if retries > 1 => {
+                            log::warn!("authentication failed, retrying: {:?}", e);
+                            retries -= 1;
+                        }
+                        Err(e) => return Err(e),
+                    }
+                }
+                Err("Authentication retries exceeded".to_string())
+            },
+            Self::SPOTIFY_RESPONSE,
+            self.spotify_thread.take(),
+        );
+
+        // Open browser with authorization URL
+        if open::that(&auth_url).is_err() {
+            data.error_alert("Failed to open browser");
+            // Resolve the promise with an error immediately
+            data.preferences
+                .auth
+                .result
+                .reject((), "Failed to open browser".to_string());
+        }
+    }
 }
 
 impl Authenticate {
@@ -492,50 +542,8 @@ impl<W: Widget<AppState>> Controller<AppState, W> for Authenticate {
     ) {
         match event {
             Event::Command(cmd) if cmd.is(Self::SPOTIFY_REQUEST) => {
-                data.preferences.auth.result.defer_default();
-                let (auth_url, pkce_verifier) = oauth::generate_auth_url(8888);
-                let config = data.preferences.auth.session_config(); // Keep config local
-
-                self.spotify_thread = Authenticate::spawn_auth_thread(
-                    ctx,
-                    move || {
-                        // Spotify authentication logic closure
-                        let code = oauth::get_authcode_listener(
-                            SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8888),
-                            Duration::from_secs(300),
-                        )
-                        .map_err(|e| e.to_string())?; // Map Error to String before ?
-                        let token = oauth::exchange_code_for_token(8888, code, pkce_verifier);
-                        let mut retries = 3;
-                        while retries > 0 {
-                            match Authentication::authenticate_and_get_credentials(SessionConfig {
-                                login_creds: Credentials::from_access_token(token.clone()),
-                                ..config.clone()
-                            }) {
-                                Ok(credentials) => return Ok(credentials),
-                                Err(e) if retries > 1 => {
-                                    log::warn!("authentication failed, retrying: {:?}", e);
-                                    retries -= 1;
-                                }
-                                Err(e) => return Err(e),
-                            }
-                        }
-                        Err("Authentication retries exceeded".to_string()) // Should not happen unless retries = 0 initially
-                    },
-                    Self::SPOTIFY_RESPONSE,
-                    self.spotify_thread.take(),
-                );
-
+                self.start_spotify_auth(ctx, data);
                 ctx.set_handled();
-
-                if open::that(&auth_url).is_err() {
-                    data.error_alert("Failed to open browser");
-                    // Optionally resolve the promise with an error immediately
-                    data.preferences
-                        .auth
-                        .result
-                        .reject((), "Failed to open browser".to_string());
-                }
             }
             Event::Command(cmd) if cmd.is(cmd::LOG_OUT) => {
                 data.config.clear_credentials();
@@ -592,6 +600,78 @@ impl<W: Widget<AppState>> Controller<AppState, W> for Authenticate {
                             Some(format!("Failed to create auth URL: {}", e));
                     }
                 }
+                ctx.set_handled();
+            }
+            Event::Command(cmd) if cmd.is(Self::SPOTIFY_RESPONSE) => {
+                let result = cmd.get_unchecked(Self::SPOTIFY_RESPONSE);
+                match result {
+                    Ok(credentials) => {
+                        // Update session config with the new credentials
+                        data.session.update_config(SessionConfig {
+                            login_creds: credentials.clone(),
+                            proxy_url: Config::proxy(),
+                        });
+                        // Store credentials in the config object properly
+                        // This is needed for has_credentials() to return true
+                        data.config.store_credentials(credentials.clone());
+                        // Save config and resolve authentication promise
+                        data.config.save();
+                        data.preferences.auth.result.resolve((), ());
+                        // Handle UI flow based on tab type
+                        if matches!(self.tab, AccountTab::FirstSetup) {
+                            ctx.submit_command(cmd::CLOSE_ALL_WINDOWS);
+                            ctx.submit_command(cmd::SHOW_MAIN);
+                        }
+                    }
+                    Err(err) => {
+                        data.preferences.auth.result.reject((), err.clone());
+                    }
+                }
+                self.spotify_thread.take();
+                ctx.set_handled();
+            }
+            Event::Command(cmd) if cmd.is(Self::LASTFM_RESPONSE) => {
+                let result = cmd.get_unchecked(Self::LASTFM_RESPONSE);
+                match result {
+                    Ok(session_key) => {
+                        // Store Last.fm session key
+                        data.config.lastfm_session_key = Some(session_key.clone());
+                        data.config.save();
+
+                        // Try to authenticate with LastFm if we have all the necessary components
+                        if let (Some(api_key), Some(api_secret)) = (
+                            (!data.preferences.lastfm_api_key_input.is_empty())
+                                .then(|| data.preferences.lastfm_api_key_input.clone()),
+                            (!data.preferences.lastfm_api_secret_input.is_empty())
+                                .then(|| data.preferences.lastfm_api_secret_input.clone()),
+                        ) {
+                            let mut client = psst_core::lastfm::LastFmClient;
+                            if let Err(e) = client.authenticate_with_config(
+                                Some(&api_key),
+                                Some(&api_secret),
+                                Some(&session_key),
+                            ) {
+                                log::error!("Failed to initialize Last.fm client: {}", e);
+                                data.preferences.lastfm_auth_result =
+                                    Some(format!("Connected, but client init failed: {}", e));
+                                self.lastfm_thread.take();
+                                ctx.set_handled();
+                                return;
+                            }
+                            log::info!("Last.fm client successfully initialized");
+                        } else {
+                            log::warn!("Missing Last.fm API key or secret after successful auth");
+                        }
+
+                        // Success message is the same for both tab types
+                        data.preferences.lastfm_auth_result =
+                            Some("Success! Last.fm connected.".to_string());
+                    }
+                    Err(err) => {
+                        data.preferences.lastfm_auth_result = Some(err.clone());
+                    }
+                }
+                self.lastfm_thread.take();
                 ctx.set_handled();
             }
             _ => {

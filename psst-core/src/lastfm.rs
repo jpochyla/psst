@@ -6,40 +6,53 @@ use std::cell::RefCell;
 use std::{net::SocketAddr, time::Duration};
 use url::Url;
 
+// Handle Last.fm client as a thread-local singleton
 thread_local! {
-    static LASTFM_CLIENT: RefCell<Option<Scrobbler>> = const { RefCell::new(None)}; //Stores the auth as a thread local variable
+    static LASTFM_CLIENT: RefCell<Option<Scrobbler>> = const { RefCell::new(None)};
 }
 
 pub struct LastFmClient;
 
 impl LastFmClient {
-    pub fn scrobble_song(
-        &self,
-        artist: &str,
-        title: &str,
-        album: Option<&str>,
-    ) -> Result<(), Error> {
-        let song = Scrobble::new(artist, title, album);
-        LASTFM_CLIENT.with(|client| {
-            if let Some(client) = &*client.borrow() {
-                client.scrobble(&song).map(|_| ())?
-            } else {
-                log::warn!("LastFmClient is not initialized.");
-            }
-            Ok(())
-        })
-    }
-
+    /// Report a track as "now playing" to Last.fm
     pub fn now_playing_song(
         &self,
         artist: &str,
         title: &str,
         album: Option<&str>,
     ) -> Result<(), Error> {
+        self.submit_track(artist, title, album, |client, song| {
+            client.now_playing(song).map(|_| ())
+        })
+    }
+
+    /// Scrobble a finished track to Last.fm
+    pub fn scrobble_song(
+        &self,
+        artist: &str,
+        title: &str,
+        album: Option<&str>,
+    ) -> Result<(), Error> {
+        self.submit_track(artist, title, album, |client, song| {
+            client.scrobble(song).map(|_| ())
+        })
+    }
+
+    /// Helper method to handle common track submission logic
+    fn submit_track<F>(
+        &self,
+        artist: &str,
+        title: &str,
+        album: Option<&str>,
+        f: F,
+    ) -> Result<(), Error>
+    where
+        F: FnOnce(&Scrobbler, &Scrobble) -> Result<(), ScrobblerError>,
+    {
         let song = Scrobble::new(artist, title, album);
         LASTFM_CLIENT.with(|client| {
             if let Some(client) = &*client.borrow() {
-                client.now_playing(&song).map(|_| ())?
+                f(client, &song)?
             } else {
                 log::warn!("LastFmClient is not initialized.");
             }
@@ -47,6 +60,7 @@ impl LastFmClient {
         })
     }
 
+    /// Authenticate the Last.fm client with provided credentials
     pub fn authenticate_with_config(
         &mut self,
         api_key: Option<&str>,
@@ -75,6 +89,15 @@ impl LastFmClient {
         // Return Ok because the configuration step itself succeeded
         Ok(())
     }
+
+    /// Check if the Last.fm client is currently authenticated
+    pub fn is_authenticated() -> bool {
+        let mut result = false;
+        LASTFM_CLIENT.with(|client| {
+            result = client.borrow().is_some();
+        });
+        result
+    }
 }
 
 impl From<ScrobblerError> for Error {
@@ -83,6 +106,7 @@ impl From<ScrobblerError> for Error {
     }
 }
 
+/// Generate a Last.fm authentication URL
 pub fn generate_lastfm_auth_url(
     api_key: &str,
     callback_url: &str,
@@ -92,6 +116,7 @@ pub fn generate_lastfm_auth_url(
     Ok(url.to_string())
 }
 
+/// Exchange a token for a Last.fm session key
 pub fn exchange_token_for_session(
     api_key: &str,
     api_secret: &str,
@@ -104,6 +129,7 @@ pub fn exchange_token_for_session(
         .map_err(Error::from) // Map ScrobblerError to crate::error::Error
 }
 
+/// Listen for a Last.fm token from the callback
 pub fn get_lastfm_token_listener(
     socket_address: SocketAddr,
     timeout: Duration,

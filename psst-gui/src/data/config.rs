@@ -20,7 +20,6 @@ use serde::{Deserialize, Serialize};
 
 use super::{Nav, Promise, QueueBehavior, SliderScrollScale};
 use crate::ui::theme;
-use psst_core::lastfm::LastFmClient;
 
 #[derive(Clone, Debug, Data, Lens)]
 pub struct Preferences {
@@ -210,7 +209,7 @@ impl Config {
     }
 
     pub fn store_credentials(&mut self, credentials: Credentials) {
-        self.credentials.replace(credentials);
+        self.credentials = Some(credentials);
     }
 
     pub fn clear_credentials(&mut self) {
@@ -252,15 +251,10 @@ impl Config {
 
     pub fn try_authenticate_lastfm(&self) {
         if let Some(_session_key) = &self.lastfm_session_key {
-            let _client = LastFmClient;
-            // Authenticate_with_config now only needs the session key (internally)
-            // Note: authenticate_with_config still needs API key/secret passed in its current form,
-            // but since we don't store them anymore, this auth call might need refactoring
-            // or we skip calling it entirely here, as validity is checked on use.
-            // For now, let's comment out the call as we don't have key/secret.
-            // if let Err(err) = client.authenticate_with_config(None, None, Some(session_key)) {
-            //     log::error!("Failed to authenticate Last.fm on startup: {}", err);
-            // }
+            // We need to create a wrapper that encapsulates Last.fm state and operations
+            // but since we don't store API key/secret permanently for security reasons,
+            // we can only set up the client with minimal info and will authenticate
+            // properly when user provides credentials in preferences
             log::info!("Last.fm session key found. Will authenticate on first use.");
         } else {
             log::info!("No Last.fm session key found, skipping authentication.");
