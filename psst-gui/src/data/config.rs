@@ -27,8 +27,6 @@ pub struct Preferences {
     pub cache_size: Promise<u64, (), ()>,
     pub auth: Authentication,
     pub lastfm_auth_result: Option<String>,
-    pub lastfm_api_key_input: String,
-    pub lastfm_api_secret_input: String,
 }
 
 impl Preferences {
@@ -127,6 +125,8 @@ pub struct Config {
     pub paginated_limit: usize,
     pub seek_duration: usize,
     pub lastfm_session_key: Option<String>,
+    pub lastfm_api_key: Option<String>,
+    pub lastfm_api_secret: Option<String>,
 }
 
 impl Default for Config {
@@ -146,6 +146,8 @@ impl Default for Config {
             paginated_limit: 500,
             seek_duration: 10,
             lastfm_session_key: None,
+            lastfm_api_key: None,
+            lastfm_api_secret: None,
         }
     }
 }
@@ -247,18 +249,6 @@ impl Config {
             },
             Some,
         )
-    }
-
-    pub fn try_authenticate_lastfm(&self) {
-        if let Some(_session_key) = &self.lastfm_session_key {
-            // We need to create a wrapper that encapsulates Last.fm state and operations
-            // but since we don't store API key/secret permanently for security reasons,
-            // we can only set up the client with minimal info and will authenticate
-            // properly when user provides credentials in preferences
-            log::info!("Last.fm session key found. Will authenticate on first use.");
-        } else {
-            log::info!("No Last.fm session key found, skipping authentication.");
-        }
     }
 }
 

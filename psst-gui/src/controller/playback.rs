@@ -17,6 +17,7 @@ use psst_core::{
     player::{item::PlaybackItem, PlaybackConfig, Player, PlayerCommand, PlayerEvent},
     session::SessionService,
 };
+use rustfm_scrobble_proxy::Scrobbler;
 use souvlaki::{
     MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback, MediaPosition, PlatformConfig,
 };
@@ -36,7 +37,8 @@ pub struct PlaybackController {
     thread: Option<JoinHandle<()>>,
     output: Option<DefaultAudioOutput>,
     media_controls: Option<MediaControls>,
-    has_scrobbled: bool, //Used to scrobble the current song once
+    has_scrobbled: bool,          // Used to scrobble the current song once
+    scrobbler: Option<Scrobbler>, // Store the Scrobbler instance
 }
 
 impl PlaybackController {
@@ -46,7 +48,8 @@ impl PlaybackController {
             thread: None,
             output: None,
             media_controls: None,
-            has_scrobbled: false, //Default value set as unscrobbled
+            has_scrobbled: false,
+            scrobbler: None,
         }
     }
 
@@ -232,40 +235,53 @@ impl PlaybackController {
     }
 
     fn report_now_playing(&mut self, playback: &Playback) {
-        if let Some(now_playing) = &playback.now_playing {
+        if let Some(now_playing) = playback.now_playing.as_ref() {
             if let Playable::Track(track) = &now_playing.item {
-                let artist_name = track.artist_name();
-                let artist = artist_name.as_ref();
-                let title_name = track.name.clone();
-                let title = title_name.as_ref();
-                let album = track.album.as_ref().map(|album| album.name.as_ref());
+                if let Some(scrobbler) = &self.scrobbler {
+                    let artist = track.artist_name();
+                    let title = track.name.clone();
+                    let album = track.album.clone();
 
-                if let Err(e) = LastFmClient.now_playing_song(artist, title, album) {
-                    log::warn!("Failed to report 'Now Playing' to Last.fm: {}", e);
+                    if let Err(e) = LastFmClient::now_playing_song(
+                        scrobbler,
+                        artist.as_ref(),
+                        title.as_ref(),
+                        album.as_ref().map(|a| a.name.as_ref()),
+                    ) {
+                        log::warn!("Failed to report 'Now Playing' to Last.fm: {}", e);
+                    } else {
+                        log::info!("Reported 'Now Playing' to Last.fm: {} - {}", artist, title);
+                    }
                 } else {
-                    log::info!("Reported 'Now Playing' to Last.fm: {} - {}", artist, title);
+                    log::debug!("Last.fm not configured, skipping now_playing report.");
                 }
             }
         }
     }
 
     fn report_scrobble(&mut self, playback: &Playback) {
-        if let Some(now_playing) = &playback.now_playing {
+        if let Some(now_playing) = playback.now_playing.as_ref() {
             if let Playable::Track(track) = &now_playing.item {
-                let artist_name = track.artist_name();
-                let artist = artist_name.as_ref();
-                let title_name = track.name.clone();
-                let title = title_name.as_ref();
-                let album = track.album.as_ref().map(|album| album.name.as_ref());
-
-                // Check if the song has been played for more than half its duration
                 if now_playing.progress >= track.duration / 2 && !self.has_scrobbled {
-                    if let Err(e) = LastFmClient.scrobble_song(artist, title, album) {
-                        log::warn!("Failed to scrobble to Last.fm: {}", e);
+                    if let Some(scrobbler) = &self.scrobbler {
+                        let artist = track.artist_name();
+                        let title = track.name.clone();
+                        let album = track.album.clone();
+
+                        if let Err(e) = LastFmClient::scrobble_song(
+                            scrobbler,
+                            artist.as_ref(),
+                            title.as_ref(),
+                            album.as_ref().map(|a| a.name.as_ref()),
+                        ) {
+                            log::warn!("Failed to scrobble track to Last.fm: {}", e);
+                        } else {
+                            log::info!("Scrobbled track to Last.fm: {} - {}", artist, title);
+                            self.has_scrobbled = true;
+                        }
                     } else {
-                        log::info!("Scrobbled to Last.fm: {} - {}", artist, title);
+                        log::debug!("Last.fm not configured, skipping scrobble.");
                     }
-                    self.has_scrobbled = true; //Song has been scrobbled
                 }
             }
         }
@@ -399,7 +415,7 @@ where
                 let (item, progress) = cmd.get_unchecked(cmd::PLAYBACK_PLAYING);
 
                 self.has_scrobbled = false; //Song has changed, so we are resetting the has_scrobbled value to unscrobbled
-                self.report_now_playing(&data.playback); // Reports song has now playing. Song data is contain in &data.playback
+                self.report_now_playing(&data.playback);
 
                 if let Some(queued) = data.queued_entry(*item) {
                     data.start_playback(queued.item, queued.origin, progress.to_owned());
@@ -417,7 +433,9 @@ where
                 let progress = cmd.get_unchecked(cmd::PLAYBACK_PROGRESS);
                 data.progress_playback(progress.to_owned());
 
-                self.report_scrobble(&data.playback); //Calls the report_scrobble function every seconds, however, no api calls are made until the necessary condition is met (played for more than half the song)
+                // Calls the report_scrobble function every second
+                // no api calls are made until the song has been played for more than half its duration
+                self.report_scrobble(&data.playback);
                 self.update_media_control_playback(&data.playback);
                 ctx.set_handled();
             }
@@ -583,6 +601,47 @@ where
         if !old_data.playback.volume.same(&data.playback.volume) {
             self.set_volume(data.playback.volume);
         }
+
+        if !old_data
+            .config
+            .lastfm_api_key
+            .same(&data.config.lastfm_api_key)
+            || !old_data
+                .config
+                .lastfm_api_secret
+                .same(&data.config.lastfm_api_secret)
+            || !old_data
+                .config
+                .lastfm_session_key
+                .same(&data.config.lastfm_session_key)
+        {
+            self.scrobbler = if let (Some(api_key), Some(api_secret), Some(session_key)) = (
+                data.config.lastfm_api_key.as_deref(),
+                data.config.lastfm_api_secret.as_deref(),
+                data.config.lastfm_session_key.as_deref(),
+            ) {
+                match LastFmClient::create_scrobbler(
+                    Some(api_key),
+                    Some(api_secret),
+                    Some(session_key),
+                ) {
+                    Ok(scrobbler) => {
+                        log::info!("Last.fm Scrobbler instance created/updated.");
+                        Some(scrobbler)
+                    }
+                    Err(e) => {
+                        log::warn!("Failed to create/update Last.fm Scrobbler instance: {}", e);
+                        None
+                    }
+                }
+            } else {
+                log::info!(
+                    "Last.fm credentials incomplete or removed, clearing Scrobbler instance."
+                );
+                None // Clear the scrobbler if config is incomplete
+            };
+        }
+
         child.update(ctx, old_data, data, env);
     }
 }

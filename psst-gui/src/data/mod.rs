@@ -119,11 +119,9 @@ impl AppState {
             config,
             preferences: Preferences {
                 active: PreferencesTab::General,
-                auth: Authentication::new(),
                 cache_size: Promise::Empty,
+                auth: Authentication::new(),
                 lastfm_auth_result: None,
-                lastfm_api_key_input: String::new(),
-                lastfm_api_secret_input: String::new(),
             },
             playback,
             added_queue: Vector::new(),

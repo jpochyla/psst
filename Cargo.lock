@@ -3748,6 +3748,7 @@ dependencies = [
  "rand",
  "raw-window-handle",
  "regex",
+ "rustfm-scrobble-proxy",
  "sanitize_html",
  "serde",
  "serde_json",

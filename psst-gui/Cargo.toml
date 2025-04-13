@@ -53,6 +53,7 @@ souvlaki = { version = "0.7.3", default-features = false, features = [
   "use_zbus",
 ] }
 sanitize_html = "0.8.1"
+rustfm-scrobble-proxy = "2.0.0"
 [target.'cfg(windows)'.build-dependencies]
 winres = { version = "0.1.12" }
 image = { version = "0.25.4" }
