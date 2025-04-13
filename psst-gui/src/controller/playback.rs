@@ -37,8 +37,8 @@ pub struct PlaybackController {
     thread: Option<JoinHandle<()>>,
     output: Option<DefaultAudioOutput>,
     media_controls: Option<MediaControls>,
-    has_scrobbled: bool,          // Used to scrobble the current song once
-    scrobbler: Option<Scrobbler>, // Store the Scrobbler instance
+    has_scrobbled: bool,
+    scrobbler: Option<Scrobbler>,
 }
 
 impl PlaybackController {
@@ -348,7 +348,7 @@ impl PlaybackController {
             } else {
                 now_playing.progress.saturating_sub(seek_duration)
             }
-            .min(now_playing.item.duration()); // Safeguard to not exceed the track duration.
+            .min(now_playing.item.duration());
 
             self.seek(seek_position);
         }
@@ -398,7 +398,6 @@ where
             Event::Command(cmd) if cmd.is(cmd::SET_FOCUS) => {
                 ctx.request_focus();
             }
-            // Player events.
             Event::Command(cmd) if cmd.is(cmd::PLAYBACK_LOADING) => {
                 let item = cmd.get_unchecked(cmd::PLAYBACK_LOADING);
 
@@ -433,8 +432,6 @@ where
                 let progress = cmd.get_unchecked(cmd::PLAYBACK_PROGRESS);
                 data.progress_playback(progress.to_owned());
 
-                // Calls the report_scrobble function every second
-                // no api calls are made until the song has been played for more than half its duration
                 self.report_scrobble(&data.playback);
                 self.update_media_control_playback(&data.playback);
                 ctx.set_handled();
@@ -458,7 +455,6 @@ where
                 self.update_media_control_playback(&data.playback);
                 ctx.set_handled();
             }
-            // Playback actions.
             Event::Command(cmd) if cmd.is(cmd::PLAY_TRACKS) => {
                 let payload = cmd.get_unchecked(cmd::PLAY_TRACKS);
                 data.playback.queue = payload
@@ -638,7 +634,7 @@ where
                 log::info!(
                     "Last.fm credentials incomplete or removed, clearing Scrobbler instance."
                 );
-                None // Clear the scrobbler if config is incomplete
+                None
             };
         }
 

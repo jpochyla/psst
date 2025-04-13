@@ -30,7 +30,7 @@ fn make_input_row<L>(
     lens: L,
 ) -> impl Widget<AppState>
 where
-    L: Lens<AppState, String> + 'static, // Ensure the lens is static
+    L: Lens<AppState, String> + 'static,
 {
     Flex::row()
         .cross_axis_alignment(CrossAxisAlignment::Center)
@@ -369,9 +369,8 @@ fn account_tab_widget(tab: AccountTab) -> impl Widget<AppState> {
                                 "API Key:",
                                 "Enter your Last.fm API Key",
                                 AppState::config.then(Config::lastfm_api_key).map(
-                                    |opt: &Option<String>| opt.clone().unwrap_or_default(), // Getter: &Option<String> -> String
+                                    |opt: &Option<String>| opt.clone().unwrap_or_default(),
                                     |opt_ref: &mut Option<String>, new_s: String| {
-                                        // Setter: (&mut Option<String>, String) -> ()
                                         *opt_ref =
                                             if new_s.is_empty() { None } else { Some(new_s) };
                                     },
@@ -383,9 +382,8 @@ fn account_tab_widget(tab: AccountTab) -> impl Widget<AppState> {
                                 "API Secret:",
                                 "Enter your Last.fm API Secret",
                                 AppState::config.then(Config::lastfm_api_secret).map(
-                                    |opt: &Option<String>| opt.clone().unwrap_or_default(), // Getter: &Option<String> -> String
+                                    |opt: &Option<String>| opt.clone().unwrap_or_default(),
                                     |opt_ref: &mut Option<String>, new_s: String| {
-                                        // Setter: (&mut Option<String>, String) -> ()
                                         *opt_ref =
                                             if new_s.is_empty() { None } else { Some(new_s) };
                                     },
@@ -460,8 +458,7 @@ impl Authenticate {
     ) -> Option<JoinHandle<()>> {
         // Clean up previous thread if any
         if let Some(_handle) = existing_handle {
-            // We don't strictly need to join, but it's good practice if possible
-            // handle.join().ok(); // Consider if joining is necessary/desirable
+            // Consider if joining is necessary/desirable
         }
 
         let window_id = ctx.window_id();
@@ -533,7 +530,6 @@ impl Authenticate {
 }
 
 impl Authenticate {
-    // Spotify selectors (renamed for clarity)
     pub const SPOTIFY_REQUEST: Selector =
         Selector::new("app.preferences.spotify.authenticate-request");
     pub const SPOTIFY_RESPONSE: Selector<Result<Credentials, String>> =
@@ -543,7 +539,6 @@ impl Authenticate {
     pub const LASTFM_REQUEST: Selector =
         Selector::new("app.preferences.lastfm.authenticate-request");
     pub const LASTFM_RESPONSE: Selector<Result<String, String>> =
-        // Ok(session_key), Err(error_message)
         Selector::new("app.preferences.lastfm.authenticate-response");
 }
 
@@ -574,7 +569,7 @@ impl<W: Widget<AppState>> Controller<AppState, W> for Authenticate {
                     data.preferences.lastfm_auth_result =
                         Some("API Key and Secret required.".to_string());
                     ctx.set_handled();
-                    return; // Don't proceed if inputs are empty
+                    return;
                 }
 
                 data.preferences.lastfm_auth_result = Some("Connecting...".to_string());
@@ -589,12 +584,11 @@ impl<W: Widget<AppState>> Controller<AppState, W> for Authenticate {
                         self.lastfm_thread = Authenticate::spawn_auth_thread(
                             ctx,
                             move || {
-                                // Last.fm authentication logic closure
                                 let token = lastfm::get_lastfm_token_listener(
                                     socket_addr,
                                     Duration::from_secs(300),
                                 )
-                                .map_err(|e| e.to_string())?; // Map Error to String
+                                .map_err(|e| e.to_string())?;
                                 log::info!("Received Last.fm token, exchanging...");
                                 lastfm::exchange_token_for_session(&api_key, &api_secret, &token)
                                     .map_err(|e| format!("Token exchange failed: {}", e))
@@ -625,10 +619,7 @@ impl<W: Widget<AppState>> Controller<AppState, W> for Authenticate {
                             login_creds: credentials.clone(),
                             proxy_url: Config::proxy(),
                         });
-                        // Store credentials in the config object properly
-                        // This is needed for has_credentials() to return true
                         data.config.store_credentials(credentials.clone());
-                        // Save config and resolve authentication promise
                         data.config.save();
                         data.preferences.auth.result.resolve((), ());
                         // Handle UI flow based on tab type
@@ -648,19 +639,11 @@ impl<W: Widget<AppState>> Controller<AppState, W> for Authenticate {
                 let result = cmd.get_unchecked(Self::LASTFM_RESPONSE);
                 match result {
                     Ok(session_key) => {
-                        // Store Last.fm session key (API Key/Secret already bound and saved)
                         data.config.lastfm_session_key = Some(session_key.clone());
                         data.config.save();
 
-                        // The Scrobbler instance should be created and managed based on
-                        // the config state (e.g., in AppState initialization or when
-                        // scrobbling is actually needed), using the stored session key
-                        // and the API key/secret (which might need to be requested again
-                        // or stored more permanently if desired, considering security).
-                        // For now, just confirm connection here.
                         log::info!("Last.fm session key stored successfully.");
 
-                        // Success message is the same for both tab types
                         data.preferences.lastfm_auth_result =
                             Some("Success! Last.fm connected.".to_string());
                     }
