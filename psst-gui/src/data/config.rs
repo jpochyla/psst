@@ -115,6 +115,7 @@ pub struct Config {
     pub lastfm_session_key: Option<String>,
     pub lastfm_api_key: Option<String>,
     pub lastfm_api_secret: Option<String>,
+    pub lastfm_enable: bool,
 }
 
 impl Default for Config {
@@ -136,6 +137,7 @@ impl Default for Config {
             lastfm_session_key: None,
             lastfm_api_key: None,
             lastfm_api_secret: None,
+            lastfm_enable: false,
         }
     }
 }

@@ -350,15 +350,23 @@ fn account_tab_widget(tab: AccountTab) -> impl Widget<AppState> {
                         // --- Connected View ---
                         Flex::column()
                             .cross_axis_alignment(CrossAxisAlignment::Start)
-                            .with_child(Button::new("Disconnect").on_click(
-                                |_ctx, data: &mut AppState, _| {
-                                    data.config.lastfm_session_key = None;
-                                    data.preferences.lastfm_auth_result = None; // Clear status
-                                    data.config.lastfm_api_key = None; // Clear API key
-                                    data.config.lastfm_api_secret = None; // Clear API secret
-                                    data.config.save();
-                                },
-                            ))
+                            .with_child(
+                                Flex::row()
+                                    .with_child(
+                                        Checkbox::new("Toggle scrobbling")
+                                            .lens(AppState::config.then(Config::lastfm_enable))
+                                            .padding((0.0, 0.0, theme::grid(1.0), 0.0)),
+                                    )
+                                    .with_child(Button::new("Disconnect").on_click(
+                                        |_ctx, data: &mut AppState, _| {
+                                            data.config.lastfm_session_key = None;
+                                            data.preferences.lastfm_auth_result = None;
+                                            data.config.lastfm_api_key = None;
+                                            data.config.lastfm_api_secret = None;
+                                            data.config.save();
+                                        },
+                                    )),
+                            )
                             .boxed()
                     } else {
                         // --- Disconnected View ---

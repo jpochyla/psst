@@ -413,7 +413,7 @@ where
             Event::Command(cmd) if cmd.is(cmd::PLAYBACK_PLAYING) => {
                 let (item, progress) = cmd.get_unchecked(cmd::PLAYBACK_PLAYING);
 
-                //Song has changed, so we reset the has_scrobbled value
+                // Song has changed, so we reset the has_scrobbled value
                 self.has_scrobbled = false;
                 self.report_now_playing(&data.playback);
 
@@ -599,42 +599,40 @@ where
             self.set_volume(data.playback.volume);
         }
 
-        if !old_data
-            .config
-            .lastfm_api_key
-            .same(&data.config.lastfm_api_key)
-            || !old_data
-                .config
-                .lastfm_api_secret
-                .same(&data.config.lastfm_api_secret)
-            || !old_data
-                .config
-                .lastfm_session_key
-                .same(&data.config.lastfm_session_key)
-        {
-            self.scrobbler = if let (Some(api_key), Some(api_secret), Some(session_key)) = (
-                data.config.lastfm_api_key.as_deref(),
-                data.config.lastfm_api_secret.as_deref(),
-                data.config.lastfm_session_key.as_deref(),
-            ) {
-                match LastFmClient::create_scrobbler(
-                    Some(api_key),
-                    Some(api_secret),
-                    Some(session_key),
+        let lastfm_changed = old_data.config.lastfm_api_key != data.config.lastfm_api_key
+            || old_data.config.lastfm_api_secret != data.config.lastfm_api_secret
+            || old_data.config.lastfm_session_key != data.config.lastfm_session_key
+            || old_data.config.lastfm_enable != data.config.lastfm_enable;
+
+        if lastfm_changed {
+            self.scrobbler = if data.config.lastfm_enable {
+                if let (Some(api_key), Some(api_secret), Some(session_key)) = (
+                    data.config.lastfm_api_key.as_deref(),
+                    data.config.lastfm_api_secret.as_deref(),
+                    data.config.lastfm_session_key.as_deref(),
                 ) {
-                    Ok(scrobbler) => {
-                        log::info!("Last.fm Scrobbler instance created/updated.");
-                        Some(scrobbler)
+                    match LastFmClient::create_scrobbler(
+                        Some(api_key),
+                        Some(api_secret),
+                        Some(session_key),
+                    ) {
+                        Ok(scrobbler) => {
+                            log::info!("Last.fm Scrobbler instance created/updated.");
+                            Some(scrobbler)
+                        }
+                        Err(e) => {
+                            log::warn!("Failed to create/update Last.fm Scrobbler instance: {}", e);
+                            None
+                        }
                     }
-                    Err(e) => {
-                        log::warn!("Failed to create/update Last.fm Scrobbler instance: {}", e);
-                        None
-                    }
+                } else {
+                    log::info!(
+                        "Last.fm credentials incomplete or removed, clearing Scrobbler instance."
+                    );
+                    None
                 }
             } else {
-                log::info!(
-                    "Last.fm credentials incomplete or removed, clearing Scrobbler instance."
-                );
+                log::info!("Last.fm scrobbling is disabled, clearing Scrobbler instance.");
                 None
             };
         }
