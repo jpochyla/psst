@@ -1,9 +1,16 @@
 [build]
 pre-build = ["""
     dpkg --add-architecture $CROSS_DEB_ARCH && \
-    apt-get update && apt-get --fix-broken --assume-yes install && \
+    apt-get update && \
     apt-get --assume-yes install \
         libgtk-3-dev:$CROSS_DEB_ARCH \
+        libatk-bridge2.0-dev:$CROSS_DEB_ARCH \
+        libatk1.0-dev:$CROSS_DEB_ARCH \
+        libcairo2-dev:$CROSS_DEB_ARCH \
+        libfontconfig1-dev:$CROSS_DEB_ARCH \
+        libgdk-pixbuf2.0-dev:$CROSS_DEB_ARCH \
+        libglib2.0-dev:$CROSS_DEB_ARCH \
+        libpango1.0-dev:$CROSS_DEB_ARCH \
         libssl-dev:$CROSS_DEB_ARCH \
         libasound2-dev:$CROSS_DEB_ARCH
 """]
