@@ -33,6 +33,8 @@ impl Preferences {
     pub fn reset(&mut self) {
         self.cache_size.clear();
         self.auth.result.clear();
+        self.auth.lastfm_api_key_input.clear();
+        self.auth.lastfm_api_secret_input.clear();
     }
 
     pub fn measure_cache_usage() -> Option<u64> {
@@ -54,6 +56,10 @@ pub struct Authentication {
     pub password: String,
     pub access_token: String,
     pub result: Promise<(), (), String>,
+    #[data(ignore)]
+    pub lastfm_api_key_input: String,
+    #[data(ignore)]
+    pub lastfm_api_secret_input: String,
 }
 
 impl Authentication {
@@ -63,6 +69,8 @@ impl Authentication {
             password: String::new(),
             access_token: String::new(),
             result: Promise::Empty,
+            lastfm_api_key_input: String::new(),
+            lastfm_api_secret_input: String::new(),
         }
     }
 

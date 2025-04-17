@@ -338,9 +338,9 @@ fn account_tab_widget(tab: AccountTab) -> impl Widget<AppState> {
             .with_child(Label::new("Last.fm Account").with_font(theme::UI_FONT_MEDIUM))
             .with_spacer(theme::grid(1.0))
             .with_child(
-                Label::new("Connect your Last.fm account to scrobble tracks you listen to.")
+                 Label::new("Connect your Last.fm account to scrobble tracks you listen to.")
                     .with_text_color(theme::PLACEHOLDER_COLOR)
-                    .with_line_break_mode(LineBreaking::WordWrap),
+                    .with_line_break_mode(LineBreaking::WordWrap)
             )
             .with_spacer(theme::grid(2.0))
             .with_child(ViewSwitcher::new(
@@ -372,44 +372,39 @@ fn account_tab_widget(tab: AccountTab) -> impl Widget<AppState> {
                         // --- Disconnected View ---
                         Flex::column()
                             .cross_axis_alignment(CrossAxisAlignment::Start)
-                            // Use the helper function for API Key input
                             .with_child(make_input_row(
                                 "API Key:",
                                 "Enter your Last.fm API Key",
-                                AppState::config.then(Config::lastfm_api_key).map(
-                                    |opt: &Option<String>| opt.clone().unwrap_or_default(),
-                                    |opt_ref: &mut Option<String>, new_s: String| {
-                                        *opt_ref =
-                                            if new_s.is_empty() { None } else { Some(new_s) };
-                                    },
-                                ),
+                                AppState::preferences.then(Preferences::auth).then(Authentication::lastfm_api_key_input),
                             ))
                             .with_default_spacer()
-                            // Use the helper function for API Secret input
                             .with_child(make_input_row(
                                 "API Secret:",
                                 "Enter your Last.fm API Secret",
-                                AppState::config.then(Config::lastfm_api_secret).map(
-                                    |opt: &Option<String>| opt.clone().unwrap_or_default(),
-                                    |opt_ref: &mut Option<String>, new_s: String| {
-                                        *opt_ref =
-                                            if new_s.is_empty() { None } else { Some(new_s) };
-                                    },
-                                ),
+                                AppState::preferences.then(Preferences::auth).then(Authentication::lastfm_api_secret_input),
                             ))
                             .with_spacer(theme::grid(2.0))
-                            .with_child(Button::new("Connect Last.fm Account").on_click(
-                                |ctx, data: &mut AppState, _| {
-                                    if data.config.lastfm_api_key.is_some()
-                                        && data.config.lastfm_api_secret.is_some()
-                                    {
-                                        ctx.submit_command(Authenticate::LASTFM_REQUEST);
-                                    } else {
-                                        data.preferences.lastfm_auth_result =
-                                            Some("API Key and Secret required.".to_string());
+                            .with_child(Flex::row() // Put buttons in a row
+                                .with_child(Button::new("Connect Last.fm Account").on_click(
+                                    |ctx, data: &mut AppState, _| {
+                                        // Check directly from config
+                                        if data.config.lastfm_api_key.is_some()
+                                            && data.config.lastfm_api_secret.is_some()
+                                        {
+                                            ctx.submit_command(Authenticate::LASTFM_REQUEST);
+                                        } else {
+                                            data.preferences.lastfm_auth_result =
+                                                Some("API Key and Secret required.".to_string());
+                                        }
+                                    },
+                                ))
+                                .with_spacer(theme::grid(1.0))
+                                .with_child(Button::new("Request API Key").on_click(
+                                    |_, _, _| {
+                                        open::that("https://www.last.fm/api/account/create").ok();
                                     }
-                                },
-                            ))
+                                ))
+                            )
                             .with_spacer(theme::grid(1.0))
                             // Last.fm Status label
                             .with_child(ViewSwitcher::new(
@@ -543,6 +538,10 @@ impl Authenticate {
     pub const SPOTIFY_RESPONSE: Selector<Result<Credentials, String>> =
         Selector::new("app.preferences.spotify.authenticate-response");
 
+    // Selector for initializing fields
+    pub const INITIALIZE_LASTFM_FIELDS: Selector =
+        Selector::new("app.preferences.lastfm.initialize-fields");
+
     // Last.fm selectors
     pub const LASTFM_REQUEST: Selector =
         Selector::new("app.preferences.lastfm.authenticate-request");
@@ -564,6 +563,13 @@ impl<W: Widget<AppState>> Controller<AppState, W> for Authenticate {
                 self.start_spotify_auth(ctx, data);
                 ctx.set_handled();
             }
+            Event::Command(cmd) if cmd.is(Self::INITIALIZE_LASTFM_FIELDS) => {
+                data.preferences.auth.lastfm_api_key_input =
+                    data.config.lastfm_api_key.clone().unwrap_or_default();
+                data.preferences.auth.lastfm_api_secret_input =
+                    data.config.lastfm_api_secret.clone().unwrap_or_default();
+                ctx.set_handled();
+            }
             Event::Command(cmd) if cmd.is(cmd::LOG_OUT) => {
                 data.config.clear_credentials();
                 data.config.save();
@@ -573,7 +579,11 @@ impl<W: Widget<AppState>> Controller<AppState, W> for Authenticate {
                 ctx.set_handled();
             }
             Event::Command(cmd) if cmd.is(Self::LASTFM_REQUEST) => {
-                if data.config.lastfm_api_key.is_none() || data.config.lastfm_api_secret.is_none() {
+                // Use the temporary input fields from preferences state.
+                let api_key = data.preferences.auth.lastfm_api_key_input.clone();
+                let api_secret = data.preferences.auth.lastfm_api_secret_input.clone();
+
+                if api_key.is_empty() || api_secret.is_empty() {
                     data.preferences.lastfm_auth_result =
                         Some("API Key and Secret required.".to_string());
                     ctx.set_handled();
@@ -581,8 +591,6 @@ impl<W: Widget<AppState>> Controller<AppState, W> for Authenticate {
                 }
 
                 data.preferences.lastfm_auth_result = Some("Connecting...".to_string());
-                let api_key = data.config.lastfm_api_key.clone().unwrap();
-                let api_secret = data.config.lastfm_api_secret.clone().unwrap();
                 let port = 8889;
                 let callback_url = format!("http://127.0.0.1:{}/lastfm_callback", port);
                 let socket_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), port);
@@ -647,6 +655,11 @@ impl<W: Widget<AppState>> Controller<AppState, W> for Authenticate {
                 let result = cmd.get_unchecked(Self::LASTFM_RESPONSE);
                 match result {
                     Ok(session_key) => {
+                        // On success, store the validated key/secret in config and save.
+                        data.config.lastfm_api_key =
+                            Some(data.preferences.auth.lastfm_api_key_input.clone());
+                        data.config.lastfm_api_secret =
+                            Some(data.preferences.auth.lastfm_api_secret_input.clone());
                         data.config.lastfm_session_key = Some(session_key.clone());
                         data.config.save();
 
@@ -666,6 +679,20 @@ impl<W: Widget<AppState>> Controller<AppState, W> for Authenticate {
                 child.event(ctx, event, data, env);
             }
         }
+    }
+
+    fn lifecycle(
+        &mut self,
+        child: &mut W,
+        ctx: &mut LifeCycleCtx,
+        event: &LifeCycle,
+        data: &AppState,
+        env: &Env,
+    ) {
+        if let LifeCycle::WidgetAdded = event {
+            ctx.submit_command(Self::INITIALIZE_LASTFM_FIELDS);
+        }
+        child.lifecycle(ctx, event, data, env);
     }
 }
 
