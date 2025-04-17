@@ -158,7 +158,7 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Get full history to count number of commits for package version
+          fetch-depth: 0 # Get full history to count number of commits for package version
 
       - name: Download Linux Binaries
         uses: actions/download-artifact@v4

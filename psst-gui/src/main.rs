@@ -31,9 +31,11 @@ fn main() {
     )
     .init();
 
+    // Load configuration
     let config = Config::load().unwrap_or_default();
+
     let paginated_limit = config.paginated_limit;
-    let state = AppState::default_with_config(config);
+    let state = AppState::default_with_config(config.clone());
     WebApi::new(
         state.session.clone(),
         Config::proxy().as_deref(),
@@ -63,4 +65,6 @@ fn main() {
         .delegate(delegate)
         .launch(state)
         .expect("Application launch");
+
+    config.save();
 }

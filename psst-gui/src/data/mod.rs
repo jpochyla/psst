@@ -119,13 +119,9 @@ impl AppState {
             config,
             preferences: Preferences {
                 active: PreferencesTab::General,
-                auth: Authentication {
-                    username: String::new(),
-                    password: String::new(),
-                    access_token: String::new(),
-                    result: Promise::Empty,
-                },
                 cache_size: Promise::Empty,
+                auth: Authentication::new(),
+                lastfm_auth_result: None,
             },
             playback,
             added_queue: Vector::new(),
@@ -483,6 +479,18 @@ impl Library {
             if let Some(playlist) = saved.iter_mut().find(|p| p.id == link.id) {
                 playlist.track_count = playlist.track_count.map(|count| count.saturating_sub(1));
             }
+        }
+    }
+}
+
+impl Default for Library {
+    fn default() -> Self {
+        Library {
+            user_profile: Promise::Empty,
+            playlists: Promise::Empty,
+            saved_albums: Promise::Empty,
+            saved_tracks: Promise::Empty,
+            saved_shows: Promise::Empty,
         }
     }
 }
