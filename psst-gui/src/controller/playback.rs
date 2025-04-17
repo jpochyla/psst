@@ -17,7 +17,7 @@ use psst_core::{
     player::{item::PlaybackItem, PlaybackConfig, Player, PlayerCommand, PlayerEvent},
     session::SessionService,
 };
-use rustfm_scrobble_proxy::Scrobbler;
+use rustfm_scrobble::Scrobbler;
 use souvlaki::{
     MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback, MediaPosition, PlatformConfig,
 };

@@ -1,6 +1,6 @@
 use crate::error::Error;
 use crate::oauth::listen_for_callback_parameter;
-use rustfm_scrobble_proxy::{responses::SessionResponse, Scrobble, Scrobbler, ScrobblerError};
+use rustfm_scrobble::{responses::SessionResponse, Scrobble, Scrobbler, ScrobblerError};
 use std::{net::SocketAddr, time::Duration};
 use url::Url;
 
@@ -14,7 +14,7 @@ impl LastFmClient {
         title: &str,
         album: Option<&str>,
     ) -> Result<(), Error> {
-        let song = Scrobble::new(artist, title, album);
+        let song = Scrobble::new(artist, title, album.unwrap_or(""));
         scrobbler
             .now_playing(&song)
             .map(|_| ())
@@ -28,7 +28,7 @@ impl LastFmClient {
         title: &str,
         album: Option<&str>,
     ) -> Result<(), Error> {
-        let song = Scrobble::new(artist, title, album);
+        let song = Scrobble::new(artist, title, album.unwrap_or(""));
         scrobbler.scrobble(&song).map(|_| ()).map_err(Error::from)
     }
 
