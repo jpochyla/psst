@@ -63,7 +63,7 @@ pub fn listen_for_callback_parameter(
 
     // 5. Wait for thread completion
     if handle.join().is_err() {
-        log::warn!("Thread join failed, but continuing with result");
+        log::warn!("thread join failed, but continuing with result");
     }
 
     // 6. Return the result
@@ -82,7 +82,7 @@ fn handle_callback_connection(
     if reader.read_line(&mut request_line).is_ok() {
         match extract_parameter_from_request(&request_line, parameter_name) {
             Some(value) => {
-                log::info!("Received callback parameter '{}'.", parameter_name);
+                log::info!("received callback parameter '{}'.", parameter_name);
                 send_success_response(stream);
                 let _ = tx.send(Ok(value));
             }

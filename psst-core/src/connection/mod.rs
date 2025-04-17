@@ -136,7 +136,7 @@ impl Transport {
             ap_list.len()
         );
         for (index, ap) in ap_list.iter().enumerate() {
-            log::info!("Trying AP {} of {}: {}", index + 1, ap_list.len(), ap);
+            log::info!("trying AP {} of {}: {}", index + 1, ap_list.len(), ap);
             let stream = if let Some(url) = proxy_url {
                 match Self::stream_through_proxy(ap, url) {
                     Ok(s) => s,

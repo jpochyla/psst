@@ -268,7 +268,7 @@ fn root_widget() -> impl Widget<AppState> {
         .on_command_async(
             cmd::LOAD_TRACK_CREDITS,
             |track: Arc<Track>| {
-                log::debug!("Fetching credits for track: {}", track.name);
+                log::debug!("fetching credits for track: {}", track.name);
                 WebApi::global().get_track_credits(&track.id.0.to_base62())
             },
             |_, data: &mut AppState, _| {

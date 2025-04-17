@@ -372,11 +372,12 @@ fn lastfm_connected_view() -> impl Widget<AppState> {
                 .with_child(
                     Button::new("Disconnect").on_click(|_ctx, data: &mut AppState, _| {
                         data.config.lastfm_session_key = None;
-                        data.preferences.lastfm_auth_result = None;
-                        // Also clear the stored API key/secret when disconnecting
                         data.config.lastfm_api_key = None;
                         data.config.lastfm_api_secret = None;
                         data.config.save();
+                        data.preferences.lastfm_auth_result = None;
+                        data.preferences.auth.lastfm_api_key_input.clear();
+                        data.preferences.auth.lastfm_api_secret_input.clear();
                     }),
                 ),
         )
@@ -616,7 +617,7 @@ impl<W: Widget<AppState>> Controller<AppState, W> for Authenticate {
                                     Duration::from_secs(300),
                                 )
                                 .map_err(|e| e.to_string())?;
-                                log::info!("Received Last.fm token, exchanging...");
+                                log::info!("received Last.fm token, exchanging...");
                                 lastfm::exchange_token_for_session(&api_key, &api_secret, &token)
                                     .map_err(|e| format!("Token exchange failed: {}", e))
                             },

@@ -248,9 +248,9 @@ impl PlaybackController {
                         title.as_ref(),
                         album.as_ref().map(|a| a.name.as_ref()),
                     ) {
-                        log::warn!("Failed to report 'Now Playing' to Last.fm: {}", e);
+                        log::warn!("failed to report 'Now Playing' to Last.fm: {}", e);
                     } else {
-                        log::info!("Reported 'Now Playing' to Last.fm: {} - {}", artist, title);
+                        log::info!("reported 'Now Playing' to Last.fm: {} - {}", artist, title);
                     }
                 } else {
                     log::debug!("Last.fm not configured, skipping now_playing report.");
@@ -274,9 +274,9 @@ impl PlaybackController {
                             title.as_ref(),
                             album.as_ref().map(|a| a.name.as_ref()),
                         ) {
-                            log::warn!("Failed to scrobble track to Last.fm: {}", e);
+                            log::warn!("failed to scrobble track to Last.fm: {}", e);
                         } else {
-                            log::info!("Scrobbled track to Last.fm: {} - {}", artist, title);
+                            log::info!("scrobbled track to Last.fm: {} - {}", artist, title);
                             self.has_scrobbled = true;
                         }
                     } else {
