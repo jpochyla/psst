@@ -338,9 +338,9 @@ fn account_tab_widget(tab: AccountTab) -> impl Widget<AppState> {
             .with_child(Label::new("Last.fm Account").with_font(theme::UI_FONT_MEDIUM))
             .with_spacer(theme::grid(1.0))
             .with_child(
-                 Label::new("Connect your Last.fm account to scrobble tracks you listen to.")
+                Label::new("Connect your Last.fm account to scrobble tracks you listen to.")
                     .with_text_color(theme::PLACEHOLDER_COLOR)
-                    .with_line_break_mode(LineBreaking::WordWrap)
+                    .with_line_break_mode(LineBreaking::WordWrap),
             )
             .with_spacer(theme::grid(2.0))
             .with_child(ViewSwitcher::new(
@@ -371,65 +371,79 @@ fn account_tab_widget(tab: AccountTab) -> impl Widget<AppState> {
                     } else {
                         // --- Disconnected View ---
                         Flex::column()
-                            .cross_axis_alignment(CrossAxisAlignment::Start)
-                            .with_child(make_input_row(
-                                "API Key:",
-                                "Enter your Last.fm API Key",
-                                AppState::preferences.then(Preferences::auth).then(Authentication::lastfm_api_key_input),
-                            ))
-                            .with_default_spacer()
-                            .with_child(make_input_row(
-                                "API Secret:",
-                                "Enter your Last.fm API Secret",
-                                AppState::preferences.then(Preferences::auth).then(Authentication::lastfm_api_secret_input),
-                            ))
-                            .with_spacer(theme::grid(2.0))
-                            .with_child(Flex::row() // Put buttons in a row
-                                .with_child(Button::new("Connect Last.fm Account").on_click(
-                                    |ctx, data: &mut AppState, _| {
-                                        // Check directly from config
-                                        if data.config.lastfm_api_key.is_some()
-                                            && data.config.lastfm_api_secret.is_some()
-                                        {
-                                            ctx.submit_command(Authenticate::LASTFM_REQUEST);
+                                .cross_axis_alignment(CrossAxisAlignment::Start)
+                                .with_child(make_input_row(
+                                    "API Key:",
+                                    "Enter your Last.fm API Key",
+                                    AppState::preferences
+                                        .then(Preferences::auth)
+                                        .then(Authentication::lastfm_api_key_input),
+                                ))
+                                .with_default_spacer()
+                                .with_child(make_input_row(
+                                    "API Secret:",
+                                    "Enter your Last.fm API Secret",
+                                    AppState::preferences
+                                        .then(Preferences::auth)
+                                        .then(Authentication::lastfm_api_secret_input),
+                                ))
+                                .with_spacer(theme::grid(2.0))
+                                .with_child(
+                                    Flex::row() // Put buttons in a row
+                                        .with_child(
+                                            Button::new("Connect Last.fm Account").on_click(
+                                                |ctx, data: &mut AppState, _| {
+                                                    // Check directly from config
+                                                    if data.config.lastfm_api_key.is_some()
+                                                        && data.config.lastfm_api_secret.is_some()
+                                                    {
+                                                        ctx.submit_command(
+                                                            Authenticate::LASTFM_REQUEST,
+                                                        );
+                                                    } else {
+                                                        data.preferences.lastfm_auth_result = Some(
+                                                            "API Key and Secret required."
+                                                                .to_string(),
+                                                        );
+                                                    }
+                                                },
+                                            ),
+                                        )
+                                        .with_spacer(theme::grid(1.0))
+                                        .with_child(Button::new("Request API Key").on_click(
+                                            |_, _, _| {
+                                                open::that(
+                                                    "https://www.last.fm/api/account/create",
+                                                )
+                                                .ok();
+                                            },
+                                        )),
+                                )
+                                .with_spacer(theme::grid(1.0))
+                                // Last.fm Status label
+                                .with_child(ViewSwitcher::new(
+                                    |data: &AppState, _| {
+                                        data.preferences
+                                            .lastfm_auth_result
+                                            .clone()
+                                            .unwrap_or_default()
+                                    },
+                                    |msg: &String, _, _| {
+                                        // Only show label if there's an error or connecting message
+                                        if msg.is_empty() || msg.starts_with("Success") {
+                                            SizedBox::empty().boxed()
                                         } else {
-                                            data.preferences.lastfm_auth_result =
-                                                Some("API Key and Secret required.".to_string());
+                                            Label::new(msg.clone())
+                                                .with_text_color(if msg.starts_with("Connect") {
+                                                    druid::Color::GRAY
+                                                } else {
+                                                    druid::Color::RED
+                                                })
+                                                .boxed()
                                         }
                                     },
                                 ))
-                                .with_spacer(theme::grid(1.0))
-                                .with_child(Button::new("Request API Key").on_click(
-                                    |_, _, _| {
-                                        open::that("https://www.last.fm/api/account/create").ok();
-                                    }
-                                ))
-                            )
-                            .with_spacer(theme::grid(1.0))
-                            // Last.fm Status label
-                            .with_child(ViewSwitcher::new(
-                                |data: &AppState, _| {
-                                    data.preferences
-                                        .lastfm_auth_result
-                                        .clone()
-                                        .unwrap_or_default()
-                                },
-                                |msg: &String, _, _| {
-                                    // Only show label if there's an error or connecting message
-                                    if msg.is_empty() || msg.starts_with("Success") {
-                                        SizedBox::empty().boxed()
-                                    } else {
-                                        Label::new(msg.clone())
-                                            .with_text_color(if msg.starts_with("Connect") {
-                                                druid::Color::GRAY
-                                            } else {
-                                                druid::Color::RED
-                                            })
-                                            .boxed()
-                                    }
-                                },
-                            ))
-                            .boxed()
+                                .boxed()
                     }
                 },
             ));
