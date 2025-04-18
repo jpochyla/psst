@@ -460,7 +460,7 @@ impl WebApi {
 
                 section.section_items.items.iter().for_each(|item| {
                     let uri = item.content.data.uri.clone();
-                    let id = uri.split(':').last().unwrap_or("").to_string();
+                    let id = uri.split(':').next_back().unwrap_or("").to_string();
 
                     match item.content.data.typename {
                         DataTypename::Playlist => {
@@ -574,7 +574,7 @@ impl WebApi {
                                                 artist
                                                     .uri
                                                     .split(':')
-                                                    .last()
+                                                    .next_back()
                                                     .unwrap_or("")
                                                     .to_string(),
                                             ),

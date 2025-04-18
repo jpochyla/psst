@@ -144,7 +144,7 @@ fn credit_artist_widget() -> impl Widget<CreditArtist> {
                 .rounded(theme::BUTTON_BORDER_RADIUS)
                 .on_click(|ctx: &mut EventCtx, data: &mut CreditArtist, _: &Env| {
                     if let Some(uri) = &data.uri {
-                        let artist_id = uri.split(':').last().unwrap_or("").to_string();
+                        let artist_id = uri.split(':').next_back().unwrap_or("").to_string();
                         let artist_link = ArtistLink {
                             id: artist_id.into(),
                             name: data.name.clone().into(),
