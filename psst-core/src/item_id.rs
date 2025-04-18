@@ -97,7 +97,7 @@ impl ItemId {
     }
 
     pub fn from_uri(uri: &str) -> Option<Self> {
-        let gid = uri.split(':').last()?;
+        let gid = uri.split(':').next_back()?;
         if uri.contains(":episode:") {
             Self::from_base62(gid, ItemIdType::Podcast)
         } else if uri.contains(":track:") {
