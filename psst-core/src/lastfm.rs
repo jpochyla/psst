@@ -1,6 +1,6 @@
 use crate::error::Error;
 use crate::oauth::listen_for_callback_parameter;
-use rustfm_scrobble_proxy::{responses::SessionResponse, Scrobble, Scrobbler, ScrobblerError};
+use rustfm_scrobble::{responses::SessionResponse, Scrobble, Scrobbler, ScrobblerError};
 use std::{net::SocketAddr, time::Duration};
 use url::Url;
 
@@ -14,7 +14,7 @@ impl LastFmClient {
         title: &str,
         album: Option<&str>,
     ) -> Result<(), Error> {
-        let song = Scrobble::new(artist, title, album);
+        let song = Scrobble::new(artist, title, album.unwrap_or(""));
         scrobbler
             .now_playing(&song)
             .map(|_| ())
@@ -28,7 +28,7 @@ impl LastFmClient {
         title: &str,
         album: Option<&str>,
     ) -> Result<(), Error> {
-        let song = Scrobble::new(artist, title, album);
+        let song = Scrobble::new(artist, title, album.unwrap_or(""));
         scrobbler.scrobble(&song).map(|_| ()).map_err(Error::from)
     }
 
@@ -42,7 +42,7 @@ impl LastFmClient {
         let (Some(api_key), Some(api_secret), Some(session_key)) =
             (api_key, api_secret, session_key)
         else {
-            log::warn!("Missing Last.fm API key, secret, or session key for scrobbler creation.");
+            log::warn!("missing Last.fm API key, secret, or session key for scrobbler creation.");
             return Err(Error::ConfigError(
                 "Missing Last.fm API key, secret, or session key.".to_string(),
             ));
@@ -51,7 +51,7 @@ impl LastFmClient {
         let mut scrobbler = Scrobbler::new(api_key, api_secret);
         // Associate the session key with the scrobbler instance.
         scrobbler.authenticate_with_session_key(session_key);
-        log::info!("Scrobbler instance created with session key (validity checked on first use).");
+        log::info!("scrobbler instance created with session key (validity checked on first use).");
         Ok(scrobbler)
     }
 }
