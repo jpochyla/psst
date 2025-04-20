@@ -190,11 +190,9 @@ impl AppDelegate<AppState> for Delegate {
             ctx.submit_command(RENAME_PLAYLIST.with(link.clone()));
             Handled::Yes
         } else if cmd.is(cmd::QUIT_APP_WITH_SAVE) {
-            data.config.save();
             ctx.submit_command(commands::QUIT_APP);
             Handled::Yes
         } else if cmd.is(commands::QUIT_APP) {
-            data.config.save();
             Handled::No
         } else if cmd.is(crate::cmd::SHOW_ARTWORK) {
             self.show_artwork(ctx);

@@ -66,5 +66,4 @@ fn main() {
         .launch(state)
         .expect("Application launch");
 
-    config.save();
 }
