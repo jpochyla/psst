@@ -8,6 +8,8 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  VERSION_DATE: ${{ format('{0}.{1}.{2}', github.run_number, github.run_id, github.run_attempt) }}
+  VERSION_TIMESTAMP: ${{ github.event.repository.updated_at }}
 
 jobs:
   code-style:
@@ -44,6 +46,13 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+
+      - name: Set Version Info
+        id: version
+        run: |
+          echo "BUILD_DATE=$(date +'%Y%m%d')" >> $GITHUB_ENV
+          echo "VERSION=0.1.0,$(date +'%Y%m%d.%H%M%S')" >> $GITHUB_ENV
+          echo "RELEASE_VERSION=$(date +'%Y.%m.%d')" >> $GITHUB_OUTPUT
 
       - name: Setup Rust Cache
         uses: Swatinem/rust-cache@v2
@@ -115,16 +124,29 @@ jobs:
             --hide-extension "Psst.app" \
             --app-drop-link 450 160 \
             --no-internet-enable \
-            "Psst.dmg" \
+            "Psst-${{ env.RELEASE_VERSION }}.dmg" \
             "target/release/bundle/osx/Psst.app"
+        working-directory: psst-gui
+
+      - name: Generate DMG Checksum
+        if: runner.os == 'macOS'
+        run: |
+          shasum -a 256 "Psst-${{ env.RELEASE_VERSION }}.dmg" > "Psst-${{ env.RELEASE_VERSION }}.dmg.sha256"
         working-directory: psst-gui
 
       - name: Upload macOS DMG
         uses: actions/upload-artifact@v4
         if: runner.os == 'macOS'
         with:
-          name: Psst.dmg
-          path: ./psst-gui/Psst.dmg
+          name: Psst-${{ env.RELEASE_VERSION }}.dmg
+          path: ./psst-gui/Psst-${{ env.RELEASE_VERSION }}.dmg
+
+      - name: Upload macOS DMG Checksum
+        uses: actions/upload-artifact@v4
+        if: runner.os == 'macOS'
+        with:
+          name: Psst-${{ env.RELEASE_VERSION }}.dmg.sha256
+          path: ./psst-gui/Psst-${{ env.RELEASE_VERSION }}.dmg.sha256
 
       - name: Make Linux Binary Executable
         if: runner.os == 'Linux'
@@ -257,3 +279,58 @@ jobs:
         with:
           name: psst-appimage
           path: ${{runner.workspace}}/out/*.AppImage
+
+  release:
+    needs: [build, deb]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Set Version Info
+        run: |
+          echo "BUILD_DATE=$(date +'%Y%m%d')" >> $GITHUB_ENV
+          echo "VERSION=0.1.0,$(date +'%Y%m%d.%H%M%S')" >> $GITHUB_ENV 
+          echo "RELEASE_VERSION=$(date +'%Y.%m.%d')" >> $GITHUB_ENV
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Generate SHA256 checksums
+        run: |
+          cd artifacts
+          find . -type f -name "*.dmg" -o -name "*.exe" -o -name "psst-gui-*" | while read file; do
+            sha256sum "$file" >> checksums.txt
+          done
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Psst ${{ env.RELEASE_VERSION }}
+          tag_name: v${{ env.RELEASE_VERSION }}
+          body: |
+            ## Psst ${{ env.RELEASE_VERSION }}
+            - Built on: $(date)
+            - Version: ${{ env.VERSION }}
+
+            ### SHA256 Checksums
+            ```
+            $(cat artifacts/checksums.txt)
+            ```
+
+            ### Homebrew Installation
+            ```
+            brew install --cask psst
+            ```
+          files: |
+            artifacts/Psst-${{ env.RELEASE_VERSION }}.dmg/Psst-${{ env.RELEASE_VERSION }}.dmg
+            artifacts/Psst-${{ env.RELEASE_VERSION }}.dmg.sha256/Psst-${{ env.RELEASE_VERSION }}.dmg.sha256
+            artifacts/Psst.exe/psst-gui.exe
+            artifacts/psst-gui-x86_64-unknown-linux-gnu/psst-gui
+            artifacts/psst-gui-aarch64-unknown-linux-gnu/psst-gui
+            artifacts/checksums.txt
+            artifacts/psst-deb-amd64/*.deb
+            artifacts/psst-deb-arm64/*.deb
+          generate_release_notes: false
