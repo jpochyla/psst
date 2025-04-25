@@ -71,18 +71,47 @@ fn init_scrobbler_instance(data: &AppState) -> Option<Scrobbler> {
     None
 }
 
+fn parse_valid_client_id(id_str: &str) -> Option<u64> {
+    let trimmed = id_str.trim();
+
+    if trimmed.is_empty() {
+        log::info!("Discord RPC client ID not provided");
+        return None;
+    }
+
+    if !trimmed.chars().all(|c| c.is_ascii_digit()) {
+        log::warn!("Discord RPC client ID contains non-digit characters");
+        return None;
+    }
+    // Check if the client ID has a valid length for a snowflake 17-19
+    if !(17..=19).contains(&trimmed.len()) {
+        log::warn!(
+            "Discord RPC client ID has invalid length ({} characters)",
+            trimmed.len()
+        );
+        return None;
+    }
+
+    match trimmed.parse::<u64>() {
+        Ok(id) => Some(id),
+        Err(e) => {
+            log::warn!("Failed to parse Discord RPC client ID '{}': {}", trimmed, e);
+            None
+        }
+    }
+}
+
 fn init_discord_rpc_instance(data: &AppState) -> Option<Sender<DiscordRpcCmd>> {
-    if data.config.discord_rcp_enable {
-        if let Some(client_id) = data.config.discord_rpc_client_id {
+    if data.config.discord_rpc_enable {
+        if let Some(client_id) = parse_valid_client_id(&data.config.discord_rpc_client_id) {
             match DiscordRPCClient::spawn_rpc_worker(client_id) {
-                Ok(discord_rpc_sender) => Some(discord_rpc_sender),
+                Ok(sender) => Some(sender),
                 Err(e) => {
                     log::warn!("Failed to create Discord RPC: {}", e);
                     None
                 }
             }
         } else {
-            log::info!("Discord RPC client ID not provided");
             None
         }
     } else {
@@ -305,6 +334,8 @@ impl PlaybackController {
                     let track_duration = track.duration;
                     let progress = now_playing.progress;
 
+                    log::info!("Updating Discord RPC with track: {}", title);
+
                     let album_cover_url = album.as_ref().and_then(|a| {
                         a.images
                             .iter()
@@ -324,6 +355,49 @@ impl PlaybackController {
                         .map_err(|e| log::error!("error updating Discord RPC: {:?}", e));
                 }
             }
+        }
+    }
+
+    fn reconcile_discord_rpc(&mut self, old: &AppState, new: &AppState, playback: &Playback) {
+        let was_enabled = old.config.discord_rpc_enable;
+        let is_enabled = new.config.discord_rpc_enable;
+        let id_changed = old.config.discord_rpc_client_id != new.config.discord_rpc_client_id;
+
+        match (was_enabled, is_enabled, self.discord_rpc_sender.is_some()) {
+            // turned OFF
+            (true, false, true) => {
+                // shutdown the RPC
+                log::info!("Shutting down Discord RPC");
+                if let Some(ref tx) = self.discord_rpc_sender {
+                    let _ = tx.send(DiscordRpcCmd::Shutdown);
+                }
+                // then drop the sender
+                self.discord_rpc_sender = None;
+            }
+
+            // turned ON first time create a new sender
+            (false, true, false) => {
+                log::info!("Starting Discord RPC");
+                self.discord_rpc_sender = init_discord_rpc_instance(new);
+                self.update_discord_rpc(playback)
+            }
+
+            // still ON and ID changed update the app id
+            (_, true, true) if id_changed => {
+                log::info!("Updating Discord RPC client ID");
+                if let Some(ref tx) = self.discord_rpc_sender {
+                    if let Some(client_id) =
+                        parse_valid_client_id(&new.config.discord_rpc_client_id)
+                    {
+                        let _ = tx.send(DiscordRpcCmd::UpdateClientId(client_id));
+                        self.update_discord_rpc(playback);
+                    } else {
+                        log::warn!("Client ID changed but new value was invalid; not updating");
+                    }
+                }
+            }
+
+            _ => {} // nothing else to do
         }
     }
 
@@ -706,6 +780,8 @@ where
             || old_data.config.lastfm_api_secret != data.config.lastfm_api_secret
             || old_data.config.lastfm_session_key != data.config.lastfm_session_key
             || old_data.config.lastfm_enable != data.config.lastfm_enable;
+
+        self.reconcile_discord_rpc(old_data, data, &data.playback);
 
         if lastfm_changed {
             self.scrobbler = init_scrobbler_instance(data);

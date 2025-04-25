@@ -356,6 +356,31 @@ fn account_tab_widget(tab: AccountTab) -> impl Widget<AppState> {
                 },
             ));
     }
+    if matches!(tab, AccountTab::InPreferences) {
+        col = col
+            .with_spacer(theme::grid(2.0))
+            .with_child(Label::new("Discord RPC"))
+            .with_spacer(theme::grid(1.0))
+            .with_child(
+                Label::new("Uses the Discord RPC socket to display currently playing music")
+                    .with_text_color(theme::PLACEHOLDER_COLOR)
+                    .with_line_break_mode(LineBreaking::WordWrap),
+            )
+            .with_spacer(theme::grid(2.0))
+            .with_child(
+                Flex::row().with_child(
+                    Checkbox::new("Enable Discord RPC")
+                        .lens(AppState::config.then(Config::discord_rpc_enable))
+                        .padding((0.0, 0.0, theme::grid(1.0), 0.0)),
+                ),
+            )
+            .with_spacer(theme::grid(1.0))
+            .with_child(make_input_row(
+                "Client ID",
+                "Enter your Discord Client ID",
+                AppState::config.then(Config::discord_rpc_client_id),
+            ))
+    }
     col.controller(Authenticate::new(tab))
 }
 

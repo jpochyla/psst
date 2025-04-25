@@ -9,8 +9,6 @@ use std::{
 
 use crossbeam_channel::{unbounded, Receiver, Sender};
 
-pub struct DiscordRPCClient;
-
 pub enum DiscordRpcCmd {
     Update {
         track: Arc<str>,
@@ -20,10 +18,25 @@ pub enum DiscordRpcCmd {
         duration: Option<Duration>,
         position: Option<Duration>,
     },
+    Shutdown,
     Clear,
+    UpdateClientId(u64),
+}
+
+pub struct DiscordRPCClient {
+    client: Option<DiscordClient>,
 }
 
 impl DiscordRPCClient {
+    #[inline]
+    fn with_client<F>(&mut self, f: F)
+    where
+        F: FnOnce(&mut DiscordClient),
+    {
+        if let Some(c) = self.client.as_mut() {
+            f(c);
+        }
+    }
     /// Creates a Discord Rich Presence client for Spotify with the provided application ID.
     pub fn create_client(app_id: u64) -> Result<DiscordClient, Error> {
         let mut client = DiscordClient::new(app_id);
@@ -32,9 +45,11 @@ impl DiscordRPCClient {
         Ok(client)
     }
 
+    /// Spawns a worker thread to handle Discord RPC commands.
     pub fn spawn_rpc_worker(app_id: u64) -> Result<Sender<DiscordRpcCmd>, Error> {
-        let mut rpc = DiscordRPCClient::create_client(app_id)?;
-
+        let mut rpc = DiscordRPCClient {
+            client: Some(Self::create_client(app_id)?),
+        };
         let (tx, rx): (Sender<DiscordRpcCmd>, Receiver<DiscordRpcCmd>) = unbounded();
 
         thread::spawn(move || {
@@ -48,18 +63,47 @@ impl DiscordRPCClient {
                         duration,
                         position,
                     } => {
-                        let _ = DiscordRPCClient::now_playing_song(
-                            &mut rpc,
-                            &track,
-                            &artist,
-                            album.as_deref(),
-                            cover_url.as_deref(),
-                            duration,
-                            position,
-                        );
+                        while !discord_presence::Client::is_ready() {
+                            std::thread::sleep(Duration::from_millis(10));
+                        }
+                        rpc.with_client(|c| {
+                            let _ = Self::now_playing_song(
+                                c, // <- &mut DiscordClient
+                                &track,
+                                &artist,
+                                album.as_deref(),
+                                cover_url.as_deref(),
+                                duration,
+                                position,
+                            );
+                        });
                     }
                     DiscordRpcCmd::Clear => {
-                        let _ = DiscordRPCClient::clear_presence(&mut rpc);
+                        rpc.with_client(|c| {
+                            let _ = DiscordRPCClient::clear_presence(c);
+                        });
+                    }
+                    DiscordRpcCmd::Shutdown => {
+                        if let Some(client) = rpc.client.take() {
+                            if let Err(e) = client.shutdown() {
+                                log::warn!("Shutdown failed: {}", e);
+                            }
+                        }
+                        // Exit the loop
+                        break;
+                    }
+                    DiscordRpcCmd::UpdateClientId(new_id) => {
+                        // take the old client out
+                        if let Some(old) = rpc.client.take() {
+                            if let Err(e) = old.shutdown() {
+                                log::warn!("shutdown failed: {}", e);
+                            }
+                        }
+                        // create replacement
+                        match Self::create_client(new_id) {
+                            Ok(new_cli) => rpc.client = Some(new_cli),
+                            Err(e) => log::warn!("failed to create new client: {}", e),
+                        }
                     }
                 }
             }
@@ -116,13 +160,12 @@ impl DiscordRPCClient {
 
                 act
             })
-            .map(|_| ()) // Discard the Payload<Activity> and return ()
+            .map(|_| ())
             .map_err(Error::from)
     }
 
     /// Stop displaying Rich Presence by clearing the activity.
     pub fn clear_presence(client: &mut DiscordClient) -> Result<(), Error> {
-        // Map the payload result to () to match our return type
         client.clear_activity().map(|_| ()).map_err(Error::from)
     }
 }
