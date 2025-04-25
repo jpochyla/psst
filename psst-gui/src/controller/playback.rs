@@ -4,6 +4,8 @@ use std::{
 };
 
 use crossbeam_channel::Sender;
+use discord_presence::Client as DiscordClient;
+
 use druid::{
     im::Vector,
     widget::{prelude::*, Controller},
@@ -13,11 +15,13 @@ use psst_core::{
     audio::{normalize::NormalizationLevel, output::DefaultAudioOutput},
     cache::Cache,
     cdn::Cdn,
+    discord_rpc::DiscordRPCClient,
     lastfm::LastFmClient,
     player::{item::PlaybackItem, PlaybackConfig, Player, PlayerCommand, PlayerEvent},
     session::SessionService,
 };
 use rustfm_scrobble::Scrobbler;
+
 use souvlaki::{
     MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback, MediaPosition, PlatformConfig,
 };
@@ -39,22 +43,18 @@ pub struct PlaybackController {
     media_controls: Option<MediaControls>,
     has_scrobbled: bool,
     scrobbler: Option<Scrobbler>,
+    discord_rpc: Option<DiscordClient>,
     startup: bool,
 }
-fn init_scrobbler_instance(
-    data: &AppState
-) -> Option<Scrobbler> {
+fn init_scrobbler_instance(data: &AppState) -> Option<Scrobbler> {
     if data.config.lastfm_enable {
         if let (Some(api_key), Some(api_secret), Some(session_key)) = (
             data.config.lastfm_api_key.as_deref(),
             data.config.lastfm_api_secret.as_deref(),
             data.config.lastfm_session_key.as_deref(),
         ) {
-            match LastFmClient::create_scrobbler(
-                Some(api_key),
-                Some(api_secret),
-                Some(session_key),
-            ) {
+            match LastFmClient::create_scrobbler(Some(api_key), Some(api_secret), Some(session_key))
+            {
                 Ok(scr) => {
                     log::info!("Last.fm Scrobbler instance created/updated.");
                     return Some(scr);
@@ -64,9 +64,7 @@ fn init_scrobbler_instance(
                 }
             }
         } else {
-            log::info!(
-                "Last.fm credentials incomplete or removed, clearing Scrobbler instance."
-            );
+            log::info!("Last.fm credentials incomplete or removed, clearing Scrobbler instance.");
         }
     } else {
         log::info!("Last.fm scrobbling is disabled, clearing Scrobbler instance.");
@@ -74,6 +72,25 @@ fn init_scrobbler_instance(
     None
 }
 
+fn init_discord_rpc_instance(data: &AppState) -> Option<DiscordClient> {
+    if data.config.discord_rcp_enable {
+        if let Some(client_id) = data.config.discord_rpc_client_id {
+            match DiscordRPCClient::create_client(client_id) {
+                Ok(rpc) => Some(rpc),
+                Err(e) => {
+                    log::warn!("Failed to create Discord RPC: {}", e);
+                    None
+                }
+            }
+        } else {
+            log::info!("Discord RPC client ID not provided");
+            None
+        }
+    } else {
+        log::info!("Discord RPC is disabled");
+        None
+    }
+}
 
 impl PlaybackController {
     pub fn new() -> Self {
@@ -84,6 +101,7 @@ impl PlaybackController {
             media_controls: None,
             has_scrobbled: false,
             scrobbler: None,
+            discord_rpc: None,
             startup: true,
         }
     }
@@ -269,6 +287,51 @@ impl PlaybackController {
         }
     }
 
+    fn clear_discord_rpc(&mut self) {
+        if let Some(discord_rpc) = &mut self.discord_rpc {
+            if let Err(e) = DiscordRPCClient::clear_presence(discord_rpc) {
+                log::warn!("error clearing Discord RPC presence: {:?}", e);
+            } else {
+                log::info!("Discord RPC presence cleared");
+            }
+        }
+    }
+
+    fn update_discord_rpc(&mut self, playback: &Playback) {
+        if let Some(now_playing) = playback.now_playing.as_ref() {
+            if let Playable::Track(track) = &now_playing.item {
+                if let Some(discord_rpc) = &mut self.discord_rpc {
+                    let artist = track.artist_name();
+                    let title = track.name.clone();
+                    let album = track.album.clone();
+                    let track_duration = track.duration;
+                    let progress = now_playing.progress;
+
+                    let album_cover_url = album.as_ref().and_then(|a| {
+                        a.images
+                            .iter()
+                            .find(|img| img.width == Some(64))
+                            .map(|img| img.url.as_ref())
+                    });
+
+                    if let Err(e) = DiscordRPCClient::now_playing_song(
+                        discord_rpc,
+                        title.as_ref(),
+                        artist.as_ref(),
+                        album.as_ref().map(|a| a.name.as_ref()),
+                        album_cover_url,
+                        Some(track_duration),
+                        Some(progress),
+                    ) {
+                        log::warn!("failed to update discord RPC: {}", e);
+                    } else {
+                        log::info!("updated discord RPC: {} - {}", artist, title);
+                    }
+                }
+            }
+        }
+    }
+
     fn report_now_playing(&mut self, playback: &Playback) {
         if let Some(now_playing) = playback.now_playing.as_ref() {
             if let Playable::Track(track) = &now_playing.item {
@@ -451,6 +514,7 @@ where
                 // Song has changed, so we reset the has_scrobbled value
                 self.has_scrobbled = false;
                 self.report_now_playing(&data.playback);
+                self.update_discord_rpc(&data.playback);
 
                 if let Some(queued) = data.queued_entry(*item) {
                     data.start_playback(queued.item, queued.origin, progress.to_owned());
@@ -475,11 +539,13 @@ where
             Event::Command(cmd) if cmd.is(cmd::PLAYBACK_PAUSING) => {
                 data.pause_playback();
                 self.update_media_control_playback(&data.playback);
+                self.clear_discord_rpc();
                 ctx.set_handled();
             }
             Event::Command(cmd) if cmd.is(cmd::PLAYBACK_RESUMING) => {
                 data.resume_playback();
                 self.update_media_control_playback(&data.playback);
+                self.update_discord_rpc(&data.playback);
                 ctx.set_handled();
             }
             Event::Command(cmd) if cmd.is(cmd::PLAYBACK_BLOCKED) => {
@@ -489,6 +555,7 @@ where
             Event::Command(cmd) if cmd.is(cmd::PLAYBACK_STOPPED) => {
                 data.stop_playback();
                 self.update_media_control_playback(&data.playback);
+                self.clear_discord_rpc();
                 ctx.set_handled();
             }
             Event::Command(cmd) if cmd.is(cmd::PLAY_TRACKS) => {
@@ -547,6 +614,7 @@ where
                     );
                     self.seek(position);
                 }
+                self.update_discord_rpc(&data.playback);
                 ctx.set_handled();
             }
             Event::Command(cmd) if cmd.is(cmd::SKIP_TO_POSITION) => {
@@ -622,8 +690,8 @@ where
         if self.startup {
             self.startup = false;
             self.scrobbler = init_scrobbler_instance(data);
-
-        }  
+            self.discord_rpc = init_discord_rpc_instance(data);
+        }
         child.lifecycle(ctx, event, data, env);
     }
 
