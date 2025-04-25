@@ -149,7 +149,7 @@ impl Default for Config {
             lastfm_api_secret: None,
             lastfm_enable: false,
             discord_rpc_app_id: String::new(),
-            discord_rpc_enable: true,
+            discord_rpc_enable: false,
         }
     }
 }

@@ -361,41 +361,36 @@ impl PlaybackController {
     fn reconcile_discord_rpc(&mut self, old: &AppState, new: &AppState, playback: &Playback) {
         let was_enabled = old.config.discord_rpc_enable;
         let is_enabled = new.config.discord_rpc_enable;
-        let id_changed = old.config.discord_rpc_app_id != new.config.discord_rpc_app_id;
+        let rpc_running = self.discord_rpc_sender.is_some();
+        let app_id_changed = old.config.discord_rpc_app_id != new.config.discord_rpc_app_id;
 
-        match (was_enabled, is_enabled, self.discord_rpc_sender.is_some()) {
-            // turned OFF
-            (true, false, true) => {
-                // shutdown the RPC
-                log::info!("Shutting down Discord RPC");
+        // Shut down if RPC was disabled
+        if was_enabled && !is_enabled && rpc_running {
+            log::info!("Shutting down Discord RPC");
+            if let Some(ref tx) = self.discord_rpc_sender {
+                let _ = tx.send(DiscordRpcCmd::Shutdown);
+            }
+            self.discord_rpc_sender = None;
+        }
+
+        // Start if RPC is enabled and no worker running
+        if is_enabled && !rpc_running {
+            log::info!("Starting Discord RPC");
+            self.discord_rpc_sender = init_discord_rpc_instance(new);
+            self.update_discord_rpc(playback);
+        }
+
+        // Update App ID if RPC is running and App ID changed
+        if is_enabled && rpc_running && app_id_changed {
+            if let Some(app_id) = parse_valid_app_id(&new.config.discord_rpc_app_id) {
+                log::info!("Updating Discord RPC app ID to {}", app_id);
                 if let Some(ref tx) = self.discord_rpc_sender {
-                    let _ = tx.send(DiscordRpcCmd::Shutdown);
+                    let _ = tx.send(DiscordRpcCmd::UpdateAppId(app_id));
+                    self.update_discord_rpc(playback);
                 }
-                // then drop the sender
-                self.discord_rpc_sender = None;
+            } else {
+                log::warn!("App ID changed but new ID is invalid; not updating");
             }
-
-            // turned ON first time create a new sender
-            (false, true, false) => {
-                log::info!("Starting Discord RPC");
-                self.discord_rpc_sender = init_discord_rpc_instance(new);
-                self.update_discord_rpc(playback)
-            }
-
-            // still ON and ID changed update the app id
-            (_, true, true) if id_changed => {
-                log::info!("Updating Discord RPC client ID");
-                if let Some(ref tx) = self.discord_rpc_sender {
-                    if let Some(client_id) = parse_valid_app_id(&new.config.discord_rpc_app_id) {
-                        let _ = tx.send(DiscordRpcCmd::UpdateAppId(client_id));
-                        self.update_discord_rpc(playback);
-                    } else {
-                        log::warn!("Client ID changed but new value was invalid; not updating");
-                    }
-                }
-            }
-
-            _ => {} // nothing else to do
         }
     }
 

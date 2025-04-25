@@ -382,6 +382,7 @@ fn account_tab_widget(tab: AccountTab) -> impl Widget<AppState> {
                 "Enter your Discord App ID",
                 AppState::config.then(Config::discord_rpc_app_id),
             ))
+            .with_spacer(theme::grid(1.0))
             .with_child(
                 Button::new("Create a Discord App →")
                     .on_click(|_, _, _| {
