@@ -323,37 +323,52 @@ impl PlaybackController {
                 .map_err(|e| log::error!("error clearing Discord RPC: {:?}", e));
         }
     }
-
     fn update_discord_rpc(&mut self, playback: &Playback) {
         if let Some(now_playing) = playback.now_playing.as_ref() {
-            if let Playable::Track(track) = &now_playing.item {
-                if let Some(discord_rpc_sender) = &mut self.discord_rpc_sender {
-                    let artist = track.artist_name();
-                    let title = track.name.clone();
-                    let album = track.album.clone();
-                    let track_duration = track.duration;
-                    let progress = now_playing.progress;
+            if let Some(discord_rpc_sender) = &mut self.discord_rpc_sender {
+                let (title, artist, album_name, images, duration, progress) =
+                    match &now_playing.item {
+                        Playable::Track(track) => (
+                            track.name.clone(),
+                            track.artist_name(),
+                            track.album.as_ref().map(|a| &a.name),
+                            track.album.as_ref().map(|a| &a.images),
+                            track.duration,
+                            now_playing.progress,
+                        ),
+                        Playable::Episode(episode) => (
+                            episode.name.clone(),
+                            episode.show.name.clone(),
+                            None,
+                            Some(&episode.images),
+                            episode.duration,
+                            now_playing.progress,
+                        ),
+                    };
 
-                    log::info!("Updating Discord RPC with track: {}", title);
+                let album_cover_url = images.and_then(|imgs| {
+                    imgs.iter()
+                        .find(|img| img.width == Some(64))
+                        .or_else(|| imgs.get(0))
+                        .map(|img| img.url.as_ref())
+                });
 
-                    let album_cover_url = album.as_ref().and_then(|a| {
-                        a.images
-                            .iter()
-                            .find(|img| img.width == Some(64))
-                            .map(|img| img.url.as_ref())
-                    });
-                    let album_name = album.as_ref().map(|a| a.name.as_ref());
-                    let _ = discord_rpc_sender
-                        .send(DiscordRpcCmd::Update {
-                            track: title.clone(),
-                            artist: artist.clone(),
-                            album: album_name.map(str::to_owned),
-                            cover_url: album_cover_url.map(str::to_owned),
-                            duration: Some(track_duration),
-                            position: Some(progress),
-                        })
-                        .map_err(|e| log::error!("error updating Discord RPC: {:?}", e));
-                }
+                log::info!(
+                    "Updating Discord RPC with track/episode: {} by {}",
+                    title,
+                    artist,
+                );
+
+                let _ = discord_rpc_sender
+                    .send(DiscordRpcCmd::Update {
+                        track: title.to_owned(),
+                        artist: artist.to_owned(),
+                        album: album_name.map(|a| a.as_ref().to_owned()),
+                        cover_url: album_cover_url.map(str::to_owned),
+                        duration: Some(duration),
+                        position: Some(progress),
+                    })
+                    .map_err(|e| log::error!("error updating Discord RPC: {:?}", e));
             }
         }
     }
