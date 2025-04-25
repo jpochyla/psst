@@ -20,7 +20,7 @@ pub enum DiscordRpcCmd {
     },
     Shutdown,
     Clear,
-    UpdateClientId(u64),
+    UpdateAppId(u64),
 }
 
 pub struct DiscordRPCClient {
@@ -92,7 +92,7 @@ impl DiscordRPCClient {
                         // Exit the loop
                         break;
                     }
-                    DiscordRpcCmd::UpdateClientId(new_id) => {
+                    DiscordRpcCmd::UpdateAppId(new_id) => {
                         // take the old client out
                         if let Some(old) = rpc.client.take() {
                             if let Err(e) = old.shutdown() {

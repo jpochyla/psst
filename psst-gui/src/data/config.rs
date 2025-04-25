@@ -124,7 +124,7 @@ pub struct Config {
     pub lastfm_api_key: Option<String>,
     pub lastfm_api_secret: Option<String>,
     pub lastfm_enable: bool,
-    pub discord_rpc_client_id: String,
+    pub discord_rpc_app_id: String,
     pub discord_rpc_enable: bool,
 }
 
@@ -148,7 +148,7 @@ impl Default for Config {
             lastfm_api_key: None,
             lastfm_api_secret: None,
             lastfm_enable: false,
-            discord_rpc_client_id: String::new(),
+            discord_rpc_app_id: String::new(),
             discord_rpc_enable: true,
         }
     }

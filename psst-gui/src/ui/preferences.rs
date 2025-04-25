@@ -362,9 +362,11 @@ fn account_tab_widget(tab: AccountTab) -> impl Widget<AppState> {
             .with_child(Label::new("Discord RPC"))
             .with_spacer(theme::grid(1.0))
             .with_child(
-                Label::new("Uses the Discord RPC socket to display currently playing music")
-                    .with_text_color(theme::PLACEHOLDER_COLOR)
-                    .with_line_break_mode(LineBreaking::WordWrap),
+                Label::new(
+                    "Connects to a running Discord client to display currently playing music",
+                )
+                .with_text_color(theme::PLACEHOLDER_COLOR)
+                .with_line_break_mode(LineBreaking::WordWrap),
             )
             .with_spacer(theme::grid(2.0))
             .with_child(
@@ -376,10 +378,17 @@ fn account_tab_widget(tab: AccountTab) -> impl Widget<AppState> {
             )
             .with_spacer(theme::grid(1.0))
             .with_child(make_input_row(
-                "Client ID",
-                "Enter your Discord Client ID",
-                AppState::config.then(Config::discord_rpc_client_id),
+                "App ID",
+                "Enter your Discord App ID",
+                AppState::config.then(Config::discord_rpc_app_id),
             ))
+            .with_child(
+                Button::new("Create a Discord App →")
+                    .on_click(|_, _, _| {
+                        open::that("https://discord.com/developers/applications").ok();
+                    })
+                    .padding((0.0, theme::grid(0.5))),
+            )
     }
     col.controller(Authenticate::new(tab))
 }

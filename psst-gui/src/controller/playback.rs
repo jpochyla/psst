@@ -71,22 +71,22 @@ fn init_scrobbler_instance(data: &AppState) -> Option<Scrobbler> {
     None
 }
 
-fn parse_valid_client_id(id_str: &str) -> Option<u64> {
+fn parse_valid_app_id(id_str: &str) -> Option<u64> {
     let trimmed = id_str.trim();
 
     if trimmed.is_empty() {
-        log::info!("Discord RPC client ID not provided");
+        log::info!("Discord RPC app ID not provided");
         return None;
     }
 
     if !trimmed.chars().all(|c| c.is_ascii_digit()) {
-        log::warn!("Discord RPC client ID contains non-digit characters");
+        log::warn!("Discord RPC app ID contains non-digit characters");
         return None;
     }
     // Check if the client ID has a valid length for a snowflake 17-19
     if !(17..=19).contains(&trimmed.len()) {
         log::warn!(
-            "Discord RPC client ID has invalid length ({} characters)",
+            "Discord RPC app ID has invalid length ({} characters)",
             trimmed.len()
         );
         return None;
@@ -95,7 +95,7 @@ fn parse_valid_client_id(id_str: &str) -> Option<u64> {
     match trimmed.parse::<u64>() {
         Ok(id) => Some(id),
         Err(e) => {
-            log::warn!("Failed to parse Discord RPC client ID '{}': {}", trimmed, e);
+            log::warn!("Failed to parse Discord RPC app ID '{}': {}", trimmed, e);
             None
         }
     }
@@ -103,7 +103,7 @@ fn parse_valid_client_id(id_str: &str) -> Option<u64> {
 
 fn init_discord_rpc_instance(data: &AppState) -> Option<Sender<DiscordRpcCmd>> {
     if data.config.discord_rpc_enable {
-        if let Some(client_id) = parse_valid_client_id(&data.config.discord_rpc_client_id) {
+        if let Some(client_id) = parse_valid_app_id(&data.config.discord_rpc_app_id) {
             match DiscordRPCClient::spawn_rpc_worker(client_id) {
                 Ok(sender) => Some(sender),
                 Err(e) => {
@@ -361,7 +361,7 @@ impl PlaybackController {
     fn reconcile_discord_rpc(&mut self, old: &AppState, new: &AppState, playback: &Playback) {
         let was_enabled = old.config.discord_rpc_enable;
         let is_enabled = new.config.discord_rpc_enable;
-        let id_changed = old.config.discord_rpc_client_id != new.config.discord_rpc_client_id;
+        let id_changed = old.config.discord_rpc_app_id != new.config.discord_rpc_app_id;
 
         match (was_enabled, is_enabled, self.discord_rpc_sender.is_some()) {
             // turned OFF
@@ -386,10 +386,8 @@ impl PlaybackController {
             (_, true, true) if id_changed => {
                 log::info!("Updating Discord RPC client ID");
                 if let Some(ref tx) = self.discord_rpc_sender {
-                    if let Some(client_id) =
-                        parse_valid_client_id(&new.config.discord_rpc_client_id)
-                    {
-                        let _ = tx.send(DiscordRpcCmd::UpdateClientId(client_id));
+                    if let Some(client_id) = parse_valid_app_id(&new.config.discord_rpc_app_id) {
+                        let _ = tx.send(DiscordRpcCmd::UpdateAppId(client_id));
                         self.update_discord_rpc(playback);
                     } else {
                         log::warn!("Client ID changed but new value was invalid; not updating");
