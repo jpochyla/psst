@@ -4,7 +4,6 @@ use std::{
 };
 
 use crossbeam_channel::Sender;
-use discord_presence::Client as DiscordClient;
 
 use druid::{
     im::Vector,
@@ -15,7 +14,7 @@ use psst_core::{
     audio::{normalize::NormalizationLevel, output::DefaultAudioOutput},
     cache::Cache,
     cdn::Cdn,
-    discord_rpc::DiscordRPCClient,
+    discord_rpc::{DiscordRPCClient, DiscordRpcCmd},
     lastfm::LastFmClient,
     player::{item::PlaybackItem, PlaybackConfig, Player, PlayerCommand, PlayerEvent},
     session::SessionService,
@@ -43,7 +42,7 @@ pub struct PlaybackController {
     media_controls: Option<MediaControls>,
     has_scrobbled: bool,
     scrobbler: Option<Scrobbler>,
-    discord_rpc: Option<DiscordClient>,
+    discord_rpc_sender: Option<Sender<DiscordRpcCmd>>,
     startup: bool,
 }
 fn init_scrobbler_instance(data: &AppState) -> Option<Scrobbler> {
@@ -72,11 +71,11 @@ fn init_scrobbler_instance(data: &AppState) -> Option<Scrobbler> {
     None
 }
 
-fn init_discord_rpc_instance(data: &AppState) -> Option<DiscordClient> {
+fn init_discord_rpc_instance(data: &AppState) -> Option<Sender<DiscordRpcCmd>> {
     if data.config.discord_rcp_enable {
         if let Some(client_id) = data.config.discord_rpc_client_id {
-            match DiscordRPCClient::create_client(client_id) {
-                Ok(rpc) => Some(rpc),
+            match DiscordRPCClient::spawn_rpc_worker(client_id) {
+                Ok(discord_rpc_sender) => Some(discord_rpc_sender),
                 Err(e) => {
                     log::warn!("Failed to create Discord RPC: {}", e);
                     None
@@ -101,7 +100,7 @@ impl PlaybackController {
             media_controls: None,
             has_scrobbled: false,
             scrobbler: None,
-            discord_rpc: None,
+            discord_rpc_sender: None,
             startup: true,
         }
     }
@@ -288,19 +287,18 @@ impl PlaybackController {
     }
 
     fn clear_discord_rpc(&mut self) {
-        if let Some(discord_rpc) = &mut self.discord_rpc {
-            if let Err(e) = DiscordRPCClient::clear_presence(discord_rpc) {
-                log::warn!("error clearing Discord RPC presence: {:?}", e);
-            } else {
-                log::info!("Discord RPC presence cleared");
-            }
+        if let Some(sender) = &self.discord_rpc_sender {
+            // `sender` is &Sender<DiscordRpcCmd>
+            let _ = sender
+                .send(DiscordRpcCmd::Clear)
+                .map_err(|e| log::error!("error clearing Discord RPC: {:?}", e));
         }
     }
 
     fn update_discord_rpc(&mut self, playback: &Playback) {
         if let Some(now_playing) = playback.now_playing.as_ref() {
             if let Playable::Track(track) = &now_playing.item {
-                if let Some(discord_rpc) = &mut self.discord_rpc {
+                if let Some(discord_rpc_sender) = &mut self.discord_rpc_sender {
                     let artist = track.artist_name();
                     let title = track.name.clone();
                     let album = track.album.clone();
@@ -313,20 +311,17 @@ impl PlaybackController {
                             .find(|img| img.width == Some(64))
                             .map(|img| img.url.as_ref())
                     });
-
-                    if let Err(e) = DiscordRPCClient::now_playing_song(
-                        discord_rpc,
-                        title.as_ref(),
-                        artist.as_ref(),
-                        album.as_ref().map(|a| a.name.as_ref()),
-                        album_cover_url,
-                        Some(track_duration),
-                        Some(progress),
-                    ) {
-                        log::warn!("failed to update discord RPC: {}", e);
-                    } else {
-                        log::info!("updated discord RPC: {} - {}", artist, title);
-                    }
+                    let album_name = album.as_ref().map(|a| a.name.as_ref());
+                    let _ = discord_rpc_sender
+                        .send(DiscordRpcCmd::Update {
+                            track: title.clone(),
+                            artist: artist.clone(),
+                            album: album_name.map(str::to_owned),
+                            cover_url: album_cover_url.map(str::to_owned),
+                            duration: Some(track_duration),
+                            position: Some(progress),
+                        })
+                        .map_err(|e| log::error!("error updating Discord RPC: {:?}", e));
                 }
             }
         }
@@ -690,7 +685,7 @@ where
         if self.startup {
             self.startup = false;
             self.scrobbler = init_scrobbler_instance(data);
-            self.discord_rpc = init_discord_rpc_instance(data);
+            self.discord_rpc_sender = init_discord_rpc_instance(data);
         }
         child.lifecycle(ctx, event, data, env);
     }

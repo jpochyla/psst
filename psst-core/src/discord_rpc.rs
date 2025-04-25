@@ -1,9 +1,27 @@
 use crate::error::Error;
 use discord_presence::{models::ActivityType, Client as DiscordClient, DiscordError};
 
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::{
+    sync::Arc,
+    thread,
+    time::{Duration, SystemTime, UNIX_EPOCH},
+};
+
+use crossbeam_channel::{unbounded, Receiver, Sender};
 
 pub struct DiscordRPCClient;
+
+pub enum DiscordRpcCmd {
+    Update {
+        track: Arc<str>,
+        artist: Arc<str>,
+        album: Option<String>,
+        cover_url: Option<String>,
+        duration: Option<Duration>,
+        position: Option<Duration>,
+    },
+    Clear,
+}
 
 impl DiscordRPCClient {
     /// Creates a Discord Rich Presence client for Spotify with the provided application ID.
@@ -12,6 +30,43 @@ impl DiscordRPCClient {
         client.start();
         log::info!("Discord RPC client created and started");
         Ok(client)
+    }
+
+    pub fn spawn_rpc_worker(app_id: u64) -> Result<Sender<DiscordRpcCmd>, Error> {
+        let mut rpc = DiscordRPCClient::create_client(app_id)?;
+
+        let (tx, rx): (Sender<DiscordRpcCmd>, Receiver<DiscordRpcCmd>) = unbounded();
+
+        thread::spawn(move || {
+            for cmd in rx {
+                match cmd {
+                    DiscordRpcCmd::Update {
+                        track,
+                        artist,
+                        album,
+                        cover_url,
+                        duration,
+                        position,
+                    } => {
+                        let _ = DiscordRPCClient::now_playing_song(
+                            &mut rpc,
+                            &track,
+                            &artist,
+                            album.as_deref(),
+                            cover_url.as_deref(),
+                            duration,
+                            position,
+                        );
+                    }
+                    DiscordRpcCmd::Clear => {
+                        let _ = DiscordRPCClient::clear_presence(&mut rpc);
+                    }
+                }
+            }
+            // when tx is dropped everywhere, rx returns Err -> loop ends, rpc is dropped
+        });
+
+        Ok(tx)
     }
 
     fn get_current_timestamp() -> u64 {
@@ -56,11 +111,6 @@ impl DiscordRPCClient {
 
                     let start_time = now.saturating_sub(position_secs);
                     let end_time = start_time + duration.as_secs();
-                    log::info!(
-                        "Discord RPC StartTime: {} - EndTime: {}",
-                        start_time,
-                        end_time
-                    );
                     act = act.timestamps(|timestamps| timestamps.start(start_time).end(end_time));
                 }
 
