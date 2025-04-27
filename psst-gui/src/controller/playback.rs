@@ -73,18 +73,18 @@ fn parse_valid_app_id(id_str: &str) -> Option<u64> {
     let trimmed = id_str.trim();
 
     if trimmed.is_empty() {
-        log::info!("Discord RPC app ID not provided");
+        log::info!("discord rpc app id not provided");
         return None;
     }
 
     if !trimmed.chars().all(|c| c.is_ascii_digit()) {
-        log::warn!("Discord RPC app ID contains non-digit characters");
+        log::warn!("discord rpc app id contains non-digit characters");
         return None;
     }
     // Check if the client ID has a valid length for a snowflake 17-19
     if !(17..=19).contains(&trimmed.len()) {
         log::warn!(
-            "Discord RPC app ID has invalid length ({} characters)",
+            "discord rpc app id has invalid length ({} characters)",
             trimmed.len()
         );
         return None;
@@ -93,7 +93,7 @@ fn parse_valid_app_id(id_str: &str) -> Option<u64> {
     match trimmed.parse::<u64>() {
         Ok(id) => Some(id),
         Err(e) => {
-            log::warn!("Failed to parse Discord RPC app ID '{}': {}", trimmed, e);
+            log::warn!("failed to parse discord rpc app id '{}': {}", trimmed, e);
             None
         }
     }
@@ -105,7 +105,7 @@ fn init_discord_rpc_instance(data: &AppState) -> Option<Sender<DiscordRpcCmd>> {
             match DiscordRPCClient::spawn_rpc_worker(client_id) {
                 Ok(sender) => Some(sender),
                 Err(e) => {
-                    log::warn!("Failed to create Discord RPC: {}", e);
+                    log::warn!("failed to create discord rpc: {}", e);
                     None
                 }
             }
@@ -113,7 +113,7 @@ fn init_discord_rpc_instance(data: &AppState) -> Option<Sender<DiscordRpcCmd>> {
             None
         }
     } else {
-        log::info!("Discord RPC is disabled");
+        log::info!("discord rpc is disabled");
         None
     }
 }
@@ -315,10 +315,9 @@ impl PlaybackController {
 
     fn clear_discord_rpc(&mut self) {
         if let Some(sender) = &self.discord_rpc_sender {
-            // `sender` is &Sender<DiscordRpcCmd>
             let _ = sender
                 .send(DiscordRpcCmd::Clear)
-                .map_err(|e| log::error!("error clearing Discord RPC: {:?}", e));
+                .map_err(|e| log::error!("error clearing discord rpc: {:?}", e));
         }
     }
     fn update_discord_rpc(&mut self, playback: &Playback) {
@@ -352,7 +351,7 @@ impl PlaybackController {
                 });
 
                 log::info!(
-                    "Updating Discord RPC with track/episode: {} by {}",
+                    "updating discord rpc with track/episode: {} by {}",
                     title,
                     artist,
                 );
@@ -366,7 +365,7 @@ impl PlaybackController {
                         duration: Some(duration),
                         position: Some(progress),
                     })
-                    .map_err(|e| log::error!("error updating Discord RPC: {:?}", e));
+                    .map_err(|e| log::error!("error updating discord rpc: {:?}", e));
             }
         }
     }
@@ -379,7 +378,7 @@ impl PlaybackController {
 
         // Shut down if RPC was disabled
         if was_enabled && !is_enabled && rpc_running {
-            log::info!("Shutting down Discord RPC");
+            log::info!("shutting down discord rpc");
             if let Some(ref tx) = self.discord_rpc_sender {
                 let _ = tx.send(DiscordRpcCmd::Shutdown);
             }
@@ -388,7 +387,7 @@ impl PlaybackController {
 
         // Start if RPC is enabled and no worker running
         if is_enabled && !rpc_running {
-            log::info!("Starting Discord RPC");
+            log::info!("starting discord rpc");
             self.discord_rpc_sender = init_discord_rpc_instance(new);
             self.update_discord_rpc(playback);
         }
@@ -396,13 +395,13 @@ impl PlaybackController {
         // Update App ID if RPC is running and App ID changed
         if is_enabled && rpc_running && app_id_changed {
             if let Some(app_id) = parse_valid_app_id(&new.config.discord_rpc_app_id) {
-                log::info!("Updating Discord RPC app ID to {}", app_id);
+                log::info!("updating discord rpc app id to {}", app_id);
                 if let Some(ref tx) = self.discord_rpc_sender {
                     let _ = tx.send(DiscordRpcCmd::UpdateAppId(app_id));
                     self.update_discord_rpc(playback);
                 }
             } else {
-                log::warn!("App ID changed but new ID is invalid; not updating");
+                log::warn!("app id changed but new id is invalid; not updating");
             }
         }
     }

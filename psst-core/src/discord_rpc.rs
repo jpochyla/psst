@@ -41,7 +41,7 @@ impl DiscordRPCClient {
     pub fn create_client(app_id: u64) -> Result<DiscordClient, Error> {
         let mut client = DiscordClient::new(app_id);
         client.start();
-        log::info!("Discord RPC client created and started");
+        log::info!("discord rpc client created and started");
         Ok(client)
     }
 
@@ -86,7 +86,7 @@ impl DiscordRPCClient {
                     DiscordRpcCmd::Shutdown => {
                         if let Some(client) = rpc.client.take() {
                             if let Err(e) = client.shutdown() {
-                                log::warn!("Shutdown failed: {}", e);
+                                log::warn!("shutdown failed: {}", e);
                             }
                         }
                         // Exit the loop
