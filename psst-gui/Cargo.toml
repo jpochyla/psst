@@ -37,20 +37,20 @@ url = { version = "2.5.2" }
 
 # GUI
 druid = { git = "https://github.com/jpochyla/druid", branch = "psst", features = [
-    "im",
-    "image",
-    "jpeg",
-    "png",
-    "serde",
+  "im",
+  "image",
+  "jpeg",
+  "png",
+  "serde",
 ] }
 druid-enums = { git = "https://github.com/jpochyla/druid-enums" }
 druid-shell = { git = "https://github.com/jpochyla/druid", branch = "psst", features = [
-    "raw-win-handle",
+  "raw-win-handle",
 ] }
 open = { version = "5.3.0" }
 raw-window-handle = { version = "0.5.2" } # Must stay compatible with Druid
 souvlaki = { version = "0.7.3", default-features = false, features = [
-    "use_zbus",
+  "use_zbus",
 ] }
 sanitize_html = "0.8.1"
 rustfm-scrobble = "1.1.1"
