@@ -54,7 +54,6 @@ souvlaki = { version = "0.7.3", default-features = false, features = [
 ] }
 sanitize_html = "0.8.1"
 rustfm-scrobble = "1.1.1"
-discord-presence = "1.5"
 
 [target.'cfg(windows)'.build-dependencies]
 winres = { version = "0.1.12" }
