@@ -4,7 +4,6 @@ use std::{
 };
 
 use crossbeam_channel::Sender;
-
 use druid::{
     im::Vector,
     widget::{prelude::*, Controller},
@@ -20,7 +19,6 @@ use psst_core::{
     session::SessionService,
 };
 use rustfm_scrobble::Scrobbler;
-
 use souvlaki::{
     MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback, MediaPosition, PlatformConfig,
 };
