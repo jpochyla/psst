@@ -186,7 +186,7 @@ impl PlaybackController {
         };
 
         let mut media_controls = MediaControls::new(PlatformConfig {
-            dbus_name: "psst",
+            dbus_name: format!("psst-{}", rand::random::<i32>()).as_str(),
             display_name: "Psst",
             hwnd,
         })?;
