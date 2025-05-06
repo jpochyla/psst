@@ -186,7 +186,7 @@ impl PlaybackController {
         };
 
         let mut media_controls = MediaControls::new(PlatformConfig {
-            dbus_name: format!("com.jpochyla.psst{:?}.{}", time::OffsetDateTime::now_utc(), rand::random::<i32>()).as_str(),
+            dbus_name: format!("com.jpochyla.psst{:?}{}", time::OffsetDateTime::now_utc(), rand::random::<i32>()).as_str(),
             display_name: "Psst",
             hwnd,
         })?;
