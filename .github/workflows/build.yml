@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
 env:
   CARGO_TERM_COLOR: always
   VERSION_DATE: ${{ format('{0}.{1}.{2}', github.run_number, github.run_id, github.run_attempt) }}
@@ -304,6 +307,14 @@ jobs:
           echo "VERSION=0.1.0,$(date +'%Y%m%d.%H%M%S')" >> $GITHUB_ENV
           SHORT_SHA=${FULL_SHA::7}
           echo "RELEASE_VERSION=$(date +'%Y.%m.%d')-$SHORT_SHA" >> $GITHUB_ENV
+          echo "RELEASE_FILES=artifacts/Psst.dmg/Psst.dmg
+          artifacts/Psst.dmg.sha256/Psst.dmg.sha256
+          artifacts/Psst.exe/psst-gui.exe
+          artifacts/psst-x86_64-unknown-linux-gnu/psst
+          artifacts/psst-aarch64-unknown-linux-gnu/psst
+          artifacts/checksums.txt
+          artifacts/psst-deb-amd64/*.deb
+          artifacts/psst-deb-arm64/*.deb" >> $GITHUB_ENV
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
@@ -326,25 +337,35 @@ jobs:
           tag_name: v${{ env.RELEASE_VERSION }}
           body: |
             ## Psst ${{ env.RELEASE_VERSION }}
-            - Built on: $(date)
-            - Version: ${{ env.VERSION }}
+            Built: $(date)
+            Version: ${{ env.VERSION }}
 
-            ### SHA256 Checksums
+            **SHA256 Checksums:**
             ```
             $(cat artifacts/checksums.txt)
             ```
 
-            ### Homebrew Installation
+            **Homebrew:**
+            `brew install --cask psst`
+          files: ${{ env.RELEASE_FILES }}
+          generate_release_notes: false
+
+      - name: Create or Update Latest Build Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Psst Latest Build (main branch)
+          tag_name: latest # Fixed tag for the latest build
+          body: |
+            ## Psst Latest Build (main)
+            Commit: ${{ github.sha }}
+            Built: $(date)
+            Workflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+            Auto-updated from the main branch. For stable releases, see other tags.
+
+            **SHA256 Checksums:**
             ```
-            brew install --cask psst
+            $(cat artifacts/checksums.txt)
             ```
-          files: |
-            artifacts/Psst.dmg/Psst.dmg
-            artifacts/Psst.dmg.sha256/Psst.dmg.sha256
-            artifacts/Psst.exe/psst-gui.exe
-            artifacts/psst-x86_64-unknown-linux-gnu/psst
-            artifacts/psst-aarch64-unknown-linux-gnu/psst
-            artifacts/checksums.txt
-            artifacts/psst-deb-amd64/*.deb
-            artifacts/psst-deb-arm64/*.deb
+          files: ${{ env.RELEASE_FILES }}
           generate_release_notes: false
