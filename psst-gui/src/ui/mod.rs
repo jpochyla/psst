@@ -1,6 +1,13 @@
+use std::time::Duration;
+
+use druid::{
+    im::Vector,
+    widget::{CrossAxisAlignment, Either, Flex, Label, List, Scroll, Slider, Split, ViewSwitcher},
+    Color, Env, Insets, Key, LensExt, Menu, MenuItem, Selector, Widget, WidgetExt, WindowDesc,
+};
+use druid_shell::Cursor;
+
 use crate::data::config::SortCriteria;
-use crate::data::Track;
-use crate::error::Error;
 use crate::{
     cmd,
     controller::{
@@ -10,32 +17,17 @@ use crate::{
         config::SortOrder, Alert, AlertStyle, AppState, Config, Nav, Playable, Playback, Route,
         ALERT_DURATION,
     },
-    webapi::WebApi,
     widget::{
-        icons, icons::SvgIcon, Border, Empty, MyWidgetExt, Overlay, RemoteImage, ThemeScope,
-        ViewDispatcher,
+        icons, icons::SvgIcon, Border, Empty, MyWidgetExt, Overlay, ThemeScope, ViewDispatcher,
     },
 };
-use credits::TrackCredits;
-use druid::widget::Controller;
-use druid::KbKey;
-use druid::{
-    im::Vector,
-    widget::{CrossAxisAlignment, Either, Flex, Label, List, Scroll, Slider, Split, ViewSwitcher},
-    Color, Env, Insets, Key, LensExt, Menu, MenuItem, Selector, Widget, WidgetExt, WindowDesc,
-};
-use druid_shell::Cursor;
-use std::sync::Arc;
-use std::time::Duration;
 
 pub mod album;
 pub mod artist;
-pub mod credits;
 pub mod episode;
 pub mod find;
 pub mod home;
 pub mod library;
-pub mod lyrics;
 pub mod menu;
 pub mod playable;
 pub mod playback;
@@ -49,8 +41,6 @@ pub mod theme;
 pub mod track;
 pub mod user;
 pub mod utils;
-
-pub const DOWNLOAD_ARTWORK: Selector<(String, String)> = Selector::new("app.artwork.download");
 
 pub fn main_window(config: &Config) -> WindowDesc<AppState> {
     let win = WindowDesc::new(root_widget())
@@ -104,42 +94,6 @@ pub fn account_setup_window() -> WindowDesc<AppState> {
     }
 }
 
-pub fn artwork_window() -> WindowDesc<AppState> {
-    let win_size = (theme::grid(50.0), theme::grid(50.0));
-
-    // On Windows, the window size includes the titlebar, so we need to account for it
-    let win_size = if cfg!(target_os = "windows") {
-        const WINDOWS_TITLEBAR_OFFSET: f64 = 24.0; // Standard Windows titlebar height
-        (win_size.0, win_size.1 + WINDOWS_TITLEBAR_OFFSET)
-    } else {
-        win_size
-    };
-
-    let win = WindowDesc::new(artwork_widget())
-        .window_size(win_size)
-        .resizable(false)
-        .show_title(false)
-        .transparent_titlebar(true)
-        .title(|data: &AppState, _env: &_| {
-            data.playback
-                .now_playing
-                .as_ref()
-                .map(|np| match &np.item {
-                    Playable::Track(track) => {
-                        format!("{} - {}", track.album_name(), track.artist_name())
-                    }
-                    Playable::Episode(episode) => episode.name.to_string(),
-                })
-                .unwrap_or_else(|| "Now Playing".to_string())
-        });
-
-    if cfg!(target_os = "macos") {
-        win.menu(menu::main_menu)
-    } else {
-        win
-    }
-}
-
 fn preferences_widget() -> impl Widget<AppState> {
     ThemeScope::new(
         preferences::preferences_widget()
@@ -154,60 +108,6 @@ fn account_setup_widget() -> impl Widget<AppState> {
             .background(theme::BACKGROUND_DARK)
             .expand(),
     )
-}
-
-struct ArtworkController;
-
-impl<W: Widget<AppState>> Controller<AppState, W> for ArtworkController {
-    fn event(
-        &mut self,
-        child: &mut W,
-        ctx: &mut druid::EventCtx,
-        event: &druid::Event,
-        data: &mut AppState,
-        env: &druid::Env,
-    ) {
-        if let druid::Event::WindowConnected = event {
-            ctx.request_focus();
-            ctx.set_handled();
-        }
-
-        if let druid::Event::KeyDown(key_event) = event {
-            // Handle D key for download
-            if key_event.key == KbKey::Character('d'.into()) {
-                if let Some(np) = &data.playback.now_playing {
-                    if let Some((url, _)) = np.cover_image_metadata() {
-                        let title = match &np.item {
-                            Playable::Track(track) => track
-                                .album
-                                .as_ref()
-                                .map(|a| a.name.as_ref())
-                                .unwrap_or("Unknown Album"),
-                            Playable::Episode(episode) => episode.show.name.as_ref(),
-                        };
-                        ctx.submit_command(
-                            DOWNLOAD_ARTWORK.with((url.to_string(), title.to_string())),
-                        );
-                        ctx.set_handled();
-                    }
-                }
-            }
-        }
-        child.event(ctx, event, data, env);
-    }
-}
-
-pub fn artwork_widget() -> impl Widget<AppState> {
-    RemoteImage::new(utils::placeholder_widget(), move |data: &AppState, _| {
-        data.playback
-            .now_playing
-            .as_ref()
-            .and_then(|np| np.cover_image_url(512.0, 512.0))
-            .map(|url| url.into())
-    })
-    .expand()
-    .background(theme::BACKGROUND_DARK)
-    .controller(ArtworkController)
 }
 
 fn root_widget() -> impl Widget<AppState> {
@@ -271,25 +171,7 @@ fn root_widget() -> impl Widget<AppState> {
         .controller(SessionController)
         .controller(NavController)
         .controller(SortController)
-        .on_command_async(
-            cmd::LOAD_TRACK_CREDITS,
-            |track: Arc<Track>| {
-                log::debug!("fetching credits for track: {}", track.name);
-                WebApi::global().get_track_credits(&track.id.0.to_base62())
-            },
-            |_, data: &mut AppState, _| {
-                data.credits = None;
-            },
-            |_ctx, data, (_track, result): (Arc<Track>, Result<TrackCredits, Error>)| match result {
-                Ok(credits) => {
-                    data.credits = Some(credits);
-                }
-                Err(err) => {
-                    log::error!("Failed to fetch credits for {}: {:?}", _track.name, err);
-                    data.error_alert(format!("Failed to fetch track credits: {}", err));
-                }
-            },
-        )
+
     // .debug_invalidation()
     // .debug_widget_id()
     // .debug_paint_layout()
@@ -340,9 +222,6 @@ fn route_widget() -> impl Widget<AppState> {
         |state: &AppState, _| state.nav.route(),
         |route: &Route, _, _| match route {
             Route::Home => Scroll::new(home::home_widget().padding(theme::grid(1.0)))
-                .vertical()
-                .boxed(),
-            Route::Lyrics => Scroll::new(lyrics::lyrics_widget().padding(theme::grid(1.0)))
                 .vertical()
                 .boxed(),
             Route::SavedTracks => Flex::column()
@@ -462,8 +341,7 @@ fn volume_slider() -> impl Widget<AppState> {
         .with_child(
             Label::dynamic(|&volume: &f64, _| format!("{}%", (volume * 100.0).floor()))
                 .with_text_color(theme::PLACEHOLDER_COLOR)
-                .with_text_size(theme::TEXT_SIZE_SMALL)
-                .fix_width(theme::grid(4.0)),
+                .with_text_size(theme::TEXT_SIZE_SMALL),
         )
         .padding((theme::grid(2.0), 0.0))
         .on_debounce(SAVE_DELAY, |ctx, _, _| ctx.submit_command(SAVE_TO_CONFIG))
@@ -600,14 +478,16 @@ fn route_icon_widget() -> impl Widget<Nav> {
         |nav: &Nav, _, _| {
             let icon = |icon: &SvgIcon| icon.scale(theme::ICON_SIZE_MEDIUM);
             match &nav {
-                Nav::Home | Nav::Lyrics | Nav::SavedTracks | Nav::SavedAlbums | Nav::SavedShows => {
-                    Empty.boxed()
-                }
-                Nav::SearchResults(_) | Nav::Recommendations(_) => icon(&icons::SEARCH).boxed(),
-                Nav::AlbumDetail(_, _) => icon(&icons::ALBUM).boxed(),
+                Nav::Home => Empty.boxed(),
+                Nav::SavedTracks => Empty.boxed(),
+                Nav::SavedAlbums => Empty.boxed(),
+                Nav::SavedShows => Empty.boxed(),
+                Nav::SearchResults(_) => icon(&icons::SEARCH).boxed(),
+                Nav::AlbumDetail(_) => icon(&icons::ALBUM).boxed(),
                 Nav::ArtistDetail(_) => icon(&icons::ARTIST).boxed(),
                 Nav::PlaylistDetail(_) => icon(&icons::PLAYLIST).boxed(),
                 Nav::ShowDetail(_) => icon(&icons::PODCAST).boxed(),
+                Nav::Recommendations(_) => icon(&icons::SEARCH).boxed(),
             }
         },
     )

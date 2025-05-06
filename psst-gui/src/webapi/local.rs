@@ -16,7 +16,7 @@ use serde_json::Value;
 use crate::data::{config::Config, AlbumLink, ArtistLink, Image, Track, TrackId};
 use psst_core::item_id::ItemId;
 
-/*
+/**
  * All local files registered by the Spotify file can be found in the file
  * located at: <Spotify config>/Users/<username>-user/local-files.bnk
  *
@@ -172,7 +172,6 @@ impl LocalTrackManager {
                     is_playable: Some(false),
                     popularity: local_track.popularity,
                     track_pos: 0,
-                    lyrics: None,
                 }));
             }
         }
@@ -187,11 +186,11 @@ impl LocalTrackManager {
             .artists
             .iter()
             .next()
-            .is_some_and(|t2_artist| t2_artist.name != t1.artist);
+            .map_or(false, |t2_artist| t2_artist.name != t1.artist);
         let album_mismatch = t2
             .album
             .as_ref()
-            .is_some_and(|t2_album| t2_album.name != t1.album);
+            .map_or(false, |t2_album| t2_album.name != t1.album);
         !(artist_mismatch || album_mismatch)
     }
 }

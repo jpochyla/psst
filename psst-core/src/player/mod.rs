@@ -95,12 +95,12 @@ impl Player {
             PlayerEvent::Loaded { item, result } => self.handle_loaded(item, result),
             PlayerEvent::Preloaded { item, result } => self.handle_preloaded(item, result),
             PlayerEvent::Position { position, path } => self.handle_position(position, path),
-            PlayerEvent::EndOfTrack => self.handle_end_of_track(),
+            PlayerEvent::EndOfTrack { .. } => self.handle_end_of_track(),
             PlayerEvent::Loading { .. }
             | PlayerEvent::Playing { .. }
             | PlayerEvent::Pausing { .. }
             | PlayerEvent::Resuming { .. }
-            | PlayerEvent::Stopped
+            | PlayerEvent::Stopped { .. }
             | PlayerEvent::Blocked { .. } => {}
         };
     }

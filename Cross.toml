@@ -1,8 +1,7 @@
 [build]
 pre-build = ["""
     dpkg --add-architecture $CROSS_DEB_ARCH && \
-    apt-get update && \
-    apt-get --assume-yes install \
+    apt-get update && apt-get --assume-yes install \
         libgtk-3-dev:$CROSS_DEB_ARCH \
         libssl-dev:$CROSS_DEB_ARCH \
         libasound2-dev:$CROSS_DEB_ARCH

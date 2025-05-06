@@ -1,10 +1,7 @@
-use std::{
-    env::{self, VarError},
-    fs::{self, File, OpenOptions},
-    io::{BufReader, BufWriter},
-    path::{Path, PathBuf},
-};
+use std::io::{BufReader, BufWriter};
+use std::{env, env::VarError, fs::File, path::PathBuf};
 
+use std::fs::OpenOptions;
 #[cfg(target_family = "unix")]
 use std::os::unix::fs::OpenOptionsExt;
 
@@ -18,27 +15,25 @@ use psst_core::{
 };
 use serde::{Deserialize, Serialize};
 
-use super::{Nav, Promise, QueueBehavior, SliderScrollScale};
 use crate::ui::theme;
+
+use super::{Nav, Promise, QueueBehavior, SliderScrollScale};
 
 #[derive(Clone, Debug, Data, Lens)]
 pub struct Preferences {
     pub active: PreferencesTab,
     pub cache_size: Promise<u64, (), ()>,
     pub auth: Authentication,
-    pub lastfm_auth_result: Option<String>,
 }
 
 impl Preferences {
     pub fn reset(&mut self) {
         self.cache_size.clear();
         self.auth.result.clear();
-        self.auth.lastfm_api_key_input.clear();
-        self.auth.lastfm_api_secret_input.clear();
     }
 
     pub fn measure_cache_usage() -> Option<u64> {
-        Config::cache_dir().and_then(|path| get_dir_size(&path))
+        Config::cache_dir().and_then(|path| fs_extra::dir::get_size(path).ok())
     }
 }
 
@@ -56,24 +51,9 @@ pub struct Authentication {
     pub password: String,
     pub access_token: String,
     pub result: Promise<(), (), String>,
-    #[data(ignore)]
-    pub lastfm_api_key_input: String,
-    #[data(ignore)]
-    pub lastfm_api_secret_input: String,
 }
 
 impl Authentication {
-    pub fn new() -> Self {
-        Self {
-            username: String::new(),
-            password: String::new(),
-            access_token: String::new(),
-            result: Promise::Empty,
-            lastfm_api_key_input: String::new(),
-            lastfm_api_secret_input: String::new(),
-        }
-    }
-
     pub fn session_config(&self) -> SessionConfig {
         SessionConfig {
             login_creds: if !self.access_token.is_empty() {
@@ -121,10 +101,6 @@ pub struct Config {
     pub sort_criteria: SortCriteria,
     pub paginated_limit: usize,
     pub seek_duration: usize,
-    pub lastfm_session_key: Option<String>,
-    pub lastfm_api_key: Option<String>,
-    pub lastfm_api_secret: Option<String>,
-    pub lastfm_enable: bool,
 }
 
 impl Default for Config {
@@ -144,10 +120,6 @@ impl Default for Config {
             sort_criteria: Default::default(),
             paginated_limit: 500,
             seek_duration: 10,
-            lastfm_session_key: None,
-            lastfm_api_key: None,
-            lastfm_api_secret: None,
-            lastfm_enable: false,
         }
     }
 }
@@ -211,7 +183,7 @@ impl Config {
     }
 
     pub fn store_credentials(&mut self, credentials: Credentials) {
-        self.credentials = Some(credentials);
+        self.credentials.replace(credentials);
     }
 
     pub fn clear_credentials(&mut self) {
@@ -310,16 +282,4 @@ impl Default for SortCriteria {
     fn default() -> Self {
         Self::DateAdded
     }
-}
-
-fn get_dir_size(path: &Path) -> Option<u64> {
-    fs::read_dir(path).ok()?.try_fold(0, |acc, entry| {
-        let entry = entry.ok()?;
-        let size = if entry.file_type().ok()?.is_dir() {
-            get_dir_size(&entry.path())?
-        } else {
-            entry.metadata().ok()?.len()
-        };
-        Some(acc + size)
-    })
 }

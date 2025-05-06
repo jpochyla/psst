@@ -75,7 +75,8 @@ impl<T: Data> Widget<T> for Link<T> {
             let is_active = self
                 .is_active
                 .as_ref()
-                .is_some_and(|predicate| predicate(data, env));
+                .map(|predicate| predicate(data, env))
+                .unwrap_or(false);
             if is_active {
                 env.get(theme::LINK_ACTIVE_COLOR)
             } else {

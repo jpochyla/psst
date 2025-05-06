@@ -1,16 +1,14 @@
-use gix_config::File;
 use std::{env, fs, io::Write};
-use time::OffsetDateTime;
 
 fn main() {
     let outdir = env::var("OUT_DIR").unwrap();
     let outfile = format!("{}/build-time.txt", outdir);
 
     let mut fh = fs::File::create(outfile).unwrap();
-    let now = OffsetDateTime::now_local().unwrap_or_else(|_| OffsetDateTime::now_utc());
-    write!(fh, r#""{}""#, now).ok();
+    write!(fh, r#""{}""#, chrono::Local::now()).ok();
 
-    let git_config = File::from_git_dir("../.git/".into()).expect("Git Config not found!");
+    let git_config =
+        gix_config::File::from_git_dir("../.git/".into()).expect("Git Config not found!");
     // Get Git's 'Origin' URL
     let mut remote_url = git_config
         .raw_value("remote.origin.url")

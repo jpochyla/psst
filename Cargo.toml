@@ -2,11 +2,6 @@
 resolver = "2"
 members = ["psst-protocol", "psst-core", "psst-cli", "psst-gui"]
 
-[profile.dev]
-opt-level = 1
-debug = true
-lto = false
-
 [profile.release]
 opt-level = 3
 strip = true

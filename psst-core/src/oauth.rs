@@ -1,4 +1,3 @@
-use crate::error::Error;
 use oauth2::{
     basic::BasicClient, reqwest::http_client, AuthUrl, AuthorizationCode, ClientId, CsrfToken,
     PkceCodeChallenge, PkceCodeVerifier, RedirectUrl, Scope, TokenResponse, TokenUrl,
@@ -12,144 +11,61 @@ use std::{
 };
 use url::Url;
 
-pub fn listen_for_callback_parameter(
+pub fn get_authcode_listener(
     socket_address: SocketAddr,
     timeout: Duration,
-    parameter_name: &'static str,
-) -> Result<String, Error> {
-    log::info!(
-        "starting callback listener for '{}' on {:?}",
-        parameter_name,
-        socket_address
-    );
+) -> Result<AuthorizationCode, String> {
+    log::info!("Starting OAuth listener on {:?}", socket_address);
+    let listener = TcpListener::bind(socket_address)
+        .map_err(|e| format!("Failed to bind to address: {}", e))?;
+    log::info!("Listener bound successfully");
 
-    // Create a simpler, linear flow
-    // 1. Bind the listener
-    let listener = match TcpListener::bind(socket_address) {
-        Ok(l) => {
-            log::info!("listener bound successfully");
-            l
-        }
-        Err(e) => {
-            log::error!("Failed to bind listener: {}", e);
-            return Err(Error::IoError(e));
-        }
-    };
+    let (tx, rx) = mpsc::channel();
 
-    // 2. Set up the channel for communication
-    let (tx, rx) = mpsc::channel::<Result<String, Error>>();
-
-    // 3. Spawn the thread
     let handle = std::thread::spawn(move || {
         if let Ok((mut stream, _)) = listener.accept() {
-            handle_callback_connection(&mut stream, &tx, parameter_name);
-        } else {
-            log::error!("Failed to accept connection on callback listener");
-            let _ = tx.send(Err(Error::IoError(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                "Failed to accept connection",
-            ))));
+            handle_connection(&mut stream, &tx);
         }
     });
 
-    // 4. Wait for the result with timeout
-    let result = match rx.recv_timeout(timeout) {
-        Ok(r) => r,
-        Err(e) => {
-            log::error!("Timed out or channel error: {}", e);
-            return Err(Error::from(e));
-        }
-    };
+    let result = rx
+        .recv_timeout(timeout)
+        .map_err(|_| "Timed out waiting for authorization code".to_string())?;
 
-    // 5. Wait for thread completion
-    if handle.join().is_err() {
-        log::warn!("thread join failed, but continuing with result");
-    }
+    handle
+        .join()
+        .map_err(|_| "Failed to join server thread".to_string())?;
 
-    // 6. Return the result
     result
 }
 
-/// Handles an incoming TCP connection for a generic OAuth callback.
-fn handle_callback_connection(
-    stream: &mut TcpStream,
-    tx: &mpsc::Sender<Result<String, Error>>,
-    parameter_name: &'static str,
-) {
+fn handle_connection(stream: &mut TcpStream, tx: &mpsc::Sender<Result<AuthorizationCode, String>>) {
     let mut reader = BufReader::new(&mut *stream);
     let mut request_line = String::new();
 
     if reader.read_line(&mut request_line).is_ok() {
-        match extract_parameter_from_request(&request_line, parameter_name) {
-            Some(value) => {
-                log::info!("received callback parameter '{}'.", parameter_name);
-                send_success_response(stream);
-                let _ = tx.send(Ok(value));
-            }
-            None => {
-                let err_msg = format!(
-                    "Failed to extract parameter '{}' from request: {}",
-                    parameter_name, request_line
-                );
-                log::error!("{}", err_msg);
-                let _ = tx.send(Err(Error::OAuthError(err_msg)));
-            }
+        if let Some(code) = extract_code_from_request(&request_line) {
+            send_success_response(stream);
+            let _ = tx.send(Ok(code));
+        } else {
+            let _ = tx.send(Err("Failed to extract code from request".to_string()));
         }
-    } else {
-        log::error!("Failed to read request line from callback.");
-        let _ = tx.send(Err(Error::IoError(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            "Failed to read request line",
-        ))));
     }
 }
 
-/// Extracts a specified query parameter from an HTTP request line.
-fn extract_parameter_from_request(request_line: &str, parameter_name: &str) -> Option<String> {
-    request_line
-        .split_whitespace()
-        .nth(1)
-        .and_then(|path| Url::parse(&format!("http://localhost{}", path)).ok())
-        .and_then(|url| {
-            url.query_pairs()
-                .find(|(key, _)| key == parameter_name)
-                .map(|(_, value)| value.into_owned())
-        })
+fn extract_code_from_request(request_line: &str) -> Option<AuthorizationCode> {
+    request_line.split_whitespace().nth(1).and_then(|path| {
+        Url::parse(&format!("http://localhost{}", path))
+            .ok()?
+            .query_pairs()
+            .find(|(key, _)| key == "code")
+            .map(|(_, code)| AuthorizationCode::new(code.into_owned()))
+    })
 }
 
-pub fn get_authcode_listener(
-    socket_address: SocketAddr,
-    timeout: Duration,
-) -> Result<AuthorizationCode, Error> {
-    listen_for_callback_parameter(socket_address, timeout, "code").map(AuthorizationCode::new)
-}
-
-pub fn send_success_response(stream: &mut TcpStream) {
-    let response = "HTTP/1.1 200 OK\r\n\r\n\
-        <html>\
-        <head>\
-            <style>\
-                body {\
-                    background-color: #121212;\
-                    color: #ffffff;\
-                    font-family: sans-serif;\
-                    display: flex;\
-                    justify-content: center;\
-                    align-items: center;\
-                    height: 100vh;\
-                    margin: 0;\
-                }\
-                a {\
-                    color: #aaaaaa;\
-                    text-decoration: underline;\
-                    cursor: pointer;\
-                }\
-            </style>\
-        </head>\
-        <body>\
-            <div>Successfully authenticated! You can close this window now.</div>\
-        </body>\
-        </html>";
+fn send_success_response(stream: &mut TcpStream) {
+    let response =
+        "HTTP/1.1 200 OK\r\n\r\n<html><body>You can close this window now.</body></html>";
     let _ = stream.write_all(response.as_bytes());
 }
 

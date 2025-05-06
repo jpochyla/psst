@@ -6,8 +6,6 @@ use std::{
 };
 
 use druid::{im::Vector, Data, Lens};
-use sanitize_html::rules::predefined::DEFAULT;
-use sanitize_html::sanitize_str;
 use serde::{Deserialize, Deserializer, Serialize};
 use time::{Date, Month};
 
@@ -173,9 +171,4 @@ where
 {
     let opt = Option::deserialize(deserializer)?;
     Ok(opt.unwrap_or_else(default_str))
-}
-
-pub fn sanitize_html_string(text: &str) -> Arc<str> {
-    let sanitized = sanitize_str(&DEFAULT, text).unwrap_or_default();
-    Arc::from(sanitized.replace("&amp;", "&"))
 }

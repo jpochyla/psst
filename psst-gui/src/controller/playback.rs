@@ -12,23 +12,16 @@ use psst_core::{
     audio::{normalize::NormalizationLevel, output::DefaultAudioOutput},
     cache::Cache,
     cdn::Cdn,
-    lastfm::LastFmClient,
     player::{item::PlaybackItem, PlaybackConfig, Player, PlayerCommand, PlayerEvent},
     session::SessionService,
 };
-use rustfm_scrobble::Scrobbler;
 use souvlaki::{
     MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback, MediaPosition, PlatformConfig,
 };
 
 use crate::{
     cmd,
-    data::Nav,
-    data::{
-        AppState, Config, NowPlaying, Playable, Playback, PlaybackOrigin, PlaybackState,
-        QueueBehavior, QueueEntry,
-    },
-    ui::lyrics,
+    data::{AppState, Config, Playback, PlaybackOrigin, PlaybackState, QueueBehavior, QueueEntry},
 };
 
 pub struct PlaybackController {
@@ -36,43 +29,7 @@ pub struct PlaybackController {
     thread: Option<JoinHandle<()>>,
     output: Option<DefaultAudioOutput>,
     media_controls: Option<MediaControls>,
-    has_scrobbled: bool,
-    scrobbler: Option<Scrobbler>,
-    startup: bool,
 }
-fn init_scrobbler_instance(
-    data: &AppState
-) -> Option<Scrobbler> {
-    if data.config.lastfm_enable {
-        if let (Some(api_key), Some(api_secret), Some(session_key)) = (
-            data.config.lastfm_api_key.as_deref(),
-            data.config.lastfm_api_secret.as_deref(),
-            data.config.lastfm_session_key.as_deref(),
-        ) {
-            match LastFmClient::create_scrobbler(
-                Some(api_key),
-                Some(api_secret),
-                Some(session_key),
-            ) {
-                Ok(scr) => {
-                    log::info!("Last.fm Scrobbler instance created/updated.");
-                    return Some(scr);
-                }
-                Err(e) => {
-                    log::warn!("Failed to create/update Last.fm Scrobbler instance: {}", e);
-                }
-            }
-        } else {
-            log::info!(
-                "Last.fm credentials incomplete or removed, clearing Scrobbler instance."
-            );
-        }
-    } else {
-        log::info!("Last.fm scrobbling is disabled, clearing Scrobbler instance.");
-    }
-    None
-}
-
 
 impl PlaybackController {
     pub fn new() -> Self {
@@ -81,9 +38,6 @@ impl PlaybackController {
             thread: None,
             output: None,
             media_controls: None,
-            has_scrobbled: false,
-            scrobbler: None,
-            startup: true,
         }
     }
 
@@ -263,61 +217,8 @@ impl PlaybackController {
     fn send(&mut self, event: PlayerEvent) {
         if let Some(s) = &self.sender {
             s.send(event)
-                .map_err(|e| log::error!("error sending message: {:?}", e))
+                .map_err(|e| log::error!("Error sending message: {:?}", e))
                 .ok();
-        }
-    }
-
-    fn report_now_playing(&mut self, playback: &Playback) {
-        if let Some(now_playing) = playback.now_playing.as_ref() {
-            if let Playable::Track(track) = &now_playing.item {
-                if let Some(scrobbler) = &self.scrobbler {
-                    let artist = track.artist_name();
-                    let title = track.name.clone();
-                    let album = track.album.clone();
-
-                    if let Err(e) = LastFmClient::now_playing_song(
-                        scrobbler,
-                        artist.as_ref(),
-                        title.as_ref(),
-                        album.as_ref().map(|a| a.name.as_ref()),
-                    ) {
-                        log::warn!("failed to report 'Now Playing' to Last.fm: {}", e);
-                    } else {
-                        log::info!("reported 'Now Playing' to Last.fm: {} - {}", artist, title);
-                    }
-                } else {
-                    log::debug!("Last.fm not configured, skipping now_playing report.");
-                }
-            }
-        }
-    }
-
-    fn report_scrobble(&mut self, playback: &Playback) {
-        if let Some(now_playing) = playback.now_playing.as_ref() {
-            if let Playable::Track(track) = &now_playing.item {
-                if now_playing.progress >= track.duration / 2 && !self.has_scrobbled {
-                    if let Some(scrobbler) = &self.scrobbler {
-                        let artist = track.artist_name();
-                        let title = track.name.clone();
-                        let album = track.album.clone();
-
-                        if let Err(e) = LastFmClient::scrobble_song(
-                            scrobbler,
-                            artist.as_ref(),
-                            title.as_ref(),
-                            album.as_ref().map(|a| a.name.as_ref()),
-                        ) {
-                            log::warn!("failed to scrobble track to Last.fm: {}", e);
-                        } else {
-                            log::info!("scrobbled track to Last.fm: {} - {}", artist, title);
-                            self.has_scrobbled = true;
-                        }
-                    } else {
-                        log::debug!("Last.fm not configured, skipping scrobble.");
-                    }
-                }
-            }
         }
     }
 
@@ -382,7 +283,7 @@ impl PlaybackController {
             } else {
                 now_playing.progress.saturating_sub(seek_duration)
             }
-            .min(now_playing.item.duration());
+            .min(now_playing.item.duration()); // Safeguard to not exceed the track duration.
 
             self.seek(seek_position);
         }
@@ -421,12 +322,6 @@ impl PlaybackController {
             },
         }));
     }
-
-    fn update_lyrics(&mut self, ctx: &mut EventCtx, data: &AppState, now_playing: &NowPlaying) {
-        if matches!(data.nav, Nav::Lyrics) {
-            ctx.submit_command(lyrics::SHOW_LYRICS.with(now_playing.clone()));
-        }
-    }
 }
 
 impl<W> Controller<AppState, W> for PlaybackController
@@ -445,6 +340,7 @@ where
             Event::Command(cmd) if cmd.is(cmd::SET_FOCUS) => {
                 ctx.request_focus();
             }
+            // Player events.
             Event::Command(cmd) if cmd.is(cmd::PLAYBACK_LOADING) => {
                 let item = cmd.get_unchecked(cmd::PLAYBACK_LOADING);
 
@@ -467,18 +363,10 @@ where
                 }) {
                     data.added_queue.displayed_queue.remove(0);
                 }
-              
-                // Song has changed, so we reset the has_scrobbled value
-                self.has_scrobbled = false;
-                self.report_now_playing(&data.playback);
-
                 if let Some(queued) = data.queued_entry(*item) {
                     data.start_playback(queued.item, queued.origin, progress.to_owned());
                     self.update_media_control_playback(&data.playback);
                     self.update_media_control_metadata(&data.playback);
-                    if let Some(now_playing) = &data.playback.now_playing {
-                        self.update_lyrics(ctx, data, now_playing);
-                    }
                 } else {
                     log::warn!("played item not found in playback queue");
                 }
@@ -487,8 +375,6 @@ where
             Event::Command(cmd) if cmd.is(cmd::PLAYBACK_PROGRESS) => {
                 let progress = cmd.get_unchecked(cmd::PLAYBACK_PROGRESS);
                 data.progress_playback(progress.to_owned());
-
-                self.report_scrobble(&data.playback);
                 self.update_media_control_playback(&data.playback);
                 ctx.set_handled();
             }
@@ -511,6 +397,7 @@ where
                 self.update_media_control_playback(&data.playback);
                 ctx.set_handled();
             }
+            // Playback actions.
             Event::Command(cmd) if cmd.is(cmd::PLAY_TRACKS) => {
                 let payload = cmd.get_unchecked(cmd::PLAY_TRACKS);
                 data.playback.queue = payload
@@ -521,7 +408,6 @@ where
                         item: item.to_owned(),
                     })
                     .collect();
-
                 self.play(&data.playback.queue, payload.position);
                 ctx.set_handled();
             }
@@ -614,9 +500,6 @@ where
                 data.added_queue.displayed_queue.clear();
                 self.clear_queue();
                 data.info_alert("Tracks cleared from queue.");
-            Event::Command(cmd) if cmd.is(cmd::SKIP_TO_POSITION) => {
-                let location = cmd.get_unchecked(cmd::SKIP_TO_POSITION);
-                self.seek(Duration::from_millis(*location));
                 ctx.set_handled();
             }
             // Keyboard shortcuts.
@@ -648,6 +531,7 @@ where
                 data.playback.volume = (data.playback.volume - 0.1).max(0.0);
                 ctx.set_handled();
             }
+            //
             _ => child.event(ctx, event, data, env),
         }
     }
@@ -684,11 +568,6 @@ where
             }
             _ => {}
         }
-        if self.startup {
-            self.startup = false;
-            self.scrobbler = init_scrobbler_instance(data);
-
-        }  
         child.lifecycle(ctx, event, data, env);
     }
 
@@ -703,16 +582,6 @@ where
         if !old_data.playback.volume.same(&data.playback.volume) {
             self.set_volume(data.playback.volume);
         }
-
-        let lastfm_changed = old_data.config.lastfm_api_key != data.config.lastfm_api_key
-            || old_data.config.lastfm_api_secret != data.config.lastfm_api_secret
-            || old_data.config.lastfm_session_key != data.config.lastfm_session_key
-            || old_data.config.lastfm_enable != data.config.lastfm_enable;
-
-        if lastfm_changed {
-            self.scrobbler = init_scrobbler_instance(data);
-        }
-
         child.update(ctx, old_data, data, env);
     }
 }

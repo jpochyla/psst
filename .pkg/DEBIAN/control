@@ -1,6 +1,6 @@
 Package: psst-gui
-Version: $VERSION
-Architecture: $ARCHITECTURE
+Version: 0.1.0
+Architecture: amd64
 Maintainer: Jan Pochyla <jpochyla@gmail.com>
 Section: sound
 Priority: optional
