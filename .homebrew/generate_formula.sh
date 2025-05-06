@@ -3,8 +3,8 @@
 
 # Get latest release info
 VERSION=$(curl -s "https://api.github.com/repos/jpochyla/psst/releases/latest" | grep '"tag_name":' | sed -E 's/.*"v([^"]+)".*/\1/')
-DOWNLOAD_URL="https://github.com/jpochyla/psst/releases/download/v${VERSION}/Psst-${VERSION}.dmg"
-SHA256=$(curl -sL "https://github.com/jpochyla/psst/releases/download/v${VERSION}/Psst-${VERSION}.dmg.sha256" | awk '{print $1}')
+DOWNLOAD_URL="https://github.com/jpochyla/psst/releases/download/v${VERSION}/Psst.dmg"
+SHA256=$(curl -sL "https://github.com/jpochyla/psst/releases/download/v${VERSION}/Psst.dmg.sha256" | awk '{print $1}')
 
 echo "Psst Homebrew Formula Information"
 echo "================================="
@@ -15,12 +15,12 @@ echo
 echo "Homebrew Cask Formula:"
 echo "----------------------"
 
-cat << EOF
+cat <<EOF
 cask "psst" do
   version "${VERSION}"
   sha256 "${SHA256}"
 
-  url "https://github.com/jpochyla/psst/releases/download/v#{version}/Psst-#{version}.dmg"
+  url "https://github.com/jpochyla/psst/releases/download/v#{version}/Psst.dmg"
   name "Psst"
   desc "Fast and multi-platform Spotify client"
   homepage "https://github.com/jpochyla/psst"
