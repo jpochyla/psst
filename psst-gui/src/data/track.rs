@@ -98,7 +98,7 @@ impl TryFrom<String> for TrackId {
     type Error = &'static str;
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
-        ItemId::from_base62(&value, ItemIdType::Track)
+        ItemId::from_base62(&value, ItemIdType::Track, false)
             .ok_or("Invalid ID")
             .map(Self)
     }

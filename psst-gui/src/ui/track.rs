@@ -356,7 +356,8 @@ pub fn track_menu(
                 origin: PlaybackOrigin::Queue,
             },
             PlaybackItem {
-                item_id: ItemId::from_base62(&String::from(track.id), ItemIdType::Track).unwrap(),
+                item_id:
+                    ItemId::from_base62(&String::from(track.id), ItemIdType::Track, true).unwrap(),
                 norm_level: NormalizationLevel::Track,
             },
         ))),

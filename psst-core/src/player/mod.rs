@@ -7,6 +7,7 @@ mod worker;
 use std::{mem, thread, thread::JoinHandle, time::Duration};
 
 use crossbeam_channel::{unbounded, Receiver, Sender};
+use log::info;
 
 use crate::{
     audio::output::{AudioOutput, AudioSink, DefaultAudioOutput, DefaultAudioSink},
@@ -292,14 +293,18 @@ impl Player {
     }
 
     fn play_loaded(&mut self, loaded_item: LoadedPlaybackItem) {
+        info!("{:?}", loaded_item.file.path());
         log::info!("starting playback");
         let path = loaded_item.file.path();
         let position = Duration::default();
         self.playback_mgr.play(loaded_item);
+        info!("111");
         self.state = PlayerState::Playing { path, position };
+        info!("22");
         self.sender
             .send(PlayerEvent::Playing { path, position })
             .unwrap();
+        info!("3333");
     }
 
     fn pause(&mut self) {

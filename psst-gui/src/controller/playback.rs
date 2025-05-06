@@ -10,10 +10,12 @@ use druid::{
     widget::{prelude::*, Controller},
     Code, ExtEventSink, InternalLifeCycle, KbKey, WindowHandle,
 };
+use log::info;
 use psst_core::{
     audio::{normalize::NormalizationLevel, output::DefaultAudioOutput},
     cache::Cache,
     cdn::Cdn,
+    item_id::ItemId,
     lastfm::LastFmClient,
     player::{item::PlaybackItem, PlaybackConfig, Player, PlayerCommand, PlayerEvent},
     session::SessionService,
@@ -322,7 +324,11 @@ impl PlaybackController {
 
     fn play(&mut self, items: &Vector<QueueEntry>, position: usize) {
         let playback_items = items.iter().map(|queued| PlaybackItem {
-            item_id: queued.item.id(),
+            item_id: ItemId {
+                id: queued.item.id().id,
+                id_type: queued.item.id().id_type,
+                from_added_queue: false,
+            },
             norm_level: match queued.origin {
                 PlaybackOrigin::Album(_) => NormalizationLevel::Album,
                 _ => NormalizationLevel::Track,

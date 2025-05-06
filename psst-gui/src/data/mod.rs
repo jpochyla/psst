@@ -30,6 +30,7 @@ use druid::{
     im::{HashSet, Vector},
     Data, Lens,
 };
+use log::info;
 use psst_core::{item_id::ItemId, session::SessionService};
 
 pub use crate::data::{
@@ -221,6 +222,7 @@ impl AppState {
 
 impl AppState {
     pub fn queued_entry(&self, item_id: ItemId) -> Option<QueueEntry> {
+        // println!("from_added_queue: {:?}", item_id.from_added_queue);
         if let Some(queued) = self
             .added_queue
             .queue
