@@ -46,15 +46,16 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Set Version Info
         id: version
+        shell: bash
+        env:
+          FULL_SHA: ${{ github.sha }}
         run: |
           echo "BUILD_DATE=$(date +'%Y%m%d')" >> $GITHUB_ENV
           echo "VERSION=0.1.0,$(date +'%Y%m%d.%H%M%S')" >> $GITHUB_ENV
-          SHORT_SHA=$(git rev-parse --short HEAD)
+          SHORT_SHA=${FULL_SHA::7}
           echo "RELEASE_VERSION=$(date +'%Y.%m.%d')-$SHORT_SHA" >> $GITHUB_ENV
 
       - name: Setup Rust Cache
@@ -291,16 +292,13 @@ jobs:
     permissions:
       contents: write
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
       - name: Set Version Info
+        env:
+          FULL_SHA: ${{ github.sha }
         run: |
           echo "BUILD_DATE=$(date +'%Y%m%d')" >> $GITHUB_ENV
           echo "VERSION=0.1.0,$(date +'%Y%m%d.%H%M%S')" >> $GITHUB_ENV
-          SHORT_SHA=$(git rev-parse --short HEAD)
+          SHORT_SHA=${FULL_SHA::7}
           echo "RELEASE_VERSION=$(date +'%Y.%m.%d')-$SHORT_SHA" >> $GITHUB_ENV
 
       - name: Download all artifacts
