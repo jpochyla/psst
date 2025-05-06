@@ -52,7 +52,7 @@ jobs:
         run: |
           echo "BUILD_DATE=$(date +'%Y%m%d')" >> $GITHUB_ENV
           echo "VERSION=0.1.0,$(date +'%Y%m%d.%H%M%S')" >> $GITHUB_ENV
-          echo "RELEASE_VERSION=$(date +'%Y.%m.%d')" >> $GITHUB_OUTPUT
+          echo "RELEASE_VERSION=$(date +'%Y.%m.%d')" >> $GITHUB_ENV
 
       - name: Setup Rust Cache
         uses: Swatinem/rust-cache@v2
@@ -186,15 +186,15 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: psst-gui-${{ matrix.target }}
-          path: ${{runner.workspace}}/binaries
+          path: binaries
 
       - name: Move Binary
         run: |
-          mkdir -p ${{runner.workspace}}/pkg/usr/bin/
-          mv ${{runner.workspace}}/binaries/psst-gui ${{runner.workspace}}/pkg/usr/bin/
+          mkdir -p pkg/usr/bin/
+          mv binaries/psst-gui pkg/usr/bin/
 
       - name: Move Desktop Entry
-        run: mkdir -p ${{runner.workspace}}/pkg/usr/share/applications/; mv .pkg/psst.desktop $_
+        run: mkdir -p pkg/usr/share/applications/; mv .pkg/psst.desktop pkg/usr/share/applications/
 
       - name: Add Icons
         run: |
@@ -202,30 +202,30 @@ jobs:
           for LOGO in $LOGOS
           do
             LOGO_SIZE=$(echo "${LOGO}" | grep -oE '[[:digit:]]{2,}')
-            mkdir -p "${{runner.workspace}}/pkg/usr/share/icons/hicolor/${LOGO_SIZE}x${LOGO_SIZE}/"
-            cp "./psst-gui/assets/${LOGO}" "$_/psst.png"
+            mkdir -p "pkg/usr/share/icons/hicolor/${LOGO_SIZE}x${LOGO_SIZE}/"
+            cp "./psst-gui/assets/${LOGO}" "pkg/usr/share/icons/hicolor/${LOGO_SIZE}x${LOGO_SIZE}/psst.png"
           done
-          mkdir -p "${{runner.workspace}}/pkg/usr/share/icons/hicolor/scalable/apps/"
-          cp "./psst-gui/assets/logo.svg" "$_/psst.svg"
+          mkdir -p "pkg/usr/share/icons/hicolor/scalable/apps/"
+          cp "./psst-gui/assets/logo.svg" "pkg/usr/share/icons/hicolor/scalable/apps/psst.svg"
 
       - name: Set Permissions
-        run: chmod 755 ${{runner.workspace}}/pkg/usr/bin/psst-gui
+        run: chmod 755 pkg/usr/bin/psst-gui
 
       - name: Move License
-        run: mkdir -p ${{runner.workspace}}/pkg/usr/share/doc/psst-gui/; mv .pkg/copyright $_
+        run: mkdir -p pkg/usr/share/doc/psst-gui/; mv .pkg/copyright pkg/usr/share/doc/psst-gui/
 
       - name: Write Package Config
         run: |
-          mkdir -p ${{runner.workspace}}/pkg/DEBIAN
+          mkdir -p pkg/DEBIAN
           export ARCHITECTURE=${{ matrix.arch }}
           SANITIZED_BRANCH="$(echo ${GITHUB_HEAD_REF:+.$GITHUB_HEAD_REF}|tr '_/' '-')"
           export VERSION=0.1.0"$SANITIZED_BRANCH"+r"$(git rev-list --count HEAD)"-0
-          envsubst < .pkg/DEBIAN/control > ${{runner.workspace}}/pkg/DEBIAN/control
+          envsubst < .pkg/DEBIAN/control > pkg/DEBIAN/control
 
       - name: Build Package
         run: |
-          cat ${{runner.workspace}}/pkg/DEBIAN/control
-          dpkg-deb -b ${{runner.workspace}}/pkg/ psst_$(git rev-list --count HEAD)_${{ matrix.arch }}.deb
+          cat pkg/DEBIAN/control
+          dpkg-deb -b pkg/ psst_$(git rev-list --count HEAD)_${{ matrix.arch }}.deb
 
       - name: Upload Debian Package
         uses: actions/upload-artifact@v4
@@ -245,29 +245,30 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: psst-deb
-          path: ${{runner.workspace}}
+          # Downloads to the root of the workspace by default if path is omitted or '.',
+          # so removing explicit path to ${{github.workspace}}
 
       - name: Install Dependencies
         run: sudo apt-get update && sudo apt-get install -y libfuse2
 
       - name: Create Workspace
-        run: mkdir -p ${{runner.workspace}}/appimage
+        run: mkdir -p appimage
 
       - name: Download the Latest pkg2appimage
         run: |
           latest_release_appimage_url=$(wget -q https://api.github.com/repos/AppImageCommunity/pkg2appimage/releases/latest -O - | jq -r '.assets[0].browser_download_url')
-          wget --directory-prefix=${{runner.workspace}}/appimage -c $latest_release_appimage_url
+          wget --directory-prefix=appimage -c $latest_release_appimage_url
 
       - name: Create Path to pkg2appimage
         run: |
-          pkg2appimage_executable=$(ls ${{runner.workspace}}/appimage)
-          app_path=${{runner.workspace}}/appimage/${pkg2appimage_executable}
+          pkg2appimage_executable=$(ls appimage)
+          app_path=appimage/${pkg2appimage_executable}
           chmod +x ${app_path}
           echo "app_path=${app_path}" >> $GITHUB_ENV
 
       - name: Create Path to pkg2appimage's Recipe File
         run: |
-          recipe_path=${{runner.workspace}}/psst/.pkg/APPIMAGE/pkg2appimage-ingredients.yml
+          recipe_path=psst/.pkg/APPIMAGE/pkg2appimage-ingredients.yml
           echo "recipe_path=${recipe_path}" >> $GITHUB_ENV
 
       - name: Run pkg2appimage
@@ -278,7 +279,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: psst-appimage
-          path: ${{runner.workspace}}/out/*.AppImage
+          path: out/*.AppImage
 
   release:
     needs: [build, deb]
