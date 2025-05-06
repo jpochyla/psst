@@ -41,20 +41,15 @@ pub struct PlaybackController {
     scrobbler: Option<Scrobbler>,
     startup: bool,
 }
-fn init_scrobbler_instance(
-    data: &AppState
-) -> Option<Scrobbler> {
+fn init_scrobbler_instance(data: &AppState) -> Option<Scrobbler> {
     if data.config.lastfm_enable {
         if let (Some(api_key), Some(api_secret), Some(session_key)) = (
             data.config.lastfm_api_key.as_deref(),
             data.config.lastfm_api_secret.as_deref(),
             data.config.lastfm_session_key.as_deref(),
         ) {
-            match LastFmClient::create_scrobbler(
-                Some(api_key),
-                Some(api_secret),
-                Some(session_key),
-            ) {
+            match LastFmClient::create_scrobbler(Some(api_key), Some(api_secret), Some(session_key))
+            {
                 Ok(scr) => {
                     log::info!("Last.fm Scrobbler instance created/updated.");
                     return Some(scr);
@@ -64,16 +59,13 @@ fn init_scrobbler_instance(
                 }
             }
         } else {
-            log::info!(
-                "Last.fm credentials incomplete or removed, clearing Scrobbler instance."
-            );
+            log::info!("Last.fm credentials incomplete or removed, clearing Scrobbler instance.");
         }
     } else {
         log::info!("Last.fm scrobbling is disabled, clearing Scrobbler instance.");
     }
     None
 }
-
 
 impl PlaybackController {
     pub fn new() -> Self {
@@ -186,7 +178,12 @@ impl PlaybackController {
         };
 
         let mut media_controls = MediaControls::new(PlatformConfig {
-            dbus_name: "psst",
+            dbus_name: format!(
+                "com.jpochyla.psst.{:04x}",
+                ((time::OffsetDateTime::now_utc().unix_timestamp_nanos() / 1_000) as u16)
+                    ^ (rand::random::<u16>())
+            )
+            .as_str(),
             display_name: "Psst",
             hwnd,
         })?;
@@ -622,8 +619,7 @@ where
         if self.startup {
             self.startup = false;
             self.scrobbler = init_scrobbler_instance(data);
-
-        }  
+        }
         child.lifecycle(ctx, event, data, env);
     }
 
