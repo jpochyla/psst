@@ -6,7 +6,7 @@ edition = "2021"
 
 
 [build-dependencies]
-gix-config = { version = "0.40.0" }
+gix-config = "0.45.1"
 time = { version = "0.3.36", features = ["local-offset"] }
 
 [dependencies]
@@ -41,7 +41,7 @@ sha-1 = { version = "0.10.1" }
 shannon = { version = "0.2.0" }
 
 # Audio
-audio_thread_priority = { version = "0.32.0" }
+audio_thread_priority = "0.33.0"
 cpal = { version = "0.15.3", optional = true }
 cubeb = { git = "https://github.com/mozilla/cubeb-rs", optional = true }
 libsamplerate = { version = "0.1.0" }
@@ -53,6 +53,4 @@ symphonia = { version = "0.5.4", default-features = false, features = [
 ] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
-windows = { version = "0.58.0", features = [
-  "Win32_System_Com",
-], default-features = false }
+windows = { version = "0.61.1", features = ["Win32_System_Com"], default-features = false }
