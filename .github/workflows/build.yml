@@ -156,12 +156,16 @@ jobs:
         if: runner.os == 'Linux'
         run: chmod +x target/${{ matrix.target }}/release/psst-gui
 
+      - name: Rename Linux Binary
+        if: runner.os == 'Linux'
+        run: mv target/${{ matrix.target }}/release/psst-gui target/${{ matrix.target }}/release/psst
+
       - name: Upload Linux Binary
         uses: actions/upload-artifact@v4
         if: runner.os == 'Linux'
         with:
-          name: psst-gui-${{ matrix.target }}
-          path: target/${{ matrix.target }}/release/psst-gui
+          name: psst-${{ matrix.target }}
+          path: target/${{ matrix.target }}/release/psst
 
       - name: Upload Windows Executable
         uses: actions/upload-artifact@v4
@@ -189,13 +193,13 @@ jobs:
       - name: Download Linux Binaries
         uses: actions/download-artifact@v4
         with:
-          name: psst-gui-${{ matrix.target }}
+          name: psst-${{ matrix.target }}
           path: binaries
 
       - name: Move Binary
         run: |
           mkdir -p pkg/usr/bin/
-          mv binaries/psst-gui pkg/usr/bin/
+          mv binaries/psst pkg/usr/bin/
 
       - name: Move Desktop Entry
         run: mkdir -p pkg/usr/share/applications/; mv .pkg/psst.desktop pkg/usr/share/applications/
@@ -213,7 +217,7 @@ jobs:
           cp "./psst-gui/assets/logo.svg" "pkg/usr/share/icons/hicolor/scalable/apps/psst.svg"
 
       - name: Set Permissions
-        run: chmod 755 pkg/usr/bin/psst-gui
+        run: chmod 755 pkg/usr/bin/psst
 
       - name: Move License
         run: mkdir -p pkg/usr/share/doc/psst-gui/; mv .pkg/copyright pkg/usr/share/doc/psst-gui/
@@ -294,7 +298,7 @@ jobs:
     steps:
       - name: Set Version Info
         env:
-          FULL_SHA: ${{ github.sha }
+          FULL_SHA: ${{ github.sha }}
         run: |
           echo "BUILD_DATE=$(date +'%Y%m%d')" >> $GITHUB_ENV
           echo "VERSION=0.1.0,$(date +'%Y%m%d.%H%M%S')" >> $GITHUB_ENV
@@ -309,8 +313,10 @@ jobs:
       - name: Generate SHA256 checksums
         run: |
           cd artifacts
-          find . -type f -name "*.dmg" -o -name "*.exe" -o -name "psst-gui-*" | while read file; do
-            sha256sum "$file" >> checksums.txt
+          find . -type f -name "*.dmg" -o -name "*.exe" -o -name "psst-*" | while read file; do
+            if [[ "$file" != *.sha256 ]]; then
+              sha256sum "$file" >> checksums.txt
+            fi
           done
 
       - name: Create Release
@@ -336,8 +342,8 @@ jobs:
             artifacts/Psst.dmg/Psst.dmg
             artifacts/Psst.dmg.sha256/Psst.dmg.sha256
             artifacts/Psst.exe/psst-gui.exe
-            artifacts/psst-gui-x86_64-unknown-linux-gnu/psst-gui
-            artifacts/psst-gui-aarch64-unknown-linux-gnu/psst-gui
+            artifacts/psst-x86_64-unknown-linux-gnu/psst
+            artifacts/psst-aarch64-unknown-linux-gnu/psst
             artifacts/checksums.txt
             artifacts/psst-deb-amd64/*.deb
             artifacts/psst-deb-arm64/*.deb
