@@ -8,8 +8,10 @@ use druid::{
 use crate::{
     cmd,
     data::{
-        Album, AlbumDetail, AlbumLink, AppState, ArtistLink, Cached, Ctx, Library, Nav, WithCtx,
+        Album, AlbumDetail, AlbumLink, AppState, ArtistLink, Cached, Ctx, Library, Nav, Playable,
+        PlaybackOrigin, WithCtx,
     },
+    ui::playable::PlayableIter,
     webapi::WebApi,
     widget::{icons, Async, MyWidgetExt, RemoteImage},
 };
@@ -178,7 +180,7 @@ pub fn album_widget(horizontal: bool) -> impl Widget<WithCtx<Arc<Album>>> {
         .link()
         .rounded(theme::BUTTON_BORDER_RADIUS)
         .on_left_click(|ctx, _, album, _| {
-            ctx.submit_command(cmd::NAVIGATE.with(Nav::AlbumDetail(album.data.link())));
+            ctx.submit_command(cmd::NAVIGATE.with(Nav::AlbumDetail(album.data.link(), None)));
         })
         .context_menu(album_ctx_menu)
 }
@@ -194,7 +196,7 @@ fn album_menu(album: &Arc<Album>, library: &Arc<Library>) -> Menu<AppState> {
         let more_than_one_artist = album.artists.len() > 1;
         let title = if more_than_one_artist {
             LocalizedString::new("menu-item-show-artist-name")
-                .with_placeholder(format!("Go to Artist “{}”", artist_link.name))
+                .with_placeholder(format!("Go to Artist \"{}\"", artist_link.name))
         } else {
             LocalizedString::new("menu-item-show-artist").with_placeholder("Go to Artist")
         };
@@ -232,4 +234,20 @@ fn album_menu(album: &Arc<Album>, library: &Arc<Library>) -> Menu<AppState> {
     }
 
     menu
+}
+
+impl PlayableIter for Arc<Album> {
+    fn origin(&self) -> PlaybackOrigin {
+        PlaybackOrigin::Album(self.link())
+    }
+
+    fn for_each(&self, mut cb: impl FnMut(Playable, usize)) {
+        for (position, track) in self.clone().into_tracks_with_context().iter().enumerate() {
+            cb(Playable::Track(track.clone()), position);
+        }
+    }
+
+    fn count(&self) -> usize {
+        self.tracks.len()
+    }
 }

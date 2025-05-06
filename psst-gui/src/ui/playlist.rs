@@ -437,57 +437,51 @@ pub fn detail_widget() -> impl Widget<AppState> {
         },
         |_, data, d| data.playlist_detail.tracks.defer(d.0),
         |_, data, (d, r)| {
-            let r = r.map(|tracks| PlaylistTracks {
+            let tracks = PlaylistTracks {
                 id: d.0.id.clone(),
                 name: d.0.name.clone(),
-                tracks,
-            });
-            data.playlist_detail.tracks.update((d.0, r))
+                tracks: r,
+            };
+            data.playlist_detail.tracks.update((d.0, Ok(tracks)))
         },
     )
 }
 
-fn sort_playlist(
-    data: &AppState,
-    result: Result<Vector<Arc<Track>>, Error>,
-) -> Result<Vector<Arc<Track>>, Error> {
+fn sort_playlist(data: &AppState, result: Result<Vector<Arc<Track>>, Error>) -> Vector<Arc<Track>> {
     let sort_criteria = data.config.sort_criteria;
     let sort_order = data.config.sort_order;
 
     let playlist = result.unwrap_or_else(|_| Vector::new());
 
-    let mut sorted_playlist: Vector<Arc<Track>> = playlist
+    let sorted_playlist: Vector<Arc<Track>> = playlist
         .into_iter()
         .sorted_by(|a, b| {
-            let mut method = match sort_criteria {
+            let method = match sort_criteria {
                 SortCriteria::Title => a.name.cmp(&b.name),
                 SortCriteria::Artist => a.artist_name().cmp(&b.artist_name()),
                 SortCriteria::Album => a.album_name().cmp(&b.album_name()),
                 SortCriteria::Duration => a.duration.cmp(&b.duration),
-                _ => Ordering::Equal,
+                SortCriteria::DateAdded => Ordering::Equal,
             };
-            method = if sort_order == SortOrder::Descending {
+
+            if sort_order == SortOrder::Descending {
                 method.reverse()
             } else {
                 method
-            };
-            method
+            }
         })
         .collect();
 
-    sorted_playlist =
-        if sort_criteria == SortCriteria::DateAdded && sort_order == SortOrder::Descending {
-            sorted_playlist.into_iter().rev().collect()
-        } else {
-            sorted_playlist
-        };
-
-    Ok(sorted_playlist)
+    if sort_criteria == SortCriteria::DateAdded && sort_order == SortOrder::Descending {
+        sorted_playlist.into_iter().rev().collect()
+    } else {
+        sorted_playlist
+    }
 }
 
 fn playlist_menu_ctx(playlist: &WithCtx<Playlist>) -> Menu<AppState> {
-    let library = &playlist.ctx.to_owned().library;
-    let playlist = &playlist.to_owned().data;
+    let library = &playlist.ctx.library;
+    let playlist = &playlist.data;
 
     let mut menu = Menu::empty();
 

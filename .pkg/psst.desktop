@@ -1,7 +1,7 @@
 [Desktop Entry]
 Type=Application
 Name=Psst
-Comment=Fast and multi-platform Spotify client with native GUI
+Comment=Fast and native Spotify client
 GenericName=Music Player
 Icon=psst
 TryExec=psst-gui
