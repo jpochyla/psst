@@ -17,11 +17,11 @@ psst-core = { path = "../psst-core" }
 
 # Common
 crossbeam-channel = { version = "0.5.13" }
-directories = { version = "5.0.1" }
+directories = "6.0.0"
 env_logger = { version = "0.11.5" }
-itertools = { version = "0.13.0" }
+itertools = "0.14.0"
 log = { version = "0.4.22" }
-lru = { version = "0.12.5" }
+lru = "0.14.0"
 once_cell = { version = "1.20.2" }
 parking_lot = { version = "0.12.3" }
 platform-dirs = { version = "0.3.0" }
@@ -48,11 +48,9 @@ druid-shell = { git = "https://github.com/jpochyla/druid", branch = "psst", feat
   "raw-win-handle",
 ] }
 open = { version = "5.3.0" }
-raw-window-handle = { version = "0.5.2" } # Must stay compatible with Druid
-souvlaki = { version = "0.7.3", default-features = false, features = [
-  "use_zbus",
-] }
-sanitize_html = "0.8.1"
+raw-window-handle = "0.6.2" # Must stay compatible with Druid
+souvlaki = { version = "0.8.2", default-features = false, features = ["use_zbus"] }
+sanitize_html = "0.9.0"
 rustfm-scrobble = "1.1.1"
 [target.'cfg(windows)'.build-dependencies]
 winres = { version = "0.1.12" }
