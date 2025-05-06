@@ -145,7 +145,7 @@ impl LocalTrackManager {
 
             if Self::is_matching_in_addition_to_title(parsed_track, &local_track) {
                 return Some(Arc::new(Track {
-                    id: TrackId(ItemId::from_local(path)),
+                    id: TrackId(ItemId::from_local(path, false)),
                     name: local_track.name,
                     album: local_track.album.map(|local_album| {
                         AlbumLink {

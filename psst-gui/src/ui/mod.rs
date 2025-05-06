@@ -41,6 +41,7 @@ pub mod playable;
 pub mod playback;
 pub mod playlist;
 pub mod preferences;
+pub mod queued;
 pub mod recommend;
 pub mod search;
 pub mod show;
@@ -235,7 +236,7 @@ fn root_widget() -> impl Widget<AppState> {
         .fix_height(88.0)
         .background(Border::Top.with_color(theme::GREY_500));
 
-    let sidebar = Flex::column()
+    let left_bar = Flex::column()
         .with_flex_child(playlists, 1.0)
         .with_child(controls)
         .background(theme::BACKGROUND_DARK);
@@ -254,7 +255,12 @@ fn root_widget() -> impl Widget<AppState> {
         .with_child(playback::panel_widget())
         .background(theme::BACKGROUND_LIGHT);
 
-    let split = Split::columns(sidebar, main)
+    let right_bar = Flex::row()
+        .with_flex_child(main, 1.0)
+        .with_child(queued::queue_widget())
+        .background(theme::BACKGROUND_DARK);
+
+    let split = Split::columns(left_bar, right_bar)
         .split_point(0.2)
         .bar_size(1.0)
         .min_size(150.0, 300.0)
@@ -284,6 +290,7 @@ fn root_widget() -> impl Widget<AppState> {
                 }
             },
         )
+
     // .debug_invalidation()
     // .debug_widget_id()
     // .debug_paint_layout()
@@ -405,6 +412,7 @@ fn sidebar_menu_widget() -> impl Widget<AppState> {
 fn sidebar_link_widget(title: &str, link_nav: Nav) -> impl Widget<AppState> {
     Label::new(title)
         .padding((theme::grid(2.0), theme::grid(1.0)))
+        // Not perfect, we need to find a way to stop it from clipping the side
         .expand_width()
         .link()
         .env_scope({

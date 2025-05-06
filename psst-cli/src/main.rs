@@ -35,7 +35,7 @@ fn main() {
 fn start(track_id: &str, session: SessionService) -> Result<(), Error> {
     let cdn = Cdn::new(session.clone(), None)?;
     let cache = Cache::new(PathBuf::from("cache"))?;
-    let item_id = ItemId::from_base62(track_id, ItemIdType::Track).unwrap();
+    let item_id = ItemId::from_base62(track_id, ItemIdType::Track, false).unwrap();
     play_item(
         session,
         cdn,
