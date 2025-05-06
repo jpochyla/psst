@@ -4,7 +4,7 @@ version = "0.1.0"
 authors = ["Jan Pochyla <jpochyla@gmail.com>"]
 edition = "2021"
 build = "build.rs"
-description = "Fast Spotify client with native GUI"
+description = "Fast and native Spotify client"
 repository = "https://github.com/jpochyla/psst"
 
 [features]
@@ -66,7 +66,7 @@ version = "0.1.0"
 resources = []
 copyright = "Copyright (c) Jan Pochyla 2024. All rights reserved."
 category = "Music"
-short_description = "Fast Spotify client with native GUI"
+short_description = "Fast and native Spotify client"
 long_description = """
-Small and efficient graphical music player for Spotify network.
+Small and efficient graphical music player for the Spotify network.
 """

@@ -13,17 +13,17 @@ Contributions are welcome!
 
 ## Download
 
-GitHub Actions automatically creates builds when new commits are pushed to the `main` branch.
-You can download the prebuilt binaries for x86_64 Windows, Linux (Ubuntu), and macOS.
+GitHub Actions automatically builds and releases new versions when changes are pushed to the `main` branch.
+You can download the latest release for Windows, Linux, and macOS from the [GitHub Releases page](https://github.com/jpochyla/psst/releases/latest).
 
-| Platform                                                                                                          |
-| ----------------------------------------------------------------------------------------------------------------- |
-| [Linux (x86_64)](https://nightly.link/jpochyla/psst/workflows/build/main/psst-gui-x86_64-unknown-linux-gnu.zip)   |
-| [Linux (aarch64)](https://nightly.link/jpochyla/psst/workflows/build/main/psst-gui-aarch64-unknown-linux-gnu.zip) |
-| [Debian Package (amd64)](https://nightly.link/jpochyla/psst/workflows/build/main/psst-deb-amd64.zip)              |
-| [Debian Package (arm64)](https://nightly.link/jpochyla/psst/workflows/build/main/psst-deb-arm64.zip)              |
-| [MacOS](https://nightly.link/jpochyla/psst/workflows/build/main/Psst.dmg.zip)                                     |
-| [Windows](https://nightly.link/jpochyla/psst/workflows/build/main/Psst.exe.zip)                                   |
+| Platform               | Download Link                                                                                            |
+| ---------------------- | -------------------------------------------------------------------------------------------------------- |
+| Linux (x86_64)         | [Download](https://github.com/jpochyla/psst/releases/latest/download/psst-gui-x86_64-unknown-linux-gnu)  |
+| Linux (aarch64)        | [Download](https://github.com/jpochyla/psst/releases/latest/download/psst-gui-aarch64-unknown-linux-gnu) |
+| Debian Package (amd64) | [Download](https://github.com/jpochyla/psst/releases/latest/download/psst_*_amd64.deb)                   |
+| Debian Package (arm64) | [Download](https://github.com/jpochyla/psst/releases/latest/download/psst_*_arm64.deb)                   |
+| macOS                  | [Download](https://github.com/jpochyla/psst/releases/latest/download/Psst-*.dmg)                         |
+| Windows                | [Download](https://github.com/jpochyla/psst/releases/latest/download/psst-gui.exe)                       |
 
 Unofficial builds of Psst are also available through the [AUR](https://aur.archlinux.org/packages/psst-git) and [Homebrew](https://formulae.brew.sh/cask/psst).
 
