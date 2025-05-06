@@ -34,7 +34,9 @@ use psst_core::{item_id::ItemId, session::SessionService};
 
 pub use crate::data::{
     album::{Album, AlbumDetail, AlbumLink, AlbumType},
-    artist::{Artist, ArtistAlbums, ArtistDetail, ArtistLink, ArtistTracks},
+    artist::{
+        Artist, ArtistAlbums, ArtistDetail, ArtistInfo, ArtistLink, ArtistStats, ArtistTracks,
+    },
     config::{AudioQuality, Authentication, Config, Preferences, PreferencesTab, Theme},
     ctx::Ctx,
     find::{FindQuery, Finder, MatchFindQuery},
@@ -55,10 +57,11 @@ pub use crate::data::{
     search::{Search, SearchResults, SearchTopic},
     show::{Episode, EpisodeId, EpisodeLink, Show, ShowDetail, ShowEpisodes, ShowLink},
     slider_scroll_scale::SliderScrollScale,
-    track::{AudioAnalysis, Track, TrackId},
+    track::{AudioAnalysis, Track, TrackId, TrackLines},
     user::{PublicUser, UserProfile},
     utils::{Cached, Float64, Image, Page},
 };
+use crate::ui::credits::TrackCredits;
 
 pub const ALERT_DURATION: Duration = Duration::from_secs(5);
 
@@ -90,6 +93,9 @@ pub struct QueueFields {
     pub queue: Vector<QueueEntry>,
     // TODO: This is a problem, due to added_queue never changing, the origin of a song, if also once added to the queue, will always be the queue.
     pub displayed_queue: Vector<QueueEntry>,
+    pub added_queue: Vector<QueueEntry>,
+    pub lyrics: Promise<Vector<TrackLines>>,
+    pub credits: Option<TrackCredits>,
 }
 
 impl AppState {
@@ -105,6 +111,7 @@ impl AppState {
             now_playing: None,
             library: Arc::clone(&library),
             show_track_cover: config.show_track_cover,
+            nav: Nav::Home,
         });
         let playback = Playback {
             state: PlaybackState::Stopped,
@@ -120,13 +127,9 @@ impl AppState {
             config,
             preferences: Preferences {
                 active: PreferencesTab::General,
-                auth: Authentication {
-                    username: String::new(),
-                    password: String::new(),
-                    access_token: String::new(),
-                    result: Promise::Empty,
-                },
                 cache_size: Promise::Empty,
+                auth: Authentication::new(),
+                lastfm_auth_result: None,
             },
             playback,
             added_queue: QueueFields {
@@ -161,6 +164,7 @@ impl AppState {
                 albums: Promise::Empty,
                 top_tracks: Promise::Empty,
                 related_artists: Promise::Empty,
+                artist_info: Promise::Empty,
             },
             playlist_detail: PlaylistDetail {
                 playlist: Promise::Empty,
@@ -174,6 +178,8 @@ impl AppState {
             common_ctx,
             alerts: Vector::new(),
             finder: Finder::new(),
+            lyrics: Promise::Empty,
+            credits: None,
         }
     }
 }
@@ -181,16 +187,28 @@ impl AppState {
 impl AppState {
     pub fn navigate(&mut self, nav: &Nav) {
         if &self.nav != nav {
-            let previous: Nav = mem::replace(&mut self.nav, nav.to_owned());
+            let previous = mem::replace(&mut self.nav, nav.to_owned());
             self.history.push_back(previous);
             self.config.last_route.replace(nav.to_owned());
+            Arc::make_mut(&mut self.common_ctx).nav = nav.to_owned();
         }
     }
 
     pub fn navigate_back(&mut self) {
-        if let Some(nav) = self.history.pop_back() {
-            self.config.last_route.replace(nav.clone());
+        if let Some(mut nav) = self.history.pop_back() {
+            if let Nav::SearchResults(query) = &nav {
+                if SpotifyUrl::parse(query).is_some() {
+                    nav = self.history.pop_back().unwrap_or(Nav::Home);
+                }
+            }
+
+            if let Nav::AlbumDetail(album, _) = nav {
+                nav = Nav::AlbumDetail(album, None);
+            }
+
             self.nav = nav;
+            self.config.last_route.replace(self.nav.to_owned());
+            Arc::make_mut(&mut self.common_ctx).nav = self.nav.clone();
         }
     }
 
@@ -478,6 +496,18 @@ impl Library {
     }
 }
 
+impl Default for Library {
+    fn default() -> Self {
+        Library {
+            user_profile: Promise::Empty,
+            playlists: Promise::Empty,
+            saved_albums: Promise::Empty,
+            saved_tracks: Promise::Empty,
+            saved_shows: Promise::Empty,
+        }
+    }
+}
+
 #[derive(Clone, Default, Data, Lens)]
 pub struct SavedTracks {
     pub tracks: Vector<Arc<Track>>,
@@ -522,6 +552,7 @@ pub struct CommonCtx {
     pub now_playing: Option<Playable>,
     pub library: Arc<Library>,
     pub show_track_cover: bool,
+    pub nav: Nav,
 }
 
 impl CommonCtx {

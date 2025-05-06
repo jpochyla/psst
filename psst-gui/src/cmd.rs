@@ -1,7 +1,8 @@
-use std::time::Duration;
-
+use crate::data::Track;
 use druid::{Selector, WidgetId};
 use psst_core::{item_id::ItemId, player::item::PlaybackItem};
+use std::sync::Arc;
+use std::time::Duration;
 
 use crate::{
     data::{Nav, PlaybackPayload, QueueBehavior, QueueEntry},
@@ -18,6 +19,7 @@ pub const CLOSE_ALL_WINDOWS: Selector = Selector::new("app.close-all-windows");
 pub const QUIT_APP_WITH_SAVE: Selector = Selector::new("app.quit-with-save");
 pub const SET_FOCUS: Selector = Selector::new("app.set-focus");
 pub const COPY: Selector<String> = Selector::new("app.copy-to-clipboard");
+pub const GO_TO_URL: Selector<String> = Selector::new("app.go-to-url");
 
 // Find
 pub const TOGGLE_FINDER: Selector = Selector::new("app.show-finder");
@@ -32,6 +34,7 @@ pub const LOG_OUT: Selector = Selector::new("app.log-out");
 pub const NAVIGATE: Selector<Nav> = Selector::new("app.navigates");
 pub const NAVIGATE_BACK: Selector<usize> = Selector::new("app.navigate-back");
 pub const NAVIGATE_REFRESH: Selector = Selector::new("app.navigate-refresh");
+pub const TOGGLE_LYRICS: Selector = Selector::new("app.toggle-lyrics");
 
 // Playback state
 pub const PLAYBACK_LOADING: Selector<ItemId> = Selector::new("app.playback-loading");
@@ -53,6 +56,7 @@ pub const PLAY_STOP: Selector = Selector::new("app.play-stop");
 pub const ADD_TO_QUEUE: Selector<(QueueEntry, PlaybackItem)> = Selector::new("app.add-to-queue");
 pub const PLAY_QUEUE_BEHAVIOR: Selector<QueueBehavior> = Selector::new("app.play-queue-behavior");
 pub const PLAY_SEEK: Selector<f64> = Selector::new("app.play-seek");
+pub const SKIP_TO_POSITION: Selector<u64> = Selector::new("app.skip-to-position");
 
 // Queue control
 pub const REMOVE_FROM_QUEUE: Selector<usize> = Selector::new("app.remove-from-queue");
@@ -68,3 +72,10 @@ pub const SORT_BY_DURATION: Selector = Selector::new("app.sort-by-duration");
 
 // Sort direction control
 pub const TOGGLE_SORT_ORDER: Selector = Selector::new("app.toggle-sort-order");
+
+// Track credits
+pub const SHOW_CREDITS_WINDOW: Selector<Arc<Track>> = Selector::new("app.credits-show-window");
+pub const LOAD_TRACK_CREDITS: Selector<Arc<Track>> = Selector::new("app.credits-load");
+
+// Artwork
+pub const SHOW_ARTWORK: Selector = Selector::new("app.show-artwork");

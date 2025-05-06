@@ -1,5 +1,6 @@
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::thread::{self, JoinHandle};
+use std::time::Duration;
 
 use crate::{
     cmd,
@@ -7,22 +8,45 @@ use crate::{
         AppState, AudioQuality, Authentication, Config, Preferences, PreferencesTab, Promise,
         SliderScrollScale, Theme,
     },
-    webapi::WebApi,
     widget::{icons, Async, Border, Checkbox, MyWidgetExt},
 };
 use druid::{
-    commands,
     text::ParseFormatter,
     widget::{
         Button, Controller, CrossAxisAlignment, Flex, Label, LineBreaking, MainAxisAlignment,
         RadioGroup, SizedBox, Slider, TextBox, ViewSwitcher,
     },
-    Color, Data, Env, Event, EventCtx, Insets, LensExt, LifeCycle, LifeCycleCtx, Selector, Widget,
-    WidgetExt,
+    Color, Data, Env, Event, EventCtx, Insets, Lens, LensExt, LifeCycle, LifeCycleCtx, Selector,
+    Widget, WidgetExt,
 };
-use psst_core::{connection::Credentials, oauth, session::SessionConfig};
+use psst_core::{connection::Credentials, lastfm, oauth, session::SessionConfig};
 
 use super::{icons::SvgIcon, theme};
+
+// Helper function for creating a labeled input row
+fn make_input_row<L>(
+    label_text: &'static str,
+    placeholder_text: &'static str,
+    lens: L,
+) -> impl Widget<AppState>
+where
+    L: Lens<AppState, String> + 'static,
+{
+    Flex::row()
+        .cross_axis_alignment(CrossAxisAlignment::Center)
+        .with_child(
+            SizedBox::new(Label::new(label_text))
+                .width(theme::grid(12.0))
+                .align_left(),
+        )
+        .with_flex_child(
+            TextBox::new()
+                .with_placeholder(placeholder_text)
+                .lens(lens)
+                .fix_width(theme::grid(30.0)),
+            1.0,
+        )
+}
 
 pub fn account_setup_widget() -> impl Widget<AppState> {
     Flex::column()
@@ -88,7 +112,7 @@ pub fn preferences_widget() -> impl Widget<AppState> {
                 ctx.submit_command(PROPAGATE_FLAGS);
             }
         })
-        .on_command(PROPAGATE_FLAGS, |_, _, data| {
+        .on_command(PROPAGATE_FLAGS, |_, (), data| {
             data.common_ctx_mut().show_track_cover = data.config.show_track_cover;
         })
         .scroll()
@@ -270,25 +294,41 @@ fn account_tab_widget(tab: AccountTab) -> impl Widget<AppState> {
 
     if matches!(tab, AccountTab::InPreferences) {
         col = col
-            .with_child(Label::new("Credentials").with_font(theme::UI_FONT_MEDIUM))
+            .with_child(Label::new("Spotify Account").with_font(theme::UI_FONT_MEDIUM))
             .with_spacer(theme::grid(2.0));
     }
 
+    // Spotify Login/Logout button
     col = col
-        .with_child(
-            Button::new("Log in with Spotify").on_click(|ctx, _data: &mut AppState, _| {
-                ctx.submit_command(Authenticate::REQUEST);
-            }),
-        )
+        .with_child(ViewSwitcher::new(
+            |data: &AppState, _| data.config.has_credentials(),
+            |is_logged_in, _, _| {
+                if *is_logged_in {
+                    Button::new("Log Out")
+                        .on_left_click(|ctx, _, _, _| {
+                            ctx.submit_command(cmd::LOG_OUT);
+                        })
+                        .boxed()
+                } else {
+                    Button::new("Log in with Spotify")
+                        .on_click(|ctx, _data: &mut AppState, _| {
+                            ctx.submit_command(Authenticate::SPOTIFY_REQUEST);
+                        })
+                        .boxed()
+                }
+            },
+        ))
         .with_spacer(theme::grid(1.0))
         .with_child(
             Async::new(
                 || Label::new("Logging in...").with_text_size(theme::TEXT_SIZE_SMALL),
-                || Label::new("").with_text_size(theme::TEXT_SIZE_SMALL),
+                // Spotify Success Arm: Show nothing
+                || SizedBox::empty().boxed(),
                 || {
+                    // Error arm remains the same
                     Label::dynamic(|err: &String, _| err.to_owned())
                         .with_text_size(theme::TEXT_SIZE_SMALL)
-                        .with_text_color(theme::RED)
+                        .with_text_color(druid::Color::RED)
                 },
             )
             .lens(
@@ -299,29 +339,232 @@ fn account_tab_widget(tab: AccountTab) -> impl Widget<AppState> {
         );
 
     if matches!(tab, AccountTab::InPreferences) {
-        col = col.with_child(Button::new("Log Out").on_left_click(|ctx, _, _, _| {
-            ctx.submit_command(cmd::LOG_OUT);
-        }))
+        col = col
+            .with_spacer(theme::grid(2.0))
+            .with_child(Label::new("Last.fm Account").with_font(theme::UI_FONT_MEDIUM))
+            .with_spacer(theme::grid(1.0))
+            .with_child(
+                Label::new("Connect your Last.fm account to scrobble tracks you listen to.")
+                    .with_text_color(theme::PLACEHOLDER_COLOR)
+                    .with_line_break_mode(LineBreaking::WordWrap),
+            )
+            .with_spacer(theme::grid(2.0))
+            .with_child(ViewSwitcher::new(
+                |data: &AppState, _| data.config.lastfm_session_key.is_some(),
+                |connected, _, _| {
+                    if *connected {
+                        // --- Connected View ---
+                        lastfm_connected_view().boxed()
+                    } else {
+                        // --- Disconnected View ---
+                        lastfm_disconnected_view().boxed()
+                    }
+                },
+            ));
     }
-
     col.controller(Authenticate::new(tab))
 }
 
-struct Authenticate {
+fn lastfm_connected_view() -> impl Widget<AppState> {
+    Flex::column()
+        .cross_axis_alignment(CrossAxisAlignment::Start)
+        .with_child(
+            Flex::row()
+                .with_child(
+                    Checkbox::new("Toggle scrobbling")
+                        .lens(AppState::config.then(Config::lastfm_enable))
+                        .padding((0.0, 0.0, theme::grid(1.0), 0.0)),
+                )
+                .with_child(
+                    Button::new("Disconnect").on_click(|_ctx, data: &mut AppState, _| {
+                        data.config.lastfm_session_key = None;
+                        data.config.lastfm_api_key = None;
+                        data.config.lastfm_api_secret = None;
+                        data.config.save();
+                        data.preferences.lastfm_auth_result = None;
+                        data.preferences.auth.lastfm_api_key_input.clear();
+                        data.preferences.auth.lastfm_api_secret_input.clear();
+                    }),
+                ),
+        )
+}
+
+fn lastfm_disconnected_view() -> impl Widget<AppState> {
+    Flex::column()
+        .cross_axis_alignment(CrossAxisAlignment::Start)
+        .with_child(make_input_row(
+            "API Key:",
+            "Enter your Last.fm API Key",
+            AppState::preferences
+                .then(Preferences::auth)
+                .then(Authentication::lastfm_api_key_input),
+        ))
+        .with_default_spacer()
+        .with_child(make_input_row(
+            "API Secret:",
+            "Enter your Last.fm API Secret",
+            AppState::preferences
+                .then(Preferences::auth)
+                .then(Authentication::lastfm_api_secret_input),
+        ))
+        .with_spacer(theme::grid(2.0))
+        .with_child(
+            Flex::row() // Put buttons in a row
+                .with_child(Button::new("Connect Last.fm Account").on_click(
+                    |ctx, data: &mut AppState, _| {
+                        // Check temporary input fields before proceeding
+                        let key_input = &data.preferences.auth.lastfm_api_key_input;
+                        let secret_input = &data.preferences.auth.lastfm_api_secret_input;
+
+                        if key_input.is_empty() || secret_input.is_empty() {
+                            data.preferences.lastfm_auth_result =
+                                Some("API Key and Secret required.".to_string());
+                        } else {
+                            ctx.submit_command(Authenticate::LASTFM_REQUEST);
+                        }
+                    },
+                ))
+                .with_spacer(theme::grid(1.0))
+                .with_child(Button::new("Request API Key").on_click(|_, _, _| {
+                    open::that("https://www.last.fm/api/account/create").ok();
+                })),
+        )
+        .with_spacer(theme::grid(1.0))
+        // Last.fm Status label
+        .with_child(ViewSwitcher::new(
+            |data: &AppState, _| {
+                data.preferences
+                    .lastfm_auth_result
+                    .clone()
+                    .unwrap_or_default()
+            },
+            |msg: &String, _, _| {
+                // Only show label if there's an error or connecting message
+                if msg.is_empty() || msg.starts_with("Success") {
+                    SizedBox::empty().boxed()
+                } else {
+                    Label::new(msg.clone())
+                        .with_text_color(if msg.starts_with("Connect") {
+                            druid::Color::GRAY
+                        } else {
+                            druid::Color::RED
+                        })
+                        .boxed()
+                }
+            },
+        ))
+}
+
+pub struct Authenticate {
     tab: AccountTab,
-    thread: Option<JoinHandle<()>>,
+    spotify_thread: Option<JoinHandle<()>>,
+    lastfm_thread: Option<JoinHandle<()>>,
 }
 
 impl Authenticate {
     fn new(tab: AccountTab) -> Self {
-        Self { tab, thread: None }
+        Self {
+            tab,
+            spotify_thread: None,
+            lastfm_thread: None,
+        }
+    }
+
+    // Helper function to spawn authentication threads
+    fn spawn_auth_thread<T: Send + 'static>(
+        ctx: &mut EventCtx,
+        auth_logic: impl FnOnce() -> Result<T, String> + Send + 'static,
+        response_selector: Selector<Result<T, String>>,
+        existing_handle: Option<JoinHandle<()>>,
+    ) -> Option<JoinHandle<()>> {
+        // Clean up previous thread if any
+        if let Some(_handle) = existing_handle {
+            // Consider if joining is necessary/desirable
+        }
+
+        let window_id = ctx.window_id();
+        let event_sink = ctx.get_external_handle();
+
+        let thread = thread::spawn(move || {
+            let result = auth_logic();
+            event_sink
+                .submit_command(response_selector, result, window_id)
+                .unwrap();
+        });
+        Some(thread)
+    }
+
+    // Helper method to simplify Spotify authentication flow
+    fn start_spotify_auth(&mut self, ctx: &mut EventCtx, data: &mut AppState) {
+        // Set authentication to in-progress state
+        data.preferences.auth.result.defer_default();
+
+        // Generate auth URL and store PKCE verifier
+        let (auth_url, pkce_verifier) = oauth::generate_auth_url(8888);
+        let config = data.preferences.auth.session_config(); // Keep config local
+
+        // Spawn authentication thread
+        self.spotify_thread = Authenticate::spawn_auth_thread(
+            ctx,
+            move || {
+                // Listen for authorization code
+                let code = oauth::get_authcode_listener(
+                    SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8888),
+                    Duration::from_secs(300),
+                )
+                .map_err(|e| e.to_string())?;
+
+                // Exchange code for access token
+                let token = oauth::exchange_code_for_token(8888, code, pkce_verifier);
+
+                // Try to authenticate with token, with retries
+                let mut retries = 3;
+                while retries > 0 {
+                    match Authentication::authenticate_and_get_credentials(SessionConfig {
+                        login_creds: Credentials::from_access_token(token.clone()),
+                        ..config.clone()
+                    }) {
+                        Ok(credentials) => return Ok(credentials),
+                        Err(e) if retries > 1 => {
+                            log::warn!("authentication failed, retrying: {:?}", e);
+                            retries -= 1;
+                        }
+                        Err(e) => return Err(e),
+                    }
+                }
+                Err("Authentication retries exceeded".to_string())
+            },
+            Self::SPOTIFY_RESPONSE,
+            self.spotify_thread.take(),
+        );
+
+        // Open browser with authorization URL
+        if open::that(&auth_url).is_err() {
+            data.error_alert("Failed to open browser");
+            // Resolve the promise with an error immediately
+            data.preferences
+                .auth
+                .result
+                .reject((), "Failed to open browser".to_string());
+        }
     }
 }
 
 impl Authenticate {
-    const REQUEST: Selector = Selector::new("app.preferences.authenticate-request");
-    const RESPONSE: Selector<Result<Credentials, String>> =
-        Selector::new("app.preferences.authenticate-response");
+    pub const SPOTIFY_REQUEST: Selector =
+        Selector::new("app.preferences.spotify.authenticate-request");
+    pub const SPOTIFY_RESPONSE: Selector<Result<Credentials, String>> =
+        Selector::new("app.preferences.spotify.authenticate-response");
+
+    // Selector for initializing fields
+    pub const INITIALIZE_LASTFM_FIELDS: Selector =
+        Selector::new("app.preferences.lastfm.initialize-fields");
+
+    // Last.fm selectors
+    pub const LASTFM_REQUEST: Selector =
+        Selector::new("app.preferences.lastfm.authenticate-request");
+    pub const LASTFM_RESPONSE: Selector<Result<String, String>> =
+        Selector::new("app.preferences.lastfm.authenticate-response");
 }
 
 impl<W: Widget<AppState>> Controller<AppState, W> for Authenticate {
@@ -334,73 +577,15 @@ impl<W: Widget<AppState>> Controller<AppState, W> for Authenticate {
         env: &Env,
     ) {
         match event {
-            Event::Command(cmd) if cmd.is(Self::REQUEST) => {
-                data.preferences.auth.result.defer_default();
-
-                let (auth_url, pkce_verifier) = oauth::generate_auth_url(8888);
-                if webbrowser::open(&auth_url).is_err() {
-                    data.error_alert("Failed to open browser");
-                    return;
-                }
-
-                let config = data.preferences.auth.session_config();
-                let widget_id = ctx.widget_id();
-                let event_sink = ctx.get_external_handle();
-                let thread = thread::spawn(move || {
-                    match oauth::get_authcode_listener(
-                        SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8888),
-                        std::time::Duration::from_secs(300),
-                    ) {
-                        Ok(code) => {
-                            let token = oauth::exchange_code_for_token(8888, code, pkce_verifier);
-                            let response =
-                                Authentication::authenticate_and_get_credentials(SessionConfig {
-                                    login_creds: Credentials::from_access_token(token),
-                                    ..config
-                                });
-                            event_sink
-                                .submit_command(Self::RESPONSE, response, widget_id)
-                                .unwrap();
-                        }
-                        Err(e) => {
-                            event_sink
-                                .submit_command(Self::RESPONSE, Err(e), widget_id)
-                                .unwrap();
-                        }
-                    }
-                });
-                self.thread.replace(thread);
+            Event::Command(cmd) if cmd.is(Self::SPOTIFY_REQUEST) => {
+                self.start_spotify_auth(ctx, data);
                 ctx.set_handled();
             }
-            Event::Command(cmd) if cmd.is(Self::RESPONSE) => {
-                self.thread.take();
-
-                let result = cmd
-                    .get_unchecked(Self::RESPONSE)
-                    .to_owned()
-                    .map(|credentials| {
-                        let username = credentials.username.clone().unwrap_or_default();
-                        WebApi::global().load_local_tracks(&username);
-                        data.config.store_credentials(credentials);
-                        data.config.save();
-                    });
-                let is_ok = result.is_ok();
-
-                data.preferences.auth.result.resolve_or_reject((), result);
-
-                if is_ok {
-                    match &self.tab {
-                        AccountTab::FirstSetup => {
-                            ctx.submit_command(cmd::SHOW_MAIN);
-                            ctx.submit_command(commands::CLOSE_WINDOW);
-                        }
-                        AccountTab::InPreferences => {
-                            ctx.submit_command(cmd::SESSION_CONNECT);
-                        }
-                    }
-                }
-                data.preferences.auth.access_token.clear();
-
+            Event::Command(cmd) if cmd.is(Self::INITIALIZE_LASTFM_FIELDS) => {
+                data.preferences.auth.lastfm_api_key_input =
+                    data.config.lastfm_api_key.clone().unwrap_or_default();
+                data.preferences.auth.lastfm_api_secret_input =
+                    data.config.lastfm_api_secret.clone().unwrap_or_default();
                 ctx.set_handled();
             }
             Event::Command(cmd) if cmd.is(cmd::LOG_OUT) => {
@@ -411,10 +596,121 @@ impl<W: Widget<AppState>> Controller<AppState, W> for Authenticate {
                 ctx.submit_command(cmd::SHOW_ACCOUNT_SETUP);
                 ctx.set_handled();
             }
+            Event::Command(cmd) if cmd.is(Self::LASTFM_REQUEST) => {
+                // Use the temporary input fields from preferences state.
+                let api_key = data.preferences.auth.lastfm_api_key_input.clone();
+                let api_secret = data.preferences.auth.lastfm_api_secret_input.clone();
+
+                if api_key.is_empty() || api_secret.is_empty() {
+                    data.preferences.lastfm_auth_result =
+                        Some("API Key and Secret required.".to_string());
+                    ctx.set_handled();
+                    return;
+                }
+
+                data.preferences.lastfm_auth_result = Some("Connecting...".to_string());
+                let port = 8889;
+                let callback_url = format!("http://127.0.0.1:{}/lastfm_callback", port);
+                let socket_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), port);
+
+                match lastfm::generate_lastfm_auth_url(&api_key, &callback_url) {
+                    Ok(auth_url) => {
+                        self.lastfm_thread = Authenticate::spawn_auth_thread(
+                            ctx,
+                            move || {
+                                let token = lastfm::get_lastfm_token_listener(
+                                    socket_addr,
+                                    Duration::from_secs(300),
+                                )
+                                .map_err(|e| e.to_string())?;
+                                log::info!("received Last.fm token, exchanging...");
+                                lastfm::exchange_token_for_session(&api_key, &api_secret, &token)
+                                    .map_err(|e| format!("Token exchange failed: {}", e))
+                            },
+                            Self::LASTFM_RESPONSE,
+                            self.lastfm_thread.take(),
+                        );
+
+                        if open::that(&auth_url).is_err() {
+                            data.preferences.lastfm_auth_result =
+                                Some("Failed to open browser.".to_string());
+                            // No promise to reject here, just update the status message
+                        }
+                    }
+                    Err(e) => {
+                        data.preferences.lastfm_auth_result =
+                            Some(format!("Failed to create auth URL: {}", e));
+                    }
+                }
+                ctx.set_handled();
+            }
+            Event::Command(cmd) if cmd.is(Self::SPOTIFY_RESPONSE) => {
+                let result = cmd.get_unchecked(Self::SPOTIFY_RESPONSE);
+                match result {
+                    Ok(credentials) => {
+                        // Update session config with the new credentials
+                        data.session.update_config(SessionConfig {
+                            login_creds: credentials.clone(),
+                            proxy_url: Config::proxy(),
+                        });
+                        data.config.store_credentials(credentials.clone());
+                        data.config.save();
+                        data.preferences.auth.result.resolve((), ());
+                        // Handle UI flow based on tab type
+                        if matches!(self.tab, AccountTab::FirstSetup) {
+                            ctx.submit_command(cmd::CLOSE_ALL_WINDOWS);
+                            ctx.submit_command(cmd::SHOW_MAIN);
+                        }
+                    }
+                    Err(err) => {
+                        data.preferences.auth.result.reject((), err.clone());
+                    }
+                }
+                self.spotify_thread.take();
+                ctx.set_handled();
+            }
+            Event::Command(cmd) if cmd.is(Self::LASTFM_RESPONSE) => {
+                let result = cmd.get_unchecked(Self::LASTFM_RESPONSE);
+                match result {
+                    Ok(session_key) => {
+                        // On success, store the validated key/secret in config and save.
+                        data.config.lastfm_api_key =
+                            Some(data.preferences.auth.lastfm_api_key_input.clone());
+                        data.config.lastfm_api_secret =
+                            Some(data.preferences.auth.lastfm_api_secret_input.clone());
+                        data.config.lastfm_session_key = Some(session_key.clone());
+                        data.config.save();
+
+                        log::info!("Last.fm session key stored successfully.");
+
+                        data.preferences.lastfm_auth_result =
+                            Some("Success! Last.fm connected.".to_string());
+                    }
+                    Err(err) => {
+                        data.preferences.lastfm_auth_result = Some(err.clone());
+                    }
+                }
+                self.lastfm_thread.take();
+                ctx.set_handled();
+            }
             _ => {
                 child.event(ctx, event, data, env);
             }
         }
+    }
+
+    fn lifecycle(
+        &mut self,
+        child: &mut W,
+        ctx: &mut LifeCycleCtx,
+        event: &LifeCycle,
+        data: &AppState,
+        env: &Env,
+    ) {
+        if let LifeCycle::WidgetAdded = event {
+            ctx.submit_command(Self::INITIALIZE_LASTFM_FIELDS);
+        }
+        child.lifecycle(ctx, event, data, env);
     }
 }
 
@@ -528,7 +824,7 @@ fn about_tab_widget() -> impl Widget<AppState> {
         Label::new(psst_core::REMOTE_URL)
             .with_text_color(Color::rgb8(138, 180, 248))
             .on_left_click(|_, _, _, _| {
-                webbrowser::open(psst_core::REMOTE_URL).ok();
+                open::that(psst_core::REMOTE_URL).ok();
             }),
     );
 

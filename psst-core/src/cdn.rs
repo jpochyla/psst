@@ -133,28 +133,23 @@ fn parse_total_content_length(response: &ureq::Response) -> u64 {
         .header("Content-Range")
         .expect("Content-Range header not found")
         .split('/')
-        .last()
+        .next_back()
         .expect("Failed to parse Content-Range Header")
         .parse()
         .expect("Failed to parse Content-Range Header")
 }
 
 /// Parses an expiration of an audio file URL.
-/// Expiration is stored either as:
-///
-///  1. `exp` field after `__token__`:
-///     .../...a35817ca410?__token__=exp=1629466995~hmac=df348...
-///                                      ^========^
-///  2. or at the beginning of the first query parameter:
-///     .../59db919e18d6336461a0c71da051842ceef1b5af?1602319025_wu-SPeHxn...
-///                                                  ^========^
 fn parse_expiration(url: &str) -> Option<Duration> {
     let token_exp = url.split("__token__=exp=").nth(1);
     let expires_millis = if let Some(token_exp) = token_exp {
-        // Parse from the expiration token param.
+        // Parse from the expiration token param
         token_exp.split('~').next()?
+    } else if let Some(verify_exp) = url.split("verify=").nth(1) {
+        // Parse from verify parameter (new spotifycdn.com format)
+        verify_exp.split('-').next()?
     } else {
-        // Parse from the first param.
+        // Parse from the first param
         let first_param = url.split('?').nth(1)?;
         first_param.split('_').next()?
     };

@@ -10,7 +10,7 @@ use druid::{
 use itertools::Itertools;
 
 use crate::{
-    cmd::{self},
+    cmd::{self, ADD_TO_QUEUE, SHOW_ARTWORK, TOGGLE_LYRICS},
     controller::PlaybackController,
     data::{
         AppState, AudioAnalysis, Episode, NowPlaying, Playable, PlayableMatcher, Playback,
@@ -167,6 +167,9 @@ fn cover_widget(size: f64) -> impl Widget<NowPlaying> {
     })
     .fix_size(size, size)
     .clip(Size::new(size, size).to_rounded_rect(4.0))
+    .on_left_click(|ctx, _, _, _| {
+        ctx.submit_command(SHOW_ARTWORK);
+    })
 }
 
 fn playback_origin_icon(origin: &PlaybackOrigin) -> &'static SvgIcon {
@@ -186,20 +189,29 @@ fn playback_origin_icon(origin: &PlaybackOrigin) -> &'static SvgIcon {
 fn player_widget() -> impl Widget<Playback> {
     Flex::row()
         .with_child(
-            small_button_widget(&icons::SKIP_BACK)
-                .on_left_click(|ctx, _, _, _| ctx.submit_command(cmd::PLAY_PREVIOUS)),
+            small_button_widget(&icons::SKIP_BACK).on_left_click(|ctx, _, _, _| {
+                ctx.submit_command(cmd::PLAY_PREVIOUS);
+            }),
         )
         .with_default_spacer()
         .with_child(player_play_pause_widget())
         .with_default_spacer()
         .with_child(
-            small_button_widget(&icons::SKIP_FORWARD)
-                .on_left_click(|ctx, _, _, _| ctx.submit_command(cmd::PLAY_NEXT)),
+            small_button_widget(&icons::SKIP_FORWARD).on_left_click(|ctx, _, _, _| {
+                ctx.submit_command(cmd::PLAY_NEXT);
+            }),
         )
         .with_default_spacer()
         .with_child(queue_behavior_widget())
         .with_default_spacer()
         .with_child(Maybe::or_empty(durations_widget).lens(Playback::now_playing))
+        .with_child(
+            small_button_widget(&icons::MUSIC_NOTE)
+                .align_right()
+                .on_left_click(|ctx, _, _, _| {
+                    ctx.submit_command(TOGGLE_LYRICS);
+                }),
+        )
         .padding(theme::grid(2.0))
 }
 
