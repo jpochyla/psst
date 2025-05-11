@@ -1,12 +1,13 @@
 name: CI
 
 on:
-  push: # Now triggers on pushes to any branch
+  push:
+    branches: [main] # Only pushes to main for the primary release flow
   pull_request:
     branches: [main] # Continues to trigger for PRs targeting main
 
 permissions:
-  contents: read
+  contents: read # Default read permission
 
 env:
   CARGO_TERM_COLOR: always
@@ -293,10 +294,10 @@ jobs:
 
   release:
     needs: [build, deb]
-    if: true
+    # This job will now be controlled by conditions on individual steps for PRs vs. main pushes
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: write # Needed for creating releases and pushing to repo (for Brewfile)
     steps:
       - name: Set Version Info
         env:
@@ -343,41 +344,19 @@ jobs:
           echo "EOF" >> $GITHUB_ENV
         working-directory: ${{ github.workspace }} # Ensure artifacts/checksums.txt is found
 
-      - name: Create Release
-        if: github.event_name == 'pull_request' # Only run for pull requests
+      - name: Create Main Branch Release
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         uses: softprops/action-gh-release@v2
         with:
-          name: test-pr-${{ github.head_ref }}-Psst ${{ env.RELEASE_VERSION }}
-          tag_name: test-pr-${{ github.head_ref }}-v${{ env.RELEASE_VERSION }}
-          prerelease: true
+          name: Psst ${{ env.RELEASE_VERSION }}
+          tag_name: v${{ env.RELEASE_VERSION }} # Versioned tag, e.g., v2025.05.11-abcdef0
+          make_latest: true # This will mark this release as the 'latest' on GitHub
+          prerelease: false
           body: |
-            ## Psst ${{ env.RELEASE_VERSION }} (TEST PR Release)
-            Built: ${{ env.CURRENT_DATE_STR }}
-            Version: ${{ env.VERSION }}
-
-            **SHA256 Checksums:**
-            ```
-            ${{ env.CHECKSUMS_CONTENT }}
-            ```
-
-            **Homebrew:**
-            `brew install --cask psst`
-          files: ${{ env.RELEASE_FILES }}
-          generate_release_notes: false
-
-      - name: Create or Update Latest Build Release
-        uses: softprops/action-gh-release@v2
-        with:
-          name: test-pr-${{ github.head_ref || github.ref_name }}-Psst Latest Build (main branch)
-          tag_name: latest-test-pr-${{ github.head_ref || github.ref_name }} # Fixed tag for the latest build
-          prerelease: true
-          body: |
-            ## Psst Latest Build (main) (TEST PR Release)
+            ## Psst ${{ env.RELEASE_VERSION }}
             Commit: ${{ github.sha }}
             Built: ${{ env.CURRENT_DATE_STR }}
             Workflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-
-            Auto-updated from the main branch. For stable releases, see other tags.
 
             **SHA256 Checksums:**
             ```
