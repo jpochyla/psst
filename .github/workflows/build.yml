@@ -2,12 +2,12 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main] # Only pushes to main for the primary release flow
   pull_request:
-    branches: [main]
+    branches: [main] # Continues to trigger for PRs targeting main
 
 permissions:
-  contents: read
+  contents: read # Default read permission
 
 env:
   CARGO_TERM_COLOR: always
@@ -236,7 +236,7 @@ jobs:
       - name: Build Package
         run: |
           cat pkg/DEBIAN/control
-          dpkg-deb -b pkg/ psst_$(git rev-list --count HEAD)_${{ matrix.arch }}.deb
+          dpkg-deb -b pkg/ psst-${{ matrix.arch }}.deb
 
       - name: Upload Debian Package
         uses: actions/upload-artifact@v4
@@ -294,10 +294,10 @@ jobs:
 
   release:
     needs: [build, deb]
-    if: github.ref == 'refs/heads/main'
+    # This job will now be controlled by conditions on individual steps for PRs vs. main pushes
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: write # Needed for creating releases and pushing to repo (for Brewfile)
     steps:
       - name: Set Version Info
         env:
@@ -307,14 +307,16 @@ jobs:
           echo "VERSION=0.1.0,$(date +'%Y%m%d.%H%M%S')" >> $GITHUB_ENV
           SHORT_SHA=${FULL_SHA::7}
           echo "RELEASE_VERSION=$(date +'%Y.%m.%d')-$SHORT_SHA" >> $GITHUB_ENV
-          echo "RELEASE_FILES=artifacts/Psst.dmg/Psst.dmg
-          artifacts/Psst.dmg.sha256/Psst.dmg.sha256
-          artifacts/Psst.exe/psst-gui.exe
-          artifacts/psst-x86_64-unknown-linux-gnu/psst
-          artifacts/psst-aarch64-unknown-linux-gnu/psst
-          artifacts/checksums.txt
-          artifacts/psst-deb-amd64/*.deb
-          artifacts/psst-deb-arm64/*.deb" >> $GITHUB_ENV
+          echo "RELEASE_FILES<<EOF" >> $GITHUB_ENV
+          echo "artifacts/Psst.dmg/Psst.dmg" >> $GITHUB_ENV
+          echo "artifacts/Psst.dmg.sha256/Psst.dmg.sha256" >> $GITHUB_ENV
+          echo "artifacts/Psst.exe/psst-gui.exe" >> $GITHUB_ENV
+          echo "artifacts/psst-x86_64-unknown-linux-gnu/psst > psst-x86_64-unknown-linux-gnu" >> $GITHUB_ENV
+          echo "artifacts/psst-aarch64-unknown-linux-gnu/psst > psst-aarch64-unknown-linux-gnu" >> $GITHUB_ENV
+          echo "artifacts/checksums.txt" >> $GITHUB_ENV
+          echo "artifacts/psst-deb-amd64/psst-amd64.deb" >> $GITHUB_ENV
+          echo "artifacts/psst-deb-arm64/psst-arm64.deb" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
@@ -324,48 +326,41 @@ jobs:
       - name: Generate SHA256 checksums
         run: |
           cd artifacts
-          find . -type f -name "*.dmg" -o -name "*.exe" -o -name "psst-*" | while read file; do
-            if [[ "$file" != *.sha256 ]]; then
+          find . -type f | while read file; do
+            if [[ "$file" != *.sha256 && "$file" != "./checksums.txt" ]]; then
               sha256sum "$file" >> checksums.txt
             fi
           done
+        working-directory: ${{ github.workspace }} # Ensure cd artifacts works as expected
 
-      - name: Create Release
+      - name: Prepare Release Body Data
+        id: release_data
+        run: |
+          echo "CURRENT_DATE_STR=$(date)" >> $GITHUB_ENV
+          # Read checksums into a variable, handling potential newlines for multiline env var
+          CHECKSUMS=$(cat artifacts/checksums.txt)
+          echo "CHECKSUMS_CONTENT<<EOF" >> $GITHUB_ENV
+          echo "$CHECKSUMS" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+        working-directory: ${{ github.workspace }} # Ensure artifacts/checksums.txt is found
+
+      - name: Create Main Branch Release
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         uses: softprops/action-gh-release@v2
         with:
           name: Psst ${{ env.RELEASE_VERSION }}
-          tag_name: v${{ env.RELEASE_VERSION }}
+          tag_name: v${{ env.RELEASE_VERSION }} # Versioned tag, e.g., v2025.05.11-abcdef0
+          make_latest: true # This will mark this release as the 'latest' on GitHub
+          prerelease: false
           body: |
             ## Psst ${{ env.RELEASE_VERSION }}
-            Built: $(date)
-            Version: ${{ env.VERSION }}
-
-            **SHA256 Checksums:**
-            ```
-            $(cat artifacts/checksums.txt)
-            ```
-
-            **Homebrew:**
-            `brew install --cask psst`
-          files: ${{ env.RELEASE_FILES }}
-          generate_release_notes: false
-
-      - name: Create or Update Latest Build Release
-        uses: softprops/action-gh-release@v2
-        with:
-          name: Psst Latest Build (main branch)
-          tag_name: latest # Fixed tag for the latest build
-          body: |
-            ## Psst Latest Build (main)
             Commit: ${{ github.sha }}
-            Built: $(date)
+            Built: ${{ env.CURRENT_DATE_STR }}
             Workflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
-            Auto-updated from the main branch. For stable releases, see other tags.
-
             **SHA256 Checksums:**
             ```
-            $(cat artifacts/checksums.txt)
+            ${{ env.CHECKSUMS_CONTENT }}
             ```
           files: ${{ env.RELEASE_FILES }}
           generate_release_notes: false
