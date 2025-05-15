@@ -124,7 +124,7 @@ impl TryFrom<String> for EpisodeId {
     type Error = &'static str;
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
-        ItemId::from_base62(&value, ItemIdType::Podcast)
+        ItemId::from_base62(&value, ItemIdType::Podcast, false)
             .ok_or("Invalid ID")
             .map(Self)
     }

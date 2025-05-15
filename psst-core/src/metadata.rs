@@ -31,8 +31,8 @@ impl Fetch for Episode {
 
 pub trait ToMediaPath {
     fn is_restricted_in_region(&self, country: &str) -> bool;
-    fn find_allowed_alternative(&self, country: &str) -> Option<ItemId>;
-    fn to_media_path(&self, preferred_bitrate: usize) -> Option<MediaPath>;
+    fn find_allowed_alternative(&self, country: &str, from_added_queue: bool) -> Option<ItemId>;
+    fn to_media_path(&self, preferred_bitrate: usize, from_added_queue: bool) -> Option<MediaPath>;
 }
 
 impl ToMediaPath for Track {
@@ -42,18 +42,18 @@ impl ToMediaPath for Track {
             .any(|rest| is_restricted_in_region(rest, country))
     }
 
-    fn find_allowed_alternative(&self, country: &str) -> Option<ItemId> {
+    fn find_allowed_alternative(&self, country: &str, from_added_queue: bool) -> Option<ItemId> {
         let alt_track = self
             .alternative
             .iter()
             .find(|alt_track| !alt_track.is_restricted_in_region(country))?;
-        ItemId::from_raw(alt_track.gid.as_ref()?, ItemIdType::Track)
+        ItemId::from_raw(alt_track.gid.as_ref()?, ItemIdType::Track, from_added_queue)
     }
 
-    fn to_media_path(&self, preferred_bitrate: usize) -> Option<MediaPath> {
+    fn to_media_path(&self, preferred_bitrate: usize, from_added_queue: bool) -> Option<MediaPath> {
         let file = select_preferred_file(&self.file, preferred_bitrate)?;
         Some(MediaPath {
-            item_id: ItemId::from_raw(self.gid.as_ref()?, ItemIdType::Track)?,
+            item_id: ItemId::from_raw(self.gid.as_ref()?, ItemIdType::Track, from_added_queue)?,
             file_id: FileId::from_raw(file.file_id.as_ref()?)?,
             file_format: AudioFormat::from_protocol(file.format?),
             duration: Duration::from_millis(self.duration? as u64),
@@ -68,14 +68,14 @@ impl ToMediaPath for Episode {
             .any(|rest| is_restricted_in_region(rest, country))
     }
 
-    fn find_allowed_alternative(&self, _country: &str) -> Option<ItemId> {
+    fn find_allowed_alternative(&self, _country: &str, _from_added_queue: bool) -> Option<ItemId> {
         None
     }
 
-    fn to_media_path(&self, preferred_bitrate: usize) -> Option<MediaPath> {
+    fn to_media_path(&self, preferred_bitrate: usize, from_added_queue: bool) -> Option<MediaPath> {
         let file = select_preferred_file(&self.file, preferred_bitrate)?;
         Some(MediaPath {
-            item_id: ItemId::from_raw(self.gid.as_ref()?, ItemIdType::Podcast)?,
+            item_id: ItemId::from_raw(self.gid.as_ref()?, ItemIdType::Podcast, from_added_queue)?,
             file_id: FileId::from_raw(file.file_id.as_ref()?)?,
             file_format: AudioFormat::from_protocol(file.format?),
             duration: Duration::from_millis(self.duration? as u64),

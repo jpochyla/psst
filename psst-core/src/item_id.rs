@@ -59,51 +59,56 @@ pub enum ItemIdType {
 pub struct ItemId {
     pub id: u128,
     pub id_type: ItemIdType,
+    pub from_added_queue: bool,
 }
 
 const BASE62_DIGITS: &[u8] = b"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
 const BASE16_DIGITS: &[u8] = b"0123456789abcdef";
 
 impl ItemId {
-    pub const INVALID: Self = Self::new(0u128, ItemIdType::Unknown);
+    pub const INVALID: Self = Self::new(0u128, ItemIdType::Unknown, false);
 
-    pub const fn new(id: u128, id_type: ItemIdType) -> Self {
-        Self { id, id_type }
+    pub const fn new(id: u128, id_type: ItemIdType, from_added_queue: bool) -> Self {
+        Self {
+            id,
+            id_type,
+            from_added_queue,
+        }
     }
 
-    pub fn from_base16(id: &str, id_type: ItemIdType) -> Option<Self> {
+    pub fn from_base16(id: &str, id_type: ItemIdType, from_added_queue: bool) -> Option<Self> {
         let mut n = 0_u128;
         for c in id.as_bytes() {
             let d = BASE16_DIGITS.iter().position(|e| e == c)? as u128;
             n *= 16;
             n += d;
         }
-        Some(Self::new(n, id_type))
+        Some(Self::new(n, id_type, from_added_queue))
     }
 
-    pub fn from_base62(id: &str, id_type: ItemIdType) -> Option<Self> {
+    pub fn from_base62(id: &str, id_type: ItemIdType, from_added_queue: bool) -> Option<Self> {
         let mut n = 0_u128;
         for c in id.as_bytes() {
             let d = BASE62_DIGITS.iter().position(|e| e == c)? as u128;
             n *= 62;
             n += d;
         }
-        Some(Self::new(n, id_type))
+        Some(Self::new(n, id_type, from_added_queue))
     }
 
-    pub fn from_raw(data: &[u8], id_type: ItemIdType) -> Option<Self> {
+    pub fn from_raw(data: &[u8], id_type: ItemIdType, from_added_queue: bool) -> Option<Self> {
         let n = u128::from_be_bytes(data.try_into().ok()?);
-        Some(Self::new(n, id_type))
+        Some(Self::new(n, id_type, from_added_queue))
     }
 
-    pub fn from_uri(uri: &str) -> Option<Self> {
+    pub fn from_uri(uri: &str, from_added_queue: bool) -> Option<Self> {
         let gid = uri.split(':').next_back()?;
         if uri.contains(":episode:") {
-            Self::from_base62(gid, ItemIdType::Podcast)
+            Self::from_base62(gid, ItemIdType::Podcast, from_added_queue)
         } else if uri.contains(":track:") {
-            Self::from_base62(gid, ItemIdType::Track)
+            Self::from_base62(gid, ItemIdType::Track, from_added_queue)
         } else {
-            Self::from_base62(gid, ItemIdType::Unknown)
+            Self::from_base62(gid, ItemIdType::Unknown, from_added_queue)
         }
     }
 
@@ -137,10 +142,11 @@ impl ItemId {
         self.id.to_be_bytes()
     }
 
-    pub fn from_local(path: PathBuf) -> Self {
+    pub fn from_local(path: PathBuf, from_added_queue: bool) -> Self {
         Self::new(
             LocalItemRegistry::get_or_insert(path),
             ItemIdType::LocalFile,
+            from_added_queue,
         )
     }
 
