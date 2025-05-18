@@ -209,6 +209,7 @@ impl AppDelegate<AppState> for Delegate {
                         .call()
                         .and_then(|response| {
                             response
+                                .into_body()
                                 .into_reader()
                                 .bytes()
                                 .collect::<Result<Vec<_>, _>>()
