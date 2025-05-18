@@ -88,7 +88,7 @@ impl Queue {
             // items and set the position to 0.
             if self.positions.len() > 1 {
                 self.positions.swap(0, self.position);
-                self.positions[1..].shuffle(&mut rand::thread_rng());
+                self.positions[1..].shuffle(&mut rand::rng());
             }
             self.position = 0;
         } else {

@@ -118,9 +118,13 @@ impl Transport {
             ap_list: Vec<String>,
         }
 
-        let agent = default_ureq_agent_builder(proxy_url)?.build();
+        let agent: ureq::Agent = default_ureq_agent_builder(proxy_url).build().into();
         log::info!("requesting AP list from {}", AP_RESOLVE_ENDPOINT);
-        let data: APResolveData = agent.get(AP_RESOLVE_ENDPOINT).call()?.into_json()?;
+        let data: APResolveData = agent
+            .get(AP_RESOLVE_ENDPOINT)
+            .call()?
+            .into_body()
+            .read_json()?;
         if data.ap_list.is_empty() {
             log::warn!("received empty AP list from server");
             Err(Error::UnexpectedResponse)

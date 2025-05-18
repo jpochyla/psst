@@ -3859,7 +3859,7 @@ dependencies = [
  "parking_lot",
  "psst-protocol",
  "quick-protobuf",
- "rand 0.8.5",
+ "rand 0.9.1",
  "rangemap",
  "rb",
  "rustfm-scrobble",
@@ -3871,7 +3871,7 @@ dependencies = [
  "symphonia",
  "tempfile",
  "time 0.3.41",
- "ureq 2.12.1",
+ "ureq 3.0.11",
  "url",
  "windows 0.61.1",
 ]
@@ -5069,9 +5069,9 @@ checksum = "61c41af27dd6d1e27b1b16b489db798443478cef1f06a660c96db617ba5de3b1"
 
 [[package]]
 name = "tempfile"
-version = "3.19.1"
+version = "3.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7437ac7763b9b123ccf33c338a5cc1bac6f69b45a136c19bdd8a65e3916435bf"
+checksum = "e8a64e3985349f2441a1a9ef0b853f869006c3855f2cda6862a94d26ebb9d6a1"
 dependencies = [
  "fastrand 2.3.0",
  "getrandom 0.3.2",
@@ -5578,24 +5578,6 @@ dependencies = [
  "url",
  "webpki",
  "webpki-roots 0.21.1",
-]
-
-[[package]]
-name = "ureq"
-version = "2.12.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "02d1a66277ed75f640d608235660df48c8e3c19f3b4edb6a263315626cc3c01d"
-dependencies = [
- "base64 0.22.1",
- "flate2",
- "log",
- "once_cell",
- "rustls 0.23.27",
- "rustls-pki-types",
- "serde",
- "serde_json",
- "url",
- "webpki-roots 0.26.11",
 ]
 
 [[package]]
