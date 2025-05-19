@@ -236,7 +236,7 @@ jobs:
       - name: Build Package
         run: |
           cat pkg/DEBIAN/control
-          dpkg-deb -b pkg/ psst_$(git rev-list --count HEAD)_${{ matrix.arch }}.deb
+          dpkg-deb -b pkg/ psst-${{ matrix.arch }}.deb
 
       - name: Upload Debian Package
         uses: actions/upload-artifact@v4
@@ -294,7 +294,6 @@ jobs:
 
   release:
     needs: [build, deb]
-    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -307,14 +306,16 @@ jobs:
           echo "VERSION=0.1.0,$(date +'%Y%m%d.%H%M%S')" >> $GITHUB_ENV
           SHORT_SHA=${FULL_SHA::7}
           echo "RELEASE_VERSION=$(date +'%Y.%m.%d')-$SHORT_SHA" >> $GITHUB_ENV
-          echo "RELEASE_FILES=artifacts/Psst.dmg/Psst.dmg
-          artifacts/Psst.dmg.sha256/Psst.dmg.sha256
-          artifacts/Psst.exe/psst-gui.exe
-          artifacts/psst-x86_64-unknown-linux-gnu/psst
-          artifacts/psst-aarch64-unknown-linux-gnu/psst
-          artifacts/checksums.txt
-          artifacts/psst-deb-amd64/*.deb
-          artifacts/psst-deb-arm64/*.deb" >> $GITHUB_ENV
+          echo "RELEASE_FILES<<EOF" >> $GITHUB_ENV
+          echo "artifacts/Psst.dmg/Psst.dmg"                             # Release asset: Psst.dmg
+          echo "artifacts/Psst.dmg.sha256/Psst.dmg.sha256"               # Release asset: Psst.dmg.sha256
+          echo "artifacts/Psst.exe/psst-gui.exe > Psst.exe"              # Original: psst-gui.exe, Release asset: Psst.exe
+          echo "artifacts/psst-x86_64-unknown-linux-gnu/psst > psst-linux-x86_64" # Release asset: psst-linux-x86_64
+          echo "artifacts/psst-aarch64-unknown-linux-gnu/psst > psst-linux-aarch64" # Release asset: psst-linux-aarch64
+          echo "artifacts/checksums.txt"                                 # Release asset: checksums.txt
+          echo "artifacts/psst-deb-amd64/psst-amd64.deb"                 # Release asset: psst-amd64.deb
+          echo "artifacts/psst-deb-arm64/psst-arm64.deb"                 # Release asset: psst-arm64.deb
+          echo "EOF" >> $GITHUB_ENV
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
@@ -324,48 +325,41 @@ jobs:
       - name: Generate SHA256 checksums
         run: |
           cd artifacts
-          find . -type f -name "*.dmg" -o -name "*.exe" -o -name "psst-*" | while read file; do
-            if [[ "$file" != *.sha256 ]]; then
+          find . -type f | while read file; do
+            if [[ "$file" != *.sha256 && "$file" != "./checksums.txt" ]]; then
               sha256sum "$file" >> checksums.txt
             fi
           done
+        working-directory: ${{ github.workspace }} # Ensure cd artifacts works as expected
 
-      - name: Create Release
+      - name: Prepare Release Body Data
+        id: release_data
+        run: |
+          echo "CURRENT_DATE_STR=$(date)" >> $GITHUB_ENV
+          # Read checksums into a variable, handling potential newlines for multiline env var
+          CHECKSUMS=$(cat artifacts/checksums.txt)
+          echo "CHECKSUMS_CONTENT<<EOF" >> $GITHUB_ENV
+          echo "$CHECKSUMS" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+        working-directory: ${{ github.workspace }}
+
+      - name: Create Main Branch Release
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         uses: softprops/action-gh-release@v2
         with:
-          name: Psst ${{ env.RELEASE_VERSION }}
-          tag_name: v${{ env.RELEASE_VERSION }}
+          name: Psst (rolling release - ${{ env.RELEASE_VERSION }})
+          tag_name: rolling
+          make_latest: true
+          prerelease: false
           body: |
             ## Psst ${{ env.RELEASE_VERSION }}
-            Built: $(date)
-            Version: ${{ env.VERSION }}
-
-            **SHA256 Checksums:**
-            ```
-            $(cat artifacts/checksums.txt)
-            ```
-
-            **Homebrew:**
-            `brew install --cask psst`
-          files: ${{ env.RELEASE_FILES }}
-          generate_release_notes: false
-
-      - name: Create or Update Latest Build Release
-        uses: softprops/action-gh-release@v2
-        with:
-          name: Psst Latest Build (main branch)
-          tag_name: latest # Fixed tag for the latest build
-          body: |
-            ## Psst Latest Build (main)
             Commit: ${{ github.sha }}
-            Built: $(date)
+            Built: ${{ env.CURRENT_DATE_STR }}
             Workflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
-            Auto-updated from the main branch. For stable releases, see other tags.
-
             **SHA256 Checksums:**
             ```
-            $(cat artifacts/checksums.txt)
+            ${{ env.CHECKSUMS_CONTENT }}
             ```
           files: ${{ env.RELEASE_FILES }}
           generate_release_notes: false
