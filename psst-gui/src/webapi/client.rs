@@ -925,7 +925,6 @@ impl WebApi {
             .query("market", "from_token");
 
         let mut results = Vector::new();
-
         self.for_all_pages(request, |page: Page<EpisodeLink>| {
             if !page.items.is_empty() {
                 let ids = page.items.into_iter().map(|link| link.id);

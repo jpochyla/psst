@@ -20,7 +20,7 @@ git-version = { version = "0.3.9" }
 log = { version = "0.4.22" }
 num-bigint = { version = "0.4.6", features = ["rand"] }
 num-traits = { version = "0.2.19" }
-oauth2 = { version = "4.4.2" }
+oauth2 = { version = "5.0.0", default-features = false, features = ["ureq"]}
 once_cell = { version = "1.20.2" }
 parking_lot = { version = "0.12.3" }
 quick-protobuf = { version = "0.8.1" }
