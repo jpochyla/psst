@@ -9,17 +9,21 @@ pub const NET_CONNECT_TIMEOUT: Duration = Duration::from_millis(8 * 1000);
 
 pub const NET_IO_TIMEOUT: Duration = Duration::from_millis(16 * 1000);
 
-pub fn default_ureq_agent_builder(proxy_url: Option<&str>) -> Result<ureq::AgentBuilder, Error> {
-    let builder = ureq::AgentBuilder::new()
-        .timeout_connect(NET_CONNECT_TIMEOUT)
-        .timeout_read(NET_IO_TIMEOUT)
-        .timeout_write(NET_IO_TIMEOUT);
-    if let Some(url) = proxy_url {
-        let proxy = ureq::Proxy::new(url)?;
-        Ok(builder.proxy(proxy))
-    } else {
-        Ok(builder)
+pub fn default_ureq_agent_builder(
+    proxy_url: Option<&str>,
+) -> ureq::config::ConfigBuilder<ureq::typestate::AgentScope> {
+    let mut agent = ureq::Agent::config_builder()
+        .timeout_global(Some(Duration::from_secs(5)))
+        .timeout_connect(Some(NET_CONNECT_TIMEOUT))
+        .timeout_recv_response(Some(NET_IO_TIMEOUT))
+        .timeout_send_request(Some(NET_IO_TIMEOUT));
+
+    if let Some(proxy_url) = proxy_url {
+        let proxy = ureq::Proxy::new(proxy_url).ok();
+        agent = agent.proxy(proxy);
     }
+
+    agent
 }
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord, Default)]

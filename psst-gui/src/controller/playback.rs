@@ -224,7 +224,7 @@ impl PlaybackController {
                     PlaybackState::Playing => MediaPlayback::Playing { progress },
                     PlaybackState::Paused => MediaPlayback::Paused { progress },
                 })
-                .unwrap();
+                .unwrap_or_default();
         }
     }
 

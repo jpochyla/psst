@@ -23,10 +23,10 @@ pub struct Cdn {
 
 impl Cdn {
     pub fn new(session: SessionService, proxy_url: Option<&str>) -> Result<CdnHandle, Error> {
-        let agent = default_ureq_agent_builder(proxy_url)?.build();
+        let agent = default_ureq_agent_builder(proxy_url).build();
         Ok(Arc::new(Self {
             session,
-            agent,
+            agent: agent.into(),
             token_provider: TokenProvider::new(),
         }))
     }
@@ -44,7 +44,7 @@ impl Cdn {
             .query("product", "9")
             .query("platform", "39")
             .query("alt", "json")
-            .set("Authorization", &format!("Bearer {}", access_token.token))
+            .header("Authorization", &format!("Bearer {}", access_token.token))
             .call()?;
 
         #[derive(Deserialize)]
@@ -53,7 +53,7 @@ impl Cdn {
         }
 
         // Deserialize the response and pick a file URL from the returned CDN list.
-        let locations: AudioFileLocations = response.into_json()?;
+        let locations: AudioFileLocations = response.into_body().read_json()?;
         let file_uri = locations
             .cdnurl
             .into_iter()
@@ -77,10 +77,10 @@ impl Cdn {
         let response = self
             .agent
             .get(uri)
-            .set("Range", &range_header(offset, length))
+            .header("Range", &range_header(offset, length))
             .call()?;
         let total_length = parse_total_content_length(&response);
-        let data_reader = response.into_reader();
+        let data_reader = response.into_body().into_reader();
         Ok((total_length, data_reader))
     }
 }
@@ -128,10 +128,13 @@ fn range_header(offfset: u64, length: u64) -> String {
 ///
 /// For example, returns 146515 for a response with header
 /// "Content-Range: bytes 0-1023/146515".
-fn parse_total_content_length(response: &ureq::Response) -> u64 {
+fn parse_total_content_length(response: &ureq::http::response::Response<ureq::Body>) -> u64 {
     response
-        .header("Content-Range")
+        .headers()
+        .get("Content-Range")
         .expect("Content-Range header not found")
+        .to_str()
+        .expect("Failed to parse Content-Range Header")
         .split('/')
         .next_back()
         .expect("Failed to parse Content-Range Header")
