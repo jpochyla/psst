@@ -54,6 +54,13 @@ impl Playable {
         }
     }
 
+    pub fn artist(&self) -> Arc<String> {
+        match self {
+            Playable::Track(track) => Arc::new(track.artist_names()),
+            Playable::Episode(episode) => Arc::new(episode.show.name.to_string()),
+        }
+    }
+
     pub fn duration(&self) -> Duration {
         match self {
             Playable::Track(track) => track.duration,
@@ -134,6 +141,7 @@ impl NowPlaying {
 pub enum PlaybackOrigin {
     Home,
     Library,
+    Queue,
     Album(AlbumLink),
     Artist(ArtistLink),
     Playlist(PlaylistLink),
@@ -147,6 +155,8 @@ impl PlaybackOrigin {
         match &self {
             PlaybackOrigin::Home => Nav::Home,
             PlaybackOrigin::Library => Nav::SavedTracks,
+            // Change this
+            PlaybackOrigin::Queue => Nav::Home,
             PlaybackOrigin::Album(link) => Nav::AlbumDetail(link.clone(), None),
             PlaybackOrigin::Artist(link) => Nav::ArtistDetail(link.clone()),
             PlaybackOrigin::Playlist(link) => Nav::PlaylistDetail(link.clone()),
@@ -162,6 +172,7 @@ impl fmt::Display for PlaybackOrigin {
         match &self {
             PlaybackOrigin::Home => f.write_str("Home"),
             PlaybackOrigin::Library => f.write_str("Saved Tracks"),
+            PlaybackOrigin::Queue => f.write_str("Queue"),
             PlaybackOrigin::Album(link) => link.name.fmt(f),
             PlaybackOrigin::Artist(link) => link.name.fmt(f),
             PlaybackOrigin::Playlist(link) => link.name.fmt(f),

@@ -90,11 +90,11 @@ fn load_media_path_from_track_or_alternative(
             // The track is regionally restricted and is unavailable.  Let's try to find an
             // alternative track.
             let alt_id = track
-                .find_allowed_alternative(&user_country)
+                .find_allowed_alternative(&user_country, item_id.from_added_queue)
                 .ok_or(Error::MediaFileNotFound)?;
             let alt_track = load_track(alt_id, session, cache)?;
             let alt_path = alt_track
-                .to_media_path(config.bitrate)
+                .to_media_path(config.bitrate, item_id.from_added_queue)
                 .ok_or(Error::MediaFileNotFound)?;
             // We've found an alternative track with a fitting audio file.  Let's cheat a
             // little and pretend we've obtained it from the requested track.
@@ -108,7 +108,7 @@ fn load_media_path_from_track_or_alternative(
             // Either we do not have a country code loaded or the track is available, return
             // it.
             track
-                .to_media_path(config.bitrate)
+                .to_media_path(config.bitrate, item_id.from_added_queue)
                 .ok_or(Error::MediaFileNotFound)?
         }
     };
@@ -129,7 +129,7 @@ fn load_media_path_from_episode(
             return Err(Error::MediaFileNotFound);
         }
         _ => episode
-            .to_media_path(config.bitrate)
+            .to_media_path(config.bitrate, item_id.from_added_queue)
             .ok_or(Error::MediaFileNotFound)?,
     };
     Ok(path)

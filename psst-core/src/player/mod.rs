@@ -7,6 +7,7 @@ mod worker;
 use std::{mem, thread, thread::JoinHandle, time::Duration};
 
 use crossbeam_channel::{unbounded, Receiver, Sender};
+use log::info;
 
 use crate::{
     audio::output::{AudioOutput, AudioSink, DefaultAudioOutput, DefaultAudioSink},
@@ -119,7 +120,10 @@ impl Player {
             PlayerCommand::Seek { position } => self.seek(position),
             PlayerCommand::Configure { config } => self.configure(config),
             PlayerCommand::SetQueueBehavior { behavior } => self.queue.set_behaviour(behavior),
+            PlayerCommand::SkipToPlaceInQueue { item } => self.queue.skip_to_place_in_queue(item),
+            PlayerCommand::ClearQueue => self.queue.clear_user_items(),
             PlayerCommand::AddToQueue { item } => self.queue.add(item),
+            PlayerCommand::RemoveFromQueue { item } => self.queue.remove(item),
             PlayerCommand::SetVolume { volume } => self.set_volume(volume),
         }
     }
@@ -289,14 +293,18 @@ impl Player {
     }
 
     fn play_loaded(&mut self, loaded_item: LoadedPlaybackItem) {
+        info!("{:?}", loaded_item.file.path());
         log::info!("starting playback");
         let path = loaded_item.file.path();
         let position = Duration::default();
         self.playback_mgr.play(loaded_item);
+        info!("111");
         self.state = PlayerState::Playing { path, position };
+        info!("22");
         self.sender
             .send(PlayerEvent::Playing { path, position })
             .unwrap();
+        info!("3333");
     }
 
     fn pause(&mut self) {
@@ -423,9 +431,16 @@ pub enum PlayerCommand {
     SetQueueBehavior {
         behavior: QueueBehavior,
     },
+    SkipToPlaceInQueue {
+        item: usize,
+    },
     AddToQueue {
         item: PlaybackItem,
     },
+    RemoveFromQueue {
+        item: usize,
+    },
+    ClearQueue,
     /// Change playback volume to a value in 0.0..=1.0 range.
     SetVolume {
         volume: f64,
