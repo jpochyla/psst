@@ -307,14 +307,14 @@ jobs:
           SHORT_SHA=${FULL_SHA::7}
           echo "RELEASE_VERSION=$(date +'%Y.%m.%d')-$SHORT_SHA" >> $GITHUB_ENV
           echo "RELEASE_FILES<<EOF" >> $GITHUB_ENV
-          echo "artifacts/Psst.dmg/Psst.dmg"                             # Release asset: Psst.dmg
-          echo "artifacts/Psst.dmg.sha256/Psst.dmg.sha256"               # Release asset: Psst.dmg.sha256
-          echo "artifacts/Psst.exe/psst-gui.exe > Psst.exe"              # Original: psst-gui.exe, Release asset: Psst.exe
-          echo "artifacts/psst-x86_64-unknown-linux-gnu/psst > psst-linux-x86_64" # Release asset: psst-linux-x86_64
-          echo "artifacts/psst-aarch64-unknown-linux-gnu/psst > psst-linux-aarch64" # Release asset: psst-linux-aarch64
-          echo "artifacts/checksums.txt"                                 # Release asset: checksums.txt
-          echo "artifacts/psst-deb-amd64/psst-amd64.deb"                 # Release asset: psst-amd64.deb
-          echo "artifacts/psst-deb-arm64/psst-arm64.deb"                 # Release asset: psst-arm64.deb
+          echo "artifacts/Psst.dmg/Psst.dmg"
+          echo "artifacts/Psst.dmg.sha256/Psst.dmg.sha256"
+          echo "artifacts/Psst.exe"
+          echo "artifacts/psst-linux-x86_64"
+          echo "artifacts/psst-linux-aarch64"
+          echo "artifacts/checksums.txt"
+          echo "artifacts/psst-deb-amd64/psst-amd64.deb"
+          echo "artifacts/psst-deb-arm64/psst-arm64.deb"
           echo "EOF" >> $GITHUB_ENV
 
       - name: Download all artifacts
@@ -331,6 +331,13 @@ jobs:
             fi
           done
         working-directory: ${{ github.workspace }} # Ensure cd artifacts works as expected
+
+      - name: Prepare Release Assets
+        run: |
+          mv artifacts/Psst.exe/psst-gui.exe artifacts/Psst.exe
+          mv artifacts/psst-x86_64-unknown-linux-gnu/psst artifacts/psst-linux-x86_64
+          mv artifacts/psst-aarch64-unknown-linux-gnu/psst artifacts/psst-linux-aarch64
+        working-directory: ${{ github.workspace }}
 
       - name: Prepare Release Body Data
         id: release_data
@@ -352,7 +359,9 @@ jobs:
           make_latest: true
           prerelease: false
           body: |
-            ## Psst ${{ env.RELEASE_VERSION }}
+            This is a rolling release of Psst, published automatically on every commit to main.
+
+            Version: ${{ env.RELEASE_VERSION }}
             Commit: ${{ github.sha }}
             Built: ${{ env.CURRENT_DATE_STR }}
             Workflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
