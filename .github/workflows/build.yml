@@ -325,6 +325,37 @@ jobs:
         with:
           path: artifacts
 
+      - name: Prepare Release Assets
+        run: |
+          # Prepare Windows executable: artifacts/Psst.exe/psst-gui.exe -> artifacts/Psst.exe
+          if [ -f "artifacts/Psst.exe/psst-gui.exe" ]; then
+            mv "artifacts/Psst.exe/psst-gui.exe" "artifacts/Psst.exe.tmp" && \
+            rmdir "artifacts/Psst.exe" && \
+            mv "artifacts/Psst.exe.tmp" "artifacts/Psst.exe" && \
+            echo "Windows executable prepared: artifacts/Psst.exe"
+          else
+            echo "Warning: Windows executable artifacts/Psst.exe/psst-gui.exe not found."
+          fi
+
+          # Prepare Linux x86_64 executable: artifacts/psst-x86_64-unknown-linux-gnu/psst -> artifacts/psst-linux-x86_64
+          if [ -f "artifacts/psst-x86_64-unknown-linux-gnu/psst" ]; then
+            mv "artifacts/psst-x86_64-unknown-linux-gnu/psst" "artifacts/psst-linux-x86_64" && \
+            rmdir "artifacts/psst-x86_64-unknown-linux-gnu" && \
+            echo "Linux x86_64 executable prepared: artifacts/psst-linux-x86_64"
+          else
+            echo "Warning: Linux x86_64 executable artifacts/psst-x86_64-unknown-linux-gnu/psst not found."
+          fi
+
+          # Prepare Linux aarch64 executable: artifacts/psst-aarch64-unknown-linux-gnu/psst -> artifacts/psst-linux-aarch64
+          if [ -f "artifacts/psst-aarch64-unknown-linux-gnu/psst" ]; then
+            mv "artifacts/psst-aarch64-unknown-linux-gnu/psst" "artifacts/psst-linux-aarch64" && \
+            rmdir "artifacts/psst-aarch64-unknown-linux-gnu" && \
+            echo "Linux aarch64 executable prepared: artifacts/psst-linux-aarch64"
+          else
+            echo "Warning: Linux aarch64 executable artifacts/psst-aarch64-unknown-linux-gnu/psst not found."
+          fi
+        working-directory: ${{ github.workspace }}
+
       - name: Generate SHA256 checksums
         run: |
           cd artifacts
@@ -333,43 +364,8 @@ jobs:
               sha256sum "$file" >> checksums.txt
             fi
           done
+          echo "Checksums generated in artifacts/checksums.txt"
         working-directory: ${{ github.workspace }} # Ensure cd artifacts works as expected
-
-      - name: Prepare Release Assets
-        run: |
-          # Correctly move and rename the Windows executable
-          # The artifact 'Psst.exe' (containing psst-gui.exe) is downloaded by 'download-artifact'
-          # into 'artifacts/Psst.exe/psst-gui.exe'.
-          # We want the final asset to be a single file named 'artifacts/Psst.exe'.
-          if [ -f "artifacts/Psst.exe/psst-gui.exe" ]; then
-            echo "Moving Windows executable..."
-            mv "artifacts/Psst.exe/psst-gui.exe" "artifacts/Psst.exe_temp_file"
-            echo "Removing temporary directory artifacts/Psst.exe..."
-            rmdir "artifacts/Psst.exe"
-            echo "Renaming temporary file to artifacts/Psst.exe..."
-            mv "artifacts/Psst.exe_temp_file" "artifacts/Psst.exe"
-            echo "Windows executable prepared."
-          else
-            echo "Warning: Expected Windows executable artifacts/Psst.exe/psst-gui.exe not found."
-          fi
-
-          # Prepare Linux assets
-          if [ -f "artifacts/psst-x86_64-unknown-linux-gnu/psst" ]; then
-            echo "Moving Linux x86_64 executable..."
-            mv "artifacts/psst-x86_64-unknown-linux-gnu/psst" "artifacts/psst-linux-x86_64"
-            echo "Linux x86_64 executable prepared."
-          else
-            echo "Warning: Expected Linux x86_64 executable artifacts/psst-x86_64-unknown-linux-gnu/psst not found."
-          fi
-
-          if [ -f "artifacts/psst-aarch64-unknown-linux-gnu/psst" ]; then
-            echo "Moving Linux aarch64 executable..."
-            mv "artifacts/psst-aarch64-unknown-linux-gnu/psst" "artifacts/psst-linux-aarch64"
-            echo "Linux aarch64 executable prepared."
-          else
-            echo "Warning: Expected Linux aarch64 executable artifacts/psst-aarch64-unknown-linux-gnu/psst not found."
-          fi
-        working-directory: ${{ github.workspace }}
 
       - name: Prepare Release Body Data
         id: release_data
@@ -381,6 +377,33 @@ jobs:
           echo "$CHECKSUMS" >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
         working-directory: ${{ github.workspace }}
+
+      - name: Create PR Draft Release
+        if: github.event_name == 'pull_request'
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Psst (PR #${{ github.event.number }} Draft - ${{ env.RELEASE_VERSION }})
+          tag_name: pr-${{ github.event.number }}-${{ env.RELEASE_VERSION }}
+          draft: true
+          prerelease: true
+          make_latest: false
+          body: |
+            **DRAFT RELEASE FOR PULL REQUEST #${{ github.event.number }}**
+
+            This is a draft release to preview the artifacts for PR #${{ github.event.number }}.
+            It will not be made the "latest" release and should be manually deleted after reviewing.
+
+            Version: ${{ env.RELEASE_VERSION }}
+            Commit: ${{ github.sha }}
+            Built: ${{ env.CURRENT_DATE_STR }}
+            Workflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+            **SHA256 Checksums:**
+            ```
+            ${{ env.CHECKSUMS_CONTENT }}
+            ```
+          files: ${{ steps.set_paths.outputs.release_files_list }}
+          generate_release_notes: false
 
       - name: Create Main Branch Release
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
