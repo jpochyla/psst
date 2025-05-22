@@ -828,21 +828,24 @@ impl WebApi {
         }
 
         let variables = json!( {
-            "uri": format!("spotify:artist:{}", id),
             "locale": "",
-            "includePrerelease": true,  // Assuming this returns a Result<String, Error>
+            "uri": format!("spotify:artist:{}", id),
         });
-        let variables_json = serde_json::to_string(&variables);
+        let json = json!({
+            "extensions": {
+                "persistedQuery": {
+                    "version": 1,
+                    "sha256Hash": "1ac33ddab5d39a3a9c27802774e6d78b9405cc188c6f75aed007df2a32737c72"
+                }
+            },
+            "operationName": "queryArtistOverview",
+            "variables": variables,
+        });
 
-        let request = &RequestBuilder::new(
-            format!("v1/artists/{}/related-artists", id),
-            Method::Get,
-            None,
-        )
-        .set_base_uri("api-partner.spotify.com")
-        .query("operationName", "queryArtistOverview")
-        .query("variables", variables_json.unwrap().to_string())
-        .query("extensions", EXTENSIONS_JSON);
+        let request = &RequestBuilder::new(format!("pathfinder/v2/query"), Method::Get, None)
+            .set_base_uri("api-partner.spotify.com")
+            .set_method(Method::Post)
+            .set_body(Some(json));
 
         let result: Cached<Welcome> = self.load_cached(request, "artist-info", id)?;
 
@@ -1083,7 +1086,7 @@ impl WebApi {
 const EXTENSIONS_JSON: &str = r#"{
     "persistedQuery": {
         "version": 1,
-        "sha256Hash": "eb3fba2d388cf4fc4d696b1757a58584e9538a3b515ea742e9cc9465807340be"
+        "sha256Hash": "1ac33ddab5d39a3a9c27802774e6d78b9405cc188c6f75aed007df2a32737c72"
     }
 }"#;
 
@@ -1595,6 +1598,10 @@ impl RequestBuilder {
     }
     fn get_method(&self) -> &Method {
         &self.method
+    }
+    fn set_method(mut self, method: Method) -> Self {
+        self.method = method;
+        self
     }
     fn set_base_uri(mut self, url: impl Display) -> Self {
         self.base_uri = url.to_string();
