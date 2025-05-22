@@ -378,34 +378,7 @@ jobs:
           echo "EOF" >> $GITHUB_ENV
         working-directory: ${{ github.workspace }}
 
-      - name: Create PR Draft Release
-        if: github.event_name == 'pull_request'
-        uses: softprops/action-gh-release@v2
-        with:
-          name: Psst (PR #${{ github.event.number }} Draft - ${{ env.RELEASE_VERSION }})
-          tag_name: pr-${{ github.event.number }}-${{ env.RELEASE_VERSION }}
-          draft: true
-          prerelease: true
-          make_latest: false
-          body: |
-            **DRAFT RELEASE FOR PULL REQUEST #${{ github.event.number }}**
-
-            This is a draft release to preview the artifacts for PR #${{ github.event.number }}.
-            It will not be made the "latest" release and should be manually deleted after reviewing.
-
-            Version: ${{ env.RELEASE_VERSION }}
-            Commit: ${{ github.sha }}
-            Built: ${{ env.CURRENT_DATE_STR }}
-            Workflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-
-            **SHA256 Checksums:**
-            ```
-            ${{ env.CHECKSUMS_CONTENT }}
-            ```
-          files: ${{ steps.set_paths.outputs.release_files_list }}
-          generate_release_notes: false
-
-      - name: Create Main Branch Release
+      - name: Create Main Release
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         uses: softprops/action-gh-release@v2
         with:
