@@ -842,7 +842,7 @@ impl WebApi {
             "variables": variables,
         });
 
-        let request = &RequestBuilder::new(format!("pathfinder/v2/query"), Method::Get, None)
+        let request = &RequestBuilder::new("pathfinder/v2/query".to_string(), Method::Get, None)
             .set_base_uri("api-partner.spotify.com")
             .set_method(Method::Post)
             .set_body(Some(json));
