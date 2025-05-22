@@ -312,7 +312,7 @@ jobs:
           echo "release_files_list<<$delimiter" >> $GITHUB_OUTPUT
           echo "artifacts/Psst.dmg/Psst.dmg" >> $GITHUB_OUTPUT
           echo "artifacts/Psst.dmg.sha256/Psst.dmg.sha256" >> $GITHUB_OUTPUT
-          echo "artifacts/Psst.exe" >> $GITHUB_OUTPUT
+          echo "artifacts/Psst.exe/psst-gui.exe" >> $GITHUB_OUTPUT
           echo "artifacts/psst-linux-x86_64" >> $GITHUB_OUTPUT
           echo "artifacts/psst-linux-aarch64" >> $GITHUB_OUTPUT
           echo "artifacts/checksums.txt" >> $GITHUB_OUTPUT
@@ -325,18 +325,8 @@ jobs:
         with:
           path: artifacts
 
-      - name: Prepare Release Assets
+      - name: Prepare Linux Release Assets
         run: |
-          # Prepare Windows executable: artifacts/Psst.exe/psst-gui.exe -> artifacts/Psst.exe
-          if [ -f "artifacts/Psst.exe/psst-gui.exe" ]; then
-            mv "artifacts/Psst.exe/psst-gui.exe" "artifacts/Psst.exe.tmp" && \
-            rmdir "artifacts/Psst.exe" && \
-            mv "artifacts/Psst.exe.tmp" "artifacts/Psst.exe" && \
-            echo "Windows executable prepared: artifacts/Psst.exe"
-          else
-            echo "Warning: Windows executable artifacts/Psst.exe/psst-gui.exe not found."
-          fi
-
           # Prepare Linux x86_64 executable: artifacts/psst-x86_64-unknown-linux-gnu/psst -> artifacts/psst-linux-x86_64
           if [ -f "artifacts/psst-x86_64-unknown-linux-gnu/psst" ]; then
             mv "artifacts/psst-x86_64-unknown-linux-gnu/psst" "artifacts/psst-linux-x86_64" && \

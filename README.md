@@ -23,7 +23,7 @@ You can download the latest release for Windows, Linux, and macOS from the [GitH
 | Debian Package (amd64) | [Download](https://github.com/jpochyla/psst/releases/latest/download/psst-amd64.deb)                 |
 | Debian Package (arm64) | [Download](https://github.com/jpochyla/psst/releases/latest/download/psst-arm64.deb)                 |
 | macOS                  | [Download](https://github.com/jpochyla/psst/releases/latest/download/Psst.dmg)                       |
-| Windows                | [Download](https://github.com/jpochyla/psst/releases/latest/download/Psst.exe)                   |
+| Windows                | [Download](https://github.com/jpochyla/psst/releases/latest/download/psst-gui.exe)                   |
 
 Unofficial builds of Psst are also available through the [AUR](https://aur.archlinux.org/packages/psst-git) and [Homebrew](https://formulae.brew.sh/cask/psst).
 
