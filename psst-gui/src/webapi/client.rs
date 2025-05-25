@@ -1346,7 +1346,7 @@ impl WebApi {
 
         let topics = topics.iter().map(SearchTopic::as_str).join(",");
         let request = &RequestBuilder::new("v1/search", Method::Get, None)
-            .query("q", query)
+            .query("q", query.replace(" ", "%20"))
             .query("type", &topics)
             .query("limit", limit.to_string())
             .query("marker", "from_token");
