@@ -15,7 +15,6 @@ use druid::{
 };
 
 use itertools::Itertools;
-use log::info;
 use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
 use serde::{de::DeserializeOwned, Deserialize};
