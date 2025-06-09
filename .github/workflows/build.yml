@@ -135,25 +135,12 @@ jobs:
             "target/release/bundle/osx/Psst.app"
         working-directory: psst-gui
 
-      - name: Generate DMG Checksum
-        if: runner.os == 'macOS'
-        run: |
-          shasum -a 256 "Psst.dmg" > "Psst.dmg.sha256"
-        working-directory: psst-gui
-
       - name: Upload macOS DMG
         uses: actions/upload-artifact@v4
         if: runner.os == 'macOS'
         with:
           name: Psst.dmg
           path: ./psst-gui/Psst.dmg
-
-      - name: Upload macOS DMG Checksum
-        uses: actions/upload-artifact@v4
-        if: runner.os == 'macOS'
-        with:
-          name: Psst.dmg.sha256
-          path: ./psst-gui/Psst.dmg.sha256
 
       - name: Make Linux Binary Executable
         if: runner.os == 'Linux'
@@ -311,11 +298,9 @@ jobs:
           delimiter=$(uuidgen)
           echo "release_files_list<<$delimiter" >> $GITHUB_OUTPUT
           echo "artifacts/Psst.dmg/Psst.dmg" >> $GITHUB_OUTPUT
-          echo "artifacts/Psst.dmg.sha256/Psst.dmg.sha256" >> $GITHUB_OUTPUT
           echo "artifacts/Psst.exe/psst-gui.exe" >> $GITHUB_OUTPUT
           echo "artifacts/psst-linux-x86_64" >> $GITHUB_OUTPUT
           echo "artifacts/psst-linux-aarch64" >> $GITHUB_OUTPUT
-          echo "artifacts/checksums.txt" >> $GITHUB_OUTPUT
           echo "artifacts/psst-deb-amd64/psst-amd64.deb" >> $GITHUB_OUTPUT
           echo "artifacts/psst-deb-arm64/psst-arm64.deb" >> $GITHUB_OUTPUT
           echo "$delimiter" >> $GITHUB_OUTPUT
@@ -346,33 +331,17 @@ jobs:
           fi
         working-directory: ${{ github.workspace }}
 
-      - name: Generate SHA256 checksums
-        run: |
-          cd artifacts
-          find . -type f | while read file; do
-            if [[ "$file" != *.sha256 && "$file" != "./checksums.txt" ]]; then
-              sha256sum "$file" >> checksums.txt
-            fi
-          done
-          echo "Checksums generated in artifacts/checksums.txt"
-        working-directory: ${{ github.workspace }} # Ensure cd artifacts works as expected
-
       - name: Prepare Release Body Data
         id: release_data
         run: |
           echo "CURRENT_DATE_STR=$(date)" >> $GITHUB_ENV
-          # Read checksums into a variable, handling potential newlines for multiline env var
-          CHECKSUMS=$(cat artifacts/checksums.txt)
-          echo "CHECKSUMS_CONTENT<<EOF" >> $GITHUB_ENV
-          echo "$CHECKSUMS" >> $GITHUB_ENV
-          echo "EOF" >> $GITHUB_ENV
         working-directory: ${{ github.workspace }}
 
       - name: Create Main Release
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         uses: softprops/action-gh-release@v2
         with:
-          name: Psst (rolling release - ${{ env.RELEASE_VERSION }})
+          name: Continuous release (${{ env.RELEASE_VERSION }})
           tag_name: rolling
           make_latest: true
           prerelease: false
@@ -384,9 +353,6 @@ jobs:
             Built: ${{ env.CURRENT_DATE_STR }}
             Workflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
-            **SHA256 Checksums:**
-            ```
-            ${{ env.CHECKSUMS_CONTENT }}
-            ```
+            See the release assets for SHA256 checksums.
           files: ${{ steps.set_paths.outputs.release_files_list }}
           generate_release_notes: false
