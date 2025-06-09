@@ -192,12 +192,9 @@ pub fn playable_widget(track: &Track, display: Display) -> impl Widget<PlayRow<A
                 return *target_id == row.item.id;
             }
             // Otherwise check if it's playing or is the current track
-            row.is_playing
-                || row
-                    .ctx
-                    .now_playing
-                    .as_ref()
-                    .is_some_and(|playable| matches!(playable, Playable::Track(track) if track.id == row.item.id))
+            row.is_playing || row.ctx.now_playing.as_ref().is_some_and(|playable| {
+                matches!(playable, Playable::Track(track) if track.id == row.item.id)
+            })
         })
         .rounded(theme::BUTTON_BORDER_RADIUS)
         .context_menu(track_row_menu)

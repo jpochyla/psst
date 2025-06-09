@@ -84,7 +84,7 @@ pub fn is_playing_marker_widget() -> impl Widget<bool> {
         let y = ctx.size().height / 2.0;
         let line = Line::new((0.0, y), (ctx.size().width, y));
         let color = if *is_playing {
-            env.get(theme::GREY_400)
+            env.get(theme::GREY_300)
         } else {
             env.get(theme::GREY_500)
         };
