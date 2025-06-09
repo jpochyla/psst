@@ -15,6 +15,7 @@ use druid::{
 };
 
 use itertools::Itertools;
+use log::info;
 use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
 use serde::{de::DeserializeOwned, Deserialize};
@@ -300,13 +301,13 @@ impl WebApi {
 
     fn load_and_return_home_section(&self, request: &RequestBuilder) -> Result<MixedView, Error> {
         #[derive(Deserialize)]
-        pub struct Welcome {
-            data: WelcomeData,
+        pub struct Root {
+            data: Data,
         }
 
         #[derive(Deserialize)]
         #[serde(rename_all = "camelCase")]
-        pub struct WelcomeData {
+        pub struct Data {
             home_sections: HomeSections,
         }
 
@@ -456,7 +457,13 @@ impl WebApi {
         }
 
         // Extract the playlists
-        let result: Welcome = self.load(request)?;
+        let result: Root = match self.load(request) {
+            Ok(res) => res,
+            Err(e) => {
+                info!("Error loading home section: {}", e);
+                return Err(e);
+            }
+        };
 
         let mut title: Arc<str> = Arc::from("");
         let mut playlist: Vector<Playlist> = Vector::new();
@@ -842,10 +849,9 @@ impl WebApi {
             "variables": variables,
         });
 
-        let request = &RequestBuilder::new("pathfinder/v2/query".to_string(), Method::Get, None)
-            .set_base_uri("api-partner.spotify.com")
-            .set_method(Method::Post)
-            .set_body(Some(json));
+        let request =
+            &RequestBuilder::new("pathfinder/v2/query".to_string(), Method::Post, Some(json))
+                .set_base_uri("api-partner.spotify.com");
 
         let result: Cached<Welcome> = self.load_cached(request, "artist-info", id)?;
 
@@ -1082,14 +1088,6 @@ impl WebApi {
     }
 }
 
-// From https://github.com/KRTirtho/spotube/blob/9b024120601c0d381edeab4460cb22f87149d0f8/lib%2Fservices%2Fcustom_spotify_endpoints%2Fspotify_endpoints.dart keep and eye on this and change accordingly
-const EXTENSIONS_JSON: &str = r#"{
-    "persistedQuery": {
-        "version": 1,
-        "sha256Hash": "1ac33ddab5d39a3a9c27802774e6d78b9405cc188c6f75aed007df2a32737c72"
-    }
-}"#;
-
 /// View endpoints.
 impl WebApi {
     pub fn get_user_info(&self) -> Result<(String, String), Error> {
@@ -1100,42 +1098,44 @@ impl WebApi {
         }
         let token = self.access_token()?;
 
-        let request = &RequestBuilder::new(
-            format!("http://{}/{}", "ip-api.com", "json"),
-            Method::Get,
-            None,
-        )
-        .query("fields", "260")
-        .header("Authorization", format!("Bearer {token}"));
+        let request = &RequestBuilder::new(format!("json"), Method::Get, None)
+            .set_protocol("http")
+            .set_base_uri("ip-api.com")
+            .query("fields", "260")
+            .header("Authorization", format!("Bearer {token}"));
+        let result: User = self.load(request)?;
 
-        let result: Cached<User> = self.load_cached(request, "User_info", "usrinfo")?;
-
-        Ok((result.data.region, result.data.timezone))
-    }
-
-    fn build_home_request(&self, section_uri: &str) -> Result<String, Error> {
-        let (time_zone, country) = self.get_user_info()?;
-        let access_token = self.access_token()?;
-
-        let variables = json!( {
-            "uri": section_uri,
-            "timeZone": time_zone,
-            "sp_t": access_token,
-            "country": country,
-            "sectionItemsOffset": 0,
-            "sectionItemsLimit": 20,
-        });
-
-        serde_json::to_string(&variables)
-            .map_err(|e| Error::WebApiError(format!("Couldn't serialize variables: {e}")))
+        Ok((result.region, result.timezone))
     }
 
     pub fn get_section(&self, section_uri: &str) -> Result<MixedView, Error> {
-        let request = &RequestBuilder::new("pathfinder/v1/query", Method::Get, None)
-            .set_base_uri("api-partner.spotify.com")
-            .query("operationName", "homeSection")
-            .query("variables", &self.build_home_request(section_uri)?)
-            .query("extensions", EXTENSIONS_JSON);
+        let (cntry, time_zone) = self.get_user_info()?;
+        let access_token = self.access_token()?;
+
+        let json = json!({
+            "extensions": {
+                "persistedQuery": {
+                    "version": 1,
+                    // From https://github.com/KRTirtho/spotube/blob/9b024120601c0d381edeab4460cb22f87149d0f8/lib%2Fservices%2Fcustom_spotify_endpoints%2Fspotify_endpoints.dart keep and eye on this and change accordingly
+                    "sha256Hash": "eb3fba2d388cf4fc4d696b1757a58584e9538a3b515ea742e9cc9465807340be"
+                }
+            },
+            "operationName": "homeSection",
+            "variables":  {
+                "sectionItemsLimit": 20,
+                "sectionItemsOffset": 0,
+                "sp_t": access_token,
+                "timeZone": time_zone,
+                "country": cntry,
+                "uri": section_uri
+            },
+        });
+
+        let request =
+            &RequestBuilder::new("pathfinder/v2/query".to_string(), Method::Post, Some(json))
+                .set_base_uri("api-partner.spotify.com")
+                .header("app-platform", "WebPlayer")
+                .header("Content-Type", "application/json");
 
         // Extract the playlists
         self.load_and_return_home_section(request)
@@ -1143,7 +1143,7 @@ impl WebApi {
 
     pub fn get_made_for_you(&self) -> Result<MixedView, Error> {
         // 0JQ5DAUnp4wcj0bCb3wh3S -> Daily mixes
-        self.get_section("spotify:section:0JQ5DAUnp4wcj0bCb3wh3S")
+        self.get_section("spotify:section:0JQ5DAqAJXkJGsa2DyEjKi")
     }
 
     pub fn get_top_mixes(&self) -> Result<MixedView, Error> {
@@ -1599,6 +1599,7 @@ impl RequestBuilder {
     fn get_method(&self) -> &Method {
         &self.method
     }
+    #[allow(dead_code)]
     fn set_method(mut self, method: Method) -> Self {
         self.method = method;
         self
