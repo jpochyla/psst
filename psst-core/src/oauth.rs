@@ -45,7 +45,8 @@ pub fn listen_for_callback_parameter(
             handle_callback_connection(&mut stream, &tx, parameter_name);
         } else {
             log::error!("Failed to accept connection on callback listener");
-            let _ = tx.send(Err(Error::IoError(std::io::Error::other(
+            let _ = tx.send(Err(Error::IoError(std::io::Error::new(
+                std::io::ErrorKind::Other,
                 "Failed to accept connection",
             ))));
         }
@@ -96,7 +97,8 @@ fn handle_callback_connection(
         }
     } else {
         log::error!("Failed to read request line from callback.");
-        let _ = tx.send(Err(Error::IoError(std::io::Error::other(
+        let _ = tx.send(Err(Error::IoError(std::io::Error::new(
+            std::io::ErrorKind::Other,
             "Failed to read request line",
         ))));
     }

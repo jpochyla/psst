@@ -25,7 +25,7 @@ pub struct QueueEntry {
     pub origin: PlaybackOrigin,
 }
 
-#[derive(Clone, Debug, Matcher)]
+#[derive(Clone, Debug, Data, Matcher)]
 pub enum Playable {
     Track(Arc<Track>),
     Episode(Arc<Episode>),
@@ -59,16 +59,6 @@ impl Playable {
             Playable::Track(track) => track.duration,
             Playable::Episode(episode) => episode.duration,
         }
-    }
-
-    pub fn same(&self, other: &Self) -> bool {
-        self.id() == other.id()
-    }
-}
-
-impl Data for Playable {
-    fn same(&self, other: &Self) -> bool {
-        self.same(other)
     }
 }
 
