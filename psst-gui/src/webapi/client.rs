@@ -1098,7 +1098,7 @@ impl WebApi {
         }
         let token = self.access_token()?;
 
-        let request = &RequestBuilder::new(format!("json"), Method::Get, None)
+        let request = &RequestBuilder::new("json".to_string(), Method::Get, None)
             .set_protocol("http")
             .set_base_uri("ip-api.com")
             .query("fields", "260")
