@@ -1,7 +1,6 @@
 mod checkbox;
 mod dispatcher;
 mod empty;
-pub mod fill_between;
 pub mod icons;
 mod link;
 mod maybe;
