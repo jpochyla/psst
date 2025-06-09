@@ -301,13 +301,13 @@ impl WebApi {
 
     fn load_and_return_home_section(&self, request: &RequestBuilder) -> Result<MixedView, Error> {
         #[derive(Deserialize)]
-        pub struct Root {
-            data: Data,
+        pub struct Welcome {
+            data: WelcomeData,
         }
 
         #[derive(Deserialize)]
         #[serde(rename_all = "camelCase")]
-        pub struct Data {
+        pub struct WelcomeData {
             home_sections: HomeSections,
         }
 
@@ -457,7 +457,7 @@ impl WebApi {
         }
 
         // Extract the playlists
-        let result: Root = match self.load(request) {
+        let result: Welcome = match self.load(request) {
             Ok(res) => res,
             Err(e) => {
                 info!("Error loading home section: {}", e);
@@ -1142,7 +1142,7 @@ impl WebApi {
     }
 
     pub fn get_made_for_you(&self) -> Result<MixedView, Error> {
-        // 0JQ5DAUnp4wcj0bCb3wh3S -> Daily mixes
+        // 0JQ5DAUnp4wcj0bCb3wh3S -> Made for you
         self.get_section("spotify:section:0JQ5DAqAJXkJGsa2DyEjKi")
     }
 
