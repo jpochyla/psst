@@ -1103,20 +1103,22 @@ impl WebApi {
             .set_base_uri("ip-api.com")
             .query("fields", "260")
             .header("Authorization", format!("Bearer {token}"));
-        let result: User = self.load(request)?;
 
-        Ok((result.region, result.timezone))
+        let result: Cached<User> = self.load_cached(request, "User_info", "usrinfo")?;
+
+        Ok((result.data.region, result.data.timezone))
     }
 
     pub fn get_section(&self, section_uri: &str) -> Result<MixedView, Error> {
-        let (cntry, time_zone) = self.get_user_info()?;
+        let (country, time_zone) = self.get_user_info()?;
         let access_token = self.access_token()?;
 
         let json = json!({
             "extensions": {
                 "persistedQuery": {
                     "version": 1,
-                    // From https://github.com/KRTirtho/spotube/blob/9b024120601c0d381edeab4460cb22f87149d0f8/lib%2Fservices%2Fcustom_spotify_endpoints%2Fspotify_endpoints.dart keep and eye on this and change accordingly
+                    // From https://github.com/KRTirtho/spotube/blob/9b024120601c0d381edeab4460cb22f87149d0f8/lib%2Fservices%2Fcustom_spotify_endpoints%2Fspotify_endpoints.dart
+                    // Keep and eye on this and change accordingly
                     "sha256Hash": "eb3fba2d388cf4fc4d696b1757a58584e9538a3b515ea742e9cc9465807340be"
                 }
             },
@@ -1126,7 +1128,7 @@ impl WebApi {
                 "sectionItemsOffset": 0,
                 "sp_t": access_token,
                 "timeZone": time_zone,
-                "country": cntry,
+                "country": country,
                 "uri": section_uri
             },
         });
@@ -1142,7 +1144,7 @@ impl WebApi {
     }
 
     pub fn get_made_for_you(&self) -> Result<MixedView, Error> {
-        // 0JQ5DAUnp4wcj0bCb3wh3S -> Made for you
+        // 0JQ5DAqAJXkJGsa2DyEjKi -> Made for you
         self.get_section("spotify:section:0JQ5DAqAJXkJGsa2DyEjKi")
     }
 
