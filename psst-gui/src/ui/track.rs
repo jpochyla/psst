@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use druid::{
-    widget::{CrossAxisAlignment, Either, Flex, Label, ViewSwitcher},
-    Env, LensExt, LocalizedString, Menu, MenuItem, Size, TextAlignment, Widget, WidgetExt,
+    widget::{CrossAxisAlignment, Either, Flex, Label, LineBreaking, ViewSwitcher},
+    Env, Lens, LensExt, LocalizedString, Menu, MenuItem, Size, TextAlignment, Widget, WidgetExt,
 };
 use psst_core::{
     audio::normalize::NormalizationLevel,
@@ -17,7 +17,7 @@ use crate::{
         QueueEntry, RecommendationsRequest, Track,
     },
     ui::playlist,
-    widget::{icons, Empty, MyWidgetExt, RemoteImage},
+    widget::{fill_between::FillBetween, icons, Empty, MyWidgetExt, RemoteImage},
 };
 
 use super::{
@@ -52,7 +52,7 @@ impl Display {
 
 pub fn playable_widget(track: &Track, display: Display) -> impl Widget<PlayRow<Arc<Track>>> {
     let mut main_row = Flex::row();
-    let mut major = Flex::row();
+    let mut major = Flex::row().cross_axis_alignment(CrossAxisAlignment::Center);
     let mut minor = Flex::row();
 
     if display.number {
@@ -73,7 +73,7 @@ pub fn playable_widget(track: &Track, display: Display) -> impl Widget<PlayRow<A
 
     if display.cover {
         let album_cover = rounded_cover_widget(theme::grid(4.0))
-            .padding_right(theme::grid(1.0)) // Instead of `add_default_spacer`.
+            .padding_right(theme::grid(1.0))
             .lens(PlayRow::item);
         main_row.add_child(Either::new(
             |row, _| row.ctx.show_track_cover,
@@ -85,36 +85,44 @@ pub fn playable_widget(track: &Track, display: Display) -> impl Widget<PlayRow<A
     if display.title {
         let track_name = Label::raw()
             .with_font(theme::UI_FONT_MEDIUM)
-            .lens(PlayRow::item.then(Track::name.in_arc()));
-        major.add_child(track_name);
+            .with_line_break_mode(LineBreaking::Clip)
+            .lens(PlayRow::item.then(Track::name.in_arc()))
+            .padding_right(theme::grid(1.0));
+        let is_playing = playable::is_playing_marker_widget().lens(PlayRow::is_playing);
+        major.add_flex_child(FillBetween::new(track_name, is_playing), 1.0);
     }
 
+    let mut minor_row = Flex::row();
     if track.explicit && (display.artist || display.album) {
         let icon = icons::EXPLICIT.scale(theme::ICON_SIZE_TINY);
-        minor.add_child(icon);
-        minor.add_spacer(theme::grid(0.5));
+        minor_row.add_child(icon);
+        minor_row.add_spacer(theme::grid(0.5));
     }
-
-    if display.artist {
-        let track_artists = Label::dynamic(|row: &PlayRow<Arc<Track>>, _| row.item.artist_names())
-            .with_text_size(theme::TEXT_SIZE_SMALL);
-        minor.add_child(track_artists);
-    }
-
-    if display.album {
-        let track_album = Label::raw()
-            .with_text_size(theme::TEXT_SIZE_SMALL)
-            .with_text_color(theme::PLACEHOLDER_COLOR)
-            .lens(PlayRow::item.then(Track::lens_album_name().in_arc()));
-        if display.artist {
-            minor.add_default_spacer();
+    let minor_label = Label::dynamic(move |row: &PlayRow<Arc<Track>>, _| {
+        let artist = if display.artist {
+            row.item.artist_names()
+        } else {
+            String::new()
+        };
+        let album = if display.album {
+            let mut album_name = String::new();
+            Track::lens_album_name().with(&row.item, |name| album_name = name.to_string());
+            album_name
+        } else {
+            String::new()
+        };
+        if !artist.is_empty() && !album.is_empty() {
+            format!("{} • {}", artist, album)
+        } else {
+            format!("{}{}", artist, album)
         }
-        minor.add_child(track_album);
-    }
+    })
+    .with_line_break_mode(LineBreaking::Clip)
+    .with_text_size(theme::TEXT_SIZE_SMALL)
+    .with_text_color(theme::PLACEHOLDER_COLOR);
 
-    let is_playing = playable::is_playing_marker_widget().lens(PlayRow::is_playing);
-    major.add_default_spacer();
-    major.add_flex_child(is_playing, 1.0);
+    minor_row.add_flex_child(minor_label, 1.0);
+    minor.add_flex_child(minor_row, 1.0);
 
     if display.popularity {
         let track_popularity = Label::<Arc<Track>>::dynamic(|track, _| {
@@ -175,7 +183,7 @@ pub fn playable_widget(track: &Track, display: Display) -> impl Widget<PlayRow<A
             1.0,
         )
         .with_default_spacer()
-        .with_child(saved)
+        .with_child(saved.center())
         .padding(theme::grid(1.0))
         .link()
         .active(|row: &PlayRow<Arc<Track>>, _env: &Env| {
