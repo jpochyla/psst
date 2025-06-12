@@ -1,7 +1,7 @@
 use druid::{
     im::Vector,
     kurbo::Circle,
-    widget::{CrossAxisAlignment, Flex, Label, LabelText, LineBreaking, List, Scroll},
+    widget::{CrossAxisAlignment, Either, Flex, Label, LabelText, LineBreaking, List, Scroll},
     BoxConstraints, Data, Env, Event, EventCtx, Insets, LayoutCtx, LensExt, LifeCycle,
     LifeCycleCtx, LocalizedString, Menu, MenuItem, PaintCtx, Point, Selector, Size, UnitPoint,
     UpdateCtx, Widget, WidgetExt, WidgetPod,
@@ -178,35 +178,41 @@ fn artist_info_widget() -> impl Widget<WithCtx<ArtistInfo>> {
     .clip(Size::new(size, size).to_rounded_rect(4.0))
     .lens(Ctx::data());
 
-    let biography = Flex::column()
-        .cross_axis_alignment(CrossAxisAlignment::Start)
-        .with_child(
-            Scroll::new(
-                Label::new(|data: &ArtistInfo, _env: &_| data.bio.clone())
-                    .with_line_break_mode(LineBreaking::WordWrap)
-                    .with_text_size(theme::TEXT_SIZE_NORMAL)
-                    .lens(Ctx::data()),
-            )
-            .vertical()
-            .fix_height(size - theme::grid(1.5)),
-        );
+    let biography = Scroll::new(
+        Label::new(|data: &ArtistInfo, _env: &_| data.bio.clone())
+            .with_line_break_mode(LineBreaking::WordWrap)
+            .with_text_size(theme::TEXT_SIZE_NORMAL)
+            .lens(Ctx::data()),
+    )
+    .vertical();
 
     let artist_stats = Flex::column()
-        .with_child(stat_row("Followers:", |info: &ArtistInfo| {
-            format!("{} followers", info.stats.followers)
-        }))
+        .with_child(Either::new(
+            |ctx: &WithCtx<ArtistInfo>, _| ctx.data.stats.followers > 0,
+            stat_row("Followers:", |info| {
+                utils::format_number_with_commas(info.stats.followers)
+            }),
+            Empty,
+        ))
         .with_default_spacer()
-        .with_child(stat_row("Monthly Listeners:", |info: &ArtistInfo| {
-            format!("{} listeners", info.stats.monthly_listeners)
-        }))
+        .with_child(Either::new(
+            |ctx: &WithCtx<ArtistInfo>, _| ctx.data.stats.monthly_listeners > 0,
+            stat_row("Monthly Listeners:", |info| {
+                utils::format_number_with_commas(info.stats.monthly_listeners)
+            }),
+            Empty,
+        ))
         .with_default_spacer()
-        .with_child(stat_row("Ranking:", |info: &ArtistInfo| {
-            if !info.stats.world_rank.starts_with("0") {
-                format!("#{} in the world", info.stats.world_rank)
-            } else {
-                "N/A".to_string()
-            }
-        }));
+        .with_child(Either::new(
+            |ctx: &WithCtx<ArtistInfo>, _| ctx.data.stats.world_rank > 0,
+            stat_row("Ranking:", |info| {
+                format!(
+                    "#{} in the world",
+                    utils::format_number_with_commas(info.stats.world_rank)
+                )
+            }),
+            Empty,
+        ));
 
     Flex::row()
         .with_child(artist_image)
@@ -258,13 +264,16 @@ impl<T: Data, B: Widget<T>, S: Widget<T>> Widget<T> for ArtistInfoLayout<T, B, S
         let max = bc.max();
         let wide_layout = max.width > theme::grid(60.0) + theme::GRID * 3.45;
         let padding = theme::grid(1.0);
+        let image_height = theme::grid(16.0);
 
         if wide_layout {
+            // In wide layout, the biography is left of the stats.
+            // The biography's height is constrained to the image height.
             let biography_width = max.width * 0.67 - padding / 2.0;
             let stats_width = max.width * 0.33 - padding / 2.0;
 
             let biography_bc =
-                BoxConstraints::new(Size::ZERO, Size::new(biography_width, max.height));
+                BoxConstraints::new(Size::ZERO, Size::new(biography_width, image_height));
             let stats_bc = BoxConstraints::new(Size::ZERO, Size::new(stats_width, max.height));
 
             let biography_size = self.biography.layout(ctx, &biography_bc, data, env);
@@ -276,21 +285,20 @@ impl<T: Data, B: Widget<T>, S: Widget<T>> Widget<T> for ArtistInfoLayout<T, B, S
 
             Size::new(max.width, biography_size.height.max(stats_size.height))
         } else {
-            let biography_size = self.biography.layout(ctx, bc, data, env);
-            let stats_bc = BoxConstraints::new(
-                Size::ZERO,
-                Size::new(max.width, max.height - biography_size.height - padding),
-            );
+            // In narrow view, the biography and stats are stacked vertically, and
+            // their combined height should be equal to the image height.
+            let stats_bc = BoxConstraints::new(Size::ZERO, Size::new(max.width, max.height));
             let stats_size = self.stats.layout(ctx, &stats_bc, data, env);
+
+            let biography_height = (image_height - stats_size.height - padding).max(0.0);
+            let biography_bc = BoxConstraints::tight(Size::new(max.width, biography_height));
+            let biography_size = self.biography.layout(ctx, &biography_bc, data, env);
 
             self.biography.set_origin(ctx, Point::ORIGIN);
             self.stats
                 .set_origin(ctx, Point::new(0.0, biography_size.height + padding));
 
-            Size::new(
-                max.width,
-                biography_size.height + padding + stats_size.height,
-            )
+            Size::new(max.width, image_height)
         }
     }
 

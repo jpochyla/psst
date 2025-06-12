@@ -115,3 +115,21 @@ pub fn as_human(dur: Duration) -> String {
         time_humanize::Tense::Present,
     )
 }
+
+pub fn format_number_with_commas(n: i64) -> String {
+    let s = n.to_string();
+    if s.len() <= 3 {
+        return s;
+    }
+    // Reverse the string, chunk it, then reverse the chunks to process from left to right.
+    s.chars()
+        .rev()
+        .collect::<Vec<_>>()
+        .chunks(3)
+        .rev()
+        // Reverse the characters in each chunk back to their original order and collect into a string.
+        .map(|chunk| chunk.iter().rev().collect::<String>())
+        .collect::<Vec<_>>()
+        // Join the chunks with commas.
+        .join(",")
+}
