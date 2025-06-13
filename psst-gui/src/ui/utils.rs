@@ -3,11 +3,11 @@ use std::{f64::consts::PI, time::Duration};
 use druid::{
     kurbo::Circle,
     widget::{prelude::*, CrossAxisAlignment, Flex, Label, SizedBox},
-    Data, Vec2, Widget, WidgetExt,
+    Data, Point, Vec2, Widget, WidgetExt, WidgetPod,
 };
 use time_humanize::HumanTime;
 
-use crate::{error::Error, widget::icons};
+use crate::{data::WithCtx, error::Error, widget::icons};
 
 use super::theme;
 
@@ -71,6 +71,24 @@ impl<T: Data> Widget<T> for Spinner {
     }
 }
 
+pub fn stat_row<T: Data>(
+    label: &'static str,
+    value_func: impl Fn(&T) -> String + 'static,
+) -> impl Widget<WithCtx<T>> {
+    Flex::row()
+        .with_child(
+            Label::new(label)
+                .with_text_size(theme::TEXT_SIZE_SMALL)
+                .with_text_color(theme::PLACEHOLDER_COLOR),
+        )
+        .with_spacer(theme::grid(0.5))
+        .with_child(
+            Label::new(move |ctx: &WithCtx<T>, _env: &_| value_func(&ctx.data))
+                .with_text_size(theme::TEXT_SIZE_SMALL),
+        )
+        .align_left()
+}
+
 pub fn placeholder_widget<T: Data>() -> impl Widget<T> {
     SizedBox::empty().background(theme::BACKGROUND_DARK)
 }
@@ -114,4 +132,85 @@ pub fn as_human(dur: Duration) -> String {
         time_humanize::Accuracy::Rough,
         time_humanize::Tense::Present,
     )
+}
+
+pub struct InfoLayout<T, B, S> {
+    biography: WidgetPod<T, B>,
+    stats: WidgetPod<T, S>,
+}
+
+impl<T, B, S> InfoLayout<T, B, S>
+where
+    T: Data,
+    B: Widget<T>,
+    S: Widget<T>,
+{
+    pub fn new(biography: B, stats: S) -> Self {
+        Self {
+            biography: WidgetPod::new(biography),
+            stats: WidgetPod::new(stats),
+        }
+    }
+}
+
+impl<T: Data, B: Widget<T>, S: Widget<T>> Widget<T> for InfoLayout<T, B, S> {
+    fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut T, env: &Env) {
+        self.biography.event(ctx, event, data, env);
+        self.stats.event(ctx, event, data, env);
+    }
+
+    fn lifecycle(&mut self, ctx: &mut LifeCycleCtx, event: &LifeCycle, data: &T, env: &Env) {
+        self.biography.lifecycle(ctx, event, data, env);
+        self.stats.lifecycle(ctx, event, data, env);
+    }
+
+    fn update(&mut self, ctx: &mut UpdateCtx, _old_data: &T, data: &T, env: &Env) {
+        self.biography.update(ctx, data, env);
+        self.stats.update(ctx, data, env);
+    }
+
+    fn layout(&mut self, ctx: &mut LayoutCtx, bc: &BoxConstraints, data: &T, env: &Env) -> Size {
+        let max = bc.max();
+        let wide_layout = max.width > theme::grid(60.0) + theme::GRID * 3.45;
+        let padding = theme::grid(1.0);
+
+        if wide_layout {
+            let biography_width = max.width * 0.67 - padding / 2.0;
+            let stats_width = max.width * 0.33 - padding / 2.0;
+
+            let biography_bc =
+                BoxConstraints::new(Size::ZERO, Size::new(biography_width, max.height));
+            let stats_bc = BoxConstraints::new(Size::ZERO, Size::new(stats_width, max.height));
+
+            let biography_size = self.biography.layout(ctx, &biography_bc, data, env);
+            let stats_size = self.stats.layout(ctx, &stats_bc, data, env);
+
+            self.biography.set_origin(ctx, Point::ORIGIN);
+            self.stats
+                .set_origin(ctx, Point::new(biography_width + padding, 0.0));
+
+            Size::new(max.width, biography_size.height.max(stats_size.height))
+        } else {
+            let biography_size = self.biography.layout(ctx, bc, data, env);
+            let stats_bc = BoxConstraints::new(
+                Size::ZERO,
+                Size::new(max.width, max.height - biography_size.height - padding),
+            );
+            let stats_size = self.stats.layout(ctx, &stats_bc, data, env);
+
+            self.biography.set_origin(ctx, Point::ORIGIN);
+            self.stats
+                .set_origin(ctx, Point::new(0.0, biography_size.height + padding));
+
+            Size::new(
+                max.width,
+                biography_size.height + padding + stats_size.height,
+            )
+        }
+    }
+
+    fn paint(&mut self, ctx: &mut PaintCtx, data: &T, env: &Env) {
+        self.biography.paint(ctx, data, env);
+        self.stats.paint(ctx, data, env);
+    }
 }
