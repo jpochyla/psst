@@ -873,15 +873,9 @@ impl WebApi {
                     .to_string(),
             ),
             stats: ArtistStats {
-                followers: result.data.data.artist_union.stats.followers.to_string(),
-                monthly_listeners: result
-                    .data
-                    .data
-                    .artist_union
-                    .stats
-                    .monthly_listeners
-                    .to_string(),
-                world_rank: result.data.data.artist_union.stats.world_rank.to_string(),
+                followers: result.data.data.artist_union.stats.followers,
+                monthly_listeners: result.data.data.artist_union.stats.monthly_listeners,
+                world_rank: result.data.data.artist_union.stats.world_rank,
             },
             bio: {
                 let sanitized_bio = sanitize_str(
