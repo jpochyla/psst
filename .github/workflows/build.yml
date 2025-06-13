@@ -333,83 +333,16 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           name: Continuous release (${{ env.RELEASE_VERSION }})
-          tag_name: rolling
           make_latest: true
           prerelease: false
           body: |
             This is a rolling release of Psst, published automatically on every commit to main.
+
             Version: ${{ env.RELEASE_VERSION }}
             Commit: ${{ github.sha }}
             Built: ${{ env.CURRENT_DATE_STR }}
             Workflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-            See the release assets for SHA256 checksums.
-          files: artifacts/*
-          generate_release_notes: false
 
-  pr-release:
-    needs: [build, deb]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    if: github.event_name == 'pull_request'
-    steps:
-      - name: Set Version Info and Paths
-        id: set_paths
-        env:
-          FULL_SHA: ${{ github.sha }}
-        run: |
-          echo "BUILD_DATE=$(date +'%Y%m%d')" >> $GITHUB_ENV
-          echo "VERSION=0.1.0,$(date +'%Y%m%d.%H%M%S')" >> $GITHUB_ENV
-          SHORT_SHA=${FULL_SHA::7}
-          echo "RELEASE_VERSION=$(date +'%Y.%m.%d')-$SHORT_SHA" >> $GITHUB_ENV
-
-      - name: Download All Artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-
-      - name: Prepare Linux Release Assets
-        run: |
-          if [ -f "artifacts/psst-x86_64-unknown-linux-gnu/psst" ]; then
-            mv "artifacts/psst-x86_64-unknown-linux-gnu/psst" "artifacts/psst-linux-x86_64" && \
-            rmdir "artifacts/psst-x86_64-unknown-linux-gnu"
-          fi
-          if [ -f "artifacts/psst-aarch64-unknown-linux-gnu/psst" ]; then
-            mv "artifacts/psst-aarch64-unknown-linux-gnu/psst" "artifacts/psst-linux-aarch64" && \
-            rmdir "artifacts/psst-aarch64-unknown-linux-gnu"
-          fi
-
-      - name: Prepare Release Body Data
-        id: release_data
-        run: |
-          echo "CURRENT_DATE_STR=$(date)" >> $GITHUB_ENV
-
-      - name: Prepare All Release Assets
-        id: prep_assets
-        run: |
-          V="${{ env.RELEASE_VERSION }}"
-          mv artifacts/Psst.dmg/Psst.dmg "artifacts/Psst-${V}.dmg"
-          mv artifacts/Psst.exe/psst-gui.exe "artifacts/Psst-${V}.exe"
-          mv artifacts/psst-linux-x86_64 "artifacts/psst-linux-x86_64-${V}"
-          mv artifacts/psst-linux-aarch64 "artifacts/psst-linux-aarch64-${V}"
-          mv artifacts/psst-deb-amd64/psst-amd64.deb "artifacts/psst-amd64-${V}.deb"
-          mv artifacts/psst-deb-arm64/psst-arm64.deb "artifacts/psst-arm64-${V}.deb"
-          ls -R artifacts
-
-      - name: Create PR Release
-        uses: softprops/action-gh-release@v2
-        with:
-          name: PR Test Build (${{ env.RELEASE_VERSION }})
-          tag_name: pr-${{ github.event.pull_request.number }}
-          make_latest: false
-          prerelease: true
-          draft: true
-          body: |
-            This is a test build for PR #${{ github.event.pull_request.number }}.
-            Version: ${{ env.RELEASE_VERSION }}
-            Commit: ${{ github.sha }}
-            Built: ${{ env.CURRENT_DATE_STR }}
-            Workflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
             See the release assets for SHA256 checksums.
           files: artifacts/*
           generate_release_notes: false

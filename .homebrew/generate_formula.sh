@@ -5,24 +5,31 @@ set -eo pipefail
 REPO_OWNER="jpochyla"
 REPO_NAME="psst"
 
-TAG_WITH_V="rolling" # Target the static rolling release tag
+# Get the latest release
+RELEASE_INFO_JSON=$(curl -sL "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases/latest")
+: "${RELEASE_INFO_JSON:?Error: Could not fetch latest release info.}"
 
-RELEASE_INFO_JSON=$(curl -sL "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases/tags/${TAG_WITH_V}")
-: "${RELEASE_INFO_JSON:?Error: Could not fetch release info for tag ${TAG_WITH_V}.}"
+# Find the latest Psst.dmg, get its version, URL, and SHA256
+DATA=$(echo "$RELEASE_INFO_JSON" | jq -r '
+  if .assets then
+    .assets[]
+    | select(.name | test("Psst-.*\\.dmg$"))
+    | .name + " " + .browser_download_url + " " + .digest
+  else
+    empty
+  end
+' | sort -V | tail -n 1)
 
-# Extract the version from the release name, e.g., "Continuous release (2023.10.26-abcdefg)"
-VERSION=$(echo "$RELEASE_INFO_JSON" | jq -r '.name' | sed -n 's/^Continuous release (\(.*\))$/\1/p')
-: "${VERSION:?Error: Could not extract version from release name for tag ${TAG_WITH_V}. Release name format might have changed.}"
+# Check if we got data
+: "${DATA:?Error: Could not find a matching Psst.dmg asset.}"
 
-DMG_NAME="Psst-${VERSION}.dmg"
-DMG_ASSET_JSON=$(echo "$RELEASE_INFO_JSON" | jq -r --arg DMG_NAME "$DMG_NAME" '.assets[] | select(.name==$DMG_NAME)')
-: "${DMG_ASSET_JSON:?Error: Could not find ${DMG_NAME} asset for tag ${TAG_WITH_V}.}"
+# Extract variables from the data
+DMG_NAME=$(echo "$DATA" | awk '{print $1}')
+DMG_URL=$(echo "$DATA" | awk '{print $2}')
+SHA256=$(echo "$DATA" | awk '{print $3}' | sed 's/sha256://')
 
-DMG_URL=$(echo "$DMG_ASSET_JSON" | jq -r '.browser_download_url')
-: "${DMG_URL:?Error: Could not find ${DMG_NAME} asset URL for tag ${TAG_WITH_V}.}"
-
-SHA256=$(echo "$DMG_ASSET_JSON" | jq -r '.digest' | sed 's/sha256://')
-: "${SHA256:?Error: Could not find SHA256 for ${DMG_NAME} in release info.}"
+VERSION=$(echo "$DMG_NAME" | sed -n 's/^Psst-\(.*\)\.dmg$/\1/p')
+: "${VERSION:?Error: Could not extract version from DMG name.}"
 
 cat <<EOF
 cask "psst" do
@@ -36,11 +43,9 @@ cask "psst" do
   homepage "https://github.com/${REPO_OWNER}/${REPO_NAME}/"
 
   livecheck do
-    # For a rolling release, check the name of the 'rolling' tag's release page title
-    url "https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/tag/rolling"
-    strategy :page_match
-    # Extracts version like "2023.10.26-abcdefg" from release title "Continuous release (2023.10.26-abcdefg)"
-    regex(/Continuous release\s+\(([^)]+)\)/i)
+    url "https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/latest"
+    strategy :github_latest
+    regex(%r{href=.*?/Psst-([^/]+?)\.dmg}i)
   end
 
   app "Psst.app"
