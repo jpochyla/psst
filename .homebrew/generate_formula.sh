@@ -14,14 +14,15 @@ RELEASE_INFO_JSON=$(curl -sL "https://api.github.com/repos/${REPO_OWNER}/${REPO_
 VERSION=$(echo "$RELEASE_INFO_JSON" | jq -r '.name' | sed -n 's/^Continuous release (\(.*\))$/\1/p')
 : "${VERSION:?Error: Could not extract version from release name for tag ${TAG_WITH_V}. Release name format might have changed.}"
 
-DMG_ASSET_JSON=$(echo "$RELEASE_INFO_JSON" | jq -r '.assets[] | select(.name=="Psst.dmg")')
-: "${DMG_ASSET_JSON:?Error: Could not find Psst.dmg asset for tag ${TAG_WITH_V}.}"
+DMG_NAME="Psst-${VERSION}.dmg"
+DMG_ASSET_JSON=$(echo "$RELEASE_INFO_JSON" | jq -r --arg DMG_NAME "$DMG_NAME" '.assets[] | select(.name==$DMG_NAME)')
+: "${DMG_ASSET_JSON:?Error: Could not find ${DMG_NAME} asset for tag ${TAG_WITH_V}.}"
 
 DMG_URL=$(echo "$DMG_ASSET_JSON" | jq -r '.browser_download_url')
-: "${DMG_URL:?Error: Could not find Psst.dmg asset URL for tag ${TAG_WITH_V}.}"
+: "${DMG_URL:?Error: Could not find ${DMG_NAME} asset URL for tag ${TAG_WITH_V}.}"
 
 SHA256=$(echo "$DMG_ASSET_JSON" | jq -r '.digest' | sed 's/sha256://')
-: "${SHA256:?Error: Could not find SHA256 for Psst.dmg in release info.}"
+: "${SHA256:?Error: Could not find SHA256 for ${DMG_NAME} in release info.}"
 
 cat <<EOF
 cask "psst" do
