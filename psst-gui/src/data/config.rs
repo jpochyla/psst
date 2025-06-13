@@ -279,6 +279,8 @@ impl Default for AudioQuality {
 pub enum Theme {
     Light,
     Dark,
+    GruvboxDark,
+    GruvboxLight,
 }
 
 impl Default for Theme {
