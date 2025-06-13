@@ -23,6 +23,8 @@ use psst_core::{connection::Credentials, lastfm, oauth, session::SessionConfig};
 
 use super::{icons::SvgIcon, theme};
 
+const CLEAR_CACHE: Selector = Selector::new("app.preferences.clear-cache");
+
 // Helper function for creating a labeled input row
 fn make_input_row<L>(
     label_text: &'static str,
@@ -272,6 +274,77 @@ fn general_tab_widget() -> impl Widget<AppState> {
         );
 
     col
+}
+
+struct CacheController {
+    thread: Option<JoinHandle<()>>,
+}
+
+impl CacheController {
+    const RESULT: Selector<Option<u64>> = Selector::new("app.preferences.measure-cache-size");
+
+    fn new() -> Self {
+        Self { thread: None }
+    }
+
+    fn start_measuring(&mut self, sink: druid::ExtEventSink, widget_id: druid::WidgetId) {
+        if self.thread.is_some() {
+            return;
+        }
+        let handle = thread::spawn(move || {
+            let size = Preferences::measure_cache_usage();
+            sink.submit_command(Self::RESULT, size, widget_id).unwrap();
+        });
+        self.thread.replace(handle);
+    }
+}
+
+impl<W: Widget<Preferences>> Controller<Preferences, W> for CacheController {
+    fn event(
+        &mut self,
+        child: &mut W,
+        ctx: &mut EventCtx,
+        event: &Event,
+        data: &mut Preferences,
+        env: &Env,
+    ) {
+        match &event {
+            Event::Command(cmd) if cmd.is(CLEAR_CACHE) => {
+                if let Some(cache) = &data.cache {
+                    if let Err(err) = cache.clear() {
+                        log::error!("Failed to clear cache: {}", err);
+                    } else {
+                        // After clearing, re-measure the cache size.
+                        self.start_measuring(ctx.get_external_handle(), ctx.widget_id());
+                    }
+                }
+                ctx.set_handled();
+            }
+            Event::Command(cmd) if cmd.is(Self::RESULT) => {
+                let result = cmd.get_unchecked(Self::RESULT).to_owned();
+                data.cache_size.resolve_or_reject((), result.ok_or(()));
+                self.thread.take();
+                ctx.set_handled();
+            }
+            _ => {
+                child.event(ctx, event, data, env);
+            }
+        }
+    }
+
+    fn lifecycle(
+        &mut self,
+        child: &mut W,
+        ctx: &mut LifeCycleCtx,
+        event: &LifeCycle,
+        data: &Preferences,
+        env: &Env,
+    ) {
+        if let LifeCycle::WidgetAdded = &event {
+            self.start_measuring(ctx.get_external_handle(), ctx.widget_id());
+        }
+        child.lifecycle(ctx, event, data, env);
+    }
 }
 
 #[derive(Copy, Clone)]
@@ -731,7 +804,7 @@ fn cache_tab_widget() -> impl Widget<AppState> {
         .with_child(Label::dynamic(
             |preferences: &Preferences, _| match preferences.cache_size {
                 Promise::Empty | Promise::Rejected { .. } => "Unknown".to_string(),
-                Promise::Deferred { .. } => "Computing".to_string(),
+                Promise::Deferred { .. } => "Computing...".to_string(),
                 Promise::Resolved { val: 0, .. } => "Empty".to_string(),
                 Promise::Resolved { val, .. } => {
                     format!("{:.2} MB", val as f64 / 1e6_f64)
@@ -739,69 +812,15 @@ fn cache_tab_widget() -> impl Widget<AppState> {
             },
         ));
 
-    col.controller(MeasureCacheSize::new())
+    // Clear cache button
+    col = col
+        .with_spacer(theme::grid(2.0))
+        .with_child(Button::new("Clear Cache").on_left_click(|ctx, _, _, _| {
+            ctx.submit_command(CLEAR_CACHE);
+        }));
+
+    col.controller(CacheController::new())
         .lens(AppState::preferences)
-}
-
-struct MeasureCacheSize {
-    thread: Option<JoinHandle<()>>,
-}
-
-impl MeasureCacheSize {
-    fn new() -> Self {
-        Self { thread: None }
-    }
-}
-
-impl MeasureCacheSize {
-    const RESULT: Selector<Option<u64>> = Selector::new("app.preferences.measure-cache-size");
-}
-
-impl<W: Widget<Preferences>> Controller<Preferences, W> for MeasureCacheSize {
-    fn event(
-        &mut self,
-        child: &mut W,
-        ctx: &mut EventCtx,
-        event: &Event,
-        data: &mut Preferences,
-        env: &Env,
-    ) {
-        match &event {
-            Event::Command(cmd) if cmd.is(Self::RESULT) => {
-                let result = cmd.get_unchecked(Self::RESULT).to_owned();
-                data.cache_size.resolve_or_reject((), result.ok_or(()));
-                self.thread.take();
-                ctx.set_handled();
-            }
-            _ => {
-                child.event(ctx, event, data, env);
-            }
-        }
-    }
-
-    fn lifecycle(
-        &mut self,
-        child: &mut W,
-        ctx: &mut LifeCycleCtx,
-        event: &LifeCycle,
-        data: &Preferences,
-        env: &Env,
-    ) {
-        if let LifeCycle::WidgetAdded = &event {
-            let handle = thread::spawn({
-                let widget_id = ctx.widget_id();
-                let event_sink = ctx.get_external_handle();
-                move || {
-                    let size = Preferences::measure_cache_usage();
-                    event_sink
-                        .submit_command(Self::RESULT, size, widget_id)
-                        .unwrap();
-                }
-            });
-            self.thread.replace(handle);
-        }
-        child.lifecycle(ctx, event, data, env);
-    }
 }
 
 fn about_tab_widget() -> impl Widget<AppState> {

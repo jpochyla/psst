@@ -1321,9 +1321,7 @@ impl WebApi {
             Method::Delete,
             None,
         )
-        .set_body(Some(json!({
-            "positions": [track_pos]
-        })));
+        .set_body(Some(json!({ "positions": [track_pos] })));
         self.request(request).map(|_| ())
     }
 }
