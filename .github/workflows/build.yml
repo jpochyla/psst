@@ -333,6 +333,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           name: Continuous release (${{ env.RELEASE_VERSION }})
+          tag_name: rolling
           make_latest: true
           prerelease: false
           body: |
