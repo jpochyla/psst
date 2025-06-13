@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::{cmp::Ordering, sync::Arc};
 
-use druid::widget::{Button, CrossAxisAlignment, LensWrap, Scroll, TextBox};
+use druid::widget::{Button, CrossAxisAlignment, Either, LensWrap, Scroll, TextBox};
 use druid::UnitPoint;
 use druid::{
     im::Vector,
@@ -431,7 +431,8 @@ fn playlist_info_widget() -> impl Widget<WithCtx<Playlist>> {
 
     let biography = Flex::column()
         .cross_axis_alignment(CrossAxisAlignment::Start)
-        .with_child(
+        .with_child(Either::new(
+            |ctx: &WithCtx<Playlist>, _| !ctx.data.description.is_empty(),
             Scroll::new(
                 Label::new(|data: &Playlist, _env: &_| data.description.clone())
                     .with_line_break_mode(LineBreaking::WordWrap)
@@ -440,17 +441,56 @@ fn playlist_info_widget() -> impl Widget<WithCtx<Playlist>> {
             )
             .vertical()
             .fix_height(size - theme::grid(1.5)),
-        );
-
-    let artist_stats = Flex::column().with_child(stat_row("Track Count:", |info: &Playlist| {
-        format!("{} followers", info.track_count.unwrap_or(0))
-    }));
+            Empty,
+        ));
 
     Flex::row()
-        .with_child(cover_widget(size).lens(Ctx::data()))
+        .with_child(
+            cover_widget(size)
+                .lens(Ctx::data())
+                .clip(Size::new(size, size).to_rounded_rect(4.0)),
+        )
         .with_spacer(theme::grid(1.0))
         .with_flex_child(
-            Flex::row().with_flex_child(InfoLayout::new(biography, artist_stats), 1.0),
+            Flex::row().with_flex_child(
+                Either::new(
+                    |ctx: &WithCtx<Playlist>, _| !ctx.data.description.is_empty(),
+                    Flex::row().with_flex_child(
+                        InfoLayout::new(
+                            biography,
+                            Flex::column()
+                                .with_child(stat_row("Track Count:", |info: &Playlist| {
+                                    format!("{} songs", info.track_count.unwrap_or(0))
+                                }))
+                                .with_default_spacer()
+                                .with_child(stat_row("Owner:", |info: &Playlist| {
+                                    format!("{}", info.owner.display_name)
+                                }))
+                                .with_default_spacer()
+                                .with_child(stat_row("Collaborative:", |info: &Playlist| {
+                                    format!("{}", info.collaborative)
+                                })),
+                        ),
+                        1.0,
+                    ),
+                    Flex::row().with_flex_child(
+                        Flex::column()
+                            .with_child(stat_row("Track Count:", |info: &Playlist| {
+                                format!("{} songs", info.track_count.unwrap_or(0))
+                            }))
+                            .with_default_spacer()
+                            .with_child(stat_row("Owner:", |info: &Playlist| {
+                                format!("{}", info.owner.display_name)
+                            }))
+                            .with_default_spacer()
+                            .with_child(stat_row("Collaborative:", |info: &Playlist| {
+                                format!("{}", info.collaborative)
+                            })),
+                        1.0,
+                    ),
+                ),
+                1.0,
+            ),
             1.0,
         )
         .padding((0.0, theme::grid(1.0))) // Keep overall vertical padding
