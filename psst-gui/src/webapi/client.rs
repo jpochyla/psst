@@ -19,7 +19,7 @@ use log::info;
 use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
 use serde::{de::DeserializeOwned, Deserialize};
-use serde_json::json;
+use serde_json::{json, Value};
 
 use psst_core::session::{access_token::TokenProvider, SessionService};
 use ureq::{
@@ -910,6 +910,160 @@ impl WebApi {
 
 /// Show endpoints. (Podcasts)
 impl WebApi {
+    // https://developer.spotify.com/documentation/web-api/reference/get-a-show
+    pub fn get_show(&self, id: &str) -> Result<Arc<Show>, Error> {
+        #[derive(Default, Debug, Clone, PartialEq, Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        pub struct Root {
+            #[serde(rename = "available_markets")]
+            pub available_markets: Vec<String>,
+            pub copyrights: Vec<Copyright>,
+            pub description: String,
+            #[serde(rename = "html_description")]
+            pub html_description: String,
+            pub explicit: bool,
+            #[serde(rename = "external_urls")]
+            pub external_urls: ExternalUrls,
+            pub href: String,
+            pub id: String,
+            pub images: Vec<Image>,
+            #[serde(rename = "is_externally_hosted")]
+            pub is_externally_hosted: bool,
+            pub languages: Vec<String>,
+            #[serde(rename = "media_type")]
+            pub media_type: String,
+            pub name: String,
+            pub publisher: String,
+            #[serde(rename = "type")]
+            pub type_field: String,
+            pub uri: String,
+            #[serde(rename = "total_episodes")]
+            pub total_episodes: i64,
+            pub episodes: Episodes,
+        }
+
+        #[derive(Default, Debug, Clone, PartialEq, Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        pub struct Copyright {
+            pub text: String,
+            #[serde(rename = "type")]
+            pub type_field: String,
+        }
+
+        #[derive(Default, Debug, Clone, PartialEq, Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        pub struct ExternalUrls {
+            pub spotify: String,
+        }
+
+        #[derive(Default, Debug, Clone, PartialEq, Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        pub struct Image {
+            pub url: String,
+            pub height: i64,
+            pub width: i64,
+        }
+
+        #[derive(Default, Debug, Clone, PartialEq, Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        pub struct Episodes {
+            pub href: String,
+            pub limit: i64,
+            pub next: String,
+            pub offset: i64,
+            pub previous: String,
+            pub total: i64,
+            pub items: Vec<Item>,
+        }
+
+        #[derive(Default, Debug, Clone, PartialEq, Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        pub struct Item {
+            #[serde(rename = "audio_preview_url")]
+            pub audio_preview_url: String,
+            pub description: String,
+            #[serde(rename = "html_description")]
+            pub html_description: String,
+            #[serde(rename = "duration_ms")]
+            pub duration_ms: i64,
+            pub explicit: bool,
+            #[serde(rename = "external_urls")]
+            pub external_urls: ExternalUrls2,
+            pub href: String,
+            pub id: String,
+            pub images: Vec<Image2>,
+            #[serde(rename = "is_externally_hosted")]
+            pub is_externally_hosted: bool,
+            #[serde(rename = "is_playable")]
+            pub is_playable: bool,
+            pub language: String,
+            pub languages: Vec<String>,
+            pub name: String,
+            #[serde(rename = "release_date")]
+            pub release_date: String,
+            #[serde(rename = "release_date_precision")]
+            pub release_date_precision: String,
+            #[serde(rename = "resume_point")]
+            pub resume_point: ResumePoint,
+            #[serde(rename = "type")]
+            pub type_field: String,
+            pub uri: String,
+            pub restrictions: Restrictions,
+        }
+
+        #[derive(Default, Debug, Clone, PartialEq, Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        pub struct ExternalUrls2 {
+            pub spotify: String,
+        }
+
+        #[derive(Default, Debug, Clone, PartialEq, Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        pub struct Image2 {
+            pub url: String,
+            pub height: i64,
+            pub width: i64,
+        }
+
+        #[derive(Default, Debug, Clone, PartialEq, Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        pub struct ResumePoint {
+            #[serde(rename = "fully_played")]
+            pub fully_played: bool,
+            #[serde(rename = "resume_position_ms")]
+            pub resume_position_ms: i64,
+        }
+
+        #[derive(Default, Debug, Clone, PartialEq, Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        pub struct Restrictions {
+            pub reason: String,
+        }
+
+        let request = &RequestBuilder::new(format!("v1/shows/{}", id), Method::Get, None);
+        let result: Value = self.load(request)?;
+        println!("{:#?}", result);
+
+        let result: Root = self.load(request)?;
+        println!("{:#?}", result);
+
+        Ok(Arc::new(Show {
+            id: Arc::from(result.id),
+            name: Arc::from(result.name),
+            images: result
+                .images
+                .into_iter()
+                .map(|img| data::utils::Image {
+                    url: Arc::from(img.url),
+                    width: Some(img.width as usize),
+                    height: Some(img.height as usize),
+                })
+                .collect(),
+            publisher: Arc::from(result.publisher),
+            description: Arc::from(result.description),
+        }))
+    }
+
     // https://developer.spotify.com/documentation/web-api/reference/get-multiple-episodes
     pub fn get_episodes(
         &self,
@@ -921,7 +1075,6 @@ impl WebApi {
         }
 
         let request = &RequestBuilder::new("v1/episodes", Method::Get, None)
-            .query("market", "from_token")
             .query("ids", ids.into_iter().map(|id| id.0.to_base62()).join(","))
             .query("market", "from_token");
         let result: Episodes = self.load(request)?;
@@ -1185,36 +1338,10 @@ impl WebApi {
         self.get_section("spotify:section:0JQ5DAnM3wGh0gz1MXnu3P")
     }
 
-    /*
-    // TODO: Episodes for you, implement this to redesign the podcast page
-    pub fn new_episodes(&self) -> Result<MixedView, Error> {
-        // 0JQ5DAnM3wGh0gz1MXnu3K -> New episodes
-        let json_query = self.build_home_request("spotify:section:0JQ5DAnM3wGh0gz1MXnu3K");
-        let request = self.get("pathfinder/v1/query", Some("api-partner.spotify.com"))?
-            .query("operationName", "homeSection")
-            .query("variables", &json_query.0.to_string())
-            .query("extensions", &json_query.1.to_string());
-
-        // Extract the playlists
-        let result = self.load_and_return_home_section(request)?;
-
-        Ok(result)
+    pub fn popular_with_listeners_of(&self) -> Result<MixedView, Error> {
+        // 0JQ5DAnM3wGh0gz1MXnu4x -> Gets top podcast and return shows with similar audience
+        self.get_section("spotify:section:0JQ5DAnM3wGh0gz1MXnu4x")
     }
-
-    // Episodes for you, this needs to have its own thing or be part of a mixed view as it is in episode form
-    pub fn episode_for_you(&self) -> Result<MixedView, Error> {
-        // 0JQ5DAnM3wGh0gz1MXnu9e -> Episodes for you
-        let json_query = self.build_home_request("spotify:section:0JQ5DAnM3wGh0gz1MXnu9e");
-        let request = self.get("pathfinder/v1/query", Some("api-partner.spotify.com"))?
-            .query("operationName", "homeSection")
-            .query("variables", &json_query.0.to_string())
-            .query("extensions", &json_query.1.to_string());
-
-        // Extract the playlists
-        let result = self.load_and_return_home_section(request)?;
-        Ok(result)
-    }
-    */
 }
 
 /// Playlist endpoints.

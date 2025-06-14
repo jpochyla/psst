@@ -140,6 +140,7 @@ impl AppState {
                 best_of_artists: Promise::Empty,
                 recommended_stations: Promise::Empty,
                 your_shows: Promise::Empty,
+                popular_with_listeners_of: Promise::Empty,
                 shows_that_you_might_like: Promise::Empty,
                 uniquely_yours: Promise::Empty,
                 jump_back_in: Promise::Empty,
@@ -341,7 +342,7 @@ pub struct Library {
     pub playlists: Promise<Vector<Playlist>>,
     pub saved_albums: Promise<SavedAlbums>,
     pub saved_tracks: Promise<SavedTracks>,
-    pub saved_shows: Promise<SavedShows>,
+    pub saved_shows: Promise<Shows>,
 }
 
 impl Library {
@@ -523,12 +524,12 @@ impl SavedAlbums {
 }
 
 #[derive(Clone, Default, Data, Lens)]
-pub struct SavedShows {
+pub struct Shows {
     pub shows: Vector<Arc<Show>>,
     pub set: HashSet<Arc<str>>,
 }
 
-impl SavedShows {
+impl Shows {
     pub fn new(shows: Vector<Arc<Show>>) -> Self {
         let set = shows.iter().map(|a| a.id.clone()).collect();
         Self { shows, set }
@@ -560,6 +561,7 @@ pub struct HomeDetail {
     pub uniquely_yours: Promise<MixedView>,
     pub your_shows: Promise<MixedView>,
     pub shows_that_you_might_like: Promise<MixedView>,
+    pub popular_with_listeners_of: Promise<MixedView>,
     pub jump_back_in: Promise<MixedView>,
     pub user_top_tracks: Promise<Vector<Arc<Track>>>,
     pub user_top_artists: Promise<Vector<Artist>>,
