@@ -355,11 +355,9 @@ fn route_widget() -> impl Widget<AppState> {
                     .vertical()
                     .boxed()
             }
-            Route::SavedShows => {
-                Scroll::new(library::saved_shows_widget().padding(theme::grid(1.0)))
-                    .vertical()
-                    .boxed()
-            }
+            Route::Shows => Scroll::new(library::saved_shows_widget().padding(theme::grid(1.0)))
+                .vertical()
+                .boxed(),
             Route::SearchResults => Scroll::new(search::results_widget().padding(theme::grid(1.0)))
                 .vertical()
                 .boxed(),
@@ -398,7 +396,7 @@ fn sidebar_menu_widget() -> impl Widget<AppState> {
         .with_child(sidebar_link_widget("Home", Nav::Home))
         .with_child(sidebar_link_widget("Tracks", Nav::SavedTracks))
         .with_child(sidebar_link_widget("Albums", Nav::SavedAlbums))
-        .with_child(sidebar_link_widget("Podcasts", Nav::SavedShows))
+        .with_child(sidebar_link_widget("Podcasts", Nav::Shows))
         .with_child(search::input_widget().padding((theme::grid(1.0), theme::grid(1.0))))
 }
 
@@ -593,7 +591,7 @@ fn route_icon_widget() -> impl Widget<Nav> {
         |nav: &Nav, _, _| {
             let icon = |icon: &SvgIcon| icon.scale(theme::ICON_SIZE_MEDIUM);
             match &nav {
-                Nav::Home | Nav::Lyrics | Nav::SavedTracks | Nav::SavedAlbums | Nav::SavedShows => {
+                Nav::Home | Nav::Lyrics | Nav::SavedTracks | Nav::SavedAlbums | Nav::Shows => {
                     Empty.boxed()
                 }
                 Nav::SearchResults(_) | Nav::Recommendations(_) => icon(&icons::SEARCH).boxed(),

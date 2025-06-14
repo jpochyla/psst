@@ -75,7 +75,7 @@ fn view_menu() -> Menu<AppState> {
             MenuItem::new(
                 LocalizedString::new("menu-item-saved-shows").with_placeholder("Saved Shows"),
             )
-            .command(cmd::NAVIGATE.with(Nav::SavedShows))
+            .command(cmd::NAVIGATE.with(Nav::Shows))
             .hotkey(SysMods::Cmd, "4"),
         )
         .entry(

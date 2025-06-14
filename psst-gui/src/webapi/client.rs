@@ -910,11 +910,14 @@ impl WebApi {
 
 /// Show endpoints. (Podcasts)
 impl WebApi {
-    // https://developer.spotify.com/documentation/web-api/reference/get-a-show/
+    // https://developer.spotify.com/documentation/web-api/reference/get-a-show/Add commentMore actions
+
     pub fn get_show(&self, id: &str) -> Result<Cached<Arc<Show>>, Error> {
         let request = &RequestBuilder::new(format!("v1/shows/{}", id), Method::Get, None)
             .query("market", "from_token");
+
         let result = self.load_cached(request, "show", id)?;
+
         Ok(result)
     }
 
@@ -929,7 +932,6 @@ impl WebApi {
         }
 
         let request = &RequestBuilder::new("v1/episodes", Method::Get, None)
-            .query("market", "from_token")
             .query("ids", ids.into_iter().map(|id| id.0.to_base62()).join(","))
             .query("market", "from_token");
         let result: Episodes = self.load(request)?;
@@ -1193,36 +1195,10 @@ impl WebApi {
         self.get_section("spotify:section:0JQ5DAnM3wGh0gz1MXnu3P")
     }
 
-    /*
-    // TODO: Episodes for you, implement this to redesign the podcast page
-    pub fn new_episodes(&self) -> Result<MixedView, Error> {
-        // 0JQ5DAnM3wGh0gz1MXnu3K -> New episodes
-        let json_query = self.build_home_request("spotify:section:0JQ5DAnM3wGh0gz1MXnu3K");
-        let request = self.get("pathfinder/v1/query", Some("api-partner.spotify.com"))?
-            .query("operationName", "homeSection")
-            .query("variables", &json_query.0.to_string())
-            .query("extensions", &json_query.1.to_string());
-
-        // Extract the playlists
-        let result = self.load_and_return_home_section(request)?;
-
-        Ok(result)
+    pub fn popular_with_listeners_of(&self) -> Result<MixedView, Error> {
+        // 0JQ5DAnM3wGh0gz1MXnu4x -> Gets top podcast and return shows with similar audience
+        self.get_section("spotify:section:0JQ5DAnM3wGh0gz1MXnu4x")
     }
-
-    // Episodes for you, this needs to have its own thing or be part of a mixed view as it is in episode form
-    pub fn episode_for_you(&self) -> Result<MixedView, Error> {
-        // 0JQ5DAnM3wGh0gz1MXnu9e -> Episodes for you
-        let json_query = self.build_home_request("spotify:section:0JQ5DAnM3wGh0gz1MXnu9e");
-        let request = self.get("pathfinder/v1/query", Some("api-partner.spotify.com"))?
-            .query("operationName", "homeSection")
-            .query("variables", &json_query.0.to_string())
-            .query("extensions", &json_query.1.to_string());
-
-        // Extract the playlists
-        let result = self.load_and_return_home_section(request)?;
-        Ok(result)
-    }
-    */
 }
 
 /// Playlist endpoints.

@@ -19,31 +19,44 @@ pub const LOAD_DETAIL: Selector<ShowLink> = Selector::new("app.show.load-detail"
 pub fn detail_widget() -> impl Widget<AppState> {
     Flex::column()
         .cross_axis_alignment(CrossAxisAlignment::Start)
-        // .with_child(async_info_widget())
-        // .with_default_spacer()
+        .with_child(async_info_widget())
+        .with_default_spacer()
         .with_child(async_episodes_widget())
 }
 
-// fn async_info_widget() -> impl Widget<AppState> {
-//     Async::new(utils::spinner_widget, info_widget, utils::error_widget)
-//         .lens(
-//             Ctx::make(
-//                 AppState::common_ctx,
-//                 AppState::show_detail.then(ShowDetail::show),
-//             )
-//             .then(Ctx::in_promise()),
-//         )
-//         .on_command_async(
-//             LOAD_DETAIL,
-//             |d| WebApi::global().get_show(&d.id),
-//             |_, data, d| data.show_detail.show.defer(d),
-//             |_, data, (d, r)| data.show_detail.show.update((d, r)),
-//         )
-// }
+fn async_info_widget() -> impl Widget<AppState> {
+    Async::new(utils::spinner_widget, info_widget, utils::error_widget)
+        .lens(
+            Ctx::make(
+                AppState::common_ctx,
+                AppState::show_detail.then(ShowDetail::show),
+            )
+            .then(Ctx::in_promise()),
+        )
+        .on_command_async(
+            LOAD_DETAIL,
+            |d| WebApi::global().get_show(&d.id),
+            |_, data, d| data.show_detail.show.defer(d),
+            |_, data, (d, r)| {
+                data.show_detail
+                    .show
+                    .update((d, r.map(|cached| cached.data)))
+            },
+        )
+}
 
-// fn info_widget() -> impl Widget<WithCtx<Arc<Show>>> {
-//     Label::raw().lens(Ctx::data().then(Show::description.in_arc()))
-// }
+fn info_widget() -> impl Widget<WithCtx<Arc<Show>>> {
+    let size = theme::grid(16.0);
+    Flex::row()
+        .with_child(
+            rounded_cover_widget(size)
+                .fix_size(size, size)
+                .clip(Size::new(size, size).to_rounded_rect(4.0)),
+        )
+        .with_default_spacer()
+        .with_child(Label::raw().lens(Show::description.in_arc()))
+        .lens(Ctx::data())
+}
 
 fn async_episodes_widget() -> impl Widget<AppState> {
     Async::new(
