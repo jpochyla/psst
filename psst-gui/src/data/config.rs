@@ -18,7 +18,7 @@ use psst_core::{
 };
 use serde::{Deserialize, Serialize};
 
-use super::{Nav, Promise, QueueBehavior, SliderScrollScale};
+use super::{LoopBehavior, Nav, Promise, ShuffleBehavior, SliderScrollScale};
 use crate::ui::theme;
 
 #[derive(Clone, Debug, Data, Lens)]
@@ -114,7 +114,8 @@ pub struct Config {
     pub theme: Theme,
     pub volume: f64,
     pub last_route: Option<Nav>,
-    pub queue_behavior: QueueBehavior,
+    pub shuffle_behavior: ShuffleBehavior,
+    pub loop_behavior: LoopBehavior,
     pub show_track_cover: bool,
     pub window_size: Size,
     pub slider_scroll_scale: SliderScrollScale,
@@ -136,7 +137,8 @@ impl Default for Config {
             theme: Default::default(),
             volume: 1.0,
             last_route: Default::default(),
-            queue_behavior: Default::default(),
+            shuffle_behavior: Default::default(),
+            loop_behavior: Default::default(),
             show_track_cover: Default::default(),
             window_size: Size::new(theme::grid(80.0), theme::grid(100.0)),
             slider_scroll_scale: Default::default(),

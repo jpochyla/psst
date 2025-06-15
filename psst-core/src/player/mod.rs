@@ -19,7 +19,7 @@ use crate::{
 use self::{
     file::MediaPath,
     item::{LoadedPlaybackItem, PlaybackItem},
-    queue::{Queue, QueueBehavior},
+    queue::{LoopBehavior, Queue, ShuffleBehavior},
     worker::PlaybackManager,
 };
 
@@ -118,7 +118,12 @@ impl Player {
             PlayerCommand::Stop => self.stop(),
             PlayerCommand::Seek { position } => self.seek(position),
             PlayerCommand::Configure { config } => self.configure(config),
-            PlayerCommand::SetQueueBehavior { behavior } => self.queue.set_behaviour(behavior),
+            PlayerCommand::SetShuffleBehavior { shuffle_behavior } => {
+                self.queue.set_shuffle_behaviour(shuffle_behavior)
+            }
+            PlayerCommand::SetLoopBehavior { loop_behavior } => {
+                self.queue.set_loop_behaviour(loop_behavior)
+            }
             PlayerCommand::AddToQueue { item } => self.queue.add(item),
             PlayerCommand::SetVolume { volume } => self.set_volume(volume),
         }
@@ -420,8 +425,11 @@ pub enum PlayerCommand {
     Configure {
         config: PlaybackConfig,
     },
-    SetQueueBehavior {
-        behavior: QueueBehavior,
+    SetShuffleBehavior {
+        shuffle_behavior: ShuffleBehavior,
+    },
+    SetLoopBehavior {
+        loop_behavior: LoopBehavior,
     },
     AddToQueue {
         item: PlaybackItem,
