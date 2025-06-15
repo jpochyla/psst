@@ -42,8 +42,8 @@ pub use crate::data::{
     find::{FindQuery, Finder, MatchFindQuery},
     nav::{Nav, Route, SpotifyUrl},
     playback::{
-        NowPlaying, Playable, PlayableMatcher, Playback, PlaybackOrigin, PlaybackPayload,
-        PlaybackState, QueueBehavior, QueueEntry,
+        LoopBehavior, NowPlaying, Playable, PlayableMatcher, Playback, PlaybackOrigin,
+        PlaybackPayload, PlaybackState, QueueEntry, ShuffleBehavior,
     },
     playlist::{
         Playlist, PlaylistAddTrack, PlaylistDetail, PlaylistLink, PlaylistRemoveTrack,
@@ -108,7 +108,8 @@ impl AppState {
         let playback = Playback {
             state: PlaybackState::Stopped,
             now_playing: None,
-            queue_behavior: config.queue_behavior,
+            shuffle_behavior: config.shuffle_behavior,
+            loop_behavior: config.loop_behavior,
             queue: Vector::new(),
             volume: config.volume,
         };
@@ -280,9 +281,15 @@ impl AppState {
         self.common_ctx_mut().now_playing.take();
     }
 
-    pub fn set_queue_behavior(&mut self, queue_behavior: QueueBehavior) {
-        self.playback.queue_behavior = queue_behavior;
-        self.config.queue_behavior = queue_behavior;
+    pub fn set_shuffle_behavior(&mut self, shuffle_behavior: ShuffleBehavior) {
+        self.playback.shuffle_behavior = shuffle_behavior;
+        self.config.shuffle_behavior = shuffle_behavior;
+        self.config.save();
+    }
+
+    pub fn set_loop_behavior(&mut self, loop_behavior: LoopBehavior) {
+        self.playback.loop_behavior = loop_behavior;
+        self.config.loop_behavior = loop_behavior;
         self.config.save();
     }
 }

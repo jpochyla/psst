@@ -13,8 +13,8 @@ use crate::{
     cmd::{self, ADD_TO_QUEUE, SHOW_ARTWORK, TOGGLE_LYRICS},
     controller::PlaybackController,
     data::{
-        AppState, AudioAnalysis, Episode, NowPlaying, Playable, PlayableMatcher, Playback,
-        PlaybackOrigin, PlaybackState, QueueBehavior, ShowLink, Track,
+        AppState, AudioAnalysis, Episode, LoopBehavior, NowPlaying, Playable, PlayableMatcher,
+        Playback, PlaybackOrigin, PlaybackState, ShowLink, ShuffleBehavior, Track,
     },
     widget::{
         icons::{self, SvgIcon},
@@ -188,6 +188,8 @@ fn playback_origin_icon(origin: &PlaybackOrigin) -> &'static SvgIcon {
 
 fn player_widget() -> impl Widget<Playback> {
     Flex::row()
+        .with_child(shuffle_behavior_widget())
+        .with_default_spacer()
         .with_child(
             small_button_widget(&icons::SKIP_BACK).on_left_click(|ctx, _, _, _| {
                 ctx.submit_command(cmd::PLAY_PREVIOUS);
@@ -202,7 +204,7 @@ fn player_widget() -> impl Widget<Playback> {
             }),
         )
         .with_default_spacer()
-        .with_child(queue_behavior_widget())
+        .with_child(loop_behavior_widget())
         .with_default_spacer()
         .with_child(Maybe::or_empty(durations_widget).lens(Playback::now_playing))
         .with_child(
@@ -213,6 +215,36 @@ fn player_widget() -> impl Widget<Playback> {
                 }),
         )
         .padding(theme::grid(2.0))
+}
+
+fn shuffle_behavior_widget() -> impl Widget<Playback> {
+    ViewSwitcher::new(
+        |playback: &Playback, _| playback.shuffle_behavior,
+        |shuffle_behavior, _, _| {
+            faded_button_widget(shuffle_behavior_icon(shuffle_behavior))
+                .on_left_click(|ctx, _, playback: &mut Playback, _| {
+                    ctx.submit_command(
+                        cmd::PLAY_SHUFFLE_BEHAVIOR
+                            .with(cycle_shuffle_behavior(&playback.shuffle_behavior)),
+                    );
+                })
+                .boxed()
+        },
+    )
+}
+
+fn cycle_shuffle_behavior(qb: &ShuffleBehavior) -> ShuffleBehavior {
+    match qb {
+        ShuffleBehavior::Sequential => ShuffleBehavior::Random,
+        ShuffleBehavior::Random => ShuffleBehavior::Sequential,
+    }
+}
+
+fn shuffle_behavior_icon(qb: &ShuffleBehavior) -> &'static SvgIcon {
+    match qb {
+        ShuffleBehavior::Sequential => &icons::PLAY_SEQUENTIAL,
+        ShuffleBehavior::Random => &icons::PLAY_SHUFFLE,
+    }
 }
 
 fn player_play_pause_widget() -> impl Widget<Playback> {
@@ -249,15 +281,14 @@ fn player_play_pause_widget() -> impl Widget<Playback> {
     )
 }
 
-fn queue_behavior_widget() -> impl Widget<Playback> {
+fn loop_behavior_widget() -> impl Widget<Playback> {
     ViewSwitcher::new(
-        |playback: &Playback, _| playback.queue_behavior,
-        |behavior, _, _| {
-            faded_button_widget(queue_behavior_icon(behavior))
+        |playback: &Playback, _| playback.loop_behavior,
+        |loop_behavior, _, _| {
+            faded_button_widget(loop_behavior_icon(loop_behavior))
                 .on_left_click(|ctx, _, playback: &mut Playback, _| {
                     ctx.submit_command(
-                        cmd::PLAY_QUEUE_BEHAVIOR
-                            .with(cycle_queue_behavior(&playback.queue_behavior)),
+                        cmd::PLAY_LOOP_BEHAVIOR.with(cycle_loop_behavior(&playback.loop_behavior)),
                     );
                 })
                 .boxed()
@@ -265,21 +296,19 @@ fn queue_behavior_widget() -> impl Widget<Playback> {
     )
 }
 
-fn cycle_queue_behavior(qb: &QueueBehavior) -> QueueBehavior {
+fn cycle_loop_behavior(qb: &LoopBehavior) -> LoopBehavior {
     match qb {
-        QueueBehavior::Sequential => QueueBehavior::Random,
-        QueueBehavior::Random => QueueBehavior::LoopTrack,
-        QueueBehavior::LoopTrack => QueueBehavior::LoopAll,
-        QueueBehavior::LoopAll => QueueBehavior::Sequential,
+        LoopBehavior::None => LoopBehavior::All,
+        LoopBehavior::All => LoopBehavior::Track,
+        LoopBehavior::Track => LoopBehavior::None,
     }
 }
 
-fn queue_behavior_icon(qb: &QueueBehavior) -> &'static SvgIcon {
+fn loop_behavior_icon(qb: &LoopBehavior) -> &'static SvgIcon {
     match qb {
-        QueueBehavior::Sequential => &icons::PLAY_SEQUENTIAL,
-        QueueBehavior::Random => &icons::PLAY_SHUFFLE,
-        QueueBehavior::LoopTrack => &icons::PLAY_LOOP_TRACK,
-        QueueBehavior::LoopAll => &icons::PLAY_LOOP_ALL,
+        LoopBehavior::None => &icons::PLAY_LOOP_NONE,
+        LoopBehavior::All => &icons::PLAY_LOOP_ALL,
+        LoopBehavior::Track => &icons::PLAY_LOOP_TRACK,
     }
 }
 
