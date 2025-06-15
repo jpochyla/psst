@@ -910,6 +910,14 @@ impl WebApi {
 
 /// Show endpoints. (Podcasts)
 impl WebApi {
+    // https://developer.spotify.com/documentation/web-api/reference/get-a-show/
+    pub fn get_show(&self, id: &str) -> Result<Cached<Arc<Show>>, Error> {
+        let request = &RequestBuilder::new(format!("v1/shows/{}", id), Method::Get, None)
+            .query("market", "from_token");
+        let result = self.load_cached(request, "show", id)?;
+        Ok(result)
+    }
+
     // https://developer.spotify.com/documentation/web-api/reference/get-multiple-episodes
     pub fn get_episodes(
         &self,
@@ -1374,7 +1382,7 @@ impl WebApi {
             SpotifyUrl::Playlist(id) => Nav::PlaylistDetail(self.get_playlist(id)?.link()),
             SpotifyUrl::Artist(id) => Nav::ArtistDetail(self.get_artist(id)?.link()),
             SpotifyUrl::Album(id) => Nav::AlbumDetail(self.get_album(id)?.data.link(), None),
-            SpotifyUrl::Show(id) => Nav::AlbumDetail(self.get_album(id)?.data.link(), None),
+            SpotifyUrl::Show(id) => Nav::ShowDetail(self.get_show(id)?.data.link()),
             SpotifyUrl::Track(id) => {
                 let track = self.get_track(id)?;
                 let album = track.album.clone().ok_or_else(|| {
