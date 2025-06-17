@@ -11,7 +11,7 @@ use crate::{
         Album, AlbumLink, AppState, Ctx, Library, SavedAlbums, SavedTracks, Show, ShowLink, Track,
         TrackId,
     },
-    ui::home::{popular_with_listeners_of, shows_that_you_might_like, your_shows},
+    ui::home::{shows_that_you_might_like, your_shows},
     webapi::WebApi,
     widget::{Async, MyWidgetExt},
 };
@@ -170,5 +170,4 @@ pub fn saved_shows_widget() -> impl Widget<AppState> {
     Flex::column()
         .with_child(your_shows())
         .with_child(shows_that_you_might_like())
-        .with_child(popular_with_listeners_of())
 }

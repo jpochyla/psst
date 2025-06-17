@@ -911,7 +911,6 @@ impl WebApi {
 /// Show endpoints. (Podcasts)
 impl WebApi {
     // https://developer.spotify.com/documentation/web-api/reference/get-a-show/Add commentMore actions
-
     pub fn get_show(&self, id: &str) -> Result<Cached<Arc<Show>>, Error> {
         let request = &RequestBuilder::new(format!("v1/shows/{}", id), Method::Get, None)
             .query("market", "from_token");
@@ -1196,11 +1195,6 @@ impl WebApi {
     pub fn shows_that_you_might_like(&self) -> Result<MixedView, Error> {
         // 0JQ5DAnM3wGh0gz1MXnu3P -> Shows that you might like
         self.get_section("spotify:section:0JQ5DAnM3wGh0gz1MXnu3P")
-    }
-
-    pub fn popular_with_listeners_of(&self) -> Result<MixedView, Error> {
-        // 0JQ5DAnM3wGh0gz1MXnu4x -> Gets top podcast and return shows with similar audience
-        self.get_section("spotify:section:0JQ5DAnM3wGh0gz1MXnu4x")
     }
 }
 

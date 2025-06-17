@@ -177,12 +177,12 @@ pub fn your_shows() -> impl Widget<AppState> {
                 data.home_detail.your_shows.update((
                     (),
                     r.1.clone().map(|saved_shows| MixedView {
-                            title: "Saved Shows".into(),
-                            playlists: Vec::new().into(),
-                            artists: Vec::new().into(),
-                            albums: Vec::new().into(),
-                            shows: saved_shows.shows,
-                        }),
+                        title: "Saved Shows".into(),
+                        playlists: Vec::new().into(),
+                        artists: Vec::new().into(),
+                        albums: Vec::new().into(),
+                        shows: saved_shows.shows,
+                    }),
                 ));
                 data.with_library_mut(|library| {
                     library.saved_shows.update(r);
@@ -254,23 +254,6 @@ pub fn shows_that_you_might_like() -> impl Widget<AppState> {
             |_| WebApi::global().shows_that_you_might_like(),
             |_, data, q| data.home_detail.shows_that_you_might_like.defer(q),
             |_, data, r| data.home_detail.shows_that_you_might_like.update(r),
-        )
-}
-
-pub fn popular_with_listeners_of() -> impl Widget<AppState> {
-    Async::new(spinner_widget, loaded_results_widget, || Empty)
-        .lens(
-            Ctx::make(
-                AppState::common_ctx,
-                AppState::home_detail.then(HomeDetail::popular_with_listeners_of),
-            )
-            .then(Ctx::in_promise()),
-        )
-        .on_command_async(
-            LOAD_MADE_FOR_YOU,
-            |_| WebApi::global().popular_with_listeners_of(),
-            |_, data, q| data.home_detail.popular_with_listeners_of.defer(q),
-            |_, data, r| data.home_detail.popular_with_listeners_of.update(r),
         )
 }
 
