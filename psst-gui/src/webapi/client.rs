@@ -19,7 +19,7 @@ use log::info;
 use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
 use serde::{de::DeserializeOwned, Deserialize};
-use serde_json::json;
+use serde_json::{json, Value};
 
 use psst_core::session::{access_token::TokenProvider, SessionService};
 use ureq::{
