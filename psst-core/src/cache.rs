@@ -14,8 +14,18 @@ use crate::{
 
 pub type CacheHandle = Arc<Cache>;
 
+#[derive(Debug)]
 pub struct Cache {
     base: PathBuf,
+}
+
+fn create_cache_dirs(base: &Path) -> io::Result<()> {
+    mkdir_if_not_exists(base)?;
+    mkdir_if_not_exists(&base.join("track"))?;
+    mkdir_if_not_exists(&base.join("episode"))?;
+    mkdir_if_not_exists(&base.join("audio"))?;
+    mkdir_if_not_exists(&base.join("key"))?;
+    Ok(())
 }
 
 impl Cache {
@@ -23,14 +33,27 @@ impl Cache {
         log::info!("using cache: {:?}", base);
 
         // Create the cache structure.
-        mkdir_if_not_exists(&base)?;
-        mkdir_if_not_exists(&base.join("track"))?;
-        mkdir_if_not_exists(&base.join("episode"))?;
-        mkdir_if_not_exists(&base.join("audio"))?;
-        mkdir_if_not_exists(&base.join("key"))?;
+        create_cache_dirs(&base)?;
 
         let cache = Self { base };
         Ok(Arc::new(cache))
+    }
+
+    pub fn clear(&self) -> io::Result<()> {
+        log::info!("clearing cache: {:?}", self.base);
+
+        for entry in fs::read_dir(&self.base)? {
+            let entry = entry?;
+            let path = entry.path();
+            if path.is_dir() {
+                fs::remove_dir_all(path)?;
+            } else {
+                fs::remove_file(path)?;
+            }
+        }
+
+        // Re-create the essential directory structure.
+        create_cache_dirs(&self.base)
     }
 }
 

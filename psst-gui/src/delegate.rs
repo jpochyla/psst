@@ -4,7 +4,6 @@ use druid::{
     WindowDesc, WindowId,
 };
 use std::fs;
-use std::io::Read;
 use threadpool::ThreadPool;
 
 use crate::ui::playlist::{
@@ -207,15 +206,12 @@ impl AppDelegate<AppState> for Delegate {
 
                     match ureq::get(url)
                         .call()
-                        .and_then(|response| {
-                            response
-                                .into_reader()
-                                .bytes()
-                                .collect::<Result<Vec<_>, _>>()
-                                .map_err(|e| e.into())
-                        })
-                        .and_then(|bytes| fs::write(&path, bytes).map_err(|e| e.into()))
-                    {
+                        .and_then(|response| -> Result<(), ureq::Error> {
+                            let mut file = fs::File::create(&path)?;
+                            let mut reader = response.into_body().into_reader();
+                            std::io::copy(&mut reader, &mut file)?;
+                            Ok(())
+                        }) {
                         Ok(_) => data.info_alert("Cover saved to Downloads folder."),
                         Err(_) => data.error_alert("Failed to download and save artwork"),
                     }
@@ -244,6 +240,7 @@ impl AppDelegate<AppState> for Delegate {
             data.preferences.auth.clear();
         }
         if self.main_window == Some(id) {
+            data.config.volume = data.playback.volume;
             data.config.save();
             ctx.submit_command(commands::CLOSE_ALL_WINDOWS);
             ctx.submit_command(commands::QUIT_APP);

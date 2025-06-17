@@ -14,6 +14,8 @@ use druid::AppLauncher;
 use env_logger::{Builder, Env};
 use webapi::WebApi;
 
+use psst_core::cache::Cache;
+
 use crate::{
     data::{AppState, Config},
     delegate::Delegate,
@@ -35,7 +37,19 @@ fn main() {
     let config = Config::load().unwrap_or_default();
 
     let paginated_limit = config.paginated_limit;
-    let state = AppState::default_with_config(config.clone());
+    let mut state = AppState::default_with_config(config.clone());
+
+    if let Some(cache_dir) = Config::cache_dir() {
+        match Cache::new(cache_dir) {
+            Ok(cache) => {
+                state.preferences.cache = Some(cache);
+            }
+            Err(err) => {
+                log::error!("Failed to create cache: {}", err);
+            }
+        }
+    }
+
     WebApi::new(
         state.session.clone(),
         Config::proxy().as_deref(),
@@ -65,5 +79,4 @@ fn main() {
         .delegate(delegate)
         .launch(state)
         .expect("Application launch");
-
 }

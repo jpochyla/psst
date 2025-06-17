@@ -8,7 +8,7 @@ use druid::{
 use crate::{
     cmd,
     data::{AppState, Episode, Library, Nav},
-    widget::{FadeOut, MyWidgetExt, RemoteImage},
+    widget::{fill_between::FillBetween, FadeOut, MyWidgetExt, RemoteImage},
 };
 
 use super::{
@@ -29,14 +29,14 @@ pub fn playable_widget() -> impl Widget<PlayRow<Arc<Episode>>> {
         .with_text_color(theme::PLACEHOLDER_COLOR)
         .with_line_break_mode(LineBreaking::WordWrap)
         .lens(PlayRow::item.then(Episode::description.in_arc()));
-
     let description =
         FadeOut::bottom(description, theme::grid(3.5)).with_color(theme::BACKGROUND_LIGHT);
 
     let release = Label::<Arc<Episode>>::dynamic(|episode, _| episode.release())
         .with_text_size(theme::TEXT_SIZE_SMALL)
         .with_text_color(theme::GREY_300)
-        .lens(PlayRow::item);
+        .lens(PlayRow::item)
+        .padding_right(theme::grid(1.0));
 
     let is_playing = playable::is_playing_marker_widget().lens(PlayRow::is_playing);
 
@@ -45,32 +45,30 @@ pub fn playable_widget() -> impl Widget<PlayRow<Arc<Episode>>> {
         .with_text_color(theme::PLACEHOLDER_COLOR)
         .lens(PlayRow::item);
 
+    let top_row = Flex::row()
+        .cross_axis_alignment(CrossAxisAlignment::Center)
+        .with_flex_child(FillBetween::new(release, is_playing), 1.0)
+        .with_default_spacer()
+        .with_child(duration);
+
+    let content = Flex::row()
+        .cross_axis_alignment(CrossAxisAlignment::Start)
+        .with_child(cover)
+        .with_default_spacer()
+        .with_flex_child(
+            Flex::column()
+                .cross_axis_alignment(CrossAxisAlignment::Start)
+                .with_child(name)
+                .with_default_spacer()
+                .with_child(description),
+            1.0,
+        );
+
     Flex::column()
         .cross_axis_alignment(CrossAxisAlignment::Start)
-        .with_child(
-            Flex::row()
-                .cross_axis_alignment(CrossAxisAlignment::Center)
-                .with_child(release)
-                .with_default_spacer()
-                .with_flex_child(is_playing, 1.0)
-                .with_default_spacer()
-                .with_child(duration),
-        )
+        .with_child(top_row)
         .with_default_spacer()
-        .with_child(
-            Flex::row()
-                .cross_axis_alignment(CrossAxisAlignment::Start)
-                .with_child(cover)
-                .with_default_spacer()
-                .with_flex_child(
-                    Flex::column()
-                        .cross_axis_alignment(CrossAxisAlignment::Start)
-                        .with_child(name)
-                        .with_default_spacer()
-                        .with_child(description),
-                    1.0,
-                ),
-        )
+        .with_child(content)
         .padding(theme::grid(1.0))
         .link()
         .rounded(theme::BUTTON_BORDER_RADIUS)

@@ -22,6 +22,7 @@ use rustfm_scrobble::Scrobbler;
 use souvlaki::{
     MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback, MediaPosition, PlatformConfig,
 };
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::{
     cmd,
@@ -230,7 +231,7 @@ impl PlaybackController {
         };
 
         let mut media_controls = MediaControls::new(PlatformConfig {
-            dbus_name: "psst",
+            dbus_name: format!("com.jpochyla.psst.{}", random_lowercase_string(8)).as_str(),
             display_name: "Psst",
             hwnd,
         })?;
@@ -271,7 +272,7 @@ impl PlaybackController {
                     PlaybackState::Playing => MediaPlayback::Playing { progress },
                     PlaybackState::Paused => MediaPlayback::Paused { progress },
                 })
-                .unwrap();
+                .unwrap_or_default();
         }
     }
 
@@ -794,4 +795,24 @@ where
 
         child.update(ctx, old_data, data, env);
     }
+}
+
+// This uses the current system time to generate a random lowercase string of a given length.
+fn random_lowercase_string(len: usize) -> String {
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+
+    let mut n = now;
+    let mut chars = Vec::new();
+    while n > 0 && chars.len() < len {
+        let c = ((n % 26) as u8 + b'a') as char;
+        chars.push(c);
+        n /= 26;
+    }
+    while chars.len() < len {
+        chars.push('a');
+    }
+    chars.into_iter().rev().collect()
 }

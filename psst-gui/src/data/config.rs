@@ -11,7 +11,7 @@ use std::os::unix::fs::OpenOptionsExt;
 use druid::{Data, Lens, Size};
 use platform_dirs::AppDirs;
 use psst_core::{
-    cache::mkdir_if_not_exists,
+    cache::{mkdir_if_not_exists, CacheHandle},
     connection::Credentials,
     player::PlaybackConfig,
     session::{SessionConfig, SessionConnection},
@@ -24,6 +24,8 @@ use crate::ui::theme;
 #[derive(Clone, Debug, Data, Lens)]
 pub struct Preferences {
     pub active: PreferencesTab,
+    #[data(ignore)]
+    pub cache: Option<CacheHandle>,
     pub cache_size: Promise<u64, (), ()>,
     pub auth: Authentication,
     pub lastfm_auth_result: Option<String>,

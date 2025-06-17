@@ -119,6 +119,7 @@ impl AppState {
             config,
             preferences: Preferences {
                 active: PreferencesTab::General,
+                cache: None,
                 cache_size: Promise::Empty,
                 auth: Authentication::new(),
                 lastfm_auth_result: None,

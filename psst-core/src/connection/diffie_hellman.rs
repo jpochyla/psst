@@ -1,4 +1,5 @@
-use num_bigint::{BigUint, RandBigInt};
+use num_bigint::{BigUint, ToBigUint};
+use rand::Rng;
 
 pub struct DHLocalKeys {
     private_key: BigUint,
@@ -7,7 +8,7 @@ pub struct DHLocalKeys {
 
 impl DHLocalKeys {
     pub fn random() -> DHLocalKeys {
-        let private_key = rand::thread_rng().gen_biguint(95);
+        let private_key = rand::rng().random::<u32>().to_biguint().unwrap();
         let public_key = dh_generator().modpow(&private_key, &dh_prime());
         DHLocalKeys {
             private_key,
