@@ -135,25 +135,12 @@ jobs:
             "target/release/bundle/osx/Psst.app"
         working-directory: psst-gui
 
-      - name: Generate DMG Checksum
-        if: runner.os == 'macOS'
-        run: |
-          shasum -a 256 "Psst.dmg" > "Psst.dmg.sha256"
-        working-directory: psst-gui
-
       - name: Upload macOS DMG
         uses: actions/upload-artifact@v4
         if: runner.os == 'macOS'
         with:
           name: Psst.dmg
           path: ./psst-gui/Psst.dmg
-
-      - name: Upload macOS DMG Checksum
-        uses: actions/upload-artifact@v4
-        if: runner.os == 'macOS'
-        with:
-          name: Psst.dmg.sha256
-          path: ./psst-gui/Psst.dmg.sha256
 
       - name: Make Linux Binary Executable
         if: runner.os == 'Linux'
@@ -297,6 +284,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     steps:
       - name: Set Version Info and Paths
         id: set_paths
@@ -307,72 +295,44 @@ jobs:
           echo "VERSION=0.1.0,$(date +'%Y%m%d.%H%M%S')" >> $GITHUB_ENV
           SHORT_SHA=${FULL_SHA::7}
           echo "RELEASE_VERSION=$(date +'%Y.%m.%d')-$SHORT_SHA" >> $GITHUB_ENV
-          # Use a delimiter for multiline output
-          delimiter=$(uuidgen)
-          echo "release_files_list<<$delimiter" >> $GITHUB_OUTPUT
-          echo "artifacts/Psst.dmg/Psst.dmg" >> $GITHUB_OUTPUT
-          echo "artifacts/Psst.dmg.sha256/Psst.dmg.sha256" >> $GITHUB_OUTPUT
-          echo "artifacts/Psst.exe/psst-gui.exe" >> $GITHUB_OUTPUT
-          echo "artifacts/psst-linux-x86_64" >> $GITHUB_OUTPUT
-          echo "artifacts/psst-linux-aarch64" >> $GITHUB_OUTPUT
-          echo "artifacts/checksums.txt" >> $GITHUB_OUTPUT
-          echo "artifacts/psst-deb-amd64/psst-amd64.deb" >> $GITHUB_OUTPUT
-          echo "artifacts/psst-deb-arm64/psst-arm64.deb" >> $GITHUB_OUTPUT
-          echo "$delimiter" >> $GITHUB_OUTPUT
 
-      - name: Download all artifacts
+      - name: Download All Artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
 
       - name: Prepare Linux Release Assets
         run: |
-          # Prepare Linux x86_64 executable: artifacts/psst-x86_64-unknown-linux-gnu/psst -> artifacts/psst-linux-x86_64
           if [ -f "artifacts/psst-x86_64-unknown-linux-gnu/psst" ]; then
             mv "artifacts/psst-x86_64-unknown-linux-gnu/psst" "artifacts/psst-linux-x86_64" && \
-            rmdir "artifacts/psst-x86_64-unknown-linux-gnu" && \
-            echo "Linux x86_64 executable prepared: artifacts/psst-linux-x86_64"
-          else
-            echo "Warning: Linux x86_64 executable artifacts/psst-x86_64-unknown-linux-gnu/psst not found."
+            rmdir "artifacts/psst-x86_64-unknown-linux-gnu"
           fi
-
-          # Prepare Linux aarch64 executable: artifacts/psst-aarch64-unknown-linux-gnu/psst -> artifacts/psst-linux-aarch64
           if [ -f "artifacts/psst-aarch64-unknown-linux-gnu/psst" ]; then
             mv "artifacts/psst-aarch64-unknown-linux-gnu/psst" "artifacts/psst-linux-aarch64" && \
-            rmdir "artifacts/psst-aarch64-unknown-linux-gnu" && \
-            echo "Linux aarch64 executable prepared: artifacts/psst-linux-aarch64"
-          else
-            echo "Warning: Linux aarch64 executable artifacts/psst-aarch64-unknown-linux-gnu/psst not found."
+            rmdir "artifacts/psst-aarch64-unknown-linux-gnu"
           fi
-        working-directory: ${{ github.workspace }}
-
-      - name: Generate SHA256 checksums
-        run: |
-          cd artifacts
-          find . -type f | while read file; do
-            if [[ "$file" != *.sha256 && "$file" != "./checksums.txt" ]]; then
-              sha256sum "$file" >> checksums.txt
-            fi
-          done
-          echo "Checksums generated in artifacts/checksums.txt"
-        working-directory: ${{ github.workspace }} # Ensure cd artifacts works as expected
 
       - name: Prepare Release Body Data
         id: release_data
         run: |
           echo "CURRENT_DATE_STR=$(date)" >> $GITHUB_ENV
-          # Read checksums into a variable, handling potential newlines for multiline env var
-          CHECKSUMS=$(cat artifacts/checksums.txt)
-          echo "CHECKSUMS_CONTENT<<EOF" >> $GITHUB_ENV
-          echo "$CHECKSUMS" >> $GITHUB_ENV
-          echo "EOF" >> $GITHUB_ENV
-        working-directory: ${{ github.workspace }}
+
+      - name: Prepare All Release Assets
+        id: prep_assets
+        run: |
+          V="${{ env.RELEASE_VERSION }}"
+          mv artifacts/Psst.dmg/Psst.dmg "artifacts/Psst-${V}.dmg"
+          mv artifacts/Psst.exe/psst-gui.exe "artifacts/Psst-${V}.exe"
+          mv artifacts/psst-linux-x86_64 "artifacts/psst-linux-x86_64-${V}"
+          mv artifacts/psst-linux-aarch64 "artifacts/psst-linux-aarch64-${V}"
+          mv artifacts/psst-deb-amd64/psst-amd64.deb "artifacts/psst-amd64-${V}.deb"
+          mv artifacts/psst-deb-arm64/psst-arm64.deb "artifacts/psst-arm64-${V}.deb"
+          ls -R artifacts
 
       - name: Create Main Release
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         uses: softprops/action-gh-release@v2
         with:
-          name: Psst (rolling release - ${{ env.RELEASE_VERSION }})
+          name: Continuous release (${{ env.RELEASE_VERSION }})
           tag_name: rolling
           make_latest: true
           prerelease: false
@@ -384,9 +344,6 @@ jobs:
             Built: ${{ env.CURRENT_DATE_STR }}
             Workflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
-            **SHA256 Checksums:**
-            ```
-            ${{ env.CHECKSUMS_CONTENT }}
-            ```
-          files: ${{ steps.set_paths.outputs.release_files_list }}
+            See the release assets for SHA256 checksums.
+          files: artifacts/*
           generate_release_notes: false
