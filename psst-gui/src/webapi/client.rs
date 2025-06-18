@@ -93,10 +93,8 @@ impl WebApi {
                 for header in request.get_headers() {
                     req = req.header(header.0, header.1);
                 }
-                self.agent
-                    .get(request.build())
-                    .header("Authorization", &format!("Bearer {}", token))
-                    .call()
+
+                req.call()
                     .map_err(|err| Error::WebApiError(err.to_string()))
             }
             Method::Post => self
@@ -987,19 +985,17 @@ impl WebApi {
             pub provider_lyrics_id: String,
         }
 
-        let token = self.access_token()?;
         let request = &RequestBuilder::new(
-            format!("https://spclient.wg.spotify.com/color-lyrics/v2/track/{track_id}/image/https%3A%2F%2Fi.scdn.co%2Fimage%2F{}", track_id.clone().split_off(3)),
+            format!("color-lyrics/v2/track/{track_id}"),
             Method::Get,
             None,
         )
+        .set_base_uri("spclient.wg.spotify.com")
         .query("format", "json")
-        .query("vocalRemoval", "false")
         .query("market", "from_token")
-        .header("app-platform", "WebPlayer")
-        .header("Authorization", format!("Bearer {token}"));
+        .header("app-platform", "WebPlayer");
 
-        let lyrics: Cached<Root> = self.load_cached(request, "TrackLines", &track_id)?;
+        let lyrics: Cached<Root> = self.load_cached(request, "lyrics", &track_id)?;
         Ok(lyrics.data.lyrics.lines)
     }
 }
@@ -1109,7 +1105,7 @@ impl WebApi {
             .query("fields", "260")
             .header("Authorization", format!("Bearer {token}"));
 
-        let result: Cached<User> = self.load_cached(request, "User_info", "usrinfo")?;
+        let result: Cached<User> = self.load_cached(request, "user-info", "usrinfo")?;
 
         Ok((result.data.region, result.data.timezone))
     }
