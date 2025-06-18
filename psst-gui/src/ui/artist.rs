@@ -191,13 +191,9 @@ fn artist_info_widget() -> impl Widget<WithCtx<ArtistInfo>> {
             utils::format_number_with_commas(info.stats.followers)
         }))
         .with_default_spacer()
-        .with_child(Either::new(
-            |ctx: &WithCtx<ArtistInfo>, _| ctx.data.stats.monthly_listeners > 0,
-            stat_row("Monthly Listeners:", |info: &ArtistInfo| {
-                utils::format_number_with_commas(info.stats.monthly_listeners)
-            }),
-            Empty,
-        ))
+        .with_child(stat_row("Monthly Listeners:", |info: &ArtistInfo| {
+            utils::format_number_with_commas(info.stats.monthly_listeners)
+        }))
         .with_default_spacer()
         .with_child(Either::new(
             |ctx: &WithCtx<ArtistInfo>, _| ctx.data.stats.world_rank > 0,
