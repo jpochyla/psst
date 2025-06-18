@@ -992,6 +992,7 @@ impl WebApi {
         )
         .set_base_uri("spclient.wg.spotify.com")
         .query("format", "json")
+        .query("vocalRemoval", "false")
         .query("market", "from_token")
         .header("app-platform", "WebPlayer");
 
