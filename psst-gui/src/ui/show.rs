@@ -1,13 +1,14 @@
 use std::sync::Arc;
 
 use druid::{
-    widget::{CrossAxisAlignment, Flex, Label, LineBreaking},
+    widget::{CrossAxisAlignment, Flex, Label, LineBreaking, Scroll},
     LensExt, LocalizedString, Menu, MenuItem, Selector, Size, UnitPoint, Widget, WidgetExt,
 };
 
 use crate::{
     cmd,
     data::{AppState, Ctx, Library, Nav, Show, ShowDetail, ShowEpisodes, ShowLink, WithCtx},
+    ui::utils::{stat_row, InfoLayout},
     webapi::WebApi,
     widget::{Async, MyWidgetExt, RemoteImage},
 };
@@ -47,15 +48,32 @@ fn async_info_widget() -> impl Widget<AppState> {
 
 fn info_widget() -> impl Widget<WithCtx<Arc<Show>>> {
     let size = theme::grid(16.0);
-    Flex::row()
-        .with_child(
-            rounded_cover_widget(size)
-                .fix_size(size, size)
-                .clip(Size::new(size, size).to_rounded_rect(4.0)),
-        )
-        .with_default_spacer()
-        .with_child(Label::raw().lens(Show::description.in_arc()))
+
+    let image = rounded_cover_widget(size)
+        .fix_size(size, size)
+        .clip(Size::new(size, size).to_rounded_rect(4.0))
         .lens(Ctx::data())
+        .context_menu(show_ctx_menu);
+
+    let biography = Scroll::new(
+        Label::new(|data: &Arc<Show>, _env: &_| data.description.clone())
+            .with_line_break_mode(LineBreaking::WordWrap)
+            .with_text_size(theme::TEXT_SIZE_NORMAL),
+    )
+    .vertical()
+    .lens(Ctx::data());
+
+    let stats = Flex::column().with_child(stat_row("Publisher:", |info: &Arc<Show>| {
+        info.publisher.to_string()
+    }));
+
+    let me = InfoLayout::new(biography, stats);
+
+    Flex::row()
+        .with_child(image)
+        .with_spacer(theme::grid(1.0))
+        .with_flex_child(me, 1.0)
+        .padding((0.0, theme::grid(1.0)))
 }
 
 fn async_episodes_widget() -> impl Widget<AppState> {
