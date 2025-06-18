@@ -51,7 +51,7 @@ pub fn setup(env: &mut Env, state: &AppState) {
     env.set(WINDOW_BACKGROUND_COLOR, env.get(GREY_700));
     env.set(TEXT_COLOR, env.get(GREY_100));
     env.set(ICON_COLOR, env.get(GREY_400));
-    env.set(PLACEHOLDER_COLOR, env.get(GREY_400));
+    // env.set(PLACEHOLDER_COLOR, env.get(GREY_400));
     env.set(PRIMARY_LIGHT, env.get(BLUE_100));
     env.set(PRIMARY_DARK, env.get(BLUE_200));
 
@@ -139,6 +139,7 @@ fn setup_light_theme(env: &mut Env) {
     env.set(GREY_700, Color::from_rgba32_u32(0xffffffff));
     env.set(BLUE_100, Color::rgb8(0x5c, 0xc4, 0xff));
     env.set(BLUE_200, Color::rgb8(0x00, 0x8d, 0xdd));
+    env.set(PLACEHOLDER_COLOR, env.get(GREY_300));
 
     env.set(RED, Color::rgba8(0xEB, 0x57, 0x57, 0xFF));
 
@@ -158,6 +159,7 @@ fn setup_dark_theme(env: &mut Env) {
     env.set(GREY_700, Color::grey8(0x28));
     env.set(BLUE_100, Color::rgb8(0x00, 0x8d, 0xdd));
     env.set(BLUE_200, Color::rgb8(0x5c, 0xc4, 0xff));
+    env.set(PLACEHOLDER_COLOR, env.get(GREY_400));
 
     env.set(RED, Color::rgba8(0xEB, 0x57, 0x57, 0xFF));
 
