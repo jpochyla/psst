@@ -187,13 +187,9 @@ fn artist_info_widget() -> impl Widget<WithCtx<ArtistInfo>> {
     .vertical();
 
     let artist_stats = Flex::column()
-        .with_child(Either::new(
-            |ctx: &WithCtx<ArtistInfo>, _| ctx.data.stats.followers > 0,
-            stat_row("Followers:", |info: &ArtistInfo| {
-                utils::format_number_with_commas(info.stats.followers)
-            }),
-            Empty,
-        ))
+        .with_child(stat_row("Followers:", |info: &ArtistInfo| {
+            utils::format_number_with_commas(info.stats.followers)
+        }))
         .with_default_spacer()
         .with_child(Either::new(
             |ctx: &WithCtx<ArtistInfo>, _| ctx.data.stats.monthly_listeners > 0,
