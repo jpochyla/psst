@@ -3,16 +3,27 @@ use rand::prelude::SliceRandom;
 use super::PlaybackItem;
 
 #[derive(Debug)]
-pub enum QueueBehavior {
+pub enum ShuffleBehavior {
     Sequential,
     Random,
-    LoopTrack,
-    LoopAll,
 }
 
-impl Default for QueueBehavior {
+#[derive(Debug)]
+pub enum LoopBehavior {
+    Track,
+    All,
+    None,
+}
+
+impl Default for ShuffleBehavior {
     fn default() -> Self {
         Self::Sequential
+    }
+}
+
+impl Default for LoopBehavior {
+    fn default() -> Self {
+        Self::None
     }
 }
 
@@ -22,7 +33,8 @@ pub struct Queue {
     position: usize,
     user_items_position: usize,
     positions: Vec<usize>,
-    behavior: QueueBehavior,
+    shuffle_behavior: ShuffleBehavior,
+    loop_behavior: LoopBehavior,
 }
 
 impl Queue {
@@ -33,7 +45,8 @@ impl Queue {
             position: 0,
             user_items_position: 0,
             positions: Vec::new(),
-            behavior: QueueBehavior::default(),
+            shuffle_behavior: ShuffleBehavior::default(),
+            loop_behavior: LoopBehavior::default(),
         }
     }
 
@@ -66,8 +79,13 @@ impl Queue {
         }
     }
 
-    pub fn set_behaviour(&mut self, behavior: QueueBehavior) {
-        self.behavior = behavior;
+    pub fn set_shuffle_behaviour(&mut self, shuffle_behavior: ShuffleBehavior) {
+        self.shuffle_behavior = shuffle_behavior;
+        self.compute_positions();
+    }
+
+    pub fn set_loop_behaviour(&mut self, loop_behavior: LoopBehavior) {
+        self.loop_behavior = loop_behavior;
         self.compute_positions();
     }
 
@@ -82,7 +100,7 @@ impl Queue {
         // Start with an ordered 1:1 mapping.
         self.positions = (0..self.items.len()).collect();
 
-        if let QueueBehavior::Random = self.behavior {
+        if let ShuffleBehavior::Random = self.shuffle_behavior {
             // Swap the current position with the first item, so we will start from the
             // beginning, with the full queue ahead of us.  Then shuffle the rest of the
             // items and set the position to 0.
@@ -127,28 +145,21 @@ impl Queue {
     }
 
     fn previous_position(&self) -> usize {
-        match self.behavior {
-            QueueBehavior::Sequential
-            | QueueBehavior::Random
-            | QueueBehavior::LoopTrack
-            | QueueBehavior::LoopAll => self.position.saturating_sub(1),
-        }
+        self.position.saturating_sub(1)
     }
 
     fn next_position(&self) -> usize {
-        match self.behavior {
-            QueueBehavior::Sequential | QueueBehavior::Random | QueueBehavior::LoopTrack => {
-                self.position + 1
-            }
-            QueueBehavior::LoopAll => (self.position + 1) % self.items.len(),
+        match self.loop_behavior {
+            LoopBehavior::Track | LoopBehavior::None => self.position + 1,
+            LoopBehavior::All => (self.position + 1) % self.items.len(),
         }
     }
 
     fn following_position(&self) -> usize {
-        match self.behavior {
-            QueueBehavior::Sequential | QueueBehavior::Random => self.position + 1,
-            QueueBehavior::LoopTrack => self.position,
-            QueueBehavior::LoopAll => (self.position + 1) % self.items.len(),
+        match self.loop_behavior {
+            LoopBehavior::None => self.position + 1,
+            LoopBehavior::Track => self.position,
+            LoopBehavior::All => (self.position + 1) % self.items.len(),
         }
     }
 }

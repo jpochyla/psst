@@ -14,7 +14,8 @@ use super::{
 pub struct Playback {
     pub state: PlaybackState,
     pub now_playing: Option<NowPlaying>,
-    pub queue_behavior: QueueBehavior,
+    pub shuffle_behavior: ShuffleBehavior,
+    pub loop_behavior: LoopBehavior,
     pub queue: Vector<QueueEntry>,
     pub volume: f64,
 }
@@ -73,12 +74,18 @@ impl Data for Playable {
 }
 
 #[derive(Default, Copy, Clone, Debug, Data, Eq, PartialEq, Serialize, Deserialize)]
-pub enum QueueBehavior {
+pub enum ShuffleBehavior {
     #[default]
     Sequential,
     Random,
-    LoopTrack,
-    LoopAll,
+}
+
+#[derive(Default, Copy, Clone, Debug, Data, Eq, PartialEq, Serialize, Deserialize)]
+pub enum LoopBehavior {
+    #[default]
+    Track,
+    All,
+    None,
 }
 
 #[derive(Copy, Clone, Debug, Data, Eq, PartialEq)]
