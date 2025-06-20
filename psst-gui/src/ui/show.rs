@@ -53,8 +53,7 @@ fn info_widget() -> impl Widget<WithCtx<Arc<Show>>> {
         .fix_size(size, size)
         .clip(Size::new(size, size).to_rounded_rect(4.0))
         .lens(Ctx::data())
-        .context_menu(show_ctx_menu)
-        .padding((0.0, theme::grid(1.0)));
+        .context_menu(show_ctx_menu);
 
     let biography = Scroll::new(
         Label::new(|data: &Arc<Show>, _env: &_| data.description.clone())
