@@ -53,7 +53,8 @@ fn info_widget() -> impl Widget<WithCtx<Arc<Show>>> {
         .fix_size(size, size)
         .clip(Size::new(size, size).to_rounded_rect(4.0))
         .lens(Ctx::data())
-        .context_menu(show_ctx_menu);
+        .context_menu(show_ctx_menu)
+        .padding((0.0, theme::grid(1.0)));
 
     let biography = Scroll::new(
         Label::new(|data: &Arc<Show>, _env: &_| data.description.clone())
@@ -73,7 +74,7 @@ fn info_widget() -> impl Widget<WithCtx<Arc<Show>>> {
         .with_child(image)
         .with_spacer(theme::grid(1.0))
         .with_flex_child(me, 1.0)
-        .padding((0.0, theme::grid(1.0)))
+        .padding(theme::grid(1.0))
 }
 
 fn async_episodes_widget() -> impl Widget<AppState> {
