@@ -134,6 +134,24 @@ pub fn as_human(dur: Duration) -> String {
     )
 }
 
+pub fn format_number_with_commas(n: i64) -> String {
+    let s = n.to_string();
+    if s.len() <= 3 {
+        return s;
+    }
+    // Reverse the string, chunk it, then reverse the chunks to process from left to right.
+    s.chars()
+        .rev()
+        .collect::<Vec<_>>()
+        .chunks(3)
+        .rev()
+        // Reverse the characters in each chunk back to their original order and collect into a string.
+        .map(|chunk| chunk.iter().rev().collect::<String>())
+        .collect::<Vec<_>>()
+        // Join the chunks with commas.
+        .join(",")
+}
+
 pub struct InfoLayout<T, B, S> {
     biography: WidgetPod<T, B>,
     stats: WidgetPod<T, S>,
@@ -173,13 +191,16 @@ impl<T: Data, B: Widget<T>, S: Widget<T>> Widget<T> for InfoLayout<T, B, S> {
         let max = bc.max();
         let wide_layout = max.width > theme::grid(60.0) + theme::GRID * 3.45;
         let padding = theme::grid(1.0);
+        let image_height = theme::grid(16.0);
 
         if wide_layout {
+            // In wide layout, the biography is left of the stats.
+            // The biography's height is constrained to the image height.
             let biography_width = max.width * 0.67 - padding / 2.0;
             let stats_width = max.width * 0.33 - padding / 2.0;
 
             let biography_bc =
-                BoxConstraints::new(Size::ZERO, Size::new(biography_width, max.height));
+                BoxConstraints::new(Size::ZERO, Size::new(biography_width, image_height));
             let stats_bc = BoxConstraints::new(Size::ZERO, Size::new(stats_width, max.height));
 
             let biography_size = self.biography.layout(ctx, &biography_bc, data, env);
@@ -191,21 +212,20 @@ impl<T: Data, B: Widget<T>, S: Widget<T>> Widget<T> for InfoLayout<T, B, S> {
 
             Size::new(max.width, biography_size.height.max(stats_size.height))
         } else {
-            let biography_size = self.biography.layout(ctx, bc, data, env);
-            let stats_bc = BoxConstraints::new(
-                Size::ZERO,
-                Size::new(max.width, max.height - biography_size.height - padding),
-            );
+            // In narrow view, the biography and stats are stacked vertically, and
+            // their combined height should be equal to the image height.
+            let stats_bc = BoxConstraints::new(Size::ZERO, Size::new(max.width, max.height));
             let stats_size = self.stats.layout(ctx, &stats_bc, data, env);
+
+            let biography_height = (image_height - stats_size.height - padding).max(0.0);
+            let biography_bc = BoxConstraints::tight(Size::new(max.width, biography_height));
+            let biography_size = self.biography.layout(ctx, &biography_bc, data, env);
 
             self.biography.set_origin(ctx, Point::ORIGIN);
             self.stats
                 .set_origin(ctx, Point::new(0.0, biography_size.height + padding));
 
-            Size::new(
-                max.width,
-                biography_size.height + padding + stats_size.height,
-            )
+            Size::new(max.width, image_height)
         }
     }
 

@@ -51,9 +51,9 @@ pub struct ArtistInfo {
 
 #[derive(Clone, Data, Lens)]
 pub struct ArtistStats {
-    pub followers: String,
-    pub monthly_listeners: String,
-    pub world_rank: String,
+    pub followers: i64,
+    pub monthly_listeners: i64,
+    pub world_rank: i64,
 }
 
 #[derive(Clone, Data, Lens)]

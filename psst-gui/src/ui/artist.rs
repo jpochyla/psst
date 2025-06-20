@@ -1,7 +1,7 @@
 use druid::{
     im::Vector,
     kurbo::Circle,
-    widget::{CrossAxisAlignment, Flex, Label, LabelText, LineBreaking, List, Scroll},
+    widget::{CrossAxisAlignment, Either, Flex, Label, LabelText, LineBreaking, List, Scroll},
     Data, Insets, LensExt, LocalizedString, Menu, MenuItem, Selector, Size, UnitPoint, Widget,
     WidgetExt,
 };
@@ -178,35 +178,33 @@ fn artist_info_widget() -> impl Widget<WithCtx<ArtistInfo>> {
     .clip(Size::new(size, size).to_rounded_rect(4.0))
     .lens(Ctx::data());
 
-    let biography = Flex::column()
-        .cross_axis_alignment(CrossAxisAlignment::Start)
-        .with_child(
-            Scroll::new(
-                Label::new(|data: &ArtistInfo, _env: &_| data.bio.clone())
-                    .with_line_break_mode(LineBreaking::WordWrap)
-                    .with_text_size(theme::TEXT_SIZE_NORMAL)
-                    .lens(Ctx::data()),
-            )
-            .vertical()
-            .fix_height(size - theme::grid(1.5)),
-        );
+    let biography = Scroll::new(
+        Label::new(|data: &ArtistInfo, _env: &_| data.bio.clone())
+            .with_line_break_mode(LineBreaking::WordWrap)
+            .with_text_size(theme::TEXT_SIZE_NORMAL)
+            .lens(Ctx::data()),
+    )
+    .vertical();
 
     let artist_stats = Flex::column()
         .with_child(stat_row("Followers:", |info: &ArtistInfo| {
-            format!("{} followers", info.stats.followers)
+            utils::format_number_with_commas(info.stats.followers)
         }))
         .with_default_spacer()
         .with_child(stat_row("Monthly Listeners:", |info: &ArtistInfo| {
-            format!("{} listeners", info.stats.monthly_listeners)
+            utils::format_number_with_commas(info.stats.monthly_listeners)
         }))
         .with_default_spacer()
-        .with_child(stat_row("Ranking:", |info: &ArtistInfo| {
-            if !info.stats.world_rank.starts_with("0") {
-                format!("#{} in the world", info.stats.world_rank)
-            } else {
-                "N/A".to_string()
-            }
-        }));
+        .with_child(Either::new(
+            |ctx: &WithCtx<ArtistInfo>, _| ctx.data.stats.world_rank > 0,
+            stat_row("Ranking:", |info: &ArtistInfo| {
+                format!(
+                    "#{} in the world",
+                    utils::format_number_with_commas(info.stats.world_rank)
+                )
+            }),
+            Empty,
+        ));
 
     Flex::row()
         .with_child(artist_image)
