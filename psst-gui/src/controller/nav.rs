@@ -23,7 +23,7 @@ impl NavController {
                     ctx.submit_command(library::LOAD_ALBUMS);
                 }
             }
-            Nav::SavedShows => {
+            Nav::Shows => {
                 if !data.library.saved_shows.is_resolved() {
                     ctx.submit_command(library::LOAD_SHOWS);
                 }

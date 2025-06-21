@@ -341,7 +341,7 @@ pub struct Library {
     pub playlists: Promise<Vector<Playlist>>,
     pub saved_albums: Promise<SavedAlbums>,
     pub saved_tracks: Promise<SavedTracks>,
-    pub saved_shows: Promise<SavedShows>,
+    pub saved_shows: Promise<Shows>,
 }
 
 impl Library {
@@ -523,12 +523,12 @@ impl SavedAlbums {
 }
 
 #[derive(Clone, Default, Data, Lens)]
-pub struct SavedShows {
+pub struct Shows {
     pub shows: Vector<Arc<Show>>,
     pub set: HashSet<Arc<str>>,
 }
 
-impl SavedShows {
+impl Shows {
     pub fn new(shows: Vector<Arc<Show>>) -> Self {
         let set = shows.iter().map(|a| a.id.clone()).collect();
         Self { shows, set }

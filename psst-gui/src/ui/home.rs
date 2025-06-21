@@ -4,7 +4,8 @@ use druid::im::Vector;
 use druid::widget::{Either, Flex, Label, Scroll};
 use druid::{widget::List, LensExt, Selector, Widget, WidgetExt};
 
-use crate::data::{Artist, Ctx, HomeDetail, MixedView, Show, Track, WithCtx};
+use crate::data::{Artist, Ctx, HomeDetail, MixedView, Show, Shows, Track, WithCtx};
+use crate::ui::library::{LOAD_SHOWS, SAVE_SHOW, UNSAVE_SHOW};
 use crate::widget::Empty;
 use crate::{
     data::AppState,
@@ -45,7 +46,7 @@ fn simple_title_label(title: &str) -> impl Widget<AppState> {
     )
 }
 
-pub fn made_for_you() -> impl Widget<AppState> {
+fn made_for_you() -> impl Widget<AppState> {
     Async::new(spinner_widget, loaded_results_widget, || Empty)
         .lens(
             Ctx::make(
@@ -62,7 +63,7 @@ pub fn made_for_you() -> impl Widget<AppState> {
         )
 }
 
-pub fn recommended_stations() -> impl Widget<AppState> {
+fn recommended_stations() -> impl Widget<AppState> {
     Async::new(spinner_widget, loaded_results_widget, || Empty)
         .lens(
             Ctx::make(
@@ -97,7 +98,7 @@ fn uniquely_yours_results_widget() -> impl Widget<WithCtx<MixedView>> {
     )
 }
 
-pub fn uniquely_yours() -> impl Widget<AppState> {
+fn uniquely_yours() -> impl Widget<AppState> {
     Async::new(spinner_widget, uniquely_yours_results_widget, || Empty)
         .lens(
             Ctx::make(
@@ -114,7 +115,7 @@ pub fn uniquely_yours() -> impl Widget<AppState> {
         )
 }
 
-pub fn user_top_mixes() -> impl Widget<AppState> {
+fn user_top_mixes() -> impl Widget<AppState> {
     Async::new(spinner_widget, loaded_results_widget, || Empty)
         .lens(
             Ctx::make(
@@ -131,7 +132,7 @@ pub fn user_top_mixes() -> impl Widget<AppState> {
         )
 }
 
-pub fn best_of_artists() -> impl Widget<AppState> {
+fn best_of_artists() -> impl Widget<AppState> {
     Async::new(spinner_widget, loaded_results_widget, || Empty)
         .lens(
             Ctx::make(
@@ -163,9 +164,66 @@ pub fn your_shows() -> impl Widget<AppState> {
             |_, data, q| data.home_detail.your_shows.defer(q),
             |_, data, r| data.home_detail.your_shows.update(r),
         )
+        .on_command_async(
+            LOAD_SHOWS,
+            |_| WebApi::global().get_saved_shows().map(Shows::new),
+            |_, data, q| {
+                data.home_detail.your_shows.defer(q);
+                data.with_library_mut(|library| {
+                    library.saved_shows.defer_default();
+                });
+            },
+            |_, data, r| {
+                data.home_detail.your_shows.update((
+                    (),
+                    r.1.clone().map(|saved_shows| MixedView {
+                        title: "Saved Shows".into(),
+                        playlists: Vec::new().into(),
+                        artists: Vec::new().into(),
+                        albums: Vec::new().into(),
+                        shows: saved_shows.shows,
+                    }),
+                ));
+                data.with_library_mut(|library| {
+                    library.saved_shows.update(r);
+                });
+            },
+        )
+        .on_command_async(
+            SAVE_SHOW,
+            |a| WebApi::global().save_show(&a.id),
+            |_, data, s| {
+                data.with_library_mut(move |library| {
+                    library.add_show(s);
+                });
+            },
+            |_, data, (_, r)| {
+                if let Err(err) = r {
+                    data.error_alert(err);
+                } else {
+                    data.info_alert("Show added to library.");
+                }
+            },
+        )
+        .on_command_async(
+            UNSAVE_SHOW,
+            |l| WebApi::global().unsave_show(&l.id),
+            |_, data, l| {
+                data.with_library_mut(|library| {
+                    library.remove_show(&l.id);
+                });
+            },
+            |_, data, (_, r)| {
+                if let Err(err) = r {
+                    data.error_alert(err);
+                } else {
+                    data.info_alert("Show removed from library.");
+                }
+            },
+        )
 }
 
-pub fn jump_back_in() -> impl Widget<AppState> {
+fn jump_back_in() -> impl Widget<AppState> {
     Async::new(spinner_widget, loaded_results_widget, || Empty)
         .lens(
             Ctx::make(
@@ -199,7 +257,7 @@ pub fn shows_that_you_might_like() -> impl Widget<AppState> {
         )
 }
 
-fn loaded_results_widget() -> impl Widget<WithCtx<MixedView>> {
+pub fn loaded_results_widget() -> impl Widget<WithCtx<MixedView>> {
     Either::new(
         |results: &WithCtx<MixedView>, _| {
             results.data.artists.is_empty()

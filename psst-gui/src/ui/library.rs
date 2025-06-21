@@ -1,18 +1,22 @@
 use std::sync::Arc;
 
-use druid::{widget::List, LensExt, Selector, Widget, WidgetExt};
+use druid::{
+    widget::{Flex, List},
+    LensExt, Selector, Widget, WidgetExt,
+};
 
 use crate::{
     cmd,
     data::{
-        Album, AlbumLink, AppState, Ctx, Library, SavedAlbums, SavedShows, SavedTracks, Show,
-        ShowLink, Track, TrackId,
+        Album, AlbumLink, AppState, Ctx, Library, SavedAlbums, SavedTracks, Show, ShowLink, Track,
+        TrackId,
     },
+    ui::home::{shows_that_you_might_like, your_shows},
     webapi::WebApi,
     widget::{Async, MyWidgetExt},
 };
 
-use super::{album, playable, show, track, utils};
+use super::{album, playable, track, utils};
 
 pub const LOAD_TRACKS: Selector = Selector::new("app.library.load-tracks");
 pub const LOAD_ALBUMS: Selector = Selector::new("app.library.load-albums");
@@ -163,62 +167,7 @@ pub fn saved_albums_widget() -> impl Widget<AppState> {
 }
 
 pub fn saved_shows_widget() -> impl Widget<AppState> {
-    Async::new(
-        utils::spinner_widget,
-        || List::new(|| show::show_widget(false)).lens(Ctx::map(SavedShows::shows)),
-        utils::error_widget,
-    )
-    .lens(
-        Ctx::make(
-            AppState::common_ctx,
-            AppState::library.then(Library::saved_shows.in_arc()),
-        )
-        .then(Ctx::in_promise()),
-    )
-    .on_command_async(
-        LOAD_SHOWS,
-        |_| WebApi::global().get_saved_shows().map(SavedShows::new),
-        |_, data, _| {
-            data.with_library_mut(|library| {
-                library.saved_shows.defer_default();
-            });
-        },
-        |_, data, r| {
-            data.with_library_mut(|library| {
-                library.saved_shows.update(r);
-            });
-        },
-    )
-    .on_command_async(
-        SAVE_SHOW,
-        |a| WebApi::global().save_show(&a.id),
-        |_, data, s| {
-            data.with_library_mut(move |library| {
-                library.add_show(s);
-            });
-        },
-        |_, data, (_, r)| {
-            if let Err(err) = r {
-                data.error_alert(err);
-            } else {
-                data.info_alert("Show added to library.");
-            }
-        },
-    )
-    .on_command_async(
-        UNSAVE_SHOW,
-        |l| WebApi::global().unsave_show(&l.id),
-        |_, data, l| {
-            data.with_library_mut(|library| {
-                library.remove_show(&l.id);
-            });
-        },
-        |_, data, (_, r)| {
-            if let Err(err) = r {
-                data.error_alert(err);
-            } else {
-                data.info_alert("Show removed from library.");
-            }
-        },
-    )
+    Flex::column()
+        .with_child(your_shows())
+        .with_child(shows_that_you_might_like())
 }
