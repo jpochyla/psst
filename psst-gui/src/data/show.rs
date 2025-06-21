@@ -22,6 +22,7 @@ pub struct Show {
     pub images: Vector<Image>,
     pub publisher: Arc<str>,
     pub description: Arc<str>,
+    pub total_episodes: Option<usize>,
 }
 
 impl Show {

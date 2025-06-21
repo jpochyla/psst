@@ -372,6 +372,7 @@ impl WebApi {
             // Show-specific fields
             cover_art: Option<CoverArt>,
             publisher: Option<Publisher>,
+            total_episodes: Option<usize>,
         }
 
         #[derive(Deserialize)]
@@ -628,9 +629,17 @@ impl WebApi {
                                 },
                             ),
                             publisher: Arc::from(
-                                item.content.data.publisher.as_ref().unwrap().name.clone(),
+                                item.content
+                                    .data
+                                    .publisher
+                                    .as_ref()
+                                    .map(|p| p.name.as_str())
+                                    .unwrap_or(""),
                             ),
-                            description: "".into(),
+                            description: Arc::from(
+                                item.content.data.description.as_deref().unwrap_or(""),
+                            ),
+                            total_episodes: item.content.data.total_episodes,
                         })),
                     }
                 });
