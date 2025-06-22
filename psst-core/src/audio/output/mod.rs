@@ -4,11 +4,15 @@ use crate::audio::source::AudioSource;
 pub mod cpal;
 #[cfg(feature = "cubeb")]
 pub mod cubeb;
+#[cfg(feature = "pipewire")]
+pub mod pipewire;
 
 #[cfg(feature = "cubeb")]
 pub type DefaultAudioOutput = cubeb::CubebOutput;
 #[cfg(feature = "cpal")]
 pub type DefaultAudioOutput = cpal::CpalOutput;
+#[cfg(feature = "pipewire")]
+pub type DefaultAudioOutput = pipewire::PipewireOutput;
 
 pub type DefaultAudioSink = <DefaultAudioOutput as AudioOutput>::Sink;
 
