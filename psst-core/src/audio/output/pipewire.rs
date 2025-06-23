@@ -1,15 +1,11 @@
-use std::{
-    io::Cursor,
-    sync::{Arc, RwLock},
-    thread::JoinHandle,
-};
+use std::{io::Cursor, rc::Rc, sync::RwLock, thread::JoinHandle};
 
 use log::{debug, error, info};
 use pipewire::{
     context::Context,
     keys::{
         APP_ICON_NAME, APP_ID, APP_NAME, AUDIO_CHANNELS, MEDIA_CATEGORY, MEDIA_NAME, MEDIA_ROLE,
-        MEDIA_TYPE, NODE_NAME,
+        MEDIA_TYPE,
     },
     main_loop::MainLoop,
     properties::properties,
@@ -28,7 +24,6 @@ use pipewire::{
     stream::{Stream, StreamFlags, StreamState},
     sys::pw_stream_control,
 };
-use symphonia::core::audio;
 
 use crate::{
     audio::{
@@ -53,7 +48,7 @@ enum PipewireMsg {
 }
 
 pub struct PipewireOutput {
-    mainloop_handle: JoinHandle<Result<(), Error>>,
+    _mainloop_handle: JoinHandle<Result<(), Error>>,
     sink: PipewireSink,
 }
 
@@ -62,22 +57,22 @@ impl PipewireOutput {
         info!("opening audio output: pipewire");
         pipewire::init();
         let (mainloop_send, mainloop_recv) = pipewire::channel::channel::<PipewireMsg>();
-        let mainloop_handle = std::thread::spawn(move || Self::run(mainloop_recv));
+        let _mainloop_handle = std::thread::spawn(move || Self::run(mainloop_recv));
         let sink = PipewireSink {
             channel_count: DEFAULT_CHANNEL_COUNT,
             sample_rate: DEFAULT_SAMPLE_RATE,
             mainloop_send,
         };
         Ok(Self {
-            mainloop_handle,
+            _mainloop_handle,
             sink,
         })
     }
 
     fn run(mainloop_recv: pipewire::channel::Receiver<PipewireMsg>) -> Result<(), Error> {
-        let audio_source = Arc::new(RwLock::new(Box::new(Empty) as Box<dyn AudioSource>));
-        let audio_is_playing = Arc::new(RwLock::new(false));
-        let audio_volume = Arc::new(RwLock::new(0f32));
+        let audio_source = Rc::new(RwLock::new(Box::new(Empty) as Box<dyn AudioSource>));
+        let audio_is_playing = Rc::new(RwLock::new(false));
+        let audio_volume = Rc::new(RwLock::new(0f32));
         let mainloop = MainLoop::new(None)?;
         let context = Context::new(&mainloop)?;
         let core = context.connect(Some(properties! {
@@ -85,7 +80,6 @@ impl PipewireOutput {
             *APP_ID => "music.player.psst",
             *APP_ICON_NAME => "Psst"
         }))?;
-        let registry = core.get_registry()?;
 
         let stream = Stream::new(
             &core,
@@ -94,34 +88,15 @@ impl PipewireOutput {
                 *MEDIA_TYPE => "Audio",
                 *MEDIA_CATEGORY => "Playback",
                 *MEDIA_ROLE => "Music",
-                // *MEDIA_NAME => "artist - title",
                 *AUDIO_CHANNELS => "2",
-                *NODE_NAME => "Psst",
-                *APP_NAME => "Psst",
-                *APP_ID => "music.player.psst",
-                *APP_ICON_NAME => "Psst",
             },
         )?;
 
-        // let _core_listener = core
-        //     .add_listener_local()
-        //     .info(|_| {})
-        //     .done({
-        //         let mainloop = mainloop.clone();
-        //         move |id, seq| {
-        //             info!("Core sync done for ID: {} seq: {}", id, seq.seq());
-        //             if id == PW_ID_CORE {
-        //                 mainloop.quit();
-        //             }
-        //         }
-        //     })
-        //     .register();
-
-        let listener = stream
+        let _stream_listener = stream
             .add_local_listener::<()>()
             .state_changed({
                 move |_stream, _userdata, _old, new| {
-                    debug!("State changed: {_old:?} -> {new:?}");
+                    debug!("stream state changed: {_old:?} -> {new:?}");
                     match new {
                         StreamState::Error(x) => {
                             error!("stream error: {x}");
@@ -167,17 +142,12 @@ impl PipewireOutput {
             .process({
                 let audio_source = audio_source.clone();
                 let audio_is_playing = audio_is_playing.clone();
-                let audio_volume = audio_volume.clone();
                 move |stream_ref, _| {
                     let is_playing = audio_is_playing
                         .read()
                         .expect("failed to lock audio_is_playing")
                         .clone();
-                    let volume = audio_volume
-                        .read()
-                        .expect("failed to lock audio_volume")
-                        .clone();
-                    // Why not two channels?
+                    // Why not is this not needing two channels?
                     // let stride = size_of::<f32>() * DEFAULT_CHANNEL_COUNT;
                     let stride = size_of::<f32>() * 1;
                     while let Some(mut buffer) = stream_ref.dequeue_buffer() {
@@ -196,10 +166,6 @@ impl PipewireOutput {
                                         .write(slice);
 
                                     // Let pipewire handle the volume scaling.
-                                    // let scaled_volume = volume.powf(4.0);
-                                    // slice[..written]
-                                    //     .iter_mut()
-                                    //     .for_each(|s| *s *= scaled_volume);
 
                                     // Mute any remaining samples.
                                     slice[written..].iter_mut().for_each(|s| *s = 0.0);
@@ -218,8 +184,6 @@ impl PipewireOutput {
                 }
             })
             .register()?;
-
-        core.sync(0)?;
 
         let mut positions = [0; MAX_CHANNELS];
         positions[0] = SPA_AUDIO_CHANNEL_FL;
@@ -272,13 +236,11 @@ impl PipewireOutput {
                         mainloop.quit();
                     }
                     PipewireMsg::Play(source) => {
-                        debug!("PipewireMsg::Play");
                         debug!(
-                            "PipewireMsg::Play: channel_count: {:?}",
-                            source.channel_count()
+                            "PipewireMsg::Play channel_count: {:?} sample_rate: {:?}",
+                            source.channel_count(),
+                            source.sample_rate()
                         );
-                        debug!("PipewireMsg::Play: sample_rate: {:?}", source.sample_rate());
-
                         let mut new_source =
                             audio_source.write().expect("failed to lock audio source");
                         *new_source = source;
