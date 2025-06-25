@@ -540,6 +540,21 @@ impl WebApi {
                                             .map(|owner| owner.data.name.as_str())
                                             .unwrap_or_default(),
                                     ),
+                                    images: item.content.data.visuals.as_ref().map_or_else(
+                                Vector::new,
+                                |images| {
+                                    images
+                                        .avatar_image
+                                        .sources
+                                        .iter()
+                                        .map(|img| data::utils::Image {
+                                            url: Arc::from(img.url.as_str()),
+                                            width: None,
+                                            height: None,
+                                        })
+                                        .collect()
+                                },
+                            ), 
                                 },
                                 collaborative: false,
                             });
