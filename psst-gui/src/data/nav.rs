@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use url::Url;
 
 use crate::data::track::TrackId;
-use crate::data::{AlbumLink, ArtistLink, PlaylistLink, ShowLink, UserDetail, UserLink};
+use crate::data::{AlbumLink, ArtistLink, PlaylistLink, ShowLink, UserLink};
 
 use super::RecommendationsRequest;
 
