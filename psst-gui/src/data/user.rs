@@ -1,6 +1,8 @@
 use std::sync::Arc;
 
-use crate::data::{Album, Cached, Image, Promise, Track};
+// use crate::data::{Album, Cached, Image, Promise, Track};
+use crate::data::{Album, Promise, Track};
+
 use druid::{im::Vector, Data, Lens};
 use serde::{Deserialize, Serialize};
 
@@ -15,7 +17,7 @@ pub struct UserProfile {
 pub struct PublicUser {
     pub display_name: Arc<str>,
     pub id: Arc<str>,
-   // pub images: Vector<Image>, // Leads to error 
+    // pub images: Vector<Image>, // Leads to error
 }
 
 #[derive(Clone, Data, Lens)]
@@ -25,16 +27,16 @@ pub struct UserDetail {
 }
 
 impl PublicUser {
-  //  pub fn image(&self, width: f64, height: f64) -> Option<&Image> {
-  //      Image::at_least_of_size(&self.images, width, height)
-  //  }
+    //  pub fn image(&self, width: f64, height: f64) -> Option<&Image> {
+    //      Image::at_least_of_size(&self.images, width, height)
+    //  }
 
-    pub fn link(&self) -> UserLink {
-        UserLink {
-            id: self.id.clone(),
-            name: self.display_name.clone(),
-        }
-    }
+    // pub fn link(&self) -> UserLink {
+    //     UserLink {
+    //         id: self.id.clone(),
+    //         name: self.display_name.clone(),
+    //     }
+    // }
 }
 
 #[derive(Clone, Data, Lens)]
@@ -60,12 +62,12 @@ pub struct UserTracks {
 }
 
 impl UserTracks {
-    pub fn link(&self) -> UserLink {
-        UserLink {
-            id: self.id.clone(),
-            name: self.name.clone(),
-        }
-    }
+    // pub fn link(&self) -> UserLink {
+    //     UserLink {
+    //         id: self.id.clone(),
+    //         name: self.name.clone(),
+    //     }
+    // }
 }
 
 #[derive(Clone, Debug, Data, Lens, Eq, PartialEq, Hash, Deserialize, Serialize)]
@@ -75,7 +77,7 @@ pub struct UserLink {
 }
 
 impl UserLink {
-    pub fn url(&self) -> String {
-        format!("https://open.spotify.com/user/{id}", id = self.id)
-    }
+    // pub fn url(&self) -> String {
+    //     format!("https://open.spotify.com/user/{id}", id = self.id)
+    // }
 }
