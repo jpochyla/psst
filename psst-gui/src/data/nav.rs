@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use url::Url;
 
 use crate::data::track::TrackId;
-use crate::data::{AlbumLink, ArtistLink, PlaylistLink, ShowLink};
+use crate::data::{AlbumLink, ArtistLink, PlaylistLink, ShowLink, UserDetail, UserLink};
 
 use super::RecommendationsRequest;
 
@@ -18,6 +18,7 @@ pub enum Route {
     Shows,
     SearchResults,
     ArtistDetail,
+    UserDetail,
     AlbumDetail,
     ShowDetail,
     PlaylistDetail,
@@ -35,6 +36,7 @@ pub enum Nav {
     SearchResults(Arc<str>),
     AlbumDetail(AlbumLink, Option<TrackId>),
     ArtistDetail(ArtistLink),
+    UserDetail(UserLink),
     PlaylistDetail(PlaylistLink),
     ShowDetail(ShowLink),
     Recommendations(Arc<RecommendationsRequest>),
@@ -51,6 +53,7 @@ impl Nav {
             Nav::SearchResults(_) => Route::SearchResults,
             Nav::AlbumDetail(_, _) => Route::AlbumDetail,
             Nav::ArtistDetail(_) => Route::ArtistDetail,
+            Nav::UserDetail(_) => Route::UserDetail,
             Nav::PlaylistDetail(_) => Route::PlaylistDetail,
             Nav::ShowDetail(_) => Route::ShowDetail,
             Nav::Recommendations(_) => Route::Recommendations,
@@ -67,6 +70,8 @@ impl Nav {
             Nav::SearchResults(query) => query.to_string(),
             Nav::AlbumDetail(link, _) => link.name.to_string(),
             Nav::ArtistDetail(link) => link.name.to_string(),
+                        Nav::UserDetail(link) => link.name.to_string(),
+
             Nav::PlaylistDetail(link) => link.name.to_string(),
             Nav::ShowDetail(link) => link.name.to_string(),
             Nav::Recommendations(_) => "Recommended".to_string(),
@@ -83,6 +88,7 @@ impl Nav {
             Nav::SearchResults(query) => format!("Search \"{}\"", query),
             Nav::AlbumDetail(link, _) => format!("Album \"{}\"", link.name),
             Nav::ArtistDetail(link) => format!("Artist \"{}\"", link.name),
+            Nav::UserDetail(link) => format!("Artist \"{}\"", link.name),
             Nav::PlaylistDetail(link) => format!("Playlist \"{}\"", link.name),
             Nav::ShowDetail(link) => format!("Show \"{}\"", link.name),
             Nav::Recommendations(_) => "Recommended".to_string(),
