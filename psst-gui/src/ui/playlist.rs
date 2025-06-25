@@ -16,7 +16,7 @@ use crate::{
         PlaylistRemoveTrack, PlaylistTracks, Track, WithCtx,
     },
     error::Error,
-    ui::{menu, utils::stat_row},
+    ui::menu,
     webapi::WebApi,
     widget::{Async, Empty, MyWidgetExt, RemoteImage, ThemeScope},
 };
@@ -397,9 +397,18 @@ fn rounded_cover_widget(size: f64) -> impl Widget<Playlist> {
 }
 
 pub fn detail_widget() -> impl Widget<AppState> {
+    use druid::widget::CrossAxisAlignment;
+
+    let playlist_top = async_playlist_info_widget().padding(theme::grid(1.0));
+
+    let playlist_tracks = async_tracks_widget();
+
     Flex::column()
-        .with_child(async_playlist_info_widget().padding((theme::grid(1.0), 0.0)))
-        .with_child(async_tracks_widget())
+        .cross_axis_alignment(CrossAxisAlignment::Start)
+        .with_spacer(theme::grid(1.0))
+        .with_child(playlist_top)
+        .with_spacer(theme::grid(1.0))
+        .with_child(playlist_tracks)
 }
 
 fn async_playlist_info_widget() -> impl Widget<AppState> {
@@ -420,43 +429,69 @@ fn async_playlist_info_widget() -> impl Widget<AppState> {
 }
 
 fn playlist_info_widget() -> impl Widget<WithCtx<Playlist>> {
+    use druid::widget::CrossAxisAlignment;
+
     let size = theme::grid(10.0);
+    let playlist_cover = cover_widget(size)
+        .lens(Ctx::data())
+        .clip(Size::new(size, size).to_rounded_rect(4.0));
+
+    let owner_label = Label::dynamic(|p: &Playlist, _| p.owner.display_name.as_ref().to_string())
+        .with_text_size(theme::TEXT_SIZE_SMALL);
+
+    let track_count_label = Label::dynamic(|p: &Playlist, _| {
+        let count = p.track_count.unwrap_or(0);
+        if count == 1 {
+            "1 song".to_string()
+        } else {
+            format!("{} songs", count)
+        }
+    })
+    .with_text_size(theme::TEXT_SIZE_SMALL);
+
+    let description_widget = Either::new(
+        |p: &Playlist, _| !p.description.is_empty(),
+        Flex::column().with_default_spacer().with_child(
+            Label::dynamic(|p: &Playlist, _| p.description.to_string())
+                .with_text_size(theme::TEXT_SIZE_SMALL)
+                .with_line_break_mode(LineBreaking::WordWrap),
+        ),
+        Empty,
+    );
+
+    let visibility_widget = Either::new(
+        |p: &Playlist, _| p.public.is_some() || p.collaborative,
+        Flex::column().with_default_spacer().with_child(
+            Label::dynamic(|p: &Playlist, _| {
+                let mut parts = Vec::new();
+                match p.public {
+                    Some(true) => parts.push("Public"),
+                    Some(false) => parts.push("Private"),
+                    None => {}
+                }
+                if p.collaborative {
+                    parts.push("Collaborative");
+                }
+                parts.join(" • ")
+            })
+            .with_text_size(theme::TEXT_SIZE_SMALL),
+        ),
+        Empty,
+    );
+
+    let playlist_info = Flex::column()
+        .cross_axis_alignment(CrossAxisAlignment::Start)
+        .with_child(owner_label)
+        .with_default_spacer()
+        .with_child(track_count_label)
+        .with_child(description_widget)
+        .with_child(visibility_widget)
+        .padding(theme::grid(1.0));
 
     Flex::row()
-        .with_child(
-            cover_widget(size)
-                .lens(Ctx::data())
-                .clip(Size::new(size, size).to_rounded_rect(4.0)),
-        )
-        .with_spacer(theme::grid(1.0))
-        .with_flex_child(
-            Flex::column()
-                .with_child(stat_row("Track Count:", |info: &Playlist| {
-                    format!("{} songs", info.track_count.unwrap_or(0))
-                }))
-                .with_default_spacer()
-                .with_child(stat_row("Owner:", |info: &Playlist| {
-                    format!("{}", info.owner.display_name)
-                }))
-                .with_child(Either::new(
-                    |ctx: &WithCtx<Playlist>, _| ctx.data.collaborative,
-                    Flex::column()
-                        .with_default_spacer()
-                        .with_child(stat_row("Collaborative", |_| "".to_string())),
-                    Empty,
-                ))
-                .with_child(Either::new(
-                    |ctx: &WithCtx<Playlist>, _| !ctx.data.description.is_empty(),
-                    Flex::column()
-                        .with_default_spacer()
-                        .with_child(stat_row("Description:", |info: &Playlist| {
-                            format!("{}", info.description)
-                        })),
-                    Empty,
-                )),
-            1.0,
-        )
-        .padding((0.0, theme::grid(1.0))) // Keep overall vertical padding
+        .with_child(playlist_cover)
+        .with_default_spacer()
+        .with_child(playlist_info.lens(Ctx::data()))
 }
 
 fn async_tracks_widget() -> impl Widget<AppState> {
