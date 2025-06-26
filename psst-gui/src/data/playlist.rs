@@ -37,6 +37,8 @@ pub struct Playlist {
     pub track_count: Option<usize>,
     pub owner: PublicUser,
     pub collaborative: bool,
+    #[serde(rename = "public")]
+    pub public: Option<bool>,
 }
 
 impl Playlist {
