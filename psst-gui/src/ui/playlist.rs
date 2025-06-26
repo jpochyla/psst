@@ -436,8 +436,7 @@ fn playlist_info_widget() -> impl Widget<WithCtx<Playlist>> {
         .lens(Ctx::data())
         .clip(Size::new(size, size).to_rounded_rect(4.0));
 
-    let owner_label = Label::dynamic(|p: &Playlist, _| p.owner.display_name.as_ref().to_string())
-        .with_text_size(theme::TEXT_SIZE_SMALL);
+    let owner_label = Label::dynamic(|p: &Playlist, _| p.owner.display_name.as_ref().to_string());
 
     let track_count_label = Label::dynamic(|p: &Playlist, _| {
         let count = p.track_count.unwrap_or(0);
@@ -453,8 +452,9 @@ fn playlist_info_widget() -> impl Widget<WithCtx<Playlist>> {
         |p: &Playlist, _| !p.description.is_empty(),
         Flex::column().with_default_spacer().with_child(
             Label::dynamic(|p: &Playlist, _| p.description.to_string())
+                .with_line_break_mode(LineBreaking::WordWrap)
                 .with_text_size(theme::TEXT_SIZE_SMALL)
-                .with_line_break_mode(LineBreaking::WordWrap),
+                .with_text_color(theme::PLACEHOLDER_COLOR),
         ),
         Empty,
     );
@@ -474,7 +474,9 @@ fn playlist_info_widget() -> impl Widget<WithCtx<Playlist>> {
                 }
                 parts.join(" • ")
             })
-            .with_text_size(theme::TEXT_SIZE_SMALL),
+            .with_line_break_mode(LineBreaking::WordWrap)
+            .with_text_size(theme::TEXT_SIZE_SMALL)
+            .with_text_color(theme::PLACEHOLDER_COLOR),
         ),
         Empty,
     );
