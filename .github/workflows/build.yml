@@ -320,13 +320,13 @@ jobs:
       - name: Prepare All Release Assets
         id: prep_assets
         run: |
-          V="${{ env.RELEASE_VERSION }}"
-          mv artifacts/Psst.dmg/Psst.dmg "artifacts/Psst-${V}.dmg"
-          mv artifacts/Psst.exe/psst-gui.exe "artifacts/Psst-${V}.exe"
-          mv artifacts/psst-linux-x86_64 "artifacts/psst-linux-x86_64-${V}"
-          mv artifacts/psst-linux-aarch64 "artifacts/psst-linux-aarch64-${V}"
-          mv artifacts/psst-deb-amd64/psst-amd64.deb "artifacts/psst-amd64-${V}.deb"
-          mv artifacts/psst-deb-arm64/psst-arm64.deb "artifacts/psst-arm64-${V}.deb"
+          # Use simple, static filenames that get replaced on each push
+          mv artifacts/Psst.dmg/Psst.dmg "artifacts/Psst.dmg"
+          mv artifacts/Psst.exe/psst-gui.exe "artifacts/Psst.exe"
+          mv artifacts/psst-linux-x86_64 "artifacts/psst-linux-x86_64"
+          mv artifacts/psst-linux-aarch64 "artifacts/psst-linux-aarch64"
+          mv artifacts/psst-deb-amd64/psst-amd64.deb "artifacts/psst-amd64.deb"
+          mv artifacts/psst-deb-arm64/psst-arm64.deb "artifacts/psst-arm64.deb"
           ls -R artifacts
 
       - name: Create Main Release
