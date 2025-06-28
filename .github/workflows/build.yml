@@ -319,18 +319,20 @@ jobs:
 
       - name: Prepare All Release Assets
         id: prep_assets
+        working-directory: artifacts
         run: |
-          # Move each artifact from its subdirectory into the top-level artifacts directory.
-          mv artifacts/Psst.dmg/Psst.dmg artifacts/
-          mv artifacts/Psst.exe/psst-gui.exe artifacts/Psst.exe
-          mv artifacts/psst-deb-amd64/psst-amd64.deb artifacts/
-          mv artifacts/psst-deb-arm64/psst-arm64.deb artifacts/
+          set -e
+          # Move each artifact out of its subdirectory.
+          mv Psst.dmg/Psst.dmg .
+          mv Psst.exe/psst-gui.exe Psst.exe
+          mv psst-deb-amd64/psst-amd64.deb .
+          mv psst-deb-arm64/psst-arm64.deb .
 
-          # Clean up the now-empty directories.
-          rm -rf artifacts/Psst.dmg/ artifacts/Psst.exe/ artifacts/psst-deb-amd64/ artifacts/psst-deb-arm64/
+          # Remove the now-empty directories.
+          rm -rf Psst.dmg/ Psst.exe/ psst-deb-amd64/ psst-deb-arm64/
 
           # List the final assets to verify.
-          ls -R artifacts
+          ls -l
 
       - name: Create Main Release
         uses: softprops/action-gh-release@v2
