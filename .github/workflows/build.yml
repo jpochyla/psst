@@ -320,13 +320,16 @@ jobs:
       - name: Prepare All Release Assets
         id: prep_assets
         run: |
-          # Use simple, static filenames that get replaced on each push
-          cp artifacts/Psst.dmg/Psst.dmg "artifacts/Psst.dmg"
-          cp artifacts/Psst.exe/psst-gui.exe "artifacts/Psst.exe"
-          cp artifacts/psst-deb-amd64/psst-amd64.deb "artifacts/psst-amd64.deb"
-          cp artifacts/psst-deb-arm64/psst-arm64.deb "artifacts/psst-arm64.deb"
-          # Remove the artifact directories to avoid confusion
+          # Move each artifact from its subdirectory into the top-level artifacts directory.
+          mv artifacts/Psst.dmg/Psst.dmg artifacts/
+          mv artifacts/Psst.exe/psst-gui.exe artifacts/Psst.exe
+          mv artifacts/psst-deb-amd64/psst-amd64.deb artifacts/
+          mv artifacts/psst-deb-arm64/psst-arm64.deb artifacts/
+
+          # Clean up the now-empty directories.
           rm -rf artifacts/Psst.dmg/ artifacts/Psst.exe/ artifacts/psst-deb-amd64/ artifacts/psst-deb-arm64/
+
+          # List the final assets to verify.
           ls -R artifacts
 
       - name: Create Main Release
