@@ -1479,6 +1479,7 @@ impl WebApi {
         let format = match infer::get(body.as_slice()) {
             Some(kind) if kind.mime_type() == "image/jpeg" => Some(ImageFormat::Jpeg),
             Some(kind) if kind.mime_type() == "image/png" => Some(ImageFormat::Png),
+            Some(kind) if kind.mime_type() == "image/webp" => Some(ImageFormat::WebP),
             _ => None,
         };
 
