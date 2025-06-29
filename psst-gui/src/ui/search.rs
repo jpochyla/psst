@@ -3,7 +3,7 @@ use std::sync::Arc;
 use druid::{
     im::Vector,
     widget::{CrossAxisAlignment, Either, Flex, Label, LabelText, List, TextBox, Container},
-    Data, LensExt, Selector, Widget, WidgetExt, Color, Env,
+    Data, LensExt, Selector, Widget, WidgetExt, Color,
 };
 
 use crate::{
@@ -15,7 +15,7 @@ use crate::{
     },
     ui::show,
     webapi::WebApi,
-    widget::{icons, Async, Empty, MyWidgetExt, Overlay},
+    widget::{icons, Async, Empty, MyWidgetExt},
 };
 
 use super::{album, artist, playable, playlist, theme, track, utils};
@@ -43,7 +43,7 @@ pub fn input_widget() -> impl Widget<AppState> {
             env.set(theme::BACKGROUND_DARK, bg_color);
             env.set(theme::BORDER_DARK, Color::TRANSPARENT);
             env.set(theme::BORDER_LIGHT, Color::TRANSPARENT);
-            env.set(theme::SELECTION_COLOR, env.get(theme::SELECTION_COLOR));
+            env.set(theme::SELECTED_TEXT_BACKGROUND_COLOR, env.get(theme::SELECTED_TEXT_BACKGROUND_COLOR));
             env.set(theme::CURSOR_COLOR, env.get(theme::CURSOR_COLOR));
             env.set(theme::PRIMARY_LIGHT, Color::TRANSPARENT);
             env.set(theme::PRIMARY_DARK, Color::TRANSPARENT);
