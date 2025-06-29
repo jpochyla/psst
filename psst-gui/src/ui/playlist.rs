@@ -338,7 +338,6 @@ pub fn playlist_widget(horizontal: bool) -> impl Widget<WithCtx<Playlist>> {
                         .fix_width(playlist_image_size)
                         .align_left()
                 )
-                .align_vertical(UnitPoint::CENTER)
         ).boxed()
     } else {
         // Mode sidebar : comportement simple
