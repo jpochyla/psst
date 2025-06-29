@@ -313,7 +313,6 @@ pub fn playlist_widget(horizontal: bool) -> impl Widget<WithCtx<Playlist>> {
         .lens(Ctx::data().then(Playlist::name));
 
     let text_content = if horizontal {
-        // Mode horizontal : permet les retours à la ligne
         let name_widget = playlist_name.fix_width(playlist_image_size).align_left();
         let description_widget = Label::raw()
             .with_line_break_mode(LineBreaking::WordWrap)
@@ -340,7 +339,6 @@ pub fn playlist_widget(horizontal: bool) -> impl Widget<WithCtx<Playlist>> {
                 )
         ).boxed()
     } else {
-        // Mode sidebar : comportement simple
         let name_widget = playlist_name.align_left();
         let description_widget = Label::raw()
             .with_text_color(theme::PLACEHOLDER_COLOR)
