@@ -2,8 +2,8 @@ use std::sync::Arc;
 
 use druid::{
     im::Vector,
-    widget::{CrossAxisAlignment, Either, Flex, Label, LabelText, List, TextBox},
-    Data, LensExt, Selector, Widget, WidgetExt,
+    widget::{CrossAxisAlignment, Either, Flex, Label, LabelText, List, TextBox, Container},
+    Data, LensExt, Selector, Widget, WidgetExt, Color, Env,
 };
 
 use crate::{
@@ -15,7 +15,7 @@ use crate::{
     },
     ui::show,
     webapi::WebApi,
-    widget::{Async, Empty, MyWidgetExt},
+    widget::{icons, Async, Empty, MyWidgetExt, Overlay},
 };
 
 use super::{album, artist, playable, playlist, theme, track, utils};
@@ -26,7 +26,7 @@ pub const LOAD_RESULTS: Selector<Arc<str>> = Selector::new("app.search.load-resu
 pub const OPEN_LINK: Selector<SpotifyUrl> = Selector::new("app.search.open-link");
 
 pub fn input_widget() -> impl Widget<AppState> {
-    TextBox::new()
+    let search_field = TextBox::new()
         .with_placeholder("Search")
         .controller(InputController::new().on_submit(|ctx, query, _| {
             if query.trim().is_empty() {
@@ -36,7 +36,33 @@ pub fn input_widget() -> impl Widget<AppState> {
         }))
         .with_id(cmd::WIDGET_SEARCH_INPUT)
         .expand_width()
-        .lens(AppState::search.then(Search::input))
+        .padding((theme::grid(0.8), theme::grid(0.15), theme::grid(0.2), theme::grid(0.15)))
+        .env_scope(|env, _| {
+            let bg_color = env.get(theme::GREY_700);
+            env.set(theme::BACKGROUND_LIGHT, bg_color);
+            env.set(theme::BACKGROUND_DARK, bg_color);
+            env.set(theme::BORDER_DARK, Color::TRANSPARENT);
+            env.set(theme::BORDER_LIGHT, Color::TRANSPARENT);
+            env.set(theme::SELECTION_COLOR, env.get(theme::SELECTION_COLOR));
+            env.set(theme::CURSOR_COLOR, env.get(theme::CURSOR_COLOR));
+            env.set(theme::PRIMARY_LIGHT, Color::TRANSPARENT);
+            env.set(theme::PRIMARY_DARK, Color::TRANSPARENT);
+        })
+        .lens(AppState::search.then(Search::input));
+
+    let icon_overlay = icons::SEARCH
+        .scale((20.0, 20.0))
+        .with_color(theme::PLACEHOLDER_COLOR)
+        .padding((theme::grid(0.5), theme::grid(0.5), theme::grid(0.2), theme::grid(0.5)));
+
+    Container::new(
+        Flex::row()
+            .cross_axis_alignment(CrossAxisAlignment::Center)
+            .with_child(icon_overlay)
+            .with_flex_child(search_field, 1.0)
+    )
+    .background(theme::GREY_700)
+    .rounded(theme::grid(1.0))
 }
 
 pub fn results_widget() -> impl Widget<AppState> {
