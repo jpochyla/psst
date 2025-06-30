@@ -18,11 +18,12 @@ use crate::{
     error::Error,
     ui::menu,
     webapi::WebApi,
-    widget::{Async, Empty, MyWidgetExt, RemoteImage, ThemeScope},
+    widget::{Async, Empty, MyWidgetExt, RemoteImage, ThemeScope, icons},
 };
 
 use super::{playable, theme, track, utils};
 
+pub const PLAY_PLAYLIST_REQUEST: Selector<PlaylistLink> = Selector::new("app.playlist.play-request");
 pub const LOAD_LIST: Selector = Selector::new("app.playlist.load-list");
 pub const LOAD_DETAIL: Selector<(PlaylistLink, AppState)> =
     Selector::new("app.playlist.load-detail");
@@ -437,6 +438,16 @@ fn playlist_info_widget() -> impl Widget<WithCtx<Playlist>> {
         .clip(Size::new(size, size).to_rounded_rect(4.0))
         .context_menu(playlist_menu_ctx);
 
+    let play_button = icons::PLAY
+        .scale((theme::grid(2.5), theme::grid(2.5)))
+        .padding(theme::grid(1.0))
+        .link()
+        .circle()
+        .border(theme::GREY_500, 1.0)
+        .on_left_click(|ctx, _, playlist_ctx: &mut WithCtx<Playlist>, _| {
+            ctx.submit_command(PLAY_PLAYLIST_REQUEST.with(playlist_ctx.data.link()));
+        });
+
     let owner_label = Label::dynamic(|p: &Playlist, _| p.owner.display_name.as_ref().to_string());
 
     let track_count_label = Label::dynamic(|p: &Playlist, _| {
@@ -495,6 +506,8 @@ fn playlist_info_widget() -> impl Widget<WithCtx<Playlist>> {
         .with_child(playlist_cover)
         .with_default_spacer()
         .with_child(playlist_info.lens(Ctx::data()))
+        .with_flex_spacer(1.0)
+        .with_child(play_button)
 }
 
 fn async_tracks_widget() -> impl Widget<AppState> {
