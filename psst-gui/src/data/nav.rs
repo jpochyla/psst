@@ -70,8 +70,7 @@ impl Nav {
             Nav::SearchResults(query) => query.to_string(),
             Nav::AlbumDetail(link, _) => link.name.to_string(),
             Nav::ArtistDetail(link) => link.name.to_string(),
-                        Nav::UserDetail(link) => link.name.to_string(),
-
+            Nav::UserDetail(link) => link.name.to_string(),
             Nav::PlaylistDetail(link) => link.name.to_string(),
             Nav::ShowDetail(link) => link.name.to_string(),
             Nav::Recommendations(_) => "Recommended".to_string(),
