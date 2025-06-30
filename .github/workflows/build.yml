@@ -301,33 +301,28 @@ jobs:
         with:
           path: artifacts
 
-      - name: Prepare Linux Release Assets
-        run: |
-          if [ -f "artifacts/psst-x86_64-unknown-linux-gnu/psst" ]; then
-            mv "artifacts/psst-x86_64-unknown-linux-gnu/psst" "artifacts/psst-linux-x86_64" && \
-            rmdir "artifacts/psst-x86_64-unknown-linux-gnu"
-          fi
-          if [ -f "artifacts/psst-aarch64-unknown-linux-gnu/psst" ]; then
-            mv "artifacts/psst-aarch64-unknown-linux-gnu/psst" "artifacts/psst-linux-aarch64" && \
-            rmdir "artifacts/psst-aarch64-unknown-linux-gnu"
-          fi
-
       - name: Prepare Release Body Data
         id: release_data
         run: |
           echo "CURRENT_DATE_STR=$(date)" >> $GITHUB_ENV
 
-      - name: Prepare All Release Assets
+      - name: Prepare Release Assets
         id: prep_assets
         run: |
-          V="${{ env.RELEASE_VERSION }}"
-          mv artifacts/Psst.dmg/Psst.dmg "artifacts/Psst-${V}.dmg"
-          mv artifacts/Psst.exe/psst-gui.exe "artifacts/Psst-${V}.exe"
-          mv artifacts/psst-linux-x86_64 "artifacts/psst-linux-x86_64-${V}"
-          mv artifacts/psst-linux-aarch64 "artifacts/psst-linux-aarch64-${V}"
-          mv artifacts/psst-deb-amd64/psst-amd64.deb "artifacts/psst-amd64-${V}.deb"
-          mv artifacts/psst-deb-arm64/psst-arm64.deb "artifacts/psst-arm64-${V}.deb"
-          ls -R artifacts
+          set -e
+          mkdir -p artifacts_final
+
+          find artifacts -type f -name 'Psst.dmg' -exec mv {} artifacts_final/Psst.dmg \;
+          find artifacts -type f -name 'psst-gui.exe' -exec mv {} artifacts_final/Psst.exe \;
+          find artifacts -type f -name 'psst-amd64.deb' -exec mv {} artifacts_final/psst-amd64.deb \;
+          find artifacts -type f -name 'psst-arm64.deb' -exec mv {} artifacts_final/psst-arm64.deb \;
+
+          find artifacts -type f -name 'psst' -path '*/psst-x86_64-unknown-linux-gnu/*' -exec mv {} artifacts_final/psst-linux-x86_64 \;
+          find artifacts -type f -name 'psst' -path '*/psst-aarch64-unknown-linux-gnu/*' -exec mv {} artifacts_final/psst-linux-aarch64 \;
+
+          rm -rf artifacts
+          mv artifacts_final artifacts
+          ls -l artifacts/
 
       - name: Create Main Release
         uses: softprops/action-gh-release@v2
