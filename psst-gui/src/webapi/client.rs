@@ -31,7 +31,7 @@ use crate::{
     data::{
         self, utils::sanitize_html_string, Album, AlbumType, Artist, ArtistAlbums, ArtistInfo,
         ArtistLink, ArtistStats, AudioAnalysis, Cached, Episode, EpisodeId, EpisodeLink, Image,
-        MixedView, Nav, Page, Playlist, PublicUser, UserAlbums, UserInfo, UserLink, UserStats,
+        MixedView, Nav, Page, Playlist, PublicUser, UserInfo, UserStats,
         Range, Recommendations, RecommendationsRequest, SearchResults, SearchTopic, Show, SpotifyUrl, 
         Track, TrackLines, UserProfile,
     },
@@ -711,11 +711,11 @@ impl WebApi {
         #[derive(Clone, Data, Deserialize)]
         #[serde(rename_all = "camelCase")]
         pub struct Data1 {
-            artist_union: ArtistUnion,
+            artist_union: UserUnion,
         }
 
         #[derive(Clone, Data, Deserialize)]
-        pub struct ArtistUnion {
+        pub struct UserUnion {
             profile: Profile,
             stats: Stats,
             visuals: Visuals,
