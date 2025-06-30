@@ -540,21 +540,7 @@ impl WebApi {
                                             .map(|owner| owner.data.name.as_str())
                                             .unwrap_or_default(),
                                     ),
-                                    images: item.content.data.visuals.as_ref().map_or_else(
-                                Vector::new,
-                                |images| {
-                                    images
-                                        .avatar_image
-                                        .sources
-                                        .iter()
-                                        .map(|img| data::utils::Image {
-                                            url: Arc::from(img.url.as_str()),
-                                            width: None,
-                                            height: None,
-                                        })
-                                        .collect()
-                                },
-                            ), 
+                                    images: Vector::new(),
                                 },
                                 collaborative: false,
                                 public: None,
@@ -714,6 +700,101 @@ impl WebApi {
             .into_iter()
             .map(|item: Artist| item)
             .collect())
+    }
+    pub fn get_publicuser_info(&self, id: &str) -> Result<UserInfo, Error> {
+        #[derive(Clone, Data, Deserialize)]
+        pub struct Welcome {
+            data: Data1,
+        }
+
+        #[derive(Clone, Data, Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        pub struct Data1 {
+            artist_union: ArtistUnion,
+        }
+
+        #[derive(Clone, Data, Deserialize)]
+        pub struct ArtistUnion {
+            profile: Profile,
+            stats: Stats,
+            visuals: Visuals,
+        }
+
+        #[derive(Clone, Data, Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        pub struct Profile {
+            external_links: ExternalLinks,
+        }
+
+        #[derive(Clone, Data, Deserialize)]
+        pub struct ExternalLinks {
+            items: Vector<ExternalLinksItem>,
+        }
+
+        #[derive(Clone, Data, Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        pub struct Visuals {
+            avatar_image: AvatarImage,
+        }
+        #[derive(Clone, Data, Deserialize)]
+        pub struct AvatarImage {
+            sources: Vector<Image>,
+        }
+        #[derive(Clone, Data, Deserialize)]
+        pub struct ExternalLinksItem {
+            url: String,
+        }
+
+        #[derive(Clone, Data, Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        pub struct Stats {
+            followers: i64,
+            following: i64,
+        }
+
+        let variables = json!( {
+            "locale": "",
+            "uri": format!("spotify:artist:{}", id),
+        });
+        let json = json!({
+            "extensions": {
+                "persistedQuery": {
+                    "version": 1,
+                    "sha256Hash": "1ac33ddab5d39a3a9c27802774e6d78b9405cc188c6f75aed007df2a32737c72"
+                }
+            },
+            "operationName": "queryArtistOverview",
+            "variables": variables,
+        });
+
+        let request =
+            &RequestBuilder::new("pathfinder/v2/query".to_string(), Method::Post, Some(json))
+                .set_base_uri("api-partner.spotify.com");
+
+        let result: Cached<Welcome> = self.load_cached(request, "artist-info", id)?;
+
+        let hrefs: Vector<String> = result
+            .data
+            .data
+            .artist_union
+            .profile
+            .external_links
+            .items
+            .into_iter()
+            .map(|link| link.url)
+            .collect();
+
+        Ok(UserInfo {
+            main_image: Arc::from(
+                result.data.data.artist_union.visuals.avatar_image.sources[0]
+                    .url
+                    .to_string(),
+            ),
+            stats: UserStats {
+                followers: result.data.data.artist_union.stats.followers,
+                following: result.data.data.artist_union.stats.following,
+            },
+        })
     }
 }
 
