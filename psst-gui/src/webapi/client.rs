@@ -31,8 +31,9 @@ use crate::{
     data::{
         self, utils::sanitize_html_string, Album, AlbumType, Artist, ArtistAlbums, ArtistInfo,
         ArtistLink, ArtistStats, AudioAnalysis, Cached, Episode, EpisodeId, EpisodeLink, Image,
-        MixedView, Nav, Page, Playlist, PublicUser, Range, Recommendations, RecommendationsRequest,
-        SearchResults, SearchTopic, Show, SpotifyUrl, Track, TrackLines, UserProfile,
+        MixedView, Nav, Page, Playlist, PublicUser, UserAlbums, UserInfo, UserLink, UserStats,
+        Range, Recommendations, RecommendationsRequest, SearchResults, SearchTopic, Show, SpotifyUrl, 
+        Track, TrackLines, UserProfile,
     },
     error::Error,
     ui::credits::TrackCredits,
