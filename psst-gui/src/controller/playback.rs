@@ -25,6 +25,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::{
     cmd,
+    controller::taskbar::TaskbarManager,
     data::Nav,
     data::{
         AppState, Config, NowPlaying, Playable, Playback, PlaybackOrigin, PlaybackState,
@@ -38,6 +39,9 @@ pub struct PlaybackController {
     thread: Option<JoinHandle<()>>,
     output: Option<DefaultAudioOutput>,
     media_controls: Option<MediaControls>,
+    taskbar_manager: Option<TaskbarManager>,
+    taskbar_buttons_initialized: bool,
+    last_taskbar_state: Option<PlaybackState>,
     has_scrobbled: bool,
     scrobbler: Option<Scrobbler>,
     startup: bool,
@@ -75,6 +79,9 @@ impl PlaybackController {
             thread: None,
             output: None,
             media_controls: None,
+            taskbar_manager: None,
+            taskbar_buttons_initialized: false,
+            last_taskbar_state: None,
             has_scrobbled: false,
             scrobbler: None,
             startup: true,
@@ -104,6 +111,9 @@ impl PlaybackController {
             .map_err(|err| log::error!("failed to connect to media control interface: {:?}", err))
             .ok();
 
+        self.taskbar_manager = TaskbarManager::new(window, event_sink.clone(), widget_id)
+            .map_err(|err| log::error!("failed to initialize taskbar manager: {:?}", err))
+            .ok();
         self.sender = Some(player.sender());
         self.thread = Some(thread::spawn(move || {
             Self::service_events(player, event_sink, widget_id);
@@ -221,6 +231,33 @@ impl PlaybackController {
                     PlaybackState::Paused => MediaPlayback::Paused { progress },
                 })
                 .unwrap_or_default();
+        }
+
+        self.update_taskbar_buttons(playback.state);
+    }
+
+    fn setup_taskbar_buttons_on_first_play(&mut self, playback_state: PlaybackState) {
+        if !self.taskbar_buttons_initialized {
+            if let Some(taskbar_manager) = &self.taskbar_manager {
+                if let Err(e) = taskbar_manager.setup_buttons(playback_state) {
+                    log::error!("Failed to setup taskbar buttons: {:?}", e);
+                } else {
+                    self.taskbar_buttons_initialized = true;
+                }
+            }
+        }
+    }
+
+    fn update_taskbar_buttons(&mut self, playback_state: PlaybackState) {
+        if Some(playback_state) != self.last_taskbar_state {
+            if self.taskbar_buttons_initialized {
+                if let Some(taskbar_manager) = &self.taskbar_manager {
+                    if let Err(e) = taskbar_manager.update_play_pause_button(playback_state) {
+                        log::error!("Failed to update taskbar buttons: {:?}", e);
+                    }
+                }   
+            }
+            self.last_taskbar_state = Some(playback_state);
         }
     }
 
@@ -447,6 +484,7 @@ where
 
                 if let Some(queued) = data.queued_entry(*item) {
                     data.start_playback(queued.item, queued.origin, progress.to_owned());
+                    self.setup_taskbar_buttons_on_first_play(PlaybackState::Playing);
                     self.update_media_control_playback(&data.playback);
                     self.update_media_control_metadata(&data.playback);
                     if let Some(now_playing) = &data.playback.now_playing {
@@ -495,6 +533,7 @@ where
                     })
                     .collect();
 
+                self.setup_taskbar_buttons_on_first_play(PlaybackState::Loading);
                 self.play(&data.playback.queue, payload.position);
                 ctx.set_handled();
             }
@@ -504,6 +543,10 @@ where
             }
             Event::Command(cmd) if cmd.is(cmd::PLAY_RESUME) => {
                 self.resume();
+                ctx.set_handled();
+            }
+            Event::Command(cmd) if cmd.is(cmd::PLAY_PAUSE_OR_RESUME) => {
+                self.pause_or_resume();
                 ctx.set_handled();
             }
             Event::Command(cmd) if cmd.is(cmd::PLAY_PREVIOUS) => {
