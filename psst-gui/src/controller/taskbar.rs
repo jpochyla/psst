@@ -1,8 +1,3 @@
-//! Windows Taskbar Thumbnail Toolbar integration
-//!
-//! This module provides functionality to display playback control buttons (https://github.com/jpochyla/psst/issues/659)
-//! (play/pause, next, previous) in the Windows taskbar thumbnail preview.
-
 #[cfg(windows)]
 use std::{
     collections::HashMap,
