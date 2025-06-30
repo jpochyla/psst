@@ -46,7 +46,7 @@ impl NavController {
                 }
             }
             Nav::UserDetail(link) => {
-                if !data.user_detail.top_tracks.contains(link) {
+                if !data.user_detail.user_info.contains(link) {
                     ctx.submit_command(user::LOAD_DETAIL.with(link.to_owned()));
                 }
             }
