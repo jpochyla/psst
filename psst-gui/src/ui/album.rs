@@ -19,6 +19,7 @@ use crate::{
 use super::{artist, library, playable, theme, track, utils};
 
 pub const LOAD_DETAIL: Selector<AlbumLink> = Selector::new("app.album.load-detail");
+pub const PLAY_ALBUM_REQUEST: Selector<AlbumLink> = Selector::new("app.album.play-request");
 
 pub fn detail_widget() -> impl Widget<AppState> {
     Async::new(
@@ -66,11 +67,23 @@ fn loaded_detail_widget() -> impl Widget<WithCtx<Cached<Arc<Album>>>> {
         .with_child(album_label)
         .padding(theme::grid(1.0));
 
+    let play_button = icons::PLAY
+        .scale((theme::grid(2.5), theme::grid(2.5)))
+        .padding(theme::grid(1.0))
+        .link()
+        .circle()
+        .border(theme::GREY_500, 1.0)
+        .on_left_click(|ctx, _, album_ctx: &mut WithCtx<Arc<Album>>, _| {
+            ctx.submit_command(PLAY_ALBUM_REQUEST.with(album_ctx.data.link()));
+        });
+
     let album_top = Flex::row()
         .with_spacer(theme::grid(4.2))
         .with_child(album_cover)
         .with_default_spacer()
-        .with_child(album_info.lens(Ctx::data()));
+        .with_child(album_info.lens(Ctx::data()))
+        .with_flex_spacer(1.0)
+        .with_child(play_button);
 
     let album_tracks = playable::list_widget(playable::Display {
         track: track::Display {
