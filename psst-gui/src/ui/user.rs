@@ -34,20 +34,19 @@ pub fn detail_widget() -> impl Widget<AppState> {
 }
 
 fn async_albums_widget() -> impl Widget<AppState> {
-    Async::new(utils::spinner_widget, albums_widget, utils::error_widget)
-        .lens(
-            Ctx::make(
-                AppState::common_ctx,
-                AppState::user_detail.then(UserDetail::albums),
-            )
-            .then(Ctx::in_promise()),
+    Async::new(utils::spinner_widget, albums_widget, utils::error_widget).lens(
+        Ctx::make(
+            AppState::common_ctx,
+            AppState::user_detail.then(UserDetail::albums),
         )
-        // .on_command_async(
-        //     LOAD_DETAIL,
-        //     |d| WebApi::global().get_publicuser_albums(&d.id),
-        //     |_, data, d| data.user_detail.albums.defer(d),
-        //     |_, data, r| data.user_detail.albums.update(r),
-        // )
+        .then(Ctx::in_promise()),
+    )
+    // .on_command_async(
+    //     LOAD_DETAIL,
+    //      |d| WebApi::global().get_publicuser_albums(&d.id),
+    //      |_, data, d| data.user_detail.albums.defer(d),
+    //      |_, data, r| data.user_detail.albums.update(r),
+    //  )
 }
 
 fn async_user_info() -> impl Widget<AppState> {
@@ -59,12 +58,12 @@ fn async_user_info() -> impl Widget<AppState> {
             )
             .then(Ctx::in_promise()),
         )
-        // .on_command_async(
-        //     LOAD_DETAIL,
-        //     |d| WebApi::global().get_publicuser_info(&d.id),
-        //     |_, data, d| data.user_detail.user_info.defer(d),
-        //     |_, data, r| data.user_detail.user_info.update(r),
-        // )
+        .on_command_async(
+            LOAD_DETAIL,
+            |d| WebApi::global().get_publicuser_info(&d.id),
+            |_, data, d| data.user_detail.user_info.defer(d),
+            |_, data, r| data.user_detail.user_info.update(r),
+        )
 }
 
 pub fn public_user_widget(horizontal: bool) -> impl Widget<PublicUser> {
