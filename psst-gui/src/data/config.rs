@@ -116,6 +116,8 @@ pub struct Config {
     pub last_route: Option<Nav>,
     pub queue_behavior: QueueBehavior,
     pub show_track_cover: bool,
+    #[cfg(target_os = "windows")]
+    pub close_to_tray: bool,
     pub window_size: Size,
     pub slider_scroll_scale: SliderScrollScale,
     pub sort_order: SortOrder,
@@ -138,6 +140,8 @@ impl Default for Config {
             last_route: Default::default(),
             queue_behavior: Default::default(),
             show_track_cover: Default::default(),
+            #[cfg(target_os = "windows")]
+            close_to_tray: false,
             window_size: Size::new(theme::grid(80.0), theme::grid(100.0)),
             slider_scroll_scale: Default::default(),
             sort_order: Default::default(),

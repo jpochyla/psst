@@ -506,6 +506,10 @@ where
                 self.resume();
                 ctx.set_handled();
             }
+            Event::Command(cmd) if cmd.is(cmd::PLAY_PAUSE_TOGGLE) => {
+                self.pause_or_resume();
+                ctx.set_handled();
+            }
             Event::Command(cmd) if cmd.is(cmd::PLAY_PREVIOUS) => {
                 self.previous();
                 ctx.set_handled();
