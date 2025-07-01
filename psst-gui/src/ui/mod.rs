@@ -367,6 +367,9 @@ fn route_widget() -> impl Widget<AppState> {
             Route::ArtistDetail => Scroll::new(artist::detail_widget().padding(theme::grid(1.0)))
                 .vertical()
                 .boxed(),
+            Route::UserDetail => Scroll::new(user::detail_widget().padding(theme::grid(1.0)))
+                .vertical()
+                .boxed(),
             Route::PlaylistDetail => Flex::column()
                 .with_child(
                     find::finder_widget(cmd::FIND_IN_PLAYLIST, "Find in Playlist...")
@@ -597,6 +600,7 @@ fn route_icon_widget() -> impl Widget<Nav> {
                 Nav::SearchResults(_) | Nav::Recommendations(_) => icon(&icons::SEARCH).boxed(),
                 Nav::AlbumDetail(_, _) => icon(&icons::ALBUM).boxed(),
                 Nav::ArtistDetail(_) => icon(&icons::ARTIST).boxed(),
+                Nav::UserDetail(_) => icon(&icons::ARTIST).boxed(),
                 Nav::PlaylistDetail(_) => icon(&icons::PLAYLIST).boxed(),
                 Nav::ShowDetail(_) => icon(&icons::PODCAST).boxed(),
             }

@@ -11,7 +11,7 @@ pub struct AlbumDetail {
     pub album: Promise<Cached<Arc<Album>>, AlbumLink>,
 }
 
-#[derive(Clone, Data, Lens, Deserialize)]
+#[derive(Clone, Data, Lens, Deserialize, Debug)]
 pub struct Album {
     pub id: Arc<str>,
     pub name: Arc<str>,

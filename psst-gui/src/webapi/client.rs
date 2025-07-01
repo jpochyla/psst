@@ -32,15 +32,15 @@ use crate::{
         self, utils::sanitize_html_string, Album, AlbumType, Artist, ArtistAlbums, ArtistInfo,
         ArtistLink, ArtistStats, AudioAnalysis, Cached, Episode, EpisodeId, EpisodeLink, Image,
         MixedView, Nav, Page, Playlist, PublicUser, Range, Recommendations, RecommendationsRequest,
-        SearchResults, SearchTopic, Show, SpotifyUrl, Track, TrackLines, UserProfile,
+        SearchResults, SearchTopic, Show, SpotifyUrl, Track, TrackLines,
+        UserInfo, UserProfile, UserStats,
     },
     error::Error,
     ui::credits::TrackCredits,
 };
 
 use super::{cache::WebApiCache, local::LocalTrackManager};
-use sanitize_html::rules::predefined::DEFAULT;
-use sanitize_html::sanitize_str;
+use sanitize_html::{rules::predefined::DEFAULT, sanitize_str};
 
 pub struct WebApi {
     session: SessionService,
@@ -211,7 +211,8 @@ impl WebApi {
         }
     }
 
-    /// Very similar to `for_all_pages`, but only returns a certain number of results
+    /// Very similar to `for_all_pages`, but only returns a certain number of
+    /// results
     fn for_some_pages<T: DeserializeOwned + Clone>(
         &self,
         request: &RequestBuilder,
@@ -270,7 +271,8 @@ impl WebApi {
         Ok(results)
     }
 
-    /// Does a similar thing as `load_all_pages`, but limiting the number of results
+    /// Does a similar thing as `load_all_pages`, but limiting the number of
+    /// results
     fn load_some_pages<T: DeserializeOwned + Clone>(
         &self,
         request: &RequestBuilder,
@@ -540,6 +542,21 @@ impl WebApi {
                                             .map(|owner| owner.data.name.as_str())
                                             .unwrap_or_default(),
                                     ),
+                                    images: item.content.data.visuals.as_ref().map_or_else(
+                                        Vector::new,
+                                        |images| {
+                                            images
+                                                .avatar_image
+                                                .sources
+                                                .iter()
+                                                .map(|img| data::utils::Image {
+                                                    url: Arc::from(img.url.as_str()),
+                                                    width: None,
+                                                    height: None,
+                                                })
+                                                .collect()
+                                        },
+                                    ),
                                 },
                                 collaborative: false,
                                 public: None,
@@ -700,6 +717,120 @@ impl WebApi {
             .map(|item: Artist| item)
             .collect())
     }
+    pub fn get_publicuser_info(&self, id: &str) -> Result<UserInfo, Error> {
+        #[derive(Clone, Data, Deserialize)]
+        pub struct Welcome {
+            uri: String,
+            name: String,
+            image_url: Option<String>,
+            followers_count: i64,
+            following_count: i64,
+            public_playlists: Vector<Playlist>,
+            total_public_playlists_count: i64,
+            has_spotify_name: bool,
+            has_spotify_image: bool,
+            color: i64,
+            allow_follows: bool,
+            // data: Data1,
+        }
+
+        // #[derive(Clone, Data, Deserialize)]
+        // #[serde(rename_all = "camelCase")]
+        // pub struct Data1 {
+        //     user_union: UserUnion,
+        // }
+
+        // #[derive(Clone, Data, Deserialize)]
+        // pub struct UserUnion {
+        //     profile: Profile,
+        //     stats: Stats,
+        //     visuals: Visuals,
+        // }
+
+        // #[derive(Clone, Data, Deserialize)]
+        // #[serde(rename_all = "camelCase")]
+        // pub struct Profile {
+        //     external_links: ExternalLinks,
+        // }
+
+        // #[derive(Clone, Data, Deserialize)]
+        // pub struct ExternalLinks {
+        //     items: Vector<ExternalLinksItem>,
+        // }
+
+        // #[derive(Clone, Data, Deserialize)]
+        // #[serde(rename_all = "camelCase")]
+        // pub struct Visuals {
+        //     avatar_image: AvatarImage,
+        // }
+        // #[derive(Clone, Data, Deserialize)]
+        // pub struct AvatarImage {
+        //     sources: Vector<Image>,
+        // }
+        // #[derive(Clone, Data, Deserialize)]
+        // pub struct ExternalLinksItem {
+        //     url: String,
+        // }
+
+        // #[derive(Clone, Data, Deserialize)]
+        // #[serde(rename_all = "camelCase")]
+        // pub struct Stats {
+        //     followers: i64,
+        //     following: i64,
+        // }
+
+        // let variables = json!( {
+        //     "locale": "",
+        //     "uri": format!("spotify:users:{}", id),
+        // });
+        // let json = json!({
+        //     "extensions": {
+        //         "persistedQuery": {
+        //             "version": 1,
+        //             "sha256Hash":
+        // "1ac33ddab5d39a3a9c27802774e6d78b9405cc188c6f75aed007df2a32737c72"
+        //         }
+        //     },
+        //     "operationName": "queryArtistOverview",
+        //     "variables": variables,
+        // });
+
+        // let request =
+        //     &RequestBuilder::new("pathfinder/v2/query".to_string(), Method::Post,
+        // Some(json))         .set_base_uri("api-partner.spotify.com");
+
+        let request = &RequestBuilder::new(
+            format!("user-profile-view/v3/profile/{}", id),
+            Method::Get,
+            None,
+        )
+        .query("market", "from_token")
+        .set_base_uri("spclient.wg.spotify.com");
+    
+    let result: Cached<Welcome> = self.load_cached(request, "user-info", id)?;
+        // let hrefs: Vector<String> = result
+        //     .data
+        //     .data
+        //     .artist_union
+        //     .profile
+        //     .external_links
+        //     .items
+        //     .into_iter()
+        //     .map(|link| link.url)
+        //     .collect();
+
+        Ok(UserInfo {
+            main_image: Arc::from(
+                result.data.image_url
+                    .unwrap_or_default()
+                    .to_string(),
+            ),
+            stats: UserStats {
+                followers: result.data.followers_count,
+                following: result.data.following_count,
+            },
+        })
+    }
 }
 
 /// Artist endpoints.
@@ -729,10 +860,12 @@ impl WebApi {
 
         for album in result {
             match album.album_type {
-                // Spotify is labeling albums and singles that should be labeled `appears_on` as `album` or `single`.
-                // They are still ordered properly though, with the most recent first, then 'appears_on'.
-                // So we just wait until they are no longer descending, then start putting them in the 'appears_on' Vec.
-                // NOTE: This will break if an artist has released 'appears_on' albums/singles before their first actual album/single.
+                // Spotify is labeling albums and singles that should be labeled `appears_on` as
+                // `album` or `single`. They are still ordered properly though, with
+                // the most recent first, then 'appears_on'. So we just wait until
+                // they are no longer descending, then start putting them in the 'appears_on' Vec.
+                // NOTE: This will break if an artist has released 'appears_on' albums/singles
+                // before their first actual album/single.
                 AlbumType::Album => {
                     if album.release_year_int() > last_album_release_year {
                         artist_albums.appears_on.push_back(album)
@@ -1528,7 +1661,8 @@ enum Method {
     Get,
 }
 
-// Creating a new URI builder so aid in the creation of uris with extendable queries.
+// Creating a new URI builder so aid in the creation of uris with extendable
+// queries.
 #[derive(Debug, Clone)]
 struct RequestBuilder {
     protocol: String,
