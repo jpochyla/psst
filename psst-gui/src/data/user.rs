@@ -11,11 +11,11 @@ pub struct UserProfile {
     pub id: Arc<str>,
 }
 
-#[derive(Clone, Data, Lens, Deserialize, Debug, Serialize)]
+#[derive(Clone, Data, Lens, Deserialize, Debug)]
 pub struct PublicUser {
     pub display_name: Arc<str>,
     pub id: Arc<str>,
-    #[serde(skip_serializing_if = "Vector::is_empty")]
+    #[serde(default)]
     pub images: Vector<Image>,
 }
 
