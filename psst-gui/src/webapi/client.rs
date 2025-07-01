@@ -541,7 +541,21 @@ impl WebApi {
                                             .map(|owner| owner.data.name.as_str())
                                             .unwrap_or_default(),
                                     ),
-                                    images: Vector::new(),
+                                    images: item.content.data.visuals.as_ref().map_or_else(
+                                        Vector::new,
+                                        |images| {
+                                            images
+                                                .avatar_image
+                                                .sources
+                                                .iter()
+                                                .map(|img| data::utils::Image {
+                                                    url: Arc::from(img.url.as_str()),
+                                                    width: None,
+                                                    height: None,
+                                                })
+                                                .collect()
+                                        },
+                                    ),
                                 },
                                 collaborative: false,
                                 public: None,
@@ -755,24 +769,33 @@ impl WebApi {
 
         let variables = json!( {
             "locale": "",
-            "uri": format!("spotify:artist:{}", id),
+            "uri": format!("spotify:users:{}", id),
         });
-        let json = json!({
-            "extensions": {
-                "persistedQuery": {
-                    "version": 1,
-                    "sha256Hash": "1ac33ddab5d39a3a9c27802774e6d78b9405cc188c6f75aed007df2a32737c72"
-                }
-            },
-            "operationName": "queryArtistOverview",
-            "variables": variables,
-        });
+        // let json = json!({
+        //     "extensions": {
+        //         "persistedQuery": {
+        //             "version": 1,
+        //             "sha256Hash":
+        // "1ac33ddab5d39a3a9c27802774e6d78b9405cc188c6f75aed007df2a32737c72"
+        //         }
+        //     },
+        //     "operationName": "queryArtistOverview",
+        //     "variables": variables,
+        // });
 
-        let request =
-            &RequestBuilder::new("pathfinder/v2/query".to_string(), Method::Post, Some(json))
-                .set_base_uri("api-partner.spotify.com");
+        // let request =
+        //     &RequestBuilder::new("pathfinder/v2/query".to_string(), Method::Post,
+        // Some(json))         .set_base_uri("api-partner.spotify.com");
 
-        let result: Cached<Welcome> = self.load_cached(request, "artist-info", id)?;
+        let request = &RequestBuilder::new(
+            format!("user-profile-view/v3/profile/{}", id),
+            Method::Get,
+            None,
+        )
+        .query("market", "from_token")
+        .set_base_uri("spclient.wg.spotify.com");
+
+        let result: Cached<Welcome> = self.load_cached(request, "user-info", id)?;
 
         let hrefs: Vector<String> = result
             .data
