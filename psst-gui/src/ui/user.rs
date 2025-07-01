@@ -28,26 +28,25 @@ pub const LOAD_PROFILE: Selector = Selector::new("app.user.load-profile");
 pub const LOAD_DETAIL: Selector<UserLink> = Selector::new("app.user.load-detail");
 
 pub fn detail_widget() -> impl Widget<AppState> {
-    Flex::column()
-        .with_child(async_user_info().padding((theme::grid(1.0), 0.0)))
-        .with_child(async_albums_widget().padding((theme::grid(1.0), 0.0)))
+    Flex::column().with_child(async_user_info().padding((theme::grid(1.0), 0.0)))
+    // .with_child(async_albums_widget().padding((theme::grid(1.0), 0.0)))
 }
 
-fn async_albums_widget() -> impl Widget<AppState> {
-    Async::new(utils::spinner_widget, albums_widget, utils::error_widget).lens(
-        Ctx::make(
-            AppState::common_ctx,
-            AppState::user_detail.then(UserDetail::albums),
-        )
-        .then(Ctx::in_promise()),
-    )
-    // .on_command_async(
-    //     LOAD_DETAIL,
-    //      |d| WebApi::global().get_publicuser_albums(&d.id),
-    //      |_, data, d| data.user_detail.albums.defer(d),
-    //      |_, data, r| data.user_detail.albums.update(r),
-    //  )
-}
+// fn async_albums_widget() -> impl Widget<AppState> {
+//     Async::new(utils::spinner_widget, albums_widget,
+// utils::error_widget).lens(         Ctx::make(
+//             AppState::common_ctx,
+//             AppState::user_detail.then(UserDetail::albums),
+//         )
+//         .then(Ctx::in_promise()),
+//     )
+//      .on_command_async(
+//          LOAD_DETAIL,
+//           |d| WebApi::global().get_publicuser_albums(&d.id),
+//           |_, data, d| data.user_detail.albums.defer(d),
+//           |_, data, r| data.user_detail.albums.update(r),
+//   )
+// }
 
 fn async_user_info() -> impl Widget<AppState> {
     Async::new(utils::spinner_widget, user_info_widget, || Empty)
