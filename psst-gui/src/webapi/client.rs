@@ -31,17 +31,16 @@ use crate::{
     data::{
         self, utils::sanitize_html_string, Album, AlbumType, Artist, ArtistAlbums, ArtistInfo,
         ArtistLink, ArtistStats, AudioAnalysis, Cached, Episode, EpisodeId, EpisodeLink, Image,
-        MixedView, Nav, Page, Playlist, PublicUser, UserInfo, UserStats,
-        Range, Recommendations, RecommendationsRequest, SearchResults, SearchTopic, Show, SpotifyUrl, 
-        Track, TrackLines, UserProfile,
+        MixedView, Nav, Page, Playlist, PublicUser, Range, Recommendations, RecommendationsRequest,
+        SearchResults, SearchTopic, Show, SpotifyUrl, Track, TrackLines, UserAlbums, UserDetail,
+        UserInfo, UserLink, UserProfile, UserStats,
     },
     error::Error,
     ui::credits::TrackCredits,
 };
 
 use super::{cache::WebApiCache, local::LocalTrackManager};
-use sanitize_html::rules::predefined::DEFAULT;
-use sanitize_html::sanitize_str;
+use sanitize_html::{rules::predefined::DEFAULT, sanitize_str};
 
 pub struct WebApi {
     session: SessionService,
@@ -212,7 +211,8 @@ impl WebApi {
         }
     }
 
-    /// Very similar to `for_all_pages`, but only returns a certain number of results
+    /// Very similar to `for_all_pages`, but only returns a certain number of
+    /// results
     fn for_some_pages<T: DeserializeOwned + Clone>(
         &self,
         request: &RequestBuilder,
@@ -271,7 +271,8 @@ impl WebApi {
         Ok(results)
     }
 
-    /// Does a similar thing as `load_all_pages`, but limiting the number of results
+    /// Does a similar thing as `load_all_pages`, but limiting the number of
+    /// results
     fn load_some_pages<T: DeserializeOwned + Clone>(
         &self,
         request: &RequestBuilder,
@@ -849,10 +850,12 @@ impl WebApi {
 
         for album in result {
             match album.album_type {
-                // Spotify is labeling albums and singles that should be labeled `appears_on` as `album` or `single`.
-                // They are still ordered properly though, with the most recent first, then 'appears_on'.
-                // So we just wait until they are no longer descending, then start putting them in the 'appears_on' Vec.
-                // NOTE: This will break if an artist has released 'appears_on' albums/singles before their first actual album/single.
+                // Spotify is labeling albums and singles that should be labeled `appears_on` as
+                // `album` or `single`. They are still ordered properly though, with
+                // the most recent first, then 'appears_on'. So we just wait until
+                // they are no longer descending, then start putting them in the 'appears_on' Vec.
+                // NOTE: This will break if an artist has released 'appears_on' albums/singles
+                // before their first actual album/single.
                 AlbumType::Album => {
                     if album.release_year_int() > last_album_release_year {
                         artist_albums.appears_on.push_back(album)
@@ -1648,7 +1651,8 @@ enum Method {
     Get,
 }
 
-// Creating a new URI builder so aid in the creation of uris with extendable queries.
+// Creating a new URI builder so aid in the creation of uris with extendable
+// queries.
 #[derive(Debug, Clone)]
 struct RequestBuilder {
     protocol: String,
