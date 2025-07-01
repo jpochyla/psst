@@ -46,7 +46,6 @@ pub struct UserAlbums {
 #[derive(Clone, Data, Lens)]
 pub struct UserInfo {
     pub main_image: Arc<str>,
-
     pub stats: UserStats,
 }
 
@@ -80,6 +79,6 @@ pub struct UserLink {
 
 impl UserLink {
     pub fn url(&self) -> String {
-        format!("https://open.spotify.com/user/{id}", id = self.id)
+        format!("https://open.spotify.com/users/{id}", id = self.id)
     }
 }
