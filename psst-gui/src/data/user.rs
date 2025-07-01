@@ -15,7 +15,7 @@ pub struct UserProfile {
 pub struct PublicUser {
     pub display_name: Arc<str>,
     pub id: Arc<str>,
-    #[serde(default)]
+    #[serde(skip)]
     pub images: Vector<Image>,
 }
 
