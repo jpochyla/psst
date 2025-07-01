@@ -32,8 +32,8 @@ use crate::{
         self, utils::sanitize_html_string, Album, AlbumType, Artist, ArtistAlbums, ArtistInfo,
         ArtistLink, ArtistStats, AudioAnalysis, Cached, Episode, EpisodeId, EpisodeLink, Image,
         MixedView, Nav, Page, Playlist, PublicUser, Range, Recommendations, RecommendationsRequest,
-        SearchResults, SearchTopic, Show, SpotifyUrl, Track, TrackLines, UserAlbums, UserDetail,
-        UserInfo, UserLink, UserProfile, UserStats,
+        SearchResults, SearchTopic, Show, SpotifyUrl, Track, TrackLines,
+        UserInfo, UserProfile, UserStats,
     },
     error::Error,
     ui::credits::TrackCredits,
@@ -720,58 +720,69 @@ impl WebApi {
     pub fn get_publicuser_info(&self, id: &str) -> Result<UserInfo, Error> {
         #[derive(Clone, Data, Deserialize)]
         pub struct Welcome {
-            data: Data1,
+            uri: String,
+            name: String,
+            image_url: Option<String>,
+            followers_count: i64,
+            following_count: i64,
+            public_playlists: Vector<Playlist>,
+            total_public_playlists_count: i64,
+            has_spotify_name: bool,
+            has_spotify_image: bool,
+            color: i64,
+            allow_follows: bool,
+            // data: Data1,
         }
 
-        #[derive(Clone, Data, Deserialize)]
-        #[serde(rename_all = "camelCase")]
-        pub struct Data1 {
-            artist_union: UserUnion,
-        }
+        // #[derive(Clone, Data, Deserialize)]
+        // #[serde(rename_all = "camelCase")]
+        // pub struct Data1 {
+        //     user_union: UserUnion,
+        // }
 
-        #[derive(Clone, Data, Deserialize)]
-        pub struct UserUnion {
-            profile: Profile,
-            stats: Stats,
-            visuals: Visuals,
-        }
+        // #[derive(Clone, Data, Deserialize)]
+        // pub struct UserUnion {
+        //     profile: Profile,
+        //     stats: Stats,
+        //     visuals: Visuals,
+        // }
 
-        #[derive(Clone, Data, Deserialize)]
-        #[serde(rename_all = "camelCase")]
-        pub struct Profile {
-            external_links: ExternalLinks,
-        }
+        // #[derive(Clone, Data, Deserialize)]
+        // #[serde(rename_all = "camelCase")]
+        // pub struct Profile {
+        //     external_links: ExternalLinks,
+        // }
 
-        #[derive(Clone, Data, Deserialize)]
-        pub struct ExternalLinks {
-            items: Vector<ExternalLinksItem>,
-        }
+        // #[derive(Clone, Data, Deserialize)]
+        // pub struct ExternalLinks {
+        //     items: Vector<ExternalLinksItem>,
+        // }
 
-        #[derive(Clone, Data, Deserialize)]
-        #[serde(rename_all = "camelCase")]
-        pub struct Visuals {
-            avatar_image: AvatarImage,
-        }
-        #[derive(Clone, Data, Deserialize)]
-        pub struct AvatarImage {
-            sources: Vector<Image>,
-        }
-        #[derive(Clone, Data, Deserialize)]
-        pub struct ExternalLinksItem {
-            url: String,
-        }
+        // #[derive(Clone, Data, Deserialize)]
+        // #[serde(rename_all = "camelCase")]
+        // pub struct Visuals {
+        //     avatar_image: AvatarImage,
+        // }
+        // #[derive(Clone, Data, Deserialize)]
+        // pub struct AvatarImage {
+        //     sources: Vector<Image>,
+        // }
+        // #[derive(Clone, Data, Deserialize)]
+        // pub struct ExternalLinksItem {
+        //     url: String,
+        // }
 
-        #[derive(Clone, Data, Deserialize)]
-        #[serde(rename_all = "camelCase")]
-        pub struct Stats {
-            followers: i64,
-            following: i64,
-        }
+        // #[derive(Clone, Data, Deserialize)]
+        // #[serde(rename_all = "camelCase")]
+        // pub struct Stats {
+        //     followers: i64,
+        //     following: i64,
+        // }
 
-        let variables = json!( {
-            "locale": "",
-            "uri": format!("spotify:users:{}", id),
-        });
+        // let variables = json!( {
+        //     "locale": "",
+        //     "uri": format!("spotify:users:{}", id),
+        // });
         // let json = json!({
         //     "extensions": {
         //         "persistedQuery": {
@@ -795,29 +806,28 @@ impl WebApi {
         )
         .query("market", "from_token")
         .set_base_uri("spclient.wg.spotify.com");
-
-        let result: Cached<Welcome> = self.load_cached(request, "user-info", id)?;
-
-        let hrefs: Vector<String> = result
-            .data
-            .data
-            .artist_union
-            .profile
-            .external_links
-            .items
-            .into_iter()
-            .map(|link| link.url)
-            .collect();
+    
+    let result: Cached<Welcome> = self.load_cached(request, "user-info", id)?;
+        // let hrefs: Vector<String> = result
+        //     .data
+        //     .data
+        //     .artist_union
+        //     .profile
+        //     .external_links
+        //     .items
+        //     .into_iter()
+        //     .map(|link| link.url)
+        //     .collect();
 
         Ok(UserInfo {
             main_image: Arc::from(
-                result.data.data.artist_union.visuals.avatar_image.sources[0]
-                    .url
+                result.data.image_url
+                    .unwrap_or_default()
                     .to_string(),
             ),
             stats: UserStats {
-                followers: result.data.data.artist_union.stats.followers,
-                following: result.data.data.artist_union.stats.following,
+                followers: result.data.followers_count,
+                following: result.data.following_count,
             },
         })
     }
