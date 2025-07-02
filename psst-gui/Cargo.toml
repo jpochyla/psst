@@ -11,9 +11,10 @@ repository = "https://github.com/jpochyla/psst"
 default = ["cpal"]
 cpal = ["psst-core/cpal"]
 cubeb = ["psst-core/cubeb"]
+pipewire = ["psst-core/pipewire"]
 
 [dependencies]
-psst-core = { path = "../psst-core" }
+psst-core = { path = "../psst-core", default-features = false }
 
 # Common
 crossbeam-channel = { version = "0.5.15" }

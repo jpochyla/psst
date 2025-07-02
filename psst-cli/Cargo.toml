@@ -8,9 +8,10 @@ edition = "2021"
 default = ["cpal"]
 cpal = ["psst-core/cpal"]
 cubeb = ["psst-core/cubeb"]
+pipewire = ["psst-core/pipewire"]
 
 [dependencies]
-psst-core = { path = "../psst-core" }
+psst-core = { path = "../psst-core", default-features = false }
 
 env_logger = "0.11.5"
 log = "0.4.22"
