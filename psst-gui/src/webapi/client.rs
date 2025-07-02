@@ -542,6 +542,7 @@ impl WebApi {
                                     ),
                                 },
                                 collaborative: false,
+                                public: None,
                             });
                         }
                         DataTypename::Artist => artist.push_back(Artist {

@@ -1,30 +1,24 @@
-use std::cell::RefCell;
-use std::rc::Rc;
-use std::{cmp::Ordering, sync::Arc};
+use std::{cell::RefCell, cmp::Ordering, rc::Rc, sync::Arc};
 
-use druid::widget::{Button, LensWrap, TextBox};
-use druid::UnitPoint;
 use druid::{
     im::Vector,
-    widget::{Flex, Label, LineBreaking, List},
-    Insets, Lens, LensExt, LocalizedString, Menu, MenuItem, Selector, Size, Widget, WidgetExt,
-    WindowDesc,
+    widget::{Button, Either, Flex, Label, LensWrap, LineBreaking, List, TextBox},
+    Insets, Lens, LensExt, LocalizedString, Menu, MenuItem, Selector, Size, UnitPoint, Widget,
+    WidgetExt, WindowDesc,
 };
 use itertools::Itertools;
 
-use crate::data::WithCtx;
-use crate::ui::menu;
-use crate::widget::ThemeScope;
 use crate::{
     cmd,
     data::{
         config::{SortCriteria, SortOrder},
         AppState, Ctx, Library, Nav, Playlist, PlaylistAddTrack, PlaylistDetail, PlaylistLink,
-        PlaylistRemoveTrack, PlaylistTracks, Track,
+        PlaylistRemoveTrack, PlaylistTracks, Track, WithCtx,
     },
     error::Error,
+    ui::menu,
     webapi::WebApi,
-    widget::{Async, MyWidgetExt, RemoteImage},
+    widget::{Async, Empty, MyWidgetExt, RemoteImage, ThemeScope},
 };
 
 use super::{playable, theme, track, utils};
@@ -403,47 +397,146 @@ fn rounded_cover_widget(size: f64) -> impl Widget<Playlist> {
 }
 
 pub fn detail_widget() -> impl Widget<AppState> {
-    Async::new(
-        utils::spinner_widget,
-        || {
-            playable::list_widget_with_find(
-                playable::Display {
-                    track: track::Display {
-                        title: true,
-                        artist: true,
-                        album: true,
-                        cover: true,
-                        ..track::Display::empty()
-                    },
-                },
-                cmd::FIND_IN_PLAYLIST,
+    use druid::widget::CrossAxisAlignment;
+
+    let playlist_top = async_playlist_info_widget().padding(theme::grid(1.0));
+
+    let playlist_tracks = async_tracks_widget();
+
+    Flex::column()
+        .cross_axis_alignment(CrossAxisAlignment::Start)
+        .with_spacer(theme::grid(1.0))
+        .with_child(playlist_top)
+        .with_spacer(theme::grid(1.0))
+        .with_child(playlist_tracks)
+}
+
+fn async_playlist_info_widget() -> impl Widget<AppState> {
+    Async::new(utils::spinner_widget, playlist_info_widget, || Empty)
+        .lens(
+            Ctx::make(
+                AppState::common_ctx,
+                AppState::playlist_detail.then(PlaylistDetail::playlist),
             )
-        },
-        utils::error_widget,
-    )
-    .lens(
-        Ctx::make(
-            AppState::common_ctx,
-            AppState::playlist_detail.then(PlaylistDetail::tracks),
+            .then(Ctx::in_promise()),
         )
-        .then(Ctx::in_promise()),
-    )
-    .on_command_async(
-        LOAD_DETAIL,
-        |arg: (PlaylistLink, AppState)| {
-            let d = arg.0;
-            let data = arg.1;
-            sort_playlist(&data, WebApi::global().get_playlist_tracks(&d.id))
+        .on_command_async(
+            LOAD_DETAIL,
+            |d| WebApi::global().get_playlist(&d.0.id),
+            |_, data, d| data.playlist_detail.playlist.defer(d.0),
+            |_, data, (d, r)| data.playlist_detail.playlist.update((d.0, r)),
+        )
+}
+
+fn playlist_info_widget() -> impl Widget<WithCtx<Playlist>> {
+    use druid::widget::CrossAxisAlignment;
+
+    let size = theme::grid(10.0);
+    let playlist_cover = cover_widget(size)
+        .lens(Ctx::data())
+        .clip(Size::new(size, size).to_rounded_rect(4.0))
+        .context_menu(playlist_menu_ctx);
+
+    let owner_label = Label::dynamic(|p: &Playlist, _| p.owner.display_name.as_ref().to_string());
+
+    let track_count_label = Label::dynamic(|p: &Playlist, _| {
+        let count = p.track_count.unwrap_or(0);
+        if count == 1 {
+            "1 song".to_string()
+        } else {
+            format!("{} songs", count)
+        }
+    })
+    .with_text_size(theme::TEXT_SIZE_SMALL);
+
+    let description_widget = Either::new(
+        |p: &Playlist, _| !p.description.is_empty(),
+        Flex::column().with_default_spacer().with_child(
+            Label::dynamic(|p: &Playlist, _| p.description.to_string())
+                .with_line_break_mode(LineBreaking::WordWrap)
+                .with_text_size(theme::TEXT_SIZE_SMALL)
+                .with_text_color(theme::PLACEHOLDER_COLOR),
+        ),
+        Empty,
+    );
+
+    let visibility_widget = Either::new(
+        |p: &Playlist, _| p.public.is_some() || p.collaborative,
+        Flex::column().with_default_spacer().with_child(
+            Label::dynamic(|p: &Playlist, _| {
+                let mut parts = Vec::new();
+                match p.public {
+                    Some(true) => parts.push("Public"),
+                    Some(false) => parts.push("Private"),
+                    None => {}
+                }
+                if p.collaborative {
+                    parts.push("Collaborative");
+                }
+                parts.join(" • ")
+            })
+            .with_line_break_mode(LineBreaking::WordWrap)
+            .with_text_size(theme::TEXT_SIZE_SMALL)
+            .with_text_color(theme::PLACEHOLDER_COLOR),
+        ),
+        Empty,
+    );
+
+    let playlist_info = Flex::column()
+        .cross_axis_alignment(CrossAxisAlignment::Start)
+        .with_child(owner_label)
+        .with_default_spacer()
+        .with_child(track_count_label)
+        .with_child(description_widget)
+        .with_child(visibility_widget)
+        .padding(theme::grid(1.0));
+
+    Flex::row()
+        .with_child(playlist_cover)
+        .with_default_spacer()
+        .with_child(playlist_info.lens(Ctx::data()))
+}
+
+fn async_tracks_widget() -> impl Widget<AppState> {
+    Async::new(utils::spinner_widget, tracks_widget, utils::error_widget)
+        .lens(
+            Ctx::make(
+                AppState::common_ctx,
+                AppState::playlist_detail.then(PlaylistDetail::tracks),
+            )
+            .then(Ctx::in_promise()),
+        )
+        .on_command_async(
+            LOAD_DETAIL,
+            |arg: (PlaylistLink, AppState)| {
+                let d = arg.0;
+                let data = arg.1;
+                sort_playlist(&data, WebApi::global().get_playlist_tracks(&d.id))
+            },
+            |_, data, d| data.playlist_detail.tracks.defer(d.0),
+            |_, data, (d, r)| {
+                let tracks = PlaylistTracks {
+                    id: d.0.id.clone(),
+                    name: d.0.name.clone(),
+                    tracks: r,
+                };
+                data.playlist_detail.tracks.update((d.0, Ok(tracks)))
+            },
+        )
+}
+
+fn tracks_widget() -> impl Widget<WithCtx<PlaylistTracks>> {
+    playable::list_widget_with_find(
+        playable::Display {
+            track: track::Display {
+                title: true,
+                artist: true,
+                album: true,
+                cover: true,
+                ..track::Display::empty()
+            },
         },
-        |_, data, d| data.playlist_detail.tracks.defer(d.0),
-        |_, data, (d, r)| {
-            let tracks = PlaylistTracks {
-                id: d.0.id.clone(),
-                name: d.0.name.clone(),
-                tracks: r,
-            };
-            data.playlist_detail.tracks.update((d.0, Ok(tracks)))
-        },
+        cmd::FIND_IN_PLAYLIST,
     )
 }
 
