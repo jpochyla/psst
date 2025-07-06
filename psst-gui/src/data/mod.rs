@@ -58,7 +58,10 @@ pub use crate::data::{
     show::{Episode, EpisodeId, EpisodeLink, Show, ShowDetail, ShowEpisodes, ShowLink},
     slider_scroll_scale::SliderScrollScale,
     track::{AudioAnalysis, Track, TrackId, TrackLines},
-    user::{PublicUser, UserProfile},
+    user::{
+        PublicUser, PublicUserDetail, UserAlbums, UserDetail, UserInfo, UserLink, UserProfile,
+        UserStats, UserTracks,
+    },
     utils::{Cached, Float64, Image, Page},
 };
 use crate::ui::credits::TrackCredits;
@@ -79,6 +82,7 @@ pub struct AppState {
     pub album_detail: AlbumDetail,
     pub artist_detail: ArtistDetail,
     pub playlist_detail: PlaylistDetail,
+    pub user_detail: UserDetail,
     pub show_detail: ShowDetail,
     pub library: Arc<Library>,
     pub common_ctx: Arc<CommonCtx>,
@@ -160,6 +164,13 @@ impl AppState {
                 playlist: Promise::Empty,
                 tracks: Promise::Empty,
             },
+            user_detail: UserDetail {
+                artist: Promise::Empty,
+                albums: Promise::Empty,
+                user_info: Promise::Empty,
+                top_tracks: Promise::Empty,
+            },
+
             show_detail: ShowDetail {
                 show: Promise::Empty,
                 episodes: Promise::Empty,

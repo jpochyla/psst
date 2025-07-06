@@ -12,9 +12,7 @@ use druid::{
 use crate::{
     cmd,
     data::{
-        ArtistTracks, CommonCtx, FindQuery, MatchFindQuery, Playable, PlaybackOrigin,
-        PlaybackPayload, PlaylistTracks, Recommendations, SavedTracks, SearchResults, ShowEpisodes,
-        Track, WithCtx,
+        ArtistTracks, CommonCtx, FindQuery, MatchFindQuery, Playable, PlaybackOrigin, PlaybackPayload, PlaylistTracks, Recommendations, SavedTracks, SearchResults, ShowEpisodes, Track, UserTracks, WithCtx
     },
     ui::theme,
 };
@@ -173,6 +171,22 @@ impl PlayableIter for PlaylistTracks {
 impl PlayableIter for ArtistTracks {
     fn origin(&self) -> PlaybackOrigin {
         PlaybackOrigin::Artist(self.link())
+    }
+
+    fn for_each(&self, mut cb: impl FnMut(Playable, usize)) {
+        for (position, track) in self.tracks.iter().enumerate() {
+            cb(Playable::Track(track.to_owned()), position);
+        }
+    }
+
+    fn count(&self) -> usize {
+        self.tracks.len()
+    }
+}
+
+impl PlayableIter for UserTracks {
+    fn origin(&self) -> PlaybackOrigin {
+        PlaybackOrigin::User(self.link())
     }
 
     fn for_each(&self, mut cb: impl FnMut(Playable, usize)) {

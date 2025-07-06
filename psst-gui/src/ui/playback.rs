@@ -179,6 +179,7 @@ fn playback_origin_icon(origin: &PlaybackOrigin) -> &'static SvgIcon {
         PlaybackOrigin::Library => &icons::HEART,
         PlaybackOrigin::Album { .. } => &icons::ALBUM,
         PlaybackOrigin::Artist { .. } => &icons::ARTIST,
+        PlaybackOrigin::User { .. } => &icons::ARTIST,
         PlaybackOrigin::Playlist { .. } => &icons::PLAYLIST,
         PlaybackOrigin::Show { .. } => &icons::PODCAST,
         PlaybackOrigin::Search { .. } => &icons::SEARCH,
