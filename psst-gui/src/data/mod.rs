@@ -59,7 +59,8 @@ pub use crate::data::{
     slider_scroll_scale::SliderScrollScale,
     track::{AudioAnalysis, Track, TrackId, TrackLines},
     user::{
-        PublicUser, UserAlbums, UserDetail, UserInfo, UserLink, UserProfile, UserStats, UserTracks,
+        PublicUser, PublicUserDetail, UserAlbums, UserDetail, UserInfo, UserLink, UserProfile,
+        UserStats, UserTracks,
     },
     utils::{Cached, Float64, Image, Page},
 };
