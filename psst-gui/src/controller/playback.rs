@@ -7,7 +7,7 @@ use crossbeam_channel::Sender;
 use druid::{
     im::Vector,
     widget::{prelude::*, Controller},
-    Code, ExtEventSink, InternalLifeCycle, KbKey, WindowHandle,
+    Code, ExtEventSink, InternalLifeCycle, KbKey, Target, WindowHandle,
 };
 use psst_core::{
     audio::{normalize::NormalizationLevel, output::DefaultAudioOutput},
@@ -252,7 +252,7 @@ impl PlaybackController {
         if Some(playback_state) != self.last_taskbar_state {
             if self.taskbar_buttons_initialized {
                 if let Some(taskbar_manager) = &self.taskbar_manager {
-                    if let Err(e) = taskbar_manager.update_play_pause_button(playback_state) {
+                    if let Err(e) = taskbar_manager.update_all_buttons(playback_state) {
                         log::error!("Failed to update taskbar buttons: {:?}", e);
                     }
                 }   
@@ -484,7 +484,6 @@ where
 
                 if let Some(queued) = data.queued_entry(*item) {
                     data.start_playback(queued.item, queued.origin, progress.to_owned());
-                    self.setup_taskbar_buttons_on_first_play(PlaybackState::Playing);
                     self.update_media_control_playback(&data.playback);
                     self.update_media_control_metadata(&data.playback);
                     if let Some(now_playing) = &data.playback.now_playing {
@@ -533,7 +532,6 @@ where
                     })
                     .collect();
 
-                self.setup_taskbar_buttons_on_first_play(PlaybackState::Loading);
                 self.play(&data.playback.queue, payload.position);
                 ctx.set_handled();
             }
@@ -590,6 +588,10 @@ where
                 self.seek(Duration::from_millis(*location));
                 ctx.set_handled();
             }
+            Event::Command(cmd) if cmd.is(cmd::INITIALIZE_TASKBAR) => {
+                self.setup_taskbar_buttons_on_first_play(PlaybackState::Stopped);
+                ctx.set_handled();
+            }
             // Keyboard shortcuts.
             Event::KeyDown(key) if key.code == Code::Space => {
                 self.pause_or_resume();
@@ -644,6 +646,17 @@ where
                 // Initialize values loaded from the config.
                 self.set_volume(data.playback.volume);
                 self.set_queue_behavior(data.playback.queue_behavior);
+
+                let event_sink = ctx.get_external_handle();
+                let widget_id = ctx.widget_id();
+                std::thread::spawn(move || {
+                    std::thread::sleep(std::time::Duration::from_millis(100));
+                    let _ = event_sink.submit_command(
+                        cmd::INITIALIZE_TASKBAR,
+                        (),
+                        Target::Widget(widget_id),
+                    );
+                });
 
                 // Request focus so we can receive keyboard events.
                 ctx.submit_command(cmd::SET_FOCUS.to(ctx.widget_id()));

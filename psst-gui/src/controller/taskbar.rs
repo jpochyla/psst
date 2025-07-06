@@ -22,11 +22,11 @@ use crate::{cmd, data::PlaybackState};
 #[cfg(windows)]
 const WM_COMMAND_OFFSET: u32 = 0x8000;
 #[cfg(windows)]
-const CMD_PREVIOUS: u32 = WM_COMMAND_OFFSET + 1; // Premier bouton
+const CMD_PREVIOUS: u32 = WM_COMMAND_OFFSET + 1;
 #[cfg(windows)]
-const CMD_PLAY_PAUSE: u32 = WM_COMMAND_OFFSET + 2; // Bouton du milieu
+const CMD_PLAY_PAUSE: u32 = WM_COMMAND_OFFSET + 2;
 #[cfg(windows)]
-const CMD_NEXT: u32 = WM_COMMAND_OFFSET + 3; // Dernier bouton
+const CMD_NEXT: u32 = WM_COMMAND_OFFSET + 3;
 
 #[cfg(windows)]
 static TASKBAR_CALLBACKS: OnceLock<Arc<Mutex<HashMap<isize, (ExtEventSink, WidgetId)>>>> =
@@ -90,10 +90,7 @@ impl TaskbarManager {
         unsafe {
             let com_result = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
             if !com_result.is_ok() {
-                log::warn!(
-                    "COM initialization failed or already initialized: {:?}",
-                    com_result
-                );
+                log::warn!("COM initialization failed or already initialized: {:?}", com_result);
             }
 
             let taskbar_list: ITaskbarList3 =
@@ -173,13 +170,16 @@ impl TaskbarManager {
                 _ => (play_icon, "Play"),
             };
 
+            let buttons_enabled = playback_state != PlaybackState::Stopped;
+            let button_flags = if buttons_enabled { THBF_ENABLED } else { THBF_DISABLED };
+
             let mut buttons = [
                 THUMBBUTTON {
                     iId: CMD_PREVIOUS,
                     hIcon: prev_icon,
                     szTip: [0; 260],
                     dwMask: THB_ICON | THB_TOOLTIP | THB_FLAGS,
-                    dwFlags: THBF_ENABLED,
+                    dwFlags: button_flags,
                     ..Default::default()
                 },
                 THUMBBUTTON {
@@ -187,7 +187,7 @@ impl TaskbarManager {
                     hIcon: play_pause_icon,
                     szTip: [0; 260],
                     dwMask: THB_ICON | THB_TOOLTIP | THB_FLAGS,
-                    dwFlags: THBF_ENABLED,
+                    dwFlags: button_flags,
                     ..Default::default()
                 },
                 THUMBBUTTON {
@@ -195,7 +195,7 @@ impl TaskbarManager {
                     hIcon: next_icon,
                     szTip: [0; 260],
                     dwMask: THB_ICON | THB_TOOLTIP | THB_FLAGS,
-                    dwFlags: THBF_ENABLED,
+                    dwFlags: button_flags,
                     ..Default::default()
                 },
             ];
@@ -209,10 +209,7 @@ impl TaskbarManager {
             match result {
                 Ok(_) => {}
                 Err(e) => {
-                    log::error!(
-                        "Failed to add taskbar buttons: HRESULT 0x{:08x}",
-                        e.code().0
-                    );
+                    log::error!("Failed to add taskbar buttons: HRESULT 0x{:08x}", e.code().0);
                     return Err(e.into());
                 }
             }
@@ -227,7 +224,7 @@ impl TaskbarManager {
     }
 
     #[cfg(windows)]
-    pub fn update_play_pause_button(&self, playback_state: PlaybackState) -> Result<()> {
+    pub fn update_all_buttons(&self, playback_state: PlaybackState) -> Result<()> {
         if !self.is_initialized {
             log::warn!("Taskbar manager not initialized, skipping button update");
             return Ok(());
@@ -242,32 +239,54 @@ impl TaskbarManager {
         };
 
         unsafe {
-            let (icon, tooltip) = match playback_state {
-                PlaybackState::Playing => {
-                    let pause_icon = taskbar_icons::create_pause_icon();
-                    (pause_icon, "Pause")
-                }
-                _ => {
-                    let play_icon = taskbar_icons::create_play_icon();
-                    (play_icon, "Play")
-                }
+            let play_icon = taskbar_icons::create_play_icon();
+            let pause_icon = taskbar_icons::create_pause_icon();
+            let prev_icon = taskbar_icons::create_previous_icon();
+            let next_icon = taskbar_icons::create_next_icon();
+
+            let (play_pause_icon, play_pause_tooltip) = match playback_state {
+                PlaybackState::Playing => (pause_icon, "Pause"),
+                _ => (play_icon, "Play"),
             };
 
-            let mut button = THUMBBUTTON {
-                iId: CMD_PLAY_PAUSE,
-                hIcon: icon,
-                szTip: [0; 260],
-                dwMask: THB_ICON | THB_TOOLTIP,
-                dwFlags: THBF_ENABLED,
-                ..Default::default()
-            };
+            let buttons_enabled = playback_state != PlaybackState::Stopped;
+            let button_flags = if buttons_enabled { THBF_ENABLED } else { THBF_DISABLED };
 
-            self.set_button_tooltip(&mut button, tooltip)?;
+            let mut buttons = [
+                THUMBBUTTON {
+                    iId: CMD_PREVIOUS,
+                    hIcon: prev_icon,
+                    szTip: [0; 260],
+                    dwMask: THB_ICON | THB_TOOLTIP | THB_FLAGS,
+                    dwFlags: button_flags,
+                    ..Default::default()
+                },
+                THUMBBUTTON {
+                    iId: CMD_PLAY_PAUSE,
+                    hIcon: play_pause_icon,
+                    szTip: [0; 260],
+                    dwMask: THB_ICON | THB_TOOLTIP | THB_FLAGS,
+                    dwFlags: button_flags,
+                    ..Default::default()
+                },
+                THUMBBUTTON {
+                    iId: CMD_NEXT,
+                    hIcon: next_icon,
+                    szTip: [0; 260],
+                    dwMask: THB_ICON | THB_TOOLTIP | THB_FLAGS,
+                    dwFlags: button_flags,
+                    ..Default::default()
+                },
+            ];
 
-            match taskbar_list.ThumbBarUpdateButtons(self.hwnd, &[button]) {
+            self.set_button_tooltip(&mut buttons[0], "Previous")?;
+            self.set_button_tooltip(&mut buttons[1], play_pause_tooltip)?;
+            self.set_button_tooltip(&mut buttons[2], "Next")?;
+
+            match taskbar_list.ThumbBarUpdateButtons(self.hwnd, &buttons) {
                 Ok(_) => {}
                 Err(e) => {
-                    log::error!("Failed to update play/pause button: {:?}", e);
+                    log::error!("Failed to update all taskbar buttons: {:?}", e);
                     return Err(e.into());
                 }
             }
@@ -277,7 +296,7 @@ impl TaskbarManager {
     }
 
     #[cfg(not(windows))]
-    pub fn update_play_pause_button(&self, _playback_state: PlaybackState) -> Result<()> {
+    pub fn update_all_buttons(&self, _playback_state: PlaybackState) -> Result<()> {
         Ok(())
     }
 
@@ -373,6 +392,7 @@ mod taskbar_icons {
     use windows::Win32::{Foundation::*, Graphics::Gdi::*, UI::WindowsAndMessaging::*};
 
     const SZ: i32 = 32;
+
     unsafe fn new_argb_bitmap() -> (HBITMAP, *mut u32) {
         let mut bits: *mut core::ffi::c_void = std::ptr::null_mut();
         let hdc = GetDC(HWND(std::ptr::null_mut()));
