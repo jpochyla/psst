@@ -22,7 +22,7 @@ use super::{
     utils::{self},
 };
 
-use crate::data::{UserAlbums, UserDetail, UserInfo};
+use crate::data::{UserAlbums, UserInfo};
 
 pub const LOAD_PROFILE: Selector = Selector::new("app.user.load-profile");
 pub const LOAD_DETAIL: Selector<UserLink> = Selector::new("app.user.load-detail");

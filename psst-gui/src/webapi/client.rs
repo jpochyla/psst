@@ -18,7 +18,10 @@ use itertools::Itertools;
 use log::info;
 use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
-use serde::{de::DeserializeOwned, Deserialize};
+use serde::{
+    de::{value, DeserializeOwned},
+    Deserialize,
+};
 use serde_json::json;
 
 use psst_core::session::{access_token::TokenProvider, SessionService};
@@ -31,8 +34,8 @@ use crate::{
     data::{
         self, utils::sanitize_html_string, Album, AlbumType, Artist, ArtistAlbums, ArtistInfo,
         ArtistLink, ArtistStats, AudioAnalysis, Cached, Episode, EpisodeId, EpisodeLink, Image,
-        MixedView, Nav, Page, Playlist, PublicUser, Range, Recommendations, RecommendationsRequest,
-        SearchResults, SearchTopic, Show, SpotifyUrl, Track, TrackLines,
+        MixedView, Nav, Page, Playlist, PublicUser, PublicUserDetail, Range, Recommendations,
+        RecommendationsRequest, SearchResults, SearchTopic, Show, SpotifyUrl, Track, TrackLines,
         UserInfo, UserProfile, UserStats,
     },
     error::Error,
@@ -542,21 +545,6 @@ impl WebApi {
                                             .map(|owner| owner.data.name.as_str())
                                             .unwrap_or_default(),
                                     ),
-                                    images: item.content.data.visuals.as_ref().map_or_else(
-                                        Vector::new,
-                                        |images| {
-                                            images
-                                                .avatar_image
-                                                .sources
-                                                .iter()
-                                                .map(|img| data::utils::Image {
-                                                    url: Arc::from(img.url.as_str()),
-                                                    width: None,
-                                                    height: None,
-                                                })
-                                                .collect()
-                                        },
-                                    ),
                                 },
                                 collaborative: false,
                                 public: None,
@@ -717,88 +705,8 @@ impl WebApi {
             .map(|item: Artist| item)
             .collect())
     }
-    pub fn get_publicuser_info(&self, id: &str) -> Result<UserInfo, Error> {
-        #[derive(Clone, Data, Deserialize)]
-        pub struct Welcome {
-            uri: String,
-            name: String,
-            image_url: Option<String>,
-            followers_count: i64,
-            following_count: i64,
-            public_playlists: Vector<Playlist>,
-            total_public_playlists_count: i64,
-            has_spotify_name: bool,
-            has_spotify_image: bool,
-            color: i64,
-            allow_follows: bool,
-            // data: Data1,
-        }
 
-        // #[derive(Clone, Data, Deserialize)]
-        // #[serde(rename_all = "camelCase")]
-        // pub struct Data1 {
-        //     user_union: UserUnion,
-        // }
-
-        // #[derive(Clone, Data, Deserialize)]
-        // pub struct UserUnion {
-        //     profile: Profile,
-        //     stats: Stats,
-        //     visuals: Visuals,
-        // }
-
-        // #[derive(Clone, Data, Deserialize)]
-        // #[serde(rename_all = "camelCase")]
-        // pub struct Profile {
-        //     external_links: ExternalLinks,
-        // }
-
-        // #[derive(Clone, Data, Deserialize)]
-        // pub struct ExternalLinks {
-        //     items: Vector<ExternalLinksItem>,
-        // }
-
-        // #[derive(Clone, Data, Deserialize)]
-        // #[serde(rename_all = "camelCase")]
-        // pub struct Visuals {
-        //     avatar_image: AvatarImage,
-        // }
-        // #[derive(Clone, Data, Deserialize)]
-        // pub struct AvatarImage {
-        //     sources: Vector<Image>,
-        // }
-        // #[derive(Clone, Data, Deserialize)]
-        // pub struct ExternalLinksItem {
-        //     url: String,
-        // }
-
-        // #[derive(Clone, Data, Deserialize)]
-        // #[serde(rename_all = "camelCase")]
-        // pub struct Stats {
-        //     followers: i64,
-        //     following: i64,
-        // }
-
-        // let variables = json!( {
-        //     "locale": "",
-        //     "uri": format!("spotify:users:{}", id),
-        // });
-        // let json = json!({
-        //     "extensions": {
-        //         "persistedQuery": {
-        //             "version": 1,
-        //             "sha256Hash":
-        // "1ac33ddab5d39a3a9c27802774e6d78b9405cc188c6f75aed007df2a32737c72"
-        //         }
-        //     },
-        //     "operationName": "queryArtistOverview",
-        //     "variables": variables,
-        // });
-
-        // let request =
-        //     &RequestBuilder::new("pathfinder/v2/query".to_string(), Method::Post,
-        // Some(json))         .set_base_uri("api-partner.spotify.com");
-
+    pub fn get_publicuser_info(&self, id: &str) -> Result<PublicUserDetail, Error> {
         let request = &RequestBuilder::new(
             format!("user-profile-view/v3/profile/{}", id),
             Method::Get,
@@ -806,30 +714,10 @@ impl WebApi {
         )
         .query("market", "from_token")
         .set_base_uri("spclient.wg.spotify.com");
-    
-    let result: Cached<Welcome> = self.load_cached(request, "user-info", id)?;
-        // let hrefs: Vector<String> = result
-        //     .data
-        //     .data
-        //     .artist_union
-        //     .profile
-        //     .external_links
-        //     .items
-        //     .into_iter()
-        //     .map(|link| link.url)
-        //     .collect();
 
-        Ok(UserInfo {
-            main_image: Arc::from(
-                result.data.image_url
-                    .unwrap_or_default()
-                    .to_string(),
-            ),
-            stats: UserStats {
-                followers: result.data.followers_count,
-                following: result.data.following_count,
-            },
-        })
+        let result: PublicUserDetail = self.load(request)?;
+
+        Ok(result)
     }
 }
 

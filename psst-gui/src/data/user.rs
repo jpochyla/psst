@@ -15,8 +15,41 @@ pub struct UserProfile {
 pub struct PublicUser {
     pub display_name: Arc<str>,
     pub id: Arc<str>,
-    #[serde(skip)]
-    pub images: Vector<Image>,
+}
+
+#[derive(Default, Debug, Clone, Lens, PartialEq, Deserialize)]
+pub struct PublicUserDetail {
+    pub uri: String,
+    pub name: String,
+    pub image_url: String,
+    pub followers_count: i64,
+    pub following_count: i64,
+    pub is_following: bool,
+    pub recently_played_artists: Vec<RecentlyPlayedArtist>,
+    pub public_playlists: Vec<PublicPlaylist>,
+    pub total_public_playlists_count: i64,
+    pub allow_follows: bool,
+    pub show_follows: bool,
+}
+
+#[derive(Default, Debug, Clone, Lens, PartialEq, Deserialize)]
+pub struct RecentlyPlayedArtist {
+    pub uri: String,
+    pub name: String,
+    pub image_url: String,
+    pub followers_count: i64,
+    pub is_following: Option<bool>,
+}
+
+#[derive(Default, Debug, Clone, Lens, PartialEq, Deserialize)]
+pub struct PublicPlaylist {
+    pub uri: String,
+    pub name: String,
+    pub image_url: String,
+    pub owner_name: String,
+    pub owner_uri: String,
+    pub followers_count: Option<i64>,
+    pub is_following: Option<bool>,
 }
 
 #[derive(Clone, Data, Lens)]
@@ -28,10 +61,6 @@ pub struct UserDetail {
 }
 
 impl PublicUser {
-    pub fn image(&self, width: f64, height: f64) -> Option<&Image> {
-        Image::at_least_of_size(&self.images, width, height)
-    }
-
     pub fn link(&self) -> UserLink {
         UserLink {
             id: self.id.clone(),
