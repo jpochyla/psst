@@ -2,7 +2,7 @@ use druid::widget::{Container, CrossAxisAlignment, Flex, Label, LineBreaking, Li
 use druid::{Insets, LensExt, Selector, Widget, WidgetExt};
 
 use crate::cmd;
-use crate::data::{AppState, Ctx, NowPlaying, Playable, TrackLines};
+use crate::data::{AppState, Ctx, NowPlaying, Playable, TrackLines, PlaybackState};
 use crate::data::CommonCtx;
 use crate::widget::MyWidgetExt;
 use crate::{webapi::WebApi, widget::Async};
@@ -134,7 +134,11 @@ fn track_lyrics_widget() -> impl Widget<AppState> {
                     .active(|c: &Ctx<Arc<CommonCtx>, TrackLines>, _env| {
                         let base_progress_ms = c.ctx.progress.as_millis() as f64;
                         let now_ms = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis() as f64;
-                        let elapsed = now_ms - c.ctx.last_update_ms as f64;
+                        let elapsed = if matches!(c.ctx.playback_state, PlaybackState::Playing) {
+                            now_ms - c.ctx.last_update_ms as f64
+                        } else {
+                            0.0
+                        };
                         let progress_ms = base_progress_ms + elapsed;
                         let offset = offset_storage().lock().unwrap().unwrap_or(0.0);
                         let adj_progress = progress_ms + offset;
@@ -152,7 +156,11 @@ fn track_lyrics_widget() -> impl Widget<AppState> {
                         let calculate_progress = |ctx: &Arc<CommonCtx>, offset: f64| {
                             let base_progress_ms = ctx.progress.as_millis() as f64;
                             let now_ms = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis() as f64;
-                            let elapsed = now_ms - ctx.last_update_ms as f64;
+                            let elapsed = if matches!(ctx.playback_state, PlaybackState::Playing) {
+                                now_ms - ctx.last_update_ms as f64
+                            } else {
+                                0.0
+                            };
                             base_progress_ms + elapsed + offset
                         };
 

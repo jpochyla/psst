@@ -106,6 +106,7 @@ impl AppState {
             nav: Nav::Home,
             progress: Duration::default(),
             last_update_ms: 0,
+            playback_state: PlaybackState::Stopped,
         });
         let playback = Playback {
             state: PlaybackState::Stopped,
@@ -239,6 +240,7 @@ impl AppState {
     pub fn loading_playback(&mut self, item: Playable, origin: PlaybackOrigin) {
         self.common_ctx_mut().now_playing.take();
         self.set_common_progress(Duration::default());
+        self.common_ctx_mut().playback_state = PlaybackState::Loading;
         self.playback.state = PlaybackState::Loading;
         self.playback.now_playing.replace(NowPlaying {
             item,
@@ -251,6 +253,7 @@ impl AppState {
     pub fn start_playback(&mut self, item: Playable, origin: PlaybackOrigin, progress: Duration) {
         self.common_ctx_mut().now_playing.replace(item.clone());
         self.set_common_progress(progress);
+        self.common_ctx_mut().playback_state = PlaybackState::Playing;
         self.playback.state = PlaybackState::Playing;
         self.playback.now_playing.replace(NowPlaying {
             item,
@@ -269,10 +272,14 @@ impl AppState {
 
     pub fn pause_playback(&mut self) {
         self.playback.state = PlaybackState::Paused;
+        self.common_ctx_mut().playback_state = PlaybackState::Paused;
+        self.common_ctx_mut().last_update_ms = current_millis();
     }
 
     pub fn resume_playback(&mut self) {
         self.playback.state = PlaybackState::Playing;
+        self.common_ctx_mut().playback_state = PlaybackState::Playing;
+        self.common_ctx_mut().last_update_ms = current_millis();
     }
 
     pub fn block_playback(&mut self) {
@@ -283,6 +290,7 @@ impl AppState {
         self.playback.state = PlaybackState::Stopped;
         self.playback.now_playing.take();
         self.common_ctx_mut().now_playing.take();
+        self.common_ctx_mut().playback_state = PlaybackState::Stopped;
         self.set_common_progress(Duration::default());
     }
 
@@ -563,6 +571,7 @@ pub struct CommonCtx {
     pub nav: Nav,
     pub progress: Duration,
     pub last_update_ms: u64,
+    pub playback_state: PlaybackState,
 }
 
 impl CommonCtx {
