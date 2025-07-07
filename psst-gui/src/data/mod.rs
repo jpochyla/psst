@@ -104,6 +104,8 @@ impl AppState {
             library: Arc::clone(&library),
             show_track_cover: config.show_track_cover,
             nav: Nav::Home,
+            progress: Duration::default(),
+            last_update_ms: 0,
         });
         let playback = Playback {
             state: PlaybackState::Stopped,
@@ -236,6 +238,7 @@ impl AppState {
 
     pub fn loading_playback(&mut self, item: Playable, origin: PlaybackOrigin) {
         self.common_ctx_mut().now_playing.take();
+        self.set_common_progress(Duration::default());
         self.playback.state = PlaybackState::Loading;
         self.playback.now_playing.replace(NowPlaying {
             item,
@@ -247,6 +250,7 @@ impl AppState {
 
     pub fn start_playback(&mut self, item: Playable, origin: PlaybackOrigin, progress: Duration) {
         self.common_ctx_mut().now_playing.replace(item.clone());
+        self.set_common_progress(progress);
         self.playback.state = PlaybackState::Playing;
         self.playback.now_playing.replace(NowPlaying {
             item,
@@ -260,6 +264,7 @@ impl AppState {
         if let Some(now_playing) = &mut self.playback.now_playing {
             now_playing.progress = progress;
         }
+        self.set_common_progress(progress);
     }
 
     pub fn pause_playback(&mut self) {
@@ -278,6 +283,7 @@ impl AppState {
         self.playback.state = PlaybackState::Stopped;
         self.playback.now_playing.take();
         self.common_ctx_mut().now_playing.take();
+        self.set_common_progress(Duration::default());
     }
 
     pub fn set_queue_behavior(&mut self, queue_behavior: QueueBehavior) {
@@ -333,6 +339,20 @@ impl AppState {
         self.alerts
             .retain(|alert| now.duration_since(alert.created_at) < ALERT_DURATION);
     }
+}
+
+impl AppState {
+    fn set_common_progress(&mut self, progress: Duration) {
+        let mut ctx = (*self.common_ctx).clone();
+        ctx.progress = progress;
+        ctx.last_update_ms = current_millis();
+        self.common_ctx = Arc::new(ctx);
+    }
+}
+
+fn current_millis() -> u64 {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis() as u64
 }
 
 #[derive(Clone, Data, Lens)]
@@ -541,6 +561,8 @@ pub struct CommonCtx {
     pub library: Arc<Library>,
     pub show_track_cover: bool,
     pub nav: Nav,
+    pub progress: Duration,
+    pub last_update_ms: u64,
 }
 
 impl CommonCtx {
