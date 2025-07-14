@@ -1,3 +1,5 @@
+use std::sync::{Arc, Mutex};
+
 use crate::error::Error;
 
 #[derive(Copy, Clone)]
@@ -32,19 +34,19 @@ impl ResamplingSpec {
 
 pub struct AudioResampler {
     pub spec: ResamplingSpec,
-    state: *mut libsamplerate::SRC_STATE,
+    state: Mutex<*mut libsamplerate::SRC_STATE>,
 }
 
 impl AudioResampler {
     pub fn new(quality: ResamplingQuality, spec: ResamplingSpec) -> Result<Self, Error> {
         let mut error_int = 0i32;
-        let state = unsafe {
+        let state = Mutex::new(unsafe {
             libsamplerate::src_new(
                 quality as i32,
                 spec.channels as i32,
                 &mut error_int as *mut i32,
             )
-        };
+        });
         if error_int != 0 {
             Err(Error::ResamplingError(error_int))
         } else {
@@ -69,7 +71,7 @@ impl AudioResampler {
             input_frames_used: 0,
             output_frames_gen: 0,
         };
-        let error_int = unsafe { libsamplerate::src_process(self.state, &mut src as *mut _) };
+        let error_int = unsafe { libsamplerate::src_process(*self.state.lock().unwrap(), &mut src as *mut _) };
         if error_int != 0 {
             Err(Error::ResamplingError(error_int))
         } else {
@@ -82,8 +84,10 @@ impl AudioResampler {
 
 impl Drop for AudioResampler {
     fn drop(&mut self) {
-        unsafe { libsamplerate::src_delete(self.state) };
+        unsafe { libsamplerate::src_delete(*self.state.lock().unwrap()) };
     }
 }
 
 unsafe impl Send for AudioResampler {}
+
+unsafe impl Sync for AudioResampler {}
