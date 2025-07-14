@@ -358,7 +358,7 @@ impl AppState {
     }
 }
 
-fn current_millis() -> u64 {
+pub fn current_millis() -> u64 {
     use std::time::{SystemTime, UNIX_EPOCH};
     SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis() as u64
 }
@@ -577,6 +577,15 @@ pub struct CommonCtx {
 impl CommonCtx {
     pub fn is_playing(&self, item: &Playable) -> bool {
         matches!(&self.now_playing, Some(i) if i.same(item))
+    }
+
+    pub fn current_progress(&self) -> Duration {
+        let elapsed_ms = if matches!(self.playback_state, PlaybackState::Playing) {
+            current_millis() - self.last_update_ms
+        } else {
+            0
+        };
+        self.progress + Duration::from_millis(elapsed_ms)
     }
 }
 
