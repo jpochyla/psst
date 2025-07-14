@@ -112,7 +112,7 @@ impl DecoderSource {
         norm_factor: f32,
         event_send: Sender<PlayerEvent>,
     ) -> Self {
-        const REPORT_PRECISION: Duration = Duration::from_millis(900);
+        const REPORT_PRECISION: Duration = Duration::from_millis(200);
 
         // Gather the source signal parameters and compute how often we should report
         // the play-head position.

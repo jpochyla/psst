@@ -88,6 +88,7 @@ pub struct AppState {
     pub added_queue: Vector<QueueEntry>,
     pub lyrics: Promise<Vector<TrackLines>>,
     pub credits: Option<TrackCredits>,
+    pub lyrics_offset: Option<f64>,
 }
 
 impl AppState {
@@ -105,8 +106,6 @@ impl AppState {
             show_track_cover: config.show_track_cover,
             nav: Nav::Home,
             progress: Duration::default(),
-            last_update_ms: 0,
-            playback_state: PlaybackState::Stopped,
         });
         let playback = Playback {
             state: PlaybackState::Stopped,
@@ -173,6 +172,7 @@ impl AppState {
             finder: Finder::new(),
             lyrics: Promise::Empty,
             credits: None,
+            lyrics_offset: None,
         }
     }
 }
@@ -240,7 +240,6 @@ impl AppState {
     pub fn loading_playback(&mut self, item: Playable, origin: PlaybackOrigin) {
         self.common_ctx_mut().now_playing.take();
         self.set_common_progress(Duration::default());
-        self.common_ctx_mut().playback_state = PlaybackState::Loading;
         self.playback.state = PlaybackState::Loading;
         self.playback.now_playing.replace(NowPlaying {
             item,
@@ -253,7 +252,6 @@ impl AppState {
     pub fn start_playback(&mut self, item: Playable, origin: PlaybackOrigin, progress: Duration) {
         self.common_ctx_mut().now_playing.replace(item.clone());
         self.set_common_progress(progress);
-        self.common_ctx_mut().playback_state = PlaybackState::Playing;
         self.playback.state = PlaybackState::Playing;
         self.playback.now_playing.replace(NowPlaying {
             item,
@@ -272,25 +270,20 @@ impl AppState {
 
     pub fn pause_playback(&mut self) {
         self.playback.state = PlaybackState::Paused;
-        self.common_ctx_mut().playback_state = PlaybackState::Paused;
-        self.common_ctx_mut().last_update_ms = current_millis();
     }
 
     pub fn resume_playback(&mut self) {
         self.playback.state = PlaybackState::Playing;
-        self.common_ctx_mut().playback_state = PlaybackState::Playing;
-        self.common_ctx_mut().last_update_ms = current_millis();
     }
 
     pub fn block_playback(&mut self) {
-        // TODO: Figure out how to signal blocked playback properly.
+        self.playback.state = PlaybackState::Loading;
     }
 
     pub fn stop_playback(&mut self) {
         self.playback.state = PlaybackState::Stopped;
         self.playback.now_playing.take();
         self.common_ctx_mut().now_playing.take();
-        self.common_ctx_mut().playback_state = PlaybackState::Stopped;
         self.set_common_progress(Duration::default());
     }
 
@@ -353,14 +346,12 @@ impl AppState {
     fn set_common_progress(&mut self, progress: Duration) {
         let mut ctx = (*self.common_ctx).clone();
         ctx.progress = progress;
-        ctx.last_update_ms = current_millis();
         self.common_ctx = Arc::new(ctx);
     }
-}
 
-pub fn current_millis() -> u64 {
-    use std::time::{SystemTime, UNIX_EPOCH};
-    SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis() as u64
+    pub fn reset_lyrics_offset(&mut self) {
+        self.lyrics_offset = None;
+    }
 }
 
 #[derive(Clone, Data, Lens)]
@@ -570,8 +561,6 @@ pub struct CommonCtx {
     pub show_track_cover: bool,
     pub nav: Nav,
     pub progress: Duration,
-    pub last_update_ms: u64,
-    pub playback_state: PlaybackState,
 }
 
 impl CommonCtx {
@@ -580,12 +569,9 @@ impl CommonCtx {
     }
 
     pub fn current_progress(&self) -> Duration {
-        let elapsed_ms = if matches!(self.playback_state, PlaybackState::Playing) {
-            current_millis() - self.last_update_ms
-        } else {
-            0
-        };
-        self.progress + Duration::from_millis(elapsed_ms)
+        // Use the stored progress directly for better accuracy
+        // The progress is updated by the audio player events
+        self.progress
     }
 }
 
