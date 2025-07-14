@@ -42,6 +42,7 @@ druid = { git = "https://github.com/jpochyla/druid", branch = "psst", features =
   "image",
   "jpeg",
   "png",
+  "webp",
   "serde",
 ] }
 druid-enums = { git = "https://github.com/jpochyla/druid-enums" }
