@@ -362,24 +362,25 @@ fn play_items_with_mode<T, F>(
 ) where
     F: Fn(&T) -> crate::data::Playable,
 {
-    if !items.is_empty() {
-        let playables: Vec<_> = items.iter().map(&to_playable).collect();
-        let is_random = queue_behavior == crate::data::QueueBehavior::Random;
-        let position = if is_random {
-            let mut rng = rand::rng();
-            (0..playables.len())
-                .collect::<Vec<_>>()
-                .choose(&mut rng)
-                .copied()
-                .unwrap_or(0)
-        } else {
-            0
-        };
-        let payload = crate::data::PlaybackPayload {
-            items: playables.into(),
-            origin,
-            position,
-        };
-        ctx.submit_command(crate::cmd::PLAY_TRACKS.with(payload));
+    if items.is_empty() {
+        return;
     }
+    
+    let playables: Vec<_> = items.iter().map(&to_playable).collect();
+    let position = if queue_behavior == crate::data::QueueBehavior::Random {
+        let mut rng = rand::rng();
+        (0..playables.len())
+            .collect::<Vec<_>>()
+            .choose(&mut rng)
+            .copied()
+            .unwrap_or(0)
+    } else {
+        0
+    };
+    let payload = crate::data::PlaybackPayload {
+        items: playables.into(),
+        origin,
+        position,
+    };
+    ctx.submit_command(crate::cmd::PLAY_TRACKS.with(payload));
 }
