@@ -3,11 +3,12 @@ use druid::{
     commands, AppDelegate, Application, Command, DelegateCtx, Env, Event, Handled, Target,
     WindowDesc, WindowId,
 };
-use std::fs;
 use rand::seq::IndexedRandom;
-use threadpool::ThreadPool;
+use std::fs;
 use std::sync::Arc;
+use threadpool::ThreadPool;
 
+use crate::data::Track;
 use crate::ui::playlist::{
     RENAME_PLAYLIST, RENAME_PLAYLIST_CONFIRM, UNFOLLOW_PLAYLIST, UNFOLLOW_PLAYLIST_CONFIRM,
 };
@@ -20,7 +21,6 @@ use crate::{
     webapi::WebApi,
     widget::remote_image,
 };
-use crate::data::Track;
 
 pub struct Delegate {
     main_window: Option<WindowId>,
@@ -142,7 +142,7 @@ impl AppDelegate<AppState> for Delegate {
         data: &mut AppState,
         _env: &Env,
     ) -> Handled {
-        if let Some(playlist_link) = cmd.get(crate::ui::playlist::PLAY_PLAYLIST_REQUEST) {
+        if let Some(playlist_link) = cmd.get(cmd::PLAY_PLAYLIST) {
             if let Some(tracks) = data.playlist_detail.tracks.resolved() {
                 play_items_with_mode(
                     ctx,
@@ -154,7 +154,7 @@ impl AppDelegate<AppState> for Delegate {
             }
             return Handled::Yes;
         }
-        if let Some(album_link) = cmd.get(crate::ui::album::PLAY_ALBUM_REQUEST) {
+        if let Some(album_link) = cmd.get(cmd::PLAY_ALBUM) {
             if let Some(album) = data.album_detail.album.resolved() {
                 play_items_with_mode(
                     ctx,
@@ -353,8 +353,13 @@ impl Delegate {
     }
 }
 
-fn play_items_with_mode<T, F>(ctx: &mut DelegateCtx, items: &[T], origin: crate::data::PlaybackOrigin, queue_behavior: crate::data::QueueBehavior, to_playable: F)
-where
+fn play_items_with_mode<T, F>(
+    ctx: &mut DelegateCtx,
+    items: &[T],
+    origin: crate::data::PlaybackOrigin,
+    queue_behavior: crate::data::QueueBehavior,
+    to_playable: F,
+) where
     F: Fn(&T) -> crate::data::Playable,
 {
     if !items.is_empty() {
@@ -362,7 +367,11 @@ where
         let is_random = queue_behavior == crate::data::QueueBehavior::Random;
         let position = if is_random {
             let mut rng = rand::rng();
-            (0..playables.len()).collect::<Vec<_>>().choose(&mut rng).copied().unwrap_or(0)
+            (0..playables.len())
+                .collect::<Vec<_>>()
+                .choose(&mut rng)
+                .copied()
+                .unwrap_or(0)
         } else {
             0
         };
