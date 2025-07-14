@@ -121,7 +121,7 @@ impl From<ureq::Error> for Error {
 /// Constructs a Range header value for given offset and length.
 fn range_header(offfset: u64, length: u64) -> String {
     let last_byte = offfset + length - 1; // Offset of the last byte of the range is inclusive.
-    format!("bytes={}-{}", offfset, last_byte)
+    format!("bytes={offfset}-{last_byte}")
 }
 
 /// Parses a total content length from a Content-Range response header.

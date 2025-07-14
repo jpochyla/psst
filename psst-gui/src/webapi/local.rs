@@ -89,7 +89,7 @@ impl LocalTrackManager {
         let local_file = File::open(&file_path)?;
         let mut reader = LocalTracksReader::new(local_file)?;
 
-        log::info!("parsing local tracks: {:?}", file_path);
+        log::info!("parsing local tracks: {file_path:?}");
 
         // Start reading the track array.
         let num_tracks = reader.read_array()?;
@@ -129,7 +129,7 @@ impl LocalTrackManager {
         let local_track: LocalTrackJson = match serde_json::from_value(track_json) {
             Ok(t) => t,
             Err(e) => {
-                log::error!("error parsing track {:?}", e);
+                log::error!("error parsing track {e:?}");
                 return None;
             }
         };
