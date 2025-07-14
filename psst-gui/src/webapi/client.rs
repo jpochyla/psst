@@ -113,7 +113,8 @@ impl WebApi {
                 .agent
                 .delete(request.build())
                 .header("Authorization", &format!("Bearer {token}"))
-                .call()
+                .force_send_body()
+                .send_json(request.get_body())
                 .map_err(|err| Error::WebApiError(err.to_string())),
         }
     }
@@ -1033,14 +1034,15 @@ impl WebApi {
 
     // https://developer.spotify.com/documentation/web-api/reference/save-albums-user/
     pub fn save_album(&self, id: &str) -> Result<(), Error> {
-        let request = &RequestBuilder::new("v1/me/albums", Method::Put, None).query("ids", id);
+        let request = &RequestBuilder::new("v1/me/albums", Method::Put, Some(json!({"ids": id})));
 
         self.send_empty_json(request)
     }
 
     // https://developer.spotify.com/documentation/web-api/reference/remove-albums-user/
     pub fn unsave_album(&self, id: &str) -> Result<(), Error> {
-        let request = &RequestBuilder::new("v1/me/albums", Method::Delete, None).query("ids", id);
+        let request =
+            &RequestBuilder::new("v1/me/albums", Method::Delete, Some(json!({"ids": id})));
         self.send_empty_json(request)
     }
 
@@ -1078,13 +1080,13 @@ impl WebApi {
 
     // https://developer.spotify.com/documentation/web-api/reference/save-tracks-user/
     pub fn save_track(&self, id: &str) -> Result<(), Error> {
-        let request = &RequestBuilder::new("v1/me/tracks", Method::Get, None).query("ids", id);
+        let request = &RequestBuilder::new("v1/me/tracks", Method::Put, None).query("ids", id);
         self.send_empty_json(request)
     }
 
     // https://developer.spotify.com/documentation/web-api/reference/remove-tracks-user/
     pub fn unsave_track(&self, id: &str) -> Result<(), Error> {
-        let request = &RequestBuilder::new("v1/me/tracks", Method::Get, None).query("ids", id);
+        let request = &RequestBuilder::new("v1/me/tracks", Method::Delete, None).query("ids", id);
         self.send_empty_json(request)
     }
 
