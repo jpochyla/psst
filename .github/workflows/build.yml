@@ -114,7 +114,7 @@ jobs:
 
       - name: Bundle macOS Release
         if: runner.os == 'macOS'
-        run: cargo bundle --release --verbose
+        run: cargo bundle --release
         working-directory: psst-gui
 
       - name: Verify Bundle
