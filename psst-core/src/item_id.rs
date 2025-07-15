@@ -111,8 +111,8 @@ impl ItemId {
     pub fn to_uri(&self) -> Option<String> {
         let b64 = self.to_base62();
         match self.id_type {
-            ItemIdType::Track => Some(format!("spotify:track:{}", b64)),
-            ItemIdType::Podcast => Some(format!("spotify:podcast:{}", b64)),
+            ItemIdType::Track => Some(format!("spotify:track:{b64}")),
+            ItemIdType::Podcast => Some(format!("spotify:podcast:{b64}")),
             // TODO: support adding local files to playlists
             ItemIdType::LocalFile => None,
             ItemIdType::Unknown => None,
@@ -176,7 +176,7 @@ impl FileId {
     pub fn to_base16(&self) -> String {
         self.0
             .iter()
-            .map(|b| format!("{:02x}", b))
+            .map(|b| format!("{b:02x}"))
             .collect::<Vec<String>>()
             .concat()
     }

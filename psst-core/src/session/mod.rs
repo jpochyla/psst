@@ -188,13 +188,13 @@ impl SessionWorker {
 
     pub fn join(self) {
         if let Err(err) = self.dispatching_thread.join() {
-            log::error!("session dispatching thread panicked: {:?}", err);
+            log::error!("session dispatching thread panicked: {err:?}");
         }
         if let Err(err) = self.encoding_thread.join() {
-            log::error!("session encoding thread panicked: {:?}", err);
+            log::error!("session encoding thread panicked: {err:?}");
         }
         if let Err(err) = self.decoding_thread.join() {
-            log::error!("session decoding thread panicked: {:?}", err);
+            log::error!("session decoding thread panicked: {err:?}");
         }
     }
 
@@ -377,12 +377,12 @@ fn dispatch_messages(
                 log::debug!("ignored message: {:?}", msg.cmd);
             }
             DispatchCmd::DecoderError(err) => {
-                log::error!("connection error: {:?}", err);
+                log::error!("connection error: {err:?}");
                 let _ = stream.shutdown(Shutdown::Write);
                 break;
             }
             DispatchCmd::EncoderError(err) => {
-                log::error!("connection error: {:?}", err);
+                log::error!("connection error: {err:?}");
                 let _ = stream.shutdown(Shutdown::Read);
                 break;
             }
