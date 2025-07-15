@@ -130,9 +130,8 @@ jobs:
             --icon "Psst.app" 150 160 \
             --hide-extension "Psst.app" \
             --app-drop-link 450 160 \
-            --no-internet-enable \
             "Psst.dmg" \
-            "target/release/bundle/osx/Psst.app"
+            "${GITHUB_WORKSPACE}/psst-gui/target/release/bundle/osx/Psst.app"
         working-directory: psst-gui
 
       - name: Upload macOS DMG
