@@ -120,7 +120,7 @@ jobs:
       - name: Create DMG
         if: runner.os == 'macOS'
         run: |
-          brew install create-dmg
+          brew upgrade create-dmg
           create-dmg \
             --volname "Psst" \
             --volicon "assets/logo.icns" \
