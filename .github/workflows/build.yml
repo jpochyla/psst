@@ -114,7 +114,12 @@ jobs:
 
       - name: Bundle macOS Release
         if: runner.os == 'macOS'
-        run: cargo bundle --release
+        run: cargo bundle --release --verbose
+        working-directory: psst-gui
+
+      - name: Verify Bundle
+        if: runner.os == 'macOS'
+        run: ls -R target/release
         working-directory: psst-gui
 
       - name: Create DMG
