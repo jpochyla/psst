@@ -91,7 +91,6 @@ jobs:
           path: |
             ~/.cargo/bin/cargo-bundle
             ~/Library/Caches/Homebrew
-            /usr/local/Cellar/create-dmg
           key: ${{ runner.os }}-tools-${{ hashFiles('**/Cargo.lock', '.github/workflows/build.yml') }}
           restore-keys: |
             ${{ runner.os }}-tools-
@@ -101,8 +100,8 @@ jobs:
         run: cargo install cargo-bundle
 
       - name: Install create-dmg
-        if: runner.os == 'macOS' && !steps.cache-tools.outputs.cache-hit
-        run: brew install create-dmg
+        if: runner.os == 'macOS'
+        run: npm install --global create-dmg
 
       - name: Create macOS universal binary
         if: runner.os == 'macOS'
@@ -121,17 +120,7 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           create-dmg \
-            --volname "Psst" \
-            --volicon "assets/logo.icns" \
-            --window-pos 200 120 \
-            --window-size 600 400 \
-            --icon-size 100 \
-            --icon "Psst.app" 150 160 \
-            --hide-extension "Psst.app" \
-            --app-drop-link 450 160 \
-            "Psst.dmg" \
-            "target/release/bundle/osx/Psst.app"
-        working-directory: psst-gui
+            "target/release/bundle/osx/Psst.app" . || true
 
       - name: Upload macOS DMG
         uses: actions/upload-artifact@v4
