@@ -125,8 +125,6 @@ jobs:
       - name: Create DMG
         if: runner.os == 'macOS'
         run: |
-          brew upgrade create-dmg
-          which create-dmg
           create-dmg \
             --volname "Psst" \
             --volicon "assets/logo.icns" \
@@ -136,8 +134,9 @@ jobs:
             --icon "Psst.app" 150 160 \
             --hide-extension "Psst.app" \
             --app-drop-link 450 160 \
+            --skip-jenkins \
             "Psst.dmg" \
-            "${GITHUB_WORKSPACE}/psst-gui/target/release/bundle/osx/Psst.app"
+            "target/release/bundle/osx/Psst.app"
         working-directory: psst-gui
 
       - name: Upload macOS DMG
