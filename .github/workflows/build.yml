@@ -117,14 +117,10 @@ jobs:
         run: cargo bundle --release
         working-directory: psst-gui
 
-      - name: Verify Bundle
-        if: runner.os == 'macOS'
-        run: ls -R target/release
-        working-directory: psst-gui
-
       - name: Create DMG
         if: runner.os == 'macOS'
         run: |
+          brew install create-dmg
           create-dmg \
             --volname "Psst" \
             --volicon "assets/logo.icns" \
