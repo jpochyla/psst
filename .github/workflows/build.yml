@@ -126,6 +126,7 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           brew upgrade create-dmg
+          which create-dmg
           create-dmg \
             --volname "Psst" \
             --volicon "assets/logo.icns" \
