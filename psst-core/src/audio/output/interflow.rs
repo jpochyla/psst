@@ -1,14 +1,17 @@
 use std::{
     fmt::{Debug, Display, Formatter},
-    sync::{Arc, PoisonError, RwLock},
+    sync::{
+        atomic::{AtomicBool, AtomicU32, AtomicUsize, Ordering},
+        Arc, PoisonError, RwLock,
+    },
 };
 
 use crossbeam_channel::Sender;
 use interflow::{
-    prelude::default_output_device, AudioCallbackContext, AudioDevice, AudioOutputDevice,
+    channel_map::Bitset, prelude::default_output_device, AudioCallbackContext, AudioDevice,
+    AudioOutputDevice,
 };
-use log::{debug, error, info, trace};
-use ndarray::Array;
+use log::{debug, error, info};
 
 use crate::{
     actor::{Act, Actor},
@@ -18,6 +21,9 @@ use crate::{
     },
     error::Error,
 };
+
+const DEFAULT_CHANNEL_COUNT: usize = 2;
+const DEFAULT_SAMPLE_RATE: u32 = 44_100;
 
 pub struct InterflowOutput {
     sink: Box<InterflowSink>,
@@ -29,13 +35,13 @@ impl InterflowOutput {
         let mut stream = InterflowStream::new();
         let channel_count = stream.channel_count.clone();
         let sample_rate = stream.sample_rate.clone();
-        let stream_handle = InterflowStream::spawn_with_default_cap("audio_output", move |this| {
+        let stream_handle = InterflowStream::spawn_with_default_cap("audio_output", move |_| {
             stream.open().unwrap()
         });
         let sink = Box::new(InterflowSink {
             stream_send: stream_handle.sender(),
-            channel_count: channel_count.clone(),
-            sample_rate: sample_rate.clone(),
+            channel_count,
+            sample_rate,
         });
         Ok(Box::new(Self { sink: sink }))
     }
@@ -59,10 +65,11 @@ enum StreamMsg {
 
 #[derive(Clone)]
 struct InterflowStream {
-    channel_count: Arc<RwLock<usize>>,
-    sample_rate: Arc<RwLock<u32>>,
-    playing: Arc<RwLock<bool>>,
-    volume: Arc<RwLock<f32>>,
+    opened: Arc<AtomicBool>,
+    channel_count: Arc<AtomicUsize>,
+    sample_rate: Arc<AtomicU32>,
+    playing: Arc<AtomicBool>,
+    volume: Arc<AtomicF32>,
     source: Arc<RwLock<Box<dyn AudioSource>>>,
 }
 
@@ -70,80 +77,100 @@ impl InterflowStream {
     pub fn new() -> Self {
         info!("creating stream");
         Self {
-            channel_count: Arc::new(RwLock::new(2)),
-            sample_rate: Arc::new(RwLock::new(44_100)),
-            playing: Arc::new(RwLock::new(false)),
-            volume: Arc::new(RwLock::new(0.0)),
+            opened: Arc::new(AtomicBool::new(false)),
+            channel_count: Arc::new(AtomicUsize::new(DEFAULT_CHANNEL_COUNT)),
+            sample_rate: Arc::new(AtomicU32::new(DEFAULT_SAMPLE_RATE)),
+            playing: Arc::new(AtomicBool::new(false)),
+            volume: Arc::new(AtomicF32::new(0.0)),
             source: Arc::new(RwLock::new(Box::new(Empty))),
         }
     }
 
     pub fn open(&mut self) -> Result<Self, Error> {
         info!("opening stream");
+        if self.opened.load(Ordering::SeqCst) {
+            info!("stream is already opened");
+            return Ok(self.clone());
+        }
+
         let callback = InterflowCallback {
-            channel_count: self.channel_count.clone(),
-            sample_rate: self.sample_rate.clone(),
             playing: self.playing.clone(),
             volume: self.volume.clone(),
             source: self.source.clone(),
         };
+        // NOTE: AudioOutputDevice is not dyn compatible, hard to keep a reference to it.
         let device = default_output_device();
         let mut config = device
             .default_output_config()
             .map_err(|err| InterflowError::from(format!("{:?}", err)))?;
-        config.samplerate = 44_100 as f64;
+        // NOTE: Channels is a bitset of channels, not a count.
+        config.channels = 0b11; // Stereo
+        config.samplerate = DEFAULT_SAMPLE_RATE as f64;
         if !device.is_config_supported(&config) {
             error!("device does not support config: {:?}", config);
             config = device
                 .default_output_config()
                 .map_err(|err| InterflowError::from(format!("{:?}", err)))?;
         }
-        let stream = device
+        info!(
+            "config channel count: {} config sample rate: {}",
+            config.channels, config.samplerate
+        );
+        // NOTE: Stream handle is a generic type on AudioOutputDevice, hard to keep a reference to it.
+        // We want to save the stream so that we can eject it on close for graceful shutdown.
+        let _stream = device
             .create_output_stream(config, callback)
             .map(Box::new)
             .map_err(|err| InterflowError::from(format!("{:?}", err)))?;
-        self.set_channel_count(config.channels as usize)
-            .map_err(|err| InterflowError::from(format!("{:?}", err)))?;
-        self.set_sample_rate(config.samplerate as u32)
-            .map_err(|err| InterflowError::from(format!("{:?}", err)))?;
+        self.set_channel_count(config.channels.count())?;
+        self.set_sample_rate(config.samplerate as u32)?;
+        self.opened.store(true, Ordering::SeqCst);
         return Ok(self.clone());
     }
 
-    pub fn set_playing(&mut self, playing: bool) -> Result<(), Error> {
-        self.playing
-            .write()
-            .map(|mut v| *v = playing)
-            .map_err(|err| Error::AudioOutputError(Box::new(InterflowError::from(err))))
+    pub fn close(&mut self) -> Result<Self, Error> {
+        info!("closing stream");
+        if !self.opened.load(Ordering::SeqCst) {
+            info!("stream is already closed");
+            return Ok(self.clone());
+        }
+        self.set_playing(false)?;
+        self.set_source(Box::new(Empty))?;
+        self.opened.store(false, Ordering::SeqCst);
+        Ok(self.clone())
     }
 
-    pub fn set_channel_count(&mut self, count: usize) -> Result<(), Error> {
-        debug!("setting channel count to {}", count);
-        self.channel_count
-            .write()
-            .map(|mut v| *v = count)
-            .map_err(|err| Error::AudioOutputError(Box::new(InterflowError::from(err))))
+    pub fn set_playing(&mut self, playing: bool) -> Result<Self, Error> {
+        debug!("setting playing to {}", playing);
+        self.playing.store(playing, Ordering::SeqCst);
+        Ok(self.clone())
     }
 
-    pub fn set_sample_rate(&mut self, sample_rate: u32) -> Result<(), Error> {
+    pub fn set_channel_count(&mut self, channel_count: usize) -> Result<Self, Error> {
+        debug!("setting channel count to {}", channel_count);
+        self.channel_count.store(channel_count, Ordering::SeqCst);
+        Ok(self.clone())
+    }
+
+    pub fn set_sample_rate(&mut self, sample_rate: u32) -> Result<Self, Error> {
         debug!("setting sample rate to {}", sample_rate);
-        self.sample_rate
-            .write()
-            .map(|mut v| *v = sample_rate)
-            .map_err(|err| Error::AudioOutputError(Box::new(InterflowError::from(err))))
+        self.sample_rate.store(sample_rate, Ordering::SeqCst);
+        Ok(self.clone())
     }
 
-    pub fn set_volume(&mut self, volume: f32) -> Result<(), Error> {
-        self.volume
-            .write()
-            .map(|mut v| *v = volume)
-            .map_err(|err| Error::AudioOutputError(Box::new(InterflowError::from(err))))
+    pub fn set_volume(&mut self, volume: f32) -> Result<Self, Error> {
+        debug!("setting volume to {}", volume);
+        self.volume.store(volume, Ordering::SeqCst);
+        Ok(self.clone())
     }
 
-    pub fn set_source(&mut self, source: Box<dyn AudioSource>) -> Result<(), Error> {
+    pub fn set_source(&mut self, source: Box<dyn AudioSource>) -> Result<Self, Error> {
+        debug!("setting source");
         self.source
             .write()
             .map(|mut v| *v = source)
-            .map_err(|err| Error::AudioOutputError(Box::new(InterflowError::from(err))))
+            .map_err(|err| Error::AudioOutputError(Box::new(InterflowError::from(err))))?;
+        Ok(self.clone())
     }
 }
 
@@ -155,12 +182,12 @@ impl Actor for InterflowStream {
         match msg {
             StreamMsg::Open => {
                 debug!("opening stream");
+                self.open()?;
                 Ok(Act::Continue)
             }
             StreamMsg::Close => {
                 debug!("closing stream");
-                self.set_playing(false)?;
-                self.set_source(Box::new(Empty))?;
+                self.close()?;
                 Ok(Act::Shutdown)
             }
             StreamMsg::Pause => {
@@ -195,93 +222,44 @@ impl Actor for InterflowStream {
 }
 
 struct InterflowCallback {
-    channel_count: Arc<RwLock<usize>>,
-    sample_rate: Arc<RwLock<u32>>,
-    playing: Arc<RwLock<bool>>,
-    volume: Arc<RwLock<f32>>,
+    playing: Arc<AtomicBool>,
+    volume: Arc<AtomicF32>,
     source: Arc<RwLock<Box<dyn AudioSource>>>,
 }
 
 impl interflow::AudioOutputCallback for InterflowCallback {
     fn on_output_data(
         &mut self,
-        context: AudioCallbackContext,
+        _context: AudioCallbackContext,
         mut output: interflow::AudioOutput<f32>,
     ) {
-        if (context.stream_config.channels as usize) != *self.channel_count.read().unwrap() {
-            info!(
-                "channel count mismatch: context channels: {}, source channels: {}",
-                context.stream_config.channels,
-                self.source.read().unwrap().channel_count()
-            );
-            self.channel_count
-                .write()
-                .map(|mut v| *v = context.stream_config.channels as usize)
-                .unwrap();
-        }
-        if (context.stream_config.samplerate as u32) != *self.sample_rate.read().unwrap() {
-            info!(
-                "sample rate mismatch: context sample rate: {}, source sample rate: {}",
-                context.stream_config.samplerate,
-                self.source.read().unwrap().sample_rate()
-            );
-            self.sample_rate
-                .write()
-                .map(|mut v| *v = context.stream_config.samplerate as u32)
-                .unwrap();
-        }
-        if *self
-            .playing
-            .read()
-            .inspect_err(|err| {
-                error!("failed to read playing state: {}", err);
-            })
-            .unwrap()
-        {
-            trace!(
-                "samples: {} channels: {} context_sample_rate: {} context_channels: {}",
-                output.buffer.num_samples(),
-                output.buffer.num_channels(),
-                context.stream_config.samplerate,
-                context.stream_config.channels
-            );
+        if self.playing.load(Ordering::SeqCst) {
             let mut buf = vec![0.0; output.buffer.num_samples() * output.buffer.num_channels()];
             let _written = self.source.write().unwrap().write(&mut buf);
-            // output.buffer.set_frame(samples, &Array::from_vec(buf));
             let _res = output.buffer.copy_from_interleaved(&buf);
-            output.buffer.change_amplitude(
-                *self
-                    .volume
-                    .read()
-                    .inspect_err(|err| error!("failed to read volume: {}", err))
-                    .unwrap(),
-            );
+            output
+                .buffer
+                .change_amplitude(self.volume.load(Ordering::SeqCst));
+        } else {
+            output.buffer.change_amplitude(0 as f32);
         }
     }
 }
 
 #[derive(Clone)]
 struct InterflowSink {
+    channel_count: Arc<AtomicUsize>,
+    sample_rate: Arc<AtomicU32>,
     stream_send: Sender<StreamMsg>,
-    channel_count: Arc<RwLock<usize>>,
-    sample_rate: Arc<RwLock<u32>>,
 }
 
 impl AudioSink for InterflowSink {
     fn channel_count(&self) -> usize {
-        *self
-            .channel_count
-            .read()
-            .inspect_err(|err| error!("failed to read channel count: {}", err))
-            .unwrap()
+        self.channel_count.load(Ordering::SeqCst)
     }
 
     fn sample_rate(&self) -> u32 {
-        *self
-            .sample_rate
-            .read()
-            .inspect_err(|err| error!("failed to read sample rate: {}", err))
-            .unwrap()
+        self.sample_rate.load(Ordering::SeqCst)
     }
 
     fn set_volume(&self, volume: f32) {
@@ -336,6 +314,26 @@ impl AudioSink for InterflowSink {
                 error!("failed to send close message to audio stream: {}", err);
             })
             .unwrap();
+    }
+}
+
+struct AtomicF32 {
+    storage: AtomicU32,
+}
+
+impl AtomicF32 {
+    fn new(value: f32) -> Self {
+        Self {
+            storage: AtomicU32::new(value.to_bits()),
+        }
+    }
+
+    fn store(&self, value: f32, ordering: Ordering) {
+        self.storage.store(value.to_bits(), ordering)
+    }
+
+    fn load(&self, ordering: Ordering) -> f32 {
+        f32::from_bits(self.storage.load(ordering))
     }
 }
 

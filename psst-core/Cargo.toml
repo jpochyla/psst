@@ -49,7 +49,7 @@ shannon = { version = "0.2.0" }
 audio_thread_priority = "0.33.0"
 cpal = { version = "0.16.0", optional = true }
 cubeb = { git = "https://github.com/mozilla/cubeb-rs", optional = true }
-interflow = { git = "https://github.com/SolarLiner/interflow.git", rev = "8ec6c84f42efd0b556e78302a5ec2c5a385e2d60", features = ["pipewire"], optional = true }
+interflow = { git = "https://github.com/SolarLiner/interflow.git", rev = "438838d872b08431b5fd1464b167f128f0a8bb1d", features = ["pipewire"], optional = true }
 ndarray = { version = "0.16.1", optional = true }
 libsamplerate = { version = "0.1.0" }
 rb = { version = "0.4.1" }

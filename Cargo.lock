@@ -2746,7 +2746,7 @@ dependencies = [
 [[package]]
 name = "interflow"
 version = "0.1.0"
-source = "git+https://github.com/SolarLiner/interflow.git?rev=8ec6c84f42efd0b556e78302a5ec2c5a385e2d60#8ec6c84f42efd0b556e78302a5ec2c5a385e2d60"
+source = "git+https://github.com/SolarLiner/interflow.git?rev=438838d872b08431b5fd1464b167f128f0a8bb1d#438838d872b08431b5fd1464b167f128f0a8bb1d"
 dependencies = [
  "alsa",
  "bitflags 2.9.1",
