@@ -130,6 +130,7 @@ jobs:
             --icon "Psst.app" 150 160 \
             --hide-extension "Psst.app" \
             --app-drop-link 450 160 \
+            --skip-jenkins \
             "Psst.dmg" \
             "target/release/bundle/osx/Psst.app"
         working-directory: psst-gui
