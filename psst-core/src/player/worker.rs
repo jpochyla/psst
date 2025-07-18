@@ -18,7 +18,7 @@ use crate::{
     actor::{Act, Actor, ActorHandle},
     audio::{
         decode::AudioDecoder,
-        output::{AudioSink, DefaultAudioSink},
+        output::AudioSink,
         resample::ResamplingQuality,
         source::{AudioSource, ResampledSource, StereoMappedSource},
     },
@@ -31,13 +31,13 @@ use super::{
 };
 
 pub struct PlaybackManager {
-    sink: DefaultAudioSink,
+    sink: Box<dyn AudioSink>,
     event_send: Sender<PlayerEvent>,
     current: Option<(MediaPath, Sender<Msg>)>,
 }
 
 impl PlaybackManager {
-    pub fn new(sink: DefaultAudioSink, event_send: Sender<PlayerEvent>) -> Self {
+    pub fn new(sink: Box<dyn AudioSink>, event_send: Sender<PlayerEvent>) -> Self {
         Self {
             sink,
             event_send,
@@ -58,7 +58,7 @@ impl PlaybackManager {
             && source.channel_count() == self.sink.channel_count()
         {
             // We can start playing the source right away.
-            self.sink.play(source);
+            self.sink.play(Box::new(source));
         } else {
             // Some output streams have different sample rate than the source, so we need to
             // resample before pushing to the sink.
@@ -70,7 +70,7 @@ impl PlaybackManager {
             // Source output streams also have a different channel count. Map the stereo
             // channels and silence the others.
             let source = StereoMappedSource::new(source, self.sink.channel_count());
-            self.sink.play(source);
+            self.sink.play(Box::new(source));
         }
         self.sink.resume();
     }

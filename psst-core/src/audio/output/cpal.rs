@@ -13,11 +13,11 @@ use crate::{
 
 pub struct CpalOutput {
     _handle: ActorHandle<StreamMsg>,
-    sink: CpalSink,
+    sink: Box<CpalSink>,
 }
 
 impl CpalOutput {
-    pub fn open() -> Result<Self, Error> {
+    pub fn open() -> Result<Box<dyn AudioOutput>, Error> {
         // Open the default output device.
         let device = cpal::default_host()
             .default_output_device()
@@ -38,17 +38,17 @@ impl CpalOutput {
             // TODO: Support additional sample formats.
             move |this| Stream::open(device, config, callback_recv, this).unwrap()
         });
-        let sink = CpalSink {
+        let sink = Box::new(CpalSink {
             channel_count: supported.channels(),
             sample_rate: supported.sample_rate(),
             stream_send: handle.sender(),
             callback_send,
-        };
+        });
 
-        Ok(Self {
+        Ok(Box::new(Self {
             _handle: handle,
-            sink,
-        })
+            sink: sink,
+        }))
     }
 
     fn preferred_output_config(
@@ -73,9 +73,7 @@ impl CpalOutput {
 }
 
 impl AudioOutput for CpalOutput {
-    type Sink = CpalSink;
-
-    fn sink(&self) -> Self::Sink {
+    fn sink(&self) -> Box<dyn AudioSink> {
         self.sink.clone()
     }
 }
@@ -115,8 +113,8 @@ impl AudioSink for CpalSink {
         self.send_to_callback(CallbackMsg::SetVolume(volume));
     }
 
-    fn play(&self, source: impl AudioSource) {
-        self.send_to_callback(CallbackMsg::PlaySource(Box::new(source)));
+    fn play(&self, source: Box<dyn AudioSource>) {
+        self.send_to_callback(CallbackMsg::PlaySource(source));
     }
 
     fn pause(&self) {
@@ -130,7 +128,7 @@ impl AudioSink for CpalSink {
     }
 
     fn stop(&self) {
-        self.play(Empty);
+        self.play(Box::new(Empty));
         self.pause();
     }
 

@@ -4,7 +4,7 @@ use super::resample::{AudioResampler, ResamplingQuality};
 
 /// Types that can produce audio samples in `f32` format. `Send`able across
 /// threads.
-pub trait AudioSource: Send + 'static {
+pub trait AudioSource: Send + Sync +'static {
     /// Write at most of `output.len()` samples into the `output`. Returns the
     /// number of written samples. Should take care to always output a full
     /// frame, and should _never_ block.

@@ -10,7 +10,10 @@ use druid::{
     Code, ExtEventSink, InternalLifeCycle, KbKey, WindowHandle,
 };
 use psst_core::{
-    audio::{normalize::NormalizationLevel, output::DefaultAudioOutput},
+    audio::{
+        normalize::NormalizationLevel,
+        output::{AudioBackend, AudioOutput},
+    },
     cache::Cache,
     cdn::Cdn,
     lastfm::LastFmClient,
@@ -36,7 +39,7 @@ use crate::{
 pub struct PlaybackController {
     sender: Option<Sender<PlayerEvent>>,
     thread: Option<JoinHandle<()>>,
-    output: Option<DefaultAudioOutput>,
+    output: Option<Box<dyn AudioOutput>>,
     media_controls: Option<MediaControls>,
     has_scrobbled: bool,
     scrobbler: Option<Scrobbler>,
@@ -89,7 +92,7 @@ impl PlaybackController {
         widget_id: WidgetId,
         #[allow(unused_variables)] window: &WindowHandle,
     ) {
-        let output = DefaultAudioOutput::open().unwrap();
+        let output = AudioBackend::default().open().unwrap();
         let cache_dir = Config::cache_dir().unwrap();
         let proxy_url = Config::proxy();
         let player = Player::new(
