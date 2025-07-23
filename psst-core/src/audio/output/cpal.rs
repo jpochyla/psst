@@ -260,7 +260,7 @@ impl StreamCallback {
             let written = self.source.write(output);
 
             // Apply scaled global volume level.
-            let scaled_volume = self.volume.pow(4);
+            let scaled_volume = self.volume.pow(2);
             output[..written]
                 .iter_mut()
                 .for_each(|s| *s *= scaled_volume);
