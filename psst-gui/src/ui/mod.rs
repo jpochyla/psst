@@ -244,7 +244,9 @@ fn root_widget() -> impl Widget<AppState> {
         .must_fill_main_axis(true)
         .with_child(topbar_back_button_widget())
         .with_child(topbar_title_widget())
+        .with_flex_spacer(1.0)
         .with_child(topbar_sort_widget())
+        .with_child(topbar_play_button_widget())
         .background(Border::Bottom.with_color(theme::BACKGROUND_DARK));
 
     let main = Flex::column()
@@ -465,6 +467,32 @@ fn volume_slider() -> impl Widget<AppState> {
                 data.playback.volume = (data.playback.volume + scaled_delta).clamp(0.0, 1.0);
             },
         )
+}
+
+fn topbar_play_button_widget() -> impl Widget<AppState> {
+    let play_button = icons::PLAY
+        .scale((theme::grid(2.0), theme::grid(2.0)))
+        .padding(theme::grid(1.0))
+        .link()
+        .rounded(theme::BUTTON_BORDER_RADIUS)
+        .on_left_click(|ctx, _, data: &mut AppState, _| match &data.nav {
+            Nav::AlbumDetail(link, _) => {
+                ctx.submit_command(cmd::PLAY_ALBUM.with(link.clone()));
+            }
+            Nav::PlaylistDetail(link) => {
+                ctx.submit_command(cmd::PLAY_PLAYLIST.with(link.clone()));
+            }
+            _ => {}
+        });
+
+    Either::new(
+        |data: &AppState, _| {
+            matches!(data.nav, Nav::AlbumDetail(..)) || matches!(data.nav, Nav::PlaylistDetail(..))
+        },
+        play_button,
+        Empty,
+    )
+    .padding((0.0, 0.0, theme::grid(1.0), 0.0))
 }
 
 fn topbar_sort_widget() -> impl Widget<AppState> {
