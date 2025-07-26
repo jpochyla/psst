@@ -5,7 +5,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use crate::{
-    data::{Nav, PlaybackPayload, QueueBehavior, QueueEntry},
+    data::{LoopBehavior, Nav, PlaybackPayload, QueueEntry, ShuffleBehavior},
     ui::find::Find,
 };
 
@@ -54,7 +54,9 @@ pub const PLAY_RESUME: Selector = Selector::new("app.play-resume");
 pub const PLAY_NEXT: Selector = Selector::new("app.play-next");
 pub const PLAY_STOP: Selector = Selector::new("app.play-stop");
 pub const ADD_TO_QUEUE: Selector<(QueueEntry, PlaybackItem)> = Selector::new("app.add-to-queue");
-pub const PLAY_QUEUE_BEHAVIOR: Selector<QueueBehavior> = Selector::new("app.play-queue-behavior");
+pub const PLAY_SHUFFLE_BEHAVIOR: Selector<ShuffleBehavior> =
+    Selector::new("app.play-shuffle-behavior");
+pub const PLAY_LOOP_BEHAVIOR: Selector<LoopBehavior> = Selector::new("app.play-loop-behavior");
 pub const PLAY_SEEK: Selector<f64> = Selector::new("app.play-seek");
 pub const SKIP_TO_POSITION: Selector<u64> = Selector::new("app.skip-to-position");
 

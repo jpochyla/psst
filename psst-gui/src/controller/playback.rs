@@ -23,12 +23,13 @@ use souvlaki::{
 };
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use crate::data::ShuffleBehavior;
 use crate::{
     cmd,
     data::Nav,
     data::{
-        AppState, Config, NowPlaying, Playable, Playback, PlaybackOrigin, PlaybackState,
-        QueueBehavior, QueueEntry,
+        AppState, Config, LoopBehavior, NowPlaying, Playable, Playback, PlaybackOrigin,
+        PlaybackState, QueueEntry,
     },
     ui::lyrics,
 };
@@ -392,13 +393,23 @@ impl PlaybackController {
         }));
     }
 
-    fn set_queue_behavior(&mut self, behavior: QueueBehavior) {
-        self.send(PlayerEvent::Command(PlayerCommand::SetQueueBehavior {
-            behavior: match behavior {
-                QueueBehavior::Sequential => psst_core::player::queue::QueueBehavior::Sequential,
-                QueueBehavior::Random => psst_core::player::queue::QueueBehavior::Random,
-                QueueBehavior::LoopTrack => psst_core::player::queue::QueueBehavior::LoopTrack,
-                QueueBehavior::LoopAll => psst_core::player::queue::QueueBehavior::LoopAll,
+    fn set_shuffle_behavior(&mut self, shuffle_behavior: ShuffleBehavior) {
+        self.send(PlayerEvent::Command(PlayerCommand::SetShuffleBehavior {
+            shuffle_behavior: match shuffle_behavior {
+                ShuffleBehavior::Sequential => {
+                    psst_core::player::queue::ShuffleBehavior::Sequential
+                }
+                ShuffleBehavior::Random => psst_core::player::queue::ShuffleBehavior::Random,
+            },
+        }));
+    }
+
+    fn set_loop_behavior(&mut self, loop_behavior: LoopBehavior) {
+        self.send(PlayerEvent::Command(PlayerCommand::SetLoopBehavior {
+            loop_behavior: match loop_behavior {
+                LoopBehavior::Track => psst_core::player::queue::LoopBehavior::Track,
+                LoopBehavior::All => psst_core::player::queue::LoopBehavior::All,
+                LoopBehavior::None => psst_core::player::queue::LoopBehavior::None,
             },
         }));
     }
@@ -526,10 +537,16 @@ where
                 data.add_queued_entry(entry.clone());
                 ctx.set_handled();
             }
-            Event::Command(cmd) if cmd.is(cmd::PLAY_QUEUE_BEHAVIOR) => {
-                let behavior = cmd.get_unchecked(cmd::PLAY_QUEUE_BEHAVIOR);
-                data.set_queue_behavior(behavior.to_owned());
-                self.set_queue_behavior(behavior.to_owned());
+            Event::Command(cmd) if cmd.is(cmd::PLAY_SHUFFLE_BEHAVIOR) => {
+                let behavior = cmd.get_unchecked(cmd::PLAY_SHUFFLE_BEHAVIOR);
+                data.set_shuffle_behavior(behavior.to_owned());
+                self.set_shuffle_behavior(behavior.to_owned());
+                ctx.set_handled();
+            }
+            Event::Command(cmd) if cmd.is(cmd::PLAY_LOOP_BEHAVIOR) => {
+                let behavior = cmd.get_unchecked(cmd::PLAY_LOOP_BEHAVIOR);
+                data.set_loop_behavior(behavior.to_owned());
+                self.set_loop_behavior(behavior.to_owned());
                 ctx.set_handled();
             }
             Event::Command(cmd) if cmd.is(cmd::PLAY_SEEK) => {
@@ -600,7 +617,8 @@ where
 
                 // Initialize values loaded from the config.
                 self.set_volume(data.playback.volume);
-                self.set_queue_behavior(data.playback.queue_behavior);
+                self.set_shuffle_behavior(data.playback.shuffle_behavior);
+                self.set_loop_behavior(data.playback.loop_behavior);
 
                 // Request focus so we can receive keyboard events.
                 ctx.submit_command(cmd::SET_FOCUS.to(ctx.widget_id()));
