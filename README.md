@@ -146,7 +146,7 @@ cargo bundle --release
   - [ ] Rethink the current design, consider a two-pane layout
     - Left pane for browsing
     - Right pane for current playback
-  - [ ] Detect light/dark OS theme
+  - [x] Detect light/dark OS theme
   - [ ] Robust error states, ideally with a retry button
   - [ ] Correct playback highlight
     - Highlight now-playing track only in the correct album/playlist
@@ -158,7 +158,7 @@ cargo bundle --release
 
 ## Development
 
-Contributions are very welcome!  
+Contributions are very welcome!
 Here's the basic project structure:
 
 - `/psst-core` - Core library, takes care of Spotify TCP session, audio file retrieval, decoding, audio output, playback queue, etc.

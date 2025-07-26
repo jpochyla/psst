@@ -20,6 +20,7 @@ pub const QUIT_APP_WITH_SAVE: Selector = Selector::new("app.quit-with-save");
 pub const SET_FOCUS: Selector = Selector::new("app.set-focus");
 pub const COPY: Selector<String> = Selector::new("app.copy-to-clipboard");
 pub const GO_TO_URL: Selector<String> = Selector::new("app.go-to-url");
+pub const DETECT_THEME: Selector = Selector::new("app.detect-theme");
 
 // Find
 pub const TOGGLE_FINDER: Selector = Selector::new("app.show-finder");

@@ -2,6 +2,7 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
+use crate::controller::GeneralTabController;
 use crate::{
     cmd,
     data::{
@@ -188,8 +189,19 @@ fn general_tab_widget() -> impl Widget<AppState> {
         .with_child(Label::new("Theme").with_font(theme::UI_FONT_MEDIUM))
         .with_spacer(theme::grid(2.0))
         .with_child(
-            RadioGroup::column(vec![("Light", Theme::Light), ("Dark", Theme::Dark)])
-                .lens(AppState::config.then(Config::theme)),
+            Flex::row()
+                .with_child(
+                    RadioGroup::column(vec![("Light", Theme::Light), ("Dark", Theme::Dark)])
+                        .lens(AppState::config.then(Config::theme)),
+                )
+                .with_spacer(theme::grid(2.0))
+                .with_child(
+                    Button::new("Detect System Theme")
+                        .on_click(|ctx, _, _| {
+                            ctx.submit_command(cmd::DETECT_THEME);
+                        })
+                        .boxed(),
+                ),
         );
 
     col = col.with_spacer(theme::grid(1.5));
@@ -273,7 +285,7 @@ fn general_tab_widget() -> impl Widget<AppState> {
                 .lens(AppState::config.then(Config::paginated_limit)),
         );
 
-    col
+    col.controller(GeneralTabController)
 }
 
 struct CacheController {
