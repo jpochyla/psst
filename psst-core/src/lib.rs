@@ -11,6 +11,7 @@ pub mod audio;
 pub mod cache;
 pub mod cdn;
 pub mod connection;
+pub mod discord_rpc;
 pub mod error;
 pub mod item_id;
 pub mod lastfm;
