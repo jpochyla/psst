@@ -200,6 +200,14 @@ fn general_tab_widget() -> impl Widget<AppState> {
             .lens(AppState::config.then(Config::show_track_cover)),
     );
 
+    col = col.with_spacer(theme::grid(1.5));
+
+    // Close to tray
+    col = col.with_child(
+        Checkbox::new("Close to system tray instead of quitting")
+            .lens(AppState::config.then(Config::close_to_tray)),
+    );
+
     col = col.with_spacer(theme::grid(3.0));
 
     // Audio quality
