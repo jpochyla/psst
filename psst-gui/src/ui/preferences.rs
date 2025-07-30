@@ -189,19 +189,12 @@ fn general_tab_widget() -> impl Widget<AppState> {
         .with_child(Label::new("Theme").with_font(theme::UI_FONT_MEDIUM))
         .with_spacer(theme::grid(2.0))
         .with_child(
-            Flex::row()
-                .with_child(
-                    RadioGroup::column(vec![("Light", Theme::Light), ("Dark", Theme::Dark)])
-                        .lens(AppState::config.then(Config::theme)),
-                )
-                .with_spacer(theme::grid(2.0))
-                .with_child(
-                    Button::new("Detect System Theme")
-                        .on_click(|ctx, _, _| {
-                            ctx.submit_command(cmd::DETECT_THEME);
-                        })
-                        .boxed(),
-                ),
+            RadioGroup::column(vec![
+                ("Light", Theme::Light),
+                ("Dark", Theme::Dark),
+                ("System", Theme::System),
+            ])
+            .lens(AppState::config.then(Config::theme)),
         );
 
     col = col.with_spacer(theme::grid(1.5));
