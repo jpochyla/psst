@@ -279,30 +279,12 @@ impl Default for AudioQuality {
 pub enum Theme {
     Light,
     Dark,
+    System,
 }
 
 impl Default for Theme {
     fn default() -> Self {
-        match dark_light::detect() {
-            Ok(mode) => match mode {
-                dark_light::Mode::Dark => {
-                    log::info!("System theme detected as Dark");
-                    Self::Dark
-                }
-                dark_light::Mode::Light => {
-                    log::info!("System theme detected as Light");
-                    Self::Light
-                }
-                dark_light::Mode::Unspecified => {
-                    log::info!("System theme is unspecified, defaulting to Light");
-                    Self::Light // Fallback to Light theme if unspecified
-                }
-            },
-            Err(e) => {
-                log::error!("Failed to detect system theme: {}", e);
-                Self::Light // Fallback to Light theme if detection fails
-            }
-        }
+        Self::System
     }
 }
 
