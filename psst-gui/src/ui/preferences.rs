@@ -2,7 +2,6 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
-use crate::controller::GeneralTabController;
 use crate::{
     cmd,
     data::{
@@ -278,7 +277,7 @@ fn general_tab_widget() -> impl Widget<AppState> {
                 .lens(AppState::config.then(Config::paginated_limit)),
         );
 
-    col.controller(GeneralTabController)
+    col
 }
 
 struct CacheController {
