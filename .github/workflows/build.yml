@@ -117,13 +117,17 @@ jobs:
         run: cargo bundle --release
         working-directory: psst-gui
 
+      - name: Sign macOS Release
+        if: runner.os == 'macOS'
+        run: codesign --force -s - "psst-gui/target/release/bundle/osx/Psst.app"
+
       - name: Create DMG
         if: runner.os == 'macOS'
         run: |
           brew install create-dmg
           create-dmg \
             --volname "Psst" \
-            --volicon "assets/logo.icns" \
+            --volicon "psst-gui/assets/logo.icns" \
             --window-pos 200 120 \
             --window-size 600 400 \
             --icon-size 100 \
