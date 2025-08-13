@@ -17,7 +17,7 @@ pub struct PublicUser {
     pub id: Arc<str>,
 }
 
-#[derive(Default, Debug, Clone, Lens, PartialEq, Deserialize)]
+#[derive(Default, Debug, Clone, Lens, PartialEq, Deserialize, Data)]
 pub struct PublicUserDetail {
     pub uri: String,
     pub name: String,
@@ -32,7 +32,7 @@ pub struct PublicUserDetail {
     pub show_follows: bool,
 }
 
-#[derive(Default, Debug, Clone, Lens, PartialEq, Deserialize)]
+#[derive(Default, Debug, Clone, Lens, PartialEq, Deserialize, Data)]
 pub struct RecentlyPlayedArtist {
     pub uri: String,
     pub name: String,

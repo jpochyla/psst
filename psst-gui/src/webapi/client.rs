@@ -709,7 +709,7 @@ impl WebApi {
 
     pub fn get_publicuser_info(&self, id: &str) -> Result<PublicUserDetail, Error> {
         let request = &RequestBuilder::new(
-            format!("user-profile-view/v3/profile/{}", id),
+            format!("user-profile-view/v3/profile/{id}"),
             Method::Get,
             None,
         )

@@ -82,7 +82,7 @@ pub struct AppState {
     pub album_detail: AlbumDetail,
     pub artist_detail: ArtistDetail,
     pub playlist_detail: PlaylistDetail,
-    pub user_detail: UserDetail,
+    pub public_user_detail: PublicUserDetail,
     pub show_detail: ShowDetail,
     pub library: Arc<Library>,
     pub common_ctx: Arc<CommonCtx>,
@@ -164,11 +164,18 @@ impl AppState {
                 playlist: Promise::Empty,
                 tracks: Promise::Empty,
             },
-            user_detail: UserDetail {
-                artist: Promise::Empty,
-                albums: Promise::Empty,
-                user_info: Promise::Empty,
-                top_tracks: Promise::Empty,
+            public_user_detail: PublicUserDetail {
+                uri: Promise::Empty,
+                name: Promise::Empty,
+                image_url: Promise::Empty,
+                followers_count: Promise::Empty,
+                following_count: Promise::Empty,
+                is_following: Promise::Empty,
+                recently_played_artists: Promise::Empty,
+                public_playlists: Promise::Empty,
+                total_public_playlists_count: Promise::Empty,
+                allow_follows: Promise::Empty,
+                show_follows: Promise::Empty,
             },
 
             show_detail: ShowDetail {

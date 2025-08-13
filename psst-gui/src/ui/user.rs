@@ -8,7 +8,7 @@ use druid::{
 
 use crate::{
     cmd,
-    data::{AppState, Ctx, Library, Nav, PublicUser, UserLink, UserProfile, WithCtx},
+    data::{AppState, Ctx, Library, Nav, PublicUser, UserDetail, UserLink, UserProfile, WithCtx},
     ui::utils::{stat_row, InfoLayout},
     webapi::WebApi,
     widget::{
@@ -49,19 +49,19 @@ pub fn detail_widget() -> impl Widget<AppState> {
 // }
 
 fn async_user_info() -> impl Widget<AppState> {
-    Async::new(utils::spinner_widget, user_info_widget, || Empty)
+    Async::new(utils::spinner_widget, user_widget, || Empty)
         .lens(
             Ctx::make(
                 AppState::common_ctx,
-                AppState::user_detail.then(UserDetail::user_info),
+                AppState::public_user_detail.then(UserDetail::user_info),
             )
             .then(Ctx::in_promise()),
         )
         .on_command_async(
             LOAD_DETAIL,
             |d| WebApi::global().get_publicuser_info(&d.id),
-            |_, data, d| data.user_detail.user_info.defer(d),
-            |_, data, r| data.user_detail.user_info.update(r),
+            |_, data, d| data.public_user_detail.user_info.defer(d),
+            |_, data, r| data.public_user_detail.user_info.update(r),
         )
 }
 
