@@ -161,7 +161,7 @@ impl Config {
 
     pub fn spotify_local_files_file(username: &str) -> Option<PathBuf> {
         AppDirs::new(Some("spotify"), false).map(|dir| {
-            let path = format!("Users/{}-user/local-files.bnk", username);
+            let path = format!("Users/{username}-user/local-files.bnk");
             dir.config_dir.join(path)
         })
     }

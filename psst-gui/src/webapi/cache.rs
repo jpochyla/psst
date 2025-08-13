@@ -37,7 +37,7 @@ impl WebApiCache {
 
     pub fn get_image_from_disk(&self, uri: &Arc<str>) -> Option<ImageBuf> {
         let hash = Self::hash_uri(uri);
-        self.key("images", &format!("{:016x}", hash))
+        self.key("images", &format!("{hash:016x}"))
             .and_then(|path| std::fs::read(path).ok())
             .and_then(|bytes| image::load_from_memory(&bytes).ok())
             .map(ImageBuf::from_dynamic_image)
@@ -45,7 +45,7 @@ impl WebApiCache {
 
     pub fn save_image_to_disk(&self, uri: &Arc<str>, data: &[u8]) {
         let hash = Self::hash_uri(uri);
-        if let Some(path) = self.key("images", &format!("{:016x}", hash)) {
+        if let Some(path) = self.key("images", &format!("{hash:016x}")) {
             if let Some(parent) = path.parent() {
                 let _ = std::fs::create_dir_all(parent);
             }
@@ -66,12 +66,12 @@ impl WebApiCache {
     pub fn set(&self, bucket: &str, key: &str, value: &[u8]) {
         if let Some(path) = self.bucket(bucket) {
             if let Err(err) = mkdir_if_not_exists(&path) {
-                log::error!("failed to create WebAPI cache bucket: {:?}", err);
+                log::error!("failed to create WebAPI cache bucket: {err:?}");
             }
         }
         if let Some(path) = self.key(bucket, key) {
             if let Err(err) = fs::write(path, value) {
-                log::error!("failed to save to WebAPI cache: {:?}", err);
+                log::error!("failed to save to WebAPI cache: {err:?}");
             }
         }
     }

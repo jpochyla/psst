@@ -59,7 +59,7 @@ impl MercuryDispatcher {
                 self.pending.insert(msg_seq, pending);
             }
         } else {
-            log::warn!("received unexpected mercury msg, seq: {}", msg_seq);
+            log::warn!("received unexpected mercury msg, seq: {msg_seq}");
         }
     }
 }
