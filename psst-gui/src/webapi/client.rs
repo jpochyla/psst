@@ -94,7 +94,7 @@ impl WebApi {
 
         // Use the current OAuth bearer for the request.
         let token = self.access_token()?;
-        let result = match request.get_method() {
+        let call = |token: &str| match request.get_method() {
             Method::Get => {
                 let mut req = self
                     .agent
@@ -123,54 +123,23 @@ impl WebApi {
                 .send_json(request.get_body()),
         };
 
-        let mut response = match result {
+        let mut response = match call(&token) {
             Ok(resp) => resp,
             Err(err) => return Err(Error::WebApiError(err.to_string())),
         };
 
-        // Tiny refresh-and-retry: if unauthorized/forbidden and we have a refresh token, refresh once.
+        // If unauthorized/forbidden, refresh once (if possible) and retry.
         if matches!(
             response.status(),
             StatusCode::UNAUTHORIZED | StatusCode::FORBIDDEN
         ) {
             if let Some(rtok) = self.oauth_refresh_token.lock().clone() {
                 if let Ok((new_access, new_refresh)) = refresh_access_token(&rtok) {
-                    // Update bearer (and refresh token if rotated), then retry once.
                     *self.oauth_bearer.lock() = Some(new_access.clone());
                     if let Some(r) = new_refresh {
                         *self.oauth_refresh_token.lock() = Some(r);
                     }
-                    let token = new_access;
-                    let result = match request.get_method() {
-                        Method::Get => {
-                            let mut req = self
-                                .agent
-                                .get(request.build())
-                                .header("Authorization", &format!("Bearer {token}"));
-                            for header in request.get_headers() {
-                                req = req.header(header.0, header.1);
-                            }
-                            req.call()
-                        }
-                        Method::Post => self
-                            .agent
-                            .post(request.build())
-                            .header("Authorization", &format!("Bearer {token}"))
-                            .send_json(request.get_body()),
-                        Method::Put => self
-                            .agent
-                            .put(request.build())
-                            .header("Authorization", &format!("Bearer {token}"))
-                            .send_json(request.get_body()),
-                        Method::Delete => self
-                            .agent
-                            .delete(request.build())
-                            .header("Authorization", &format!("Bearer {token}"))
-                            .force_send_body()
-                            .send_json(request.get_body()),
-                    };
-
-                    response = match result {
+                    response = match call(&new_access) {
                         Ok(resp) => resp,
                         Err(err) => return Err(Error::WebApiError(err.to_string())),
                     };
