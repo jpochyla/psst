@@ -581,17 +581,20 @@ impl Authenticate {
                 )
                 .map_err(|e| e.to_string())?;
 
-                // Exchange code for access token
-                let token = oauth::exchange_code_for_token(8888, code, pkce_verifier);
+                // Exchange code for access and refresh tokens
+                let (access, refresh) =
+                    oauth::exchange_code_for_token_with_refresh(8888, code, pkce_verifier);
 
                 // Try to authenticate with token, with retries
                 let mut retries = 3;
                 while retries > 0 {
                     match Authentication::authenticate_and_get_credentials(SessionConfig {
-                        login_creds: Credentials::from_access_token(token.clone()),
+                        login_creds: Credentials::from_access_token(access.clone()),
                         ..config.clone()
                     }) {
-                        Ok(credentials) => return Ok(credentials),
+                        Ok(credentials) => {
+                            return Ok((credentials, access.clone(), refresh.clone()))
+                        }
                         Err(e) if retries > 1 => {
                             log::warn!("authentication failed, retrying: {e:?}");
                             retries -= 1;
@@ -620,7 +623,7 @@ impl Authenticate {
 impl Authenticate {
     pub const SPOTIFY_REQUEST: Selector =
         Selector::new("app.preferences.spotify.authenticate-request");
-    pub const SPOTIFY_RESPONSE: Selector<Result<Credentials, String>> =
+    pub const SPOTIFY_RESPONSE: Selector<Result<(Credentials, String, Option<String>), String>> =
         Selector::new("app.preferences.spotify.authenticate-response");
 
     // Selector for initializing fields
@@ -632,6 +635,20 @@ impl Authenticate {
         Selector::new("app.preferences.lastfm.authenticate-request");
     pub const LASTFM_RESPONSE: Selector<Result<String, String>> =
         Selector::new("app.preferences.lastfm.authenticate-response");
+}
+
+fn logout_and_reset(ctx: &mut EventCtx, data: &mut AppState) {
+    data.config.clear_credentials();
+    data.config.clear_oauth_tokens();
+    data.config.save();
+    // Clear OAuth tokens for session and Web API.
+    data.session.set_oauth_bearer(None);
+    data.session.set_oauth_refresh_token(None);
+    crate::webapi::WebApi::global().set_oauth_bearer(None);
+    crate::webapi::WebApi::global().set_oauth_refresh_token(None);
+    data.session.shutdown();
+    ctx.submit_command(cmd::CLOSE_ALL_WINDOWS);
+    ctx.submit_command(cmd::SHOW_ACCOUNT_SETUP);
 }
 
 impl<W: Widget<AppState>> Controller<AppState, W> for Authenticate {
@@ -656,11 +673,7 @@ impl<W: Widget<AppState>> Controller<AppState, W> for Authenticate {
                 ctx.set_handled();
             }
             Event::Command(cmd) if cmd.is(cmd::LOG_OUT) => {
-                data.config.clear_credentials();
-                data.config.save();
-                data.session.shutdown();
-                ctx.submit_command(cmd::CLOSE_ALL_WINDOWS);
-                ctx.submit_command(cmd::SHOW_ACCOUNT_SETUP);
+                logout_and_reset(ctx, data);
                 ctx.set_handled();
             }
             Event::Command(cmd) if cmd.is(Self::LASTFM_REQUEST) => {
@@ -714,13 +727,23 @@ impl<W: Widget<AppState>> Controller<AppState, W> for Authenticate {
             Event::Command(cmd) if cmd.is(Self::SPOTIFY_RESPONSE) => {
                 let result = cmd.get_unchecked(Self::SPOTIFY_RESPONSE);
                 match result {
-                    Ok(credentials) => {
+                    Ok((credentials, token, refresh)) => {
+                        // Provide Web API with the OAuth token directly (avoid keymaster dependency).
+                        crate::webapi::WebApi::global().set_oauth_bearer(Some(token.clone()));
+                        // Optionally persist refresh token for later use.
+                        if let Some(r) = refresh.clone() {
+                            data.config.oauth_refresh_token = Some(r);
+                        }
+                        // Also inform the core session for token-based requests.
+                        data.session.set_oauth_bearer(Some(token.clone()));
                         // Update session config with the new credentials
                         data.session.update_config(SessionConfig {
                             login_creds: credentials.clone(),
                             proxy_url: Config::proxy(),
                         });
                         data.config.store_credentials(credentials.clone());
+                        data.config.oauth_bearer = Some(token.clone());
+                        data.config.oauth_refresh_token = refresh.clone();
                         data.config.save();
                         data.preferences.auth.result.resolve((), ());
                         // Handle UI flow based on tab type

@@ -49,6 +49,8 @@ pub struct SessionConfig {
 pub struct SessionService {
     connected: Arc<Mutex<Option<SessionWorker>>>,
     config: Arc<Mutex<Option<SessionConfig>>>,
+    oauth_bearer: Arc<Mutex<Option<String>>>,
+    oauth_refresh_token: Arc<Mutex<Option<String>>>,
 }
 
 impl SessionService {
@@ -58,6 +60,8 @@ impl SessionService {
         Self {
             connected: Arc::default(),
             config: Arc::default(),
+            oauth_bearer: Arc::default(),
+            oauth_refresh_token: Arc::default(),
         }
     }
 
@@ -66,6 +70,8 @@ impl SessionService {
         Self {
             connected: Arc::default(),
             config: Arc::new(Mutex::new(Some(config))),
+            oauth_bearer: Arc::default(),
+            oauth_refresh_token: Arc::default(),
         }
     }
 
@@ -116,6 +122,26 @@ impl SessionService {
             worker.join();
         }
     }
+
+    /// Set or clear OAuth bearer used by dependent services.
+    pub fn set_oauth_bearer(&self, token: Option<String>) {
+        *self.oauth_bearer.lock() = token;
+    }
+
+    /// Get the currently configured OAuth bearer, if any.
+    pub fn oauth_bearer(&self) -> Option<String> {
+        self.oauth_bearer.lock().clone()
+    }
+
+    /// Set or clear the OAuth refresh token.
+    pub fn set_oauth_refresh_token(&self, token: Option<String>) {
+        *self.oauth_refresh_token.lock() = token;
+    }
+
+    /// Get the currently configured OAuth refresh token, if any.
+    pub fn oauth_refresh_token(&self) -> Option<String> {
+        self.oauth_refresh_token.lock().clone()
+    }
 }
 
 /// Successful connection through the Spotify Shannon-encrypted TCP channel.
@@ -135,7 +161,14 @@ impl SessionConnection {
         let proxy_url = config.proxy_url.as_deref();
         let ap_list = Transport::resolve_ap_with_fallback(proxy_url);
         let mut transport = Transport::connect(&ap_list, proxy_url)?;
-        let credentials = transport.authenticate(config.login_creds)?;
+        let is_token_login = config.login_creds.auth_type
+            == crate::protocol::authentication::AuthenticationType::AUTHENTICATION_SPOTIFY_TOKEN;
+        let mut credentials = transport.authenticate(config.login_creds)?;
+        if is_token_login {
+            // Reconnect using reusable credentials so that keymaster requests succeed.
+            transport = Transport::connect(&ap_list, proxy_url)?;
+            credentials = transport.authenticate(credentials)?;
+        }
         Ok(Self {
             credentials,
             transport,

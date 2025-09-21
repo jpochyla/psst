@@ -21,7 +21,6 @@ use parking_lot::Mutex;
 use serde::{de::DeserializeOwned, Deserialize};
 use serde_json::json;
 
-use psst_core::session::{access_token::TokenProvider, SessionService};
 use ureq::{
     http::{Response, StatusCode},
     Agent, Body,
@@ -39,21 +38,21 @@ use crate::{
 };
 
 use super::{cache::WebApiCache, local::LocalTrackManager};
+use psst_core::oauth::refresh_access_token;
 use sanitize_html::rules::predefined::DEFAULT;
 use sanitize_html::sanitize_str;
 
 pub struct WebApi {
-    session: SessionService,
     agent: Agent,
     cache: WebApiCache,
-    token_provider: TokenProvider,
+    oauth_bearer: Mutex<Option<String>>,
+    oauth_refresh_token: Mutex<Option<String>>,
     local_track_manager: Mutex<LocalTrackManager>,
     paginated_limit: usize,
 }
 
 impl WebApi {
     pub fn new(
-        session: SessionService,
         proxy_url: Option<&str>,
         cache_base: Option<PathBuf>,
         paginated_limit: usize,
@@ -64,27 +63,38 @@ impl WebApi {
             agent = agent.proxy(proxy);
         }
         Self {
-            session,
             agent: agent.build().into(),
             cache: WebApiCache::new(cache_base),
-            token_provider: TokenProvider::new(),
+            oauth_bearer: Mutex::new(None),
+            oauth_refresh_token: Mutex::new(None),
             local_track_manager: Mutex::new(LocalTrackManager::new()),
             paginated_limit,
         }
     }
 
     fn access_token(&self) -> Result<String, Error> {
-        self.token_provider
-            .get(&self.session)
-            .map_err(|err| Error::WebApiError(err.to_string()))
-            .map(|t| t.token)
+        self.oauth_bearer
+            .lock()
+            .clone()
+            .ok_or_else(|| Error::WebApiError("OAuth access token required".to_string()))
+    }
+
+    /// Set the OAuth bearer token for Web API. Pass None to clear.
+    pub fn set_oauth_bearer(&self, token: Option<String>) {
+        *self.oauth_bearer.lock() = token;
+    }
+
+    /// Optionally set the OAuth refresh token for Web API. Pass None to clear.
+    pub fn set_oauth_refresh_token(&self, token: Option<String>) {
+        *self.oauth_refresh_token.lock() = token;
     }
 
     fn request(&self, request: &RequestBuilder) -> Result<Response<Body>, Error> {
-        let token = self.access_token()?;
         let request = request.clone().query("market", "from_token");
 
-        match request.get_method() {
+        // Use the current OAuth bearer for the request.
+        let token = self.access_token()?;
+        let result = match request.get_method() {
             Method::Get => {
                 let mut req = self
                     .agent
@@ -93,30 +103,82 @@ impl WebApi {
                 for header in request.get_headers() {
                     req = req.header(header.0, header.1);
                 }
-
                 req.call()
-                    .map_err(|err| Error::WebApiError(err.to_string()))
             }
             Method::Post => self
                 .agent
                 .post(request.build())
                 .header("Authorization", &format!("Bearer {token}"))
-                .send_json(request.get_body())
-                .map_err(|err| Error::WebApiError(err.to_string())),
+                .send_json(request.get_body()),
             Method::Put => self
                 .agent
                 .put(request.build())
                 .header("Authorization", &format!("Bearer {token}"))
-                .send_json(request.get_body())
-                .map_err(|err| Error::WebApiError(err.to_string())),
+                .send_json(request.get_body()),
             Method::Delete => self
                 .agent
                 .delete(request.build())
                 .header("Authorization", &format!("Bearer {token}"))
                 .force_send_body()
-                .send_json(request.get_body())
-                .map_err(|err| Error::WebApiError(err.to_string())),
+                .send_json(request.get_body()),
+        };
+
+        let mut response = match result {
+            Ok(resp) => resp,
+            Err(err) => return Err(Error::WebApiError(err.to_string())),
+        };
+
+        // Tiny refresh-and-retry: if unauthorized/forbidden and we have a refresh token, refresh once.
+        if matches!(
+            response.status(),
+            StatusCode::UNAUTHORIZED | StatusCode::FORBIDDEN
+        ) {
+            if let Some(rtok) = self.oauth_refresh_token.lock().clone() {
+                if let Ok((new_access, new_refresh)) = refresh_access_token(&rtok) {
+                    // Update bearer (and refresh token if rotated), then retry once.
+                    *self.oauth_bearer.lock() = Some(new_access.clone());
+                    if let Some(r) = new_refresh {
+                        *self.oauth_refresh_token.lock() = Some(r);
+                    }
+                    let token = new_access;
+                    let result = match request.get_method() {
+                        Method::Get => {
+                            let mut req = self
+                                .agent
+                                .get(request.build())
+                                .header("Authorization", &format!("Bearer {token}"));
+                            for header in request.get_headers() {
+                                req = req.header(header.0, header.1);
+                            }
+                            req.call()
+                        }
+                        Method::Post => self
+                            .agent
+                            .post(request.build())
+                            .header("Authorization", &format!("Bearer {token}"))
+                            .send_json(request.get_body()),
+                        Method::Put => self
+                            .agent
+                            .put(request.build())
+                            .header("Authorization", &format!("Bearer {token}"))
+                            .send_json(request.get_body()),
+                        Method::Delete => self
+                            .agent
+                            .delete(request.build())
+                            .header("Authorization", &format!("Bearer {token}"))
+                            .force_send_body()
+                            .send_json(request.get_body()),
+                    };
+
+                    response = match result {
+                        Ok(resp) => resp,
+                        Err(err) => return Err(Error::WebApiError(err.to_string())),
+                    };
+                }
+            }
         }
+
+        Ok(response)
     }
 
     fn with_retry(f: impl Fn() -> Result<Response<Body>, Error>) -> Result<Response<Body>, Error> {
@@ -1219,11 +1281,8 @@ impl WebApi {
     }
 
     pub fn unfollow_playlist(&self, id: &str) -> Result<(), Error> {
-        let request = &RequestBuilder::new(
-            format!("v1/playlists/{id}/followers"),
-            Method::Delete,
-            None,
-        );
+        let request =
+            &RequestBuilder::new(format!("v1/playlists/{id}/followers"), Method::Delete, None);
         self.request(request)?;
         Ok(())
     }
@@ -1252,10 +1311,9 @@ impl WebApi {
             Json(serde_json::Value),
         }
 
-        let request =
-            &RequestBuilder::new(format!("v1/playlists/{id}/tracks"), Method::Get, None)
-                .query("marker", "from_token")
-                .query("additional_types", "track");
+        let request = &RequestBuilder::new(format!("v1/playlists/{id}/tracks"), Method::Get, None)
+            .query("marker", "from_token")
+            .query("additional_types", "track");
 
         let result: Vector<PlaylistItem> = self.load_all_pages(request)?;
 
@@ -1276,9 +1334,8 @@ impl WebApi {
     }
 
     pub fn change_playlist_details(&self, id: &str, name: &str) -> Result<(), Error> {
-        let request =
-            &RequestBuilder::new(format!("v1/playlists/{id}/tracks"), Method::Get, None)
-                .set_body(Some(json!({ "name": name })));
+        let request = &RequestBuilder::new(format!("v1/playlists/{id}/tracks"), Method::Get, None)
+            .set_body(Some(json!({ "name": name })));
         self.request(request)?;
         Ok(())
     }

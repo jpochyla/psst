@@ -7,10 +7,7 @@ use std::{
 use serde::Deserialize;
 
 use crate::{
-    error::Error,
-    item_id::FileId,
-    session::{access_token::TokenProvider, SessionService},
-    util::default_ureq_agent_builder,
+    error::Error, item_id::FileId, session::SessionService, util::default_ureq_agent_builder,
 };
 
 pub type CdnHandle = Arc<Cdn>;
@@ -18,7 +15,6 @@ pub type CdnHandle = Arc<Cdn>;
 pub struct Cdn {
     session: SessionService,
     agent: ureq::Agent,
-    token_provider: TokenProvider,
 }
 
 impl Cdn {
@@ -27,7 +23,6 @@ impl Cdn {
         Ok(Arc::new(Self {
             session,
             agent: agent.into(),
-            token_provider: TokenProvider::new(),
         }))
     }
 
@@ -36,7 +31,12 @@ impl Cdn {
             "https://api.spotify.com/v1/storage-resolve/files/audio/interactive/{}",
             id.to_base16()
         );
-        let access_token = self.token_provider.get(&self.session)?;
+        // OAuth-only: requires a browser OAuth bearer; no Keymaster fallback for CDN.
+        let bearer = self
+            .session
+            .oauth_bearer()
+            .ok_or_else(|| Error::OAuthError("OAuth access token required".to_string()))?;
+
         let response = self
             .agent
             .get(&locations_uri)
@@ -44,7 +44,7 @@ impl Cdn {
             .query("product", "9")
             .query("platform", "39")
             .query("alt", "json")
-            .header("Authorization", &format!("Bearer {}", access_token.token))
+            .header("Authorization", &format!("Bearer {}", bearer))
             .call()?;
 
         #[derive(Deserialize)]

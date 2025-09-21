@@ -15,6 +15,7 @@ use env_logger::{Builder, Env};
 use webapi::WebApi;
 
 use psst_core::cache::Cache;
+use psst_core::oauth::refresh_access_token;
 
 use crate::{
     data::{AppState, Config},
@@ -51,12 +52,36 @@ fn main() {
     }
 
     WebApi::new(
-        state.session.clone(),
         Config::proxy().as_deref(),
         Config::cache_dir(),
         paginated_limit,
     )
     .install_as_global();
+
+    // Apply persisted OAuth bearer if present; otherwise try refresh once if a refresh token exists.
+    if let Some(tok) = state.config.oauth_bearer.clone() {
+        state.session.set_oauth_bearer(Some(tok.clone()));
+        WebApi::global().set_oauth_bearer(Some(tok));
+        if let Some(rtok) = state.config.oauth_refresh_token.clone() {
+            state.session.set_oauth_refresh_token(Some(rtok.clone()));
+            WebApi::global().set_oauth_refresh_token(Some(rtok));
+        }
+    } else if let Some(rtok) = state.config.oauth_refresh_token.clone() {
+        match refresh_access_token(&rtok) {
+            Ok((new_access, new_refresh)) => {
+                state.session.set_oauth_bearer(Some(new_access.clone()));
+                WebApi::global().set_oauth_bearer(Some(new_access.clone()));
+                state.config.oauth_bearer = Some(new_access);
+                if let Some(r) = new_refresh {
+                    state.config.oauth_refresh_token = Some(r);
+                }
+                state.config.save();
+            }
+            Err(e) => {
+                log::warn!("Failed to refresh OAuth token: {e}");
+            }
+        }
+    }
 
     let delegate;
     let launcher;

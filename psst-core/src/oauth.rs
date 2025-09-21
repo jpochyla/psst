@@ -1,7 +1,7 @@
 use crate::error::Error;
 use oauth2::{
     basic::BasicClient, reqwest::http_client, AuthUrl, AuthorizationCode, ClientId, CsrfToken,
-    PkceCodeChallenge, PkceCodeVerifier, RedirectUrl, Scope, TokenResponse, TokenUrl,
+    PkceCodeChallenge, PkceCodeVerifier, RedirectUrl, RefreshToken, Scope, TokenResponse, TokenUrl,
 };
 use std::{
     io::{BufRead, BufReader, Write},
@@ -17,9 +17,7 @@ pub fn listen_for_callback_parameter(
     timeout: Duration,
     parameter_name: &'static str,
 ) -> Result<String, Error> {
-    log::info!(
-        "starting callback listener for '{parameter_name}' on {socket_address:?}",
-    );
+    log::info!("starting callback listener for '{parameter_name}' on {socket_address:?}",);
 
     // Create a simpler, linear flow
     // 1. Bind the listener
@@ -191,8 +189,53 @@ pub fn exchange_code_for_token(
 }
 
 fn get_scopes() -> Vec<Scope> {
-    crate::session::access_token::ACCESS_SCOPES
+    // Use a broader OAuth scope set for initial AP login (includes streaming).
+    const OAUTH_SCOPES: &str = "streaming,user-read-email,user-read-private,playlist-read-private,playlist-read-collaborative,playlist-modify-public,playlist-modify-private,user-follow-modify,user-follow-read,user-library-read,user-library-modify,user-top-read,user-read-recently-played,app-remote-control";
+    OAUTH_SCOPES
         .split(',')
         .map(|s| Scope::new(s.trim().to_string()))
         .collect()
+}
+
+/// Variant of `exchange_code_for_token` that also returns a refresh token if Spotify provides one.
+pub fn exchange_code_for_token_with_refresh(
+    redirect_port: u16,
+    code: AuthorizationCode,
+    pkce_verifier: PkceCodeVerifier,
+) -> (String, Option<String>) {
+    let client = create_spotify_oauth_client(redirect_port);
+
+    let token_response = client
+        .exchange_code(code)
+        .set_pkce_verifier(pkce_verifier)
+        .request(http_client)
+        .expect("Failed to exchange code for token");
+
+    let access = token_response.access_token().secret().to_string();
+    let refresh = token_response
+        .refresh_token()
+        .map(|t| t.secret().to_string());
+    (access, refresh)
+}
+
+/// Refresh an access token using a stored refresh token. Returns the new access token and
+/// an optional new refresh token if Spotify rotates it.
+pub fn refresh_access_token(refresh_token: &str) -> Result<(String, Option<String>), Error> {
+    let client = BasicClient::new(
+        ClientId::new(crate::session::access_token::CLIENT_ID.to_string()),
+        None,
+        AuthUrl::new("https://accounts.spotify.com/authorize".to_string()).unwrap(),
+        Some(TokenUrl::new("https://accounts.spotify.com/api/token".to_string()).unwrap()),
+    );
+
+    let token_response = client
+        .exchange_refresh_token(&RefreshToken::new(refresh_token.to_string()))
+        .request(http_client)
+        .map_err(|e| Error::OAuthError(format!("Failed to refresh token: {e}")))?;
+
+    let access = token_response.access_token().secret().to_string();
+    let refresh = token_response
+        .refresh_token()
+        .map(|t| t.secret().to_string());
+    Ok((access, refresh))
 }
