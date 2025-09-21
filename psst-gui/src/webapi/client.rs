@@ -41,12 +41,16 @@ use crate::{
 use super::{cache::WebApiCache, local::LocalTrackManager};
 use sanitize_html::rules::predefined::DEFAULT;
 use sanitize_html::sanitize_str;
+use psst_core::session::login5::Login5Manager;
+use psst_core::session::spclient::SpClient;
 
 pub struct WebApi {
     session: SessionService,
     agent: Agent,
     cache: WebApiCache,
     token_provider: TokenProvider,
+    login5: Login5Manager,
+    spclient: SpClient,
     local_track_manager: Mutex<LocalTrackManager>,
     paginated_limit: usize,
 }
@@ -68,16 +72,18 @@ impl WebApi {
             agent: agent.build().into(),
             cache: WebApiCache::new(cache_base),
             token_provider: TokenProvider::new(),
+            login5: Login5Manager::new(proxy_url),
+            spclient: SpClient::new(proxy_url),
             local_track_manager: Mutex::new(LocalTrackManager::new()),
             paginated_limit,
         }
     }
 
     fn access_token(&self) -> Result<String, Error> {
-        self.token_provider
-            .get(&self.session)
+        self.login5
+            .auth_token(&self.session, &self.spclient)
             .map_err(|err| Error::WebApiError(err.to_string()))
-            .map(|t| t.token)
+            .map(|t| t.access_token)
     }
 
     fn request(&self, request: &RequestBuilder) -> Result<Response<Body>, Error> {
@@ -138,7 +144,7 @@ impl WebApi {
         }
     }
 
-    /// Send a request with a empty JSON object, throw away the response body.
+    /// Send a request with an empty JSON object, throw away the response body.
     /// Use for POST/PUT/DELETE requests.
     fn send_empty_json(&self, request: &RequestBuilder) -> Result<(), Error> {
         Self::with_retry(|| self.request(request)).map(|_| ())
@@ -1544,7 +1550,7 @@ struct RequestBuilder {
 }
 
 impl RequestBuilder {
-    // By default we use https and the api.spotify.com
+    // By default, we use https and the api.spotify.com
     fn new(path: impl Display, method: Method, body: Option<serde_json::Value>) -> Self {
         Self {
             protocol: "https".to_string(),
