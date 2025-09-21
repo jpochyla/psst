@@ -12,6 +12,8 @@ use crate::{
     session::{access_token::TokenProvider, SessionService},
     util::default_ureq_agent_builder,
 };
+use crate::session::login5::Login5Manager;
+use crate::session::spclient::SpClient;
 
 pub type CdnHandle = Arc<Cdn>;
 
@@ -19,6 +21,8 @@ pub struct Cdn {
     session: SessionService,
     agent: ureq::Agent,
     token_provider: TokenProvider,
+    login5: Login5Manager,
+    spclient: SpClient,
 }
 
 impl Cdn {
@@ -28,6 +32,8 @@ impl Cdn {
             session,
             agent: agent.into(),
             token_provider: TokenProvider::new(),
+            login5: Login5Manager::new(proxy_url),
+            spclient: SpClient::new(proxy_url),
         }))
     }
 
@@ -36,7 +42,7 @@ impl Cdn {
             "https://api.spotify.com/v1/storage-resolve/files/audio/interactive/{}",
             id.to_base16()
         );
-        let access_token = self.token_provider.get(&self.session)?;
+        let access_token = self.login5.auth_token(&self.session, &self.spclient)?;
         let response = self
             .agent
             .get(&locations_uri)
@@ -44,7 +50,7 @@ impl Cdn {
             .query("product", "9")
             .query("platform", "39")
             .query("alt", "json")
-            .header("Authorization", &format!("Bearer {}", access_token.token))
+            .header("Authorization", &format!("Bearer {}", access_token.access_token))
             .call()?;
 
         #[derive(Deserialize)]
