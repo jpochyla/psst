@@ -1,6 +1,9 @@
 pub mod access_token;
 pub mod audio_key;
 pub mod mercury;
+pub mod login5;
+pub mod spclient;
+pub mod token;
 
 use std::{
     io,
