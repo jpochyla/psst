@@ -10,7 +10,7 @@ use byteorder::{BigEndian, ByteOrder};
 use librespot_protocol::login5::login_response::Response;
 use librespot_protocol::{
     client_info::ClientInfo,
-    credentials::{Password, StoredCredential},
+    credentials::{StoredCredential},
     hashcash::HashcashSolution,
     login5::{
         login_request::Login_method, ChallengeSolution, LoginError, LoginOk, LoginRequest,
@@ -22,10 +22,8 @@ use protobuf::well_known_types::duration::Duration as ProtoDuration;
 use protobuf::{Message, MessageField};
 use sha1::{Digest, Sha1};
 use std::fmt::Formatter;
-use std::ops::Deref;
 use std::time::{Duration, Instant};
-use std::{error, fmt};
-use ureq::Body;
+use std::{error, fmt, thread};
 
 const MAX_LOGIN_TRIES: u8 = 3;
 const LOGIN_TIMEOUT: Duration = Duration::from_secs(3);
@@ -42,7 +40,6 @@ enum Login5Error {
     CodeChallenge,
     NoStoredCredentials,
     RetriesFailed(u8),
-    OnlyForMobile,
 }
 
 impl error::Error for Login5Error {}
@@ -62,9 +59,6 @@ impl fmt::Display for Login5Error {
             Login5Error::RetriesFailed(u8) => {
                 write!(f, "Couldn't successfully authenticate after {:?} times", u8)
             }
-            Login5Error::OnlyForMobile => {
-                write!(f, "Login via login5 is only allowed for android or ios")
-            }
         }
     }
 }
@@ -73,7 +67,6 @@ impl From<Login5Error> for Error {
     fn from(err: Login5Error) -> Self {
         match err {
             Login5Error::NoStoredCredentials => Error::InvalidStateError(err.into()),
-            Login5Error::OnlyForMobile => Error::UnimplementedError(err.into()),
             Login5Error::RetriesFailed(_) | Login5Error::FaultyRequest(_) => {
                 Error::InvalidStateError(err.into())
             }
@@ -103,7 +96,6 @@ impl Login5Manager {
     }
 
     fn request(&self, spclient: &SpClient, message: &LoginRequest) -> Result<Vec<u8>, Error> {
-        //self.session().spclient().client_token().await?;
         let client_token: String = spclient.client_token()?;
         let body = message.write_to_bytes()?;
 
@@ -146,8 +138,7 @@ impl Login5Manager {
                 match message.error() {
                     LoginError::TIMEOUT | LoginError::TOO_MANY_ATTEMPTS => {
                         log::debug!("Too many login5 requests... timeout!");
-
-                        // TODO: timeout of 3 seconds
+                        thread::sleep(LOGIN_TIMEOUT)
                     }
                     others => {
                         log::debug!("Login5 request failed!");
@@ -170,42 +161,6 @@ impl Login5Manager {
         }
     }
 
-    /// Login for android and ios
-    ///
-    /// This request doesn't require a connected session as it is the entrypoint for android or ios
-    ///
-    /// This request will only work when:
-    /// - client_id => android or ios | can be easily adjusted in [SessionConfig::default_for_os]
-    /// - user-agent => android or ios | has to be adjusted in [HttpClient::new](crate::http_client::HttpClient::new)
-    pub fn login(
-        &self,
-        id: impl Into<String> + fmt::Debug,
-        password: impl Into<String> + fmt::Debug,
-    ) -> Result<(Token, Vec<u8>), Error> {
-        log::debug!("Wanting to log in with {id:?} and {password:?}");
-        Err(Login5Error::OnlyForMobile.into())
-        /*
-        if !matches!(OS, "android" | "ios") {
-            // by manipulating the user-agent and client-id it can be also used/tested on desktop
-            return Err(Login5Error::OnlyForMobile.into());
-        }
-
-        let method = Login_method::Password(Password {
-            id: id.into(),
-            password: password.into(),
-            ..Default::default()
-        });
-
-        let token_response = self.login5_request(method)?;
-        let auth_token = Self::token_from_login(
-            token_response.access_token,
-            token_response.access_token_expires_in,
-        );
-
-        Ok((auth_token, token_response.stored_credential))
-         */
-    }
-
     /// Retrieve the access_token via login5
     ///
     /// This request will only work when the store credentials match the client-id. Meaning that
@@ -225,9 +180,15 @@ impl Login5Manager {
         }
 
         if let Some(auth_token) = &*cur_token {
-            // auth token expired check
-            return Ok(auth_token.clone());
+            if (auth_token.is_expired()) {
+                *cur_token = None;
+                log::debug!("Auth token expired");
+            } else {
+                return Ok(auth_token.clone());
+            }
         }
+
+        log::debug!("Requesting new auth token");
 
         let method = Login_method::StoredCredential(StoredCredential {
             username: login_creds.username.clone().unwrap(),
@@ -243,7 +204,7 @@ impl Login5Manager {
 
         *cur_token = Some(auth_token);
 
-        log::trace!("Got auth token: {:?}", self.auth_token);
+        log::trace!("Got auth token: {:?}", *cur_token);
 
         (*cur_token)
             .clone()

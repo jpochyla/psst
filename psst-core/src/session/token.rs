@@ -1,4 +1,8 @@
+// Ported from librespot
+
 use std::time::{Duration, Instant};
+
+const EXPIRY_THRESHOLD: Duration = Duration::from_secs(10);
 
 #[derive(Clone, Debug)]
 pub struct Token {
@@ -14,4 +18,10 @@ pub struct Token {
 pub enum TokenType {
     AuthToken,
     ClientToken,
+}
+
+impl Token {
+    pub fn is_expired(&self) -> bool {
+        self.timestamp + (self.expires_in.saturating_sub(EXPIRY_THRESHOLD)) < Instant::now()
+    }
 }

@@ -49,11 +49,15 @@ impl SpClient {
         let mut cur_client_token = self.client_token.lock();
 
         if let Some(client_token) = &*cur_client_token {
-            // TODO: if is token expired, set it to None and re-acquire it
-            return Ok(client_token.access_token.clone());
+            if (client_token.is_expired()) {
+                *cur_client_token = None;
+                log::debug!("Client token expired");
+            } else {
+                return Ok(client_token.access_token.clone());
+            }
         }
 
-        log::debug!("Client token unavailable or expired, requesting new token.");
+        log::debug!("Requesting new token.");
 
         let mut request = ClientTokenRequest::new();
         request.request_type = ClientTokenRequestType::REQUEST_CLIENT_DATA_REQUEST.into();
