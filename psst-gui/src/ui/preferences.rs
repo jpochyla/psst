@@ -1,6 +1,8 @@
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
-use std::thread::{self, JoinHandle};
-use std::time::Duration;
+use std::{
+    net::{IpAddr, Ipv4Addr, SocketAddr},
+    thread::{self, JoinHandle},
+    time::Duration,
+};
 
 use crate::{
     cmd,
@@ -582,8 +584,7 @@ impl Authenticate {
                 .map_err(|e| e.to_string())?;
 
                 // Exchange code for access and refresh tokens
-                let (access, refresh) =
-                    oauth::exchange_code_for_token_with_refresh(8888, code, pkce_verifier);
+                let (access, refresh) = oauth::exchange_code_for_token(8888, code, pkce_verifier);
 
                 // Try to authenticate with token, with retries
                 let mut retries = 3;
@@ -639,13 +640,7 @@ impl Authenticate {
 
 fn logout_and_reset(ctx: &mut EventCtx, data: &mut AppState) {
     data.config.clear_credentials();
-    data.config.clear_oauth_tokens();
-    data.config.save();
-    // Clear OAuth tokens for session and Web API.
-    data.session.set_oauth_bearer(None);
-    data.session.set_oauth_refresh_token(None);
-    crate::webapi::WebApi::global().set_oauth_bearer(None);
-    crate::webapi::WebApi::global().set_oauth_refresh_token(None);
+    crate::token_utils::TokenUtils::clear_all(&data.session, &mut data.config, true);
     data.session.shutdown();
     ctx.submit_command(cmd::CLOSE_ALL_WINDOWS);
     ctx.submit_command(cmd::SHOW_ACCOUNT_SETUP);
@@ -728,23 +723,33 @@ impl<W: Widget<AppState>> Controller<AppState, W> for Authenticate {
                 let result = cmd.get_unchecked(Self::SPOTIFY_RESPONSE);
                 match result {
                     Ok((credentials, token, refresh)) => {
-                        // Provide Web API with the OAuth token directly (avoid keymaster dependency).
-                        crate::webapi::WebApi::global().set_oauth_bearer(Some(token.clone()));
-                        // Optionally persist refresh token for later use.
-                        if let Some(r) = refresh.clone() {
-                            data.config.oauth_refresh_token = Some(r);
-                        }
-                        // Also inform the core session for token-based requests.
-                        data.session.set_oauth_bearer(Some(token.clone()));
+                        log::info!(
+                            "OAuth: Spotify auth response success (access_token_present={}, refresh_token_present={})",
+                            !token.is_empty(),
+                            refresh.as_ref().is_some()
+                        );
+                        // Apply and persist tokens atomically (runtime + config) to keep
+                        // Session/WebApi in sync.
+                        log::info!(
+                            "OAuth: installing tokens into Session/WebApi and persisting to Config"
+                        );
+                        crate::token_utils::TokenUtils::apply_and_persist(
+                            &data.session,
+                            &mut data.config,
+                            Some(token.clone()),
+                            refresh.clone(),
+                            /* clear_refresh_if_none = */ false,
+                            /* save = */ false,
+                        );
                         // Update session config with the new credentials
+                        log::info!("OAuth: updating session config with new credentials");
                         data.session.update_config(SessionConfig {
                             login_creds: credentials.clone(),
                             proxy_url: Config::proxy(),
                         });
                         data.config.store_credentials(credentials.clone());
-                        data.config.oauth_bearer = Some(token.clone());
-                        data.config.oauth_refresh_token = refresh.clone();
                         data.config.save();
+                        log::info!("OAuth: config saved and tokens applied");
                         data.preferences.auth.result.resolve((), ());
                         // Handle UI flow based on tab type
                         if matches!(self.tab, AccountTab::FirstSetup) {
@@ -753,6 +758,7 @@ impl<W: Widget<AppState>> Controller<AppState, W> for Authenticate {
                         }
                     }
                     Err(err) => {
+                        log::warn!("OAuth: Spotify authentication failed: {}", err);
                         data.preferences.auth.result.reject((), err.clone());
                     }
                 }

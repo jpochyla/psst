@@ -6,16 +6,17 @@ mod controller;
 mod data;
 mod delegate;
 mod error;
+mod token_utils;
 mod ui;
 mod webapi;
 mod widget;
 
 use druid::AppLauncher;
 use env_logger::{Builder, Env};
+use token_utils::TokenUtils;
 use webapi::WebApi;
 
-use psst_core::cache::Cache;
-use psst_core::oauth::refresh_access_token;
+use psst_core::{cache::Cache, oauth::refresh_access_token};
 
 use crate::{
     data::{AppState, Config},
@@ -58,29 +59,28 @@ fn main() {
     )
     .install_as_global();
 
-    // Apply persisted OAuth bearer if present; otherwise try refresh once if a refresh token exists.
-    if let Some(tok) = state.config.oauth_bearer.clone() {
-        state.session.set_oauth_bearer(Some(tok.clone()));
-        WebApi::global().set_oauth_bearer(Some(tok));
-        if let Some(rtok) = state.config.oauth_refresh_token.clone() {
-            state.session.set_oauth_refresh_token(Some(rtok.clone()));
-            WebApi::global().set_oauth_refresh_token(Some(rtok));
-        }
-    } else if let Some(rtok) = state.config.oauth_refresh_token.clone() {
-        match refresh_access_token(&rtok) {
-            Ok((new_access, new_refresh)) => {
-                state.session.set_oauth_bearer(Some(new_access.clone()));
-                WebApi::global().set_oauth_bearer(Some(new_access.clone()));
-                state.config.oauth_bearer = Some(new_access);
-                if let Some(r) = new_refresh {
-                    state.config.oauth_refresh_token = Some(r);
-                }
-                state.config.save();
+    if let Some(refresh_token) = state.config.oauth_refresh_token.clone() {
+        match refresh_access_token(&refresh_token) {
+            Ok((access_token, maybe_refresh_token)) => {
+                TokenUtils::apply_refresh_result(
+                    &state.session,
+                    &mut state.config,
+                    access_token,
+                    maybe_refresh_token,
+                    true,
+                );
             }
             Err(e) => {
-                log::warn!("Failed to refresh OAuth token: {e}");
+                log::warn!(
+                    "Failed to refresh OAuth token at startup: {e}. Falling back to persisted access token if any."
+                );
+                // Install tokens from config into runtime holders as-is
+                TokenUtils::install_from_config(&state.session, &state.config);
             }
         }
+    } else {
+        // No refresh token; install any persisted tokens as-is
+        TokenUtils::install_from_config(&state.session, &state.config);
     }
 
     let delegate;

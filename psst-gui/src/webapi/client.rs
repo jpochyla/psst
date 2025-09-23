@@ -123,47 +123,46 @@ impl WebApi {
                 .send_json(request.get_body()),
         };
 
-        let mut response = match call(&token) {
+        let response = match call(&token) {
             Ok(resp) => resp,
-            Err(err) => return Err(Error::WebApiError(err.to_string())),
-        };
-
-        // If unauthorized/forbidden, refresh once (if possible) and retry.
-        if matches!(
-            response.status(),
-            StatusCode::UNAUTHORIZED | StatusCode::FORBIDDEN
-        ) {
-            if let Some(rtok) = self.oauth_refresh_token.lock().clone() {
-                if let Ok((new_access, new_refresh)) = refresh_access_token(&rtok) {
-                    *self.oauth_bearer.lock() = Some(new_access.clone());
-                    if let Some(r) = new_refresh {
-                        *self.oauth_refresh_token.lock() = Some(r);
+            Err(ureq::Error::StatusCode(code)) if code == 401 || code == 403 => {
+                if let Some(rtok) = self.oauth_refresh_token.lock().clone() {
+                    if let Ok((new_access, new_refresh)) = refresh_access_token(&rtok) {
+                        *self.oauth_bearer.lock() = Some(new_access.clone());
+                        if let Some(r) = new_refresh {
+                            *self.oauth_refresh_token.lock() = Some(r);
+                        }
+                        call(&new_access)?
+                    } else {
+                        return Err(Error::WebApiError("Failed to refresh token".to_string()));
                     }
-                    response = match call(&new_access) {
-                        Ok(resp) => resp,
-                        Err(err) => return Err(Error::WebApiError(err.to_string())),
-                    };
+                } else {
+                    return Err(Error::WebApiError("Missing refresh token".to_string()));
                 }
             }
-        }
+            Err(err) => return Err(Error::WebApiError(err.to_string())),
+        };
 
         Ok(response)
     }
 
     fn with_retry(f: impl Fn() -> Result<Response<Body>, Error>) -> Result<Response<Body>, Error> {
         loop {
-            let response = f()?;
-            match response.status() {
-                StatusCode::TOO_MANY_REQUESTS => {
-                    let retry_after_secs = response
-                        .headers()
-                        .get("Retry-After")
-                        .and_then(|secs| secs.to_str().ok());
-                    let secs = retry_after_secs.unwrap_or("2").parse::<u64>().unwrap_or(2);
-                    thread::sleep(Duration::from_secs(secs));
+            match f() {
+                Ok(response) => {
+                    if response.status() == StatusCode::TOO_MANY_REQUESTS {
+                        let retry_after_secs = response
+                            .headers()
+                            .get("Retry-After")
+                            .and_then(|secs| secs.to_str().ok());
+                        let secs = retry_after_secs.unwrap_or("2").parse::<u64>().unwrap_or(2);
+                        thread::sleep(Duration::from_secs(secs));
+                        continue;
+                    }
+                    return Ok(response);
                 }
-                _ => {
-                    break Ok(response);
+                Err(err) => {
+                    return Err(err);
                 }
             }
         }
@@ -172,7 +171,7 @@ impl WebApi {
     /// Send a request with a empty JSON object, throw away the response body.
     /// Use for POST/PUT/DELETE requests.
     fn send_empty_json(&self, request: &RequestBuilder) -> Result<(), Error> {
-        Self::with_retry(|| self.request(request)).map(|_| ())
+        self.request(request).map(|_| ())
     }
 
     /// Send a request and return the deserialized JSON body.  Use for GET

@@ -5,9 +5,11 @@ use std::{
 };
 
 use serde::Deserialize;
+use ureq::http::StatusCode;
 
 use crate::{
-    error::Error, item_id::FileId, session::SessionService, util::default_ureq_agent_builder,
+    error::Error, item_id::FileId, oauth::refresh_access_token, session::SessionService,
+    util::default_ureq_agent_builder,
 };
 
 pub type CdnHandle = Arc<Cdn>;
@@ -32,20 +34,41 @@ impl Cdn {
             id.to_base16()
         );
         // OAuth-only: requires a browser OAuth bearer; no Keymaster fallback for CDN.
-        let bearer = self
+        let mut access_token = self
             .session
             .oauth_bearer()
             .ok_or_else(|| Error::OAuthError("OAuth access token required".to_string()))?;
 
-        let response = self
-            .agent
-            .get(&locations_uri)
-            .query("version", "10000000")
-            .query("product", "9")
-            .query("platform", "39")
-            .query("alt", "json")
-            .header("Authorization", &format!("Bearer {}", bearer))
-            .call()?;
+        let call = |token: &str| {
+            self.agent
+                .get(&locations_uri)
+                .query("version", "10000000")
+                .query("product", "9")
+                .query("platform", "39")
+                .query("alt", "json")
+                .header("Authorization", &format!("Bearer {}", token))
+                .call()
+        };
+
+        // First attempt; if unauthorized/forbidden, refresh access token and retry once.
+        let response = match call(&access_token) {
+            Ok(r) => r,
+            Err(ureq::Error::StatusCode(code)) if code == 401 || code == 403 => {
+                let Some(refresh_token) = self.session.oauth_refresh_token() else {
+                    return Err(Error::OAuthError("Missing refresh token".into()));
+                };
+                let (new_access, new_refresh) = refresh_access_token(&refresh_token)
+                    .map_err(|_| Error::OAuthError("Failed to refresh token".into()))?;
+                // Update session tokens so future requests use the fresh token
+                self.session.set_oauth_bearer(Some(new_access.clone()));
+                if let Some(r) = new_refresh {
+                    self.session.set_oauth_refresh_token(Some(r));
+                }
+                access_token = new_access;
+                call(&access_token)?
+            }
+            Err(e) => return Err(Error::AudioFetchingError(Box::new(e))),
+        };
 
         #[derive(Deserialize)]
         struct AudioFileLocations {
@@ -54,15 +77,10 @@ impl Cdn {
 
         // Deserialize the response and pick a file URL from the returned CDN list.
         let locations: AudioFileLocations = response.into_body().read_json()?;
-        let file_uri = locations
-            .cdnurl
-            .into_iter()
-            // TODO:
-            //  Now, we always pick the first URL in the list, figure out a better strategy.
-            //  Choosing by random seems wrong.
-            .next()
-            // TODO: Avoid panicking here.
-            .expect("No file URI found");
+        let file_uri = match locations.cdnurl.into_iter().next() {
+            Some(uri) => uri,
+            None => return Err(Error::UnexpectedResponse),
+        };
 
         let uri = CdnUrl::new(file_uri);
         Ok(uri)
@@ -74,14 +92,25 @@ impl Cdn {
         offset: u64,
         length: u64,
     ) -> Result<(u64, impl Read), Error> {
-        let response = self
+        let req = self
             .agent
             .get(uri)
-            .header("Range", &range_header(offset, length))
-            .call()?;
-        let total_length = parse_total_content_length(&response);
-        let data_reader = response.into_body().into_reader();
-        Ok((total_length, data_reader))
+            .header("Range", &range_header(offset, length));
+        match req.call() {
+            Ok(response) => {
+                let status = response.status();
+                if status != StatusCode::PARTIAL_CONTENT {
+                    return Err(Error::HttpStatus(status.as_u16()));
+                }
+                let total_length = parse_total_content_length(&response)?;
+                let data_reader = response.into_body().into_reader();
+                Ok((total_length, data_reader))
+            }
+            Err(e) => match e {
+                ureq::Error::StatusCode(code) => Err(Error::HttpStatus(code)),
+                other => Err(Error::AudioFetchingError(Box::new(other))),
+            },
+        }
     }
 }
 
@@ -128,18 +157,26 @@ fn range_header(offfset: u64, length: u64) -> String {
 ///
 /// For example, returns 146515 for a response with header
 /// "Content-Range: bytes 0-1023/146515".
-fn parse_total_content_length(response: &ureq::http::response::Response<ureq::Body>) -> u64 {
-    response
-        .headers()
-        .get("Content-Range")
-        .expect("Content-Range header not found")
-        .to_str()
-        .expect("Failed to parse Content-Range Header")
-        .split('/')
-        .next_back()
-        .expect("Failed to parse Content-Range Header")
-        .parse()
-        .expect("Failed to parse Content-Range Header")
+fn parse_total_content_length(
+    response: &ureq::http::response::Response<ureq::Body>,
+) -> Result<u64, Error> {
+    let header = match response.headers().get("Content-Range") {
+        Some(h) => h,
+        None => return Err(Error::UnexpectedResponse),
+    };
+    let s = match header.to_str() {
+        Ok(s) => s,
+        Err(_) => return Err(Error::UnexpectedResponse),
+    };
+    let total_str = match s.split('/').next_back() {
+        Some(x) => x,
+        None => return Err(Error::UnexpectedResponse),
+    };
+    let total = match total_str.parse::<u64>() {
+        Ok(n) => n,
+        Err(_) => return Err(Error::UnexpectedResponse),
+    };
+    Ok(total)
 }
 
 /// Parses an expiration of an audio file URL.

@@ -223,11 +223,6 @@ impl Config {
         self.credentials = Default::default();
     }
 
-    pub fn clear_oauth_tokens(&mut self) {
-        self.oauth_bearer = None;
-        self.oauth_refresh_token = None;
-    }
-
     pub fn username(&self) -> Option<&str> {
         self.credentials
             .as_ref()
