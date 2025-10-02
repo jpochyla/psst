@@ -16,7 +16,6 @@ rustfm-scrobble = "1.1.1"
 # Login5 dependencies
 librespot-protocol = "0.7.1"
 protobuf = "3"
-uuid = { version = "1.18.1", features = ["v4"] }
 sysinfo = "0.35.0"
 data-encoding = "2.9"
 

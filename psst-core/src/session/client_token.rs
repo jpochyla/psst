@@ -1,9 +1,8 @@
 // Ported from librespot
 
 use crate::error::Error;
-use crate::session::login5::Login5Manager;
 use crate::session::token::{Token, TokenType};
-use crate::util::default_ureq_agent_builder;
+use crate::util::{default_ureq_agent_builder, solve_hash_cash};
 use data_encoding::HEXUPPER_PERMISSIVE;
 use librespot_protocol::clienttoken_http::{
     ChallengeAnswer, ChallengeType, ClientTokenRequest, ClientTokenRequestType,
@@ -12,27 +11,22 @@ use librespot_protocol::clienttoken_http::{
 use parking_lot::Mutex;
 use protobuf::{Enum, Message};
 use std::time::{Duration, Instant};
+use crate::system_info::{CLIENT_ID, DEVICE_ID, SPOTIFY_SEMANTIC_VERSION};
 
-/// The semantic version of the Spotify desktop client.
-pub const SPOTIFY_SEMANTIC_VERSION: &str = "1.2.52.442";
-
-/// Client ID for desktop keymaster client
-pub const KEYMASTER_CLIENT_ID: &str = "65b708073fc0480ea92a077233ca87bd";
-
-pub struct SpClient {
-    client_token: Mutex<Option<Token>>,
+pub struct ClientTokenProvider {
+    token: Mutex<Option<Token>>,
     agent: ureq::Agent,
 }
 
-impl SpClient {
+impl ClientTokenProvider {
     pub fn new(proxy_url: Option<&str>) -> Self {
         Self {
-            client_token: Mutex::new(None),
+            token: Mutex::new(None),
             agent: default_ureq_agent_builder(proxy_url).build().into(),
         }
     }
 
-    fn client_token_request<M: Message>(&self, message: &M) -> Result<Vec<u8>, Error> {
+    fn request<M: Message>(&self, message: &M) -> Result<Vec<u8>, Error> {
         let body = message.write_to_bytes()?;
 
         let mut response = self
@@ -45,19 +39,8 @@ impl SpClient {
         Ok(vec?)
     }
 
-    pub fn client_token(&self) -> Result<String, Error> {
-        let mut cur_client_token = self.client_token.lock();
-
-        if let Some(client_token) = &*cur_client_token {
-            if (client_token.is_expired()) {
-                *cur_client_token = None;
-                log::debug!("Client token expired");
-            } else {
-                return Ok(client_token.access_token.clone());
-            }
-        }
-
-        log::debug!("Requesting new token.");
+    fn request_new_token(&self) -> Result<Token, Error> {
+        log::debug!("Requesting new token...");
 
         let mut request = ClientTokenRequest::new();
         request.request_type = ClientTokenRequestType::REQUEST_CLIENT_DATA_REQUEST.into();
@@ -65,10 +48,10 @@ impl SpClient {
         let client_data = request.mut_client_data();
 
         client_data.client_version = SPOTIFY_SEMANTIC_VERSION.into();
-        client_data.client_id = KEYMASTER_CLIENT_ID.into();
+        client_data.client_id = CLIENT_ID.into();
 
         let connectivity_data = client_data.mut_connectivity_sdk_data();
-        connectivity_data.device_id = uuid::Uuid::new_v4().as_hyphenated().to_string();
+        connectivity_data.device_id = DEVICE_ID.to_string();
 
         let platform_data = connectivity_data
             .platform_specific_data
@@ -129,7 +112,7 @@ impl SpClient {
             }
         }
 
-        let mut response = self.client_token_request(&request)?;
+        let mut response = self.request(&request)?;
         let mut count = 0;
         const MAX_TRIES: u8 = 3;
 
@@ -164,8 +147,7 @@ impl SpClient {
                         let length = hash_cash_challenge.length;
 
                         let mut suffix = [0u8; 0x10];
-                        let answer =
-                            Login5Manager::solve_hash_cash(&ctx, &prefix, length, &mut suffix);
+                        let answer = solve_hash_cash(&ctx, &prefix, length, &mut suffix);
 
                         match answer {
                             Ok(_) => {
@@ -188,7 +170,7 @@ impl SpClient {
                                 challenge_answers.answers.push(challenge_answer);
 
                                 log::trace!("Answering hash cash challenge");
-                                match self.client_token_request(&answer_message) {
+                                match self.request(&answer_message) {
                                     Ok(token) => {
                                         response = token;
                                         continue;
@@ -204,7 +186,7 @@ impl SpClient {
                         }
 
                         if count < MAX_TRIES {
-                            response = self.client_token_request(&request)?;
+                            response = self.request(&request)?;
                         } else {
                             return Err(Error::InvalidStateError(
                                 format!("Unable to solve any of {MAX_TRIES} hash cash challenges")
@@ -232,7 +214,7 @@ impl SpClient {
         let granted_token = token_response.granted_token();
         let access_token = granted_token.token.to_owned();
 
-        let client_token = Token {
+        Ok(Token {
             access_token: access_token.clone(),
             expires_in: Duration::from_secs(
                 granted_token
@@ -248,12 +230,25 @@ impl SpClient {
                 .map(|d| d.domain.clone())
                 .collect(),
             timestamp: Instant::now(),
-        };
+        })
+    }
 
-        *cur_client_token = Some(client_token);
+    pub fn get(&self) -> Result<String, Error> {
+        // Check for cached token availability, else retrieve fresh token
+        let mut cur_token = self.token.lock();
 
-        log::trace!("Got client token: {granted_token:?}");
+        if let Some(token) = &*cur_token {
+            if !token.is_expired() {
+                return Ok(token.access_token.clone());
+            }
 
-        Ok(access_token)
+            *cur_token = None;
+            log::debug!("Client token expired");
+        }
+
+        let new_token = self.request_new_token()?;
+
+        *cur_token = Some(new_token.clone());
+        Ok(new_token.access_token)
     }
 }

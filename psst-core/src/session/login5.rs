@@ -1,38 +1,31 @@
 // Ported from librespot
 
 use crate::error::Error;
-use crate::session::spclient::SpClient;
+use crate::session::client_token::ClientTokenProvider;
 use crate::session::token::Token;
 use crate::session::token::TokenType::AuthToken;
 use crate::session::SessionService;
-use crate::util::default_ureq_agent_builder;
-use byteorder::{BigEndian, ByteOrder};
+use crate::util::{default_ureq_agent_builder, solve_hash_cash};
 use librespot_protocol::login5::login_response::Response;
 use librespot_protocol::{
     client_info::ClientInfo,
     credentials::{StoredCredential},
     hashcash::HashcashSolution,
     login5::{
-        login_request::Login_method, ChallengeSolution, LoginError, LoginOk, LoginRequest,
+        login_request::Login_method, ChallengeSolution, LoginError, LoginRequest,
         LoginResponse,
     },
 };
 use parking_lot::Mutex;
 use protobuf::well_known_types::duration::Duration as ProtoDuration;
 use protobuf::{Message, MessageField};
-use sha1::{Digest, Sha1};
 use std::fmt::Formatter;
 use std::time::{Duration, Instant};
 use std::{error, fmt, thread};
+use crate::system_info::{CLIENT_ID, DEVICE_ID};
 
 const MAX_LOGIN_TRIES: u8 = 3;
 const LOGIN_TIMEOUT: Duration = Duration::from_secs(3);
-
-/// Client ID for desktop keymaster client
-pub const CLIENT_ID: &str = "65b708073fc0480ea92a077233ca87bd";
-
-// Device ID used for authentication message.
-const DEVICE_ID: &str = "Psst";
 
 #[derive(Debug)]
 enum Login5Error {
@@ -51,10 +44,10 @@ impl fmt::Display for Login5Error {
                 write!(f, "Login request was denied {:?}", e)
             }
             Login5Error::CodeChallenge => {
-                write!(f, "Code challenge is not supported")
+                write!(f, "Login5 code challenge is not supported")
             }
             Login5Error::NoStoredCredentials => {
-                write!(f, "Tried to acquire token without stored credentials")
+                write!(f, "Tried to acquire access token without stored credentials")
             }
             Login5Error::RetriesFailed(u8) => {
                 write!(f, "Couldn't successfully authenticate after {:?} times", u8)
@@ -66,8 +59,7 @@ impl fmt::Display for Login5Error {
 impl From<Login5Error> for Error {
     fn from(err: Login5Error) -> Self {
         match err {
-            Login5Error::NoStoredCredentials => Error::InvalidStateError(err.into()),
-            Login5Error::RetriesFailed(_) | Login5Error::FaultyRequest(_) => {
+            Login5Error::NoStoredCredentials | Login5Error::RetriesFailed(_) | Login5Error::FaultyRequest(_) => {
                 Error::InvalidStateError(err.into())
             }
             Login5Error::CodeChallenge => Error::UnimplementedError(err.into()),
@@ -82,21 +74,31 @@ pub struct Login5Request {
     pub payload: Vec<Vec<u8>>,
 }
 
-pub struct Login5Manager {
+pub struct Login5 {
     auth_token: Mutex<Option<Token>>,
+    client_token_provider: ClientTokenProvider,
     agent: ureq::Agent,
 }
 
-impl Login5Manager {
-    pub fn new(proxy_url: Option<&str>) -> Self {
+impl Login5 {
+    /// Login5 instances can be used to cache and retrieve access tokens from stored credentials.
+    ///
+    /// # Arguments
+    ///
+    /// * `client_token_provider`: Can be optionally injected to control which client-id is
+    /// used for it.
+    ///
+    /// returns: Login5
+    pub fn new(client_token_provider: Option<ClientTokenProvider>, proxy_url: Option<&str>) -> Self {
         Self {
             auth_token: Mutex::new(None),
+            client_token_provider: client_token_provider.unwrap_or_else(|| ClientTokenProvider::new(proxy_url)),
             agent: default_ureq_agent_builder(proxy_url).build().into(),
         }
     }
 
-    fn request(&self, spclient: &SpClient, message: &LoginRequest) -> Result<Vec<u8>, Error> {
-        let client_token: String = spclient.client_token()?;
+    fn request(&self, message: &LoginRequest) -> Result<Vec<u8>, Error> {
+        let client_token: String = self.client_token_provider.get()?;
         let body = message.write_to_bytes()?;
 
         let mut response = self
@@ -110,7 +112,7 @@ impl Login5Manager {
         Ok(vec)
     }
 
-    fn login5_request(&self, spclient: &SpClient, login: Login_method) -> Result<LoginOk, Error> {
+    fn request_new_access_token(&self, login: Login_method) -> Result<Token, Error> {
         let mut login_request = LoginRequest {
             client_info: MessageField::some(ClientInfo {
                 client_id: String::from(CLIENT_ID),
@@ -121,7 +123,7 @@ impl Login5Manager {
             ..Default::default()
         };
 
-        let mut response = self.request(spclient, &login_request)?;
+        let mut response = self.request(&login_request)?;
         let mut count = 0;
 
         loop {
@@ -131,7 +133,14 @@ impl Login5Manager {
             log::debug!("Login5 attempt responded with {message:?}");
 
             if let Some(Response::Ok(ok)) = message.response {
-                break Ok(ok);
+                return Ok(Token {
+                    access_token: ok.access_token,
+                    expires_in: Duration::from_secs(ok.access_token_expires_in.try_into().unwrap_or(3600)),
+                    token_type: AuthToken,
+                    token_type_s: "Bearer".to_string(),
+                    scopes: vec![],
+                    timestamp: Instant::now(),
+                });
             }
 
             if message.has_error() {
@@ -154,61 +163,11 @@ impl Login5Manager {
             }
 
             if count < MAX_LOGIN_TRIES {
-                response = self.request(spclient, &login_request)?;
+                response = self.request(&login_request)?;
             } else {
                 return Err(Login5Error::RetriesFailed(MAX_LOGIN_TRIES).into());
             }
         }
-    }
-
-    /// Retrieve the access_token via login5
-    ///
-    /// This request will only work when the store credentials match the client-id. Meaning that
-    /// stored credentials generated with the keymaster client-id will not work, for example, with
-    /// the android client-id.
-    pub fn auth_token(
-        &self,
-        session: &SessionService,
-        spclient: &SpClient,
-    ) -> Result<Token, Error> {
-        let mut cur_token = self.auth_token.lock();
-
-        let login_creds = session.config.lock().as_ref().unwrap().login_creds.clone();
-        let auth_data = login_creds.auth_data.clone();
-        if auth_data.is_empty() {
-            return Err(Login5Error::NoStoredCredentials.into());
-        }
-
-        if let Some(auth_token) = &*cur_token {
-            if (auth_token.is_expired()) {
-                *cur_token = None;
-                log::debug!("Auth token expired");
-            } else {
-                return Ok(auth_token.clone());
-            }
-        }
-
-        log::debug!("Requesting new auth token");
-
-        let method = Login_method::StoredCredential(StoredCredential {
-            username: login_creds.username.clone().unwrap(),
-            data: auth_data,
-            ..Default::default()
-        });
-
-        let token_response = self.login5_request(spclient, method)?;
-        let auth_token = Self::token_from_login(
-            token_response.access_token,
-            token_response.access_token_expires_in,
-        );
-
-        *cur_token = Some(auth_token);
-
-        log::trace!("Got auth token: {:?}", *cur_token);
-
-        (*cur_token)
-            .clone()
-            .ok_or(Login5Error::NoStoredCredentials.into())
     }
 
     fn handle_challenges(
@@ -232,7 +191,7 @@ impl Login5Manager {
             let hash_cash_challenge = challenge.hashcash();
 
             let mut suffix = [0u8; 0x10];
-            let duration = Login5Manager::solve_hash_cash(
+            let duration = solve_hash_cash(
                 &message.login_context,
                 &hash_cash_challenge.prefix,
                 hash_cash_challenge.length,
@@ -265,56 +224,50 @@ impl Login5Manager {
         Ok(())
     }
 
-    fn token_from_login(token: String, expires_in: i32) -> Token {
-        Token {
-            access_token: token,
-            expires_in: Duration::from_secs(expires_in.try_into().unwrap_or(3600)),
-            token_type: AuthToken,
-            token_type_s: "Bearer".to_string(),
-            scopes: vec![],
-            timestamp: Instant::now(),
+    /// Retrieve an `access_token` via Login5. The token is either requested first (slow), or
+    /// retrieved from local cache (fast).
+    ///
+    /// This request will only work if the session already has valid credentials available.
+    /// The client-id of the credentials have to match the client-id used to retrieve
+    /// the client token (see also `Login5::new(...)`). For example, if you previously generated
+    /// stored credentials with an android client-id, they won't work within login5 using a desktop
+    /// client-id.
+    pub fn get_access_token(
+        &self,
+        session: &SessionService,
+    ) -> Result<Token, Error> {
+        let mut cur_token = self.auth_token.lock();
+
+        let login_creds = session.config.lock().as_ref().unwrap().login_creds.clone();
+        let auth_data = login_creds.auth_data.clone();
+        if auth_data.is_empty() {
+            return Err(Login5Error::NoStoredCredentials.into());
         }
-    }
 
-    // TODO: move solve_hash_cash to a better place
-    pub fn solve_hash_cash(
-        ctx: &[u8],
-        prefix: &[u8],
-        length: i32,
-        dst: &mut [u8],
-    ) -> Result<Duration, Error> {
-        // after a certain number of seconds, the challenge expires
-        const TIMEOUT: u64 = 5; // seconds
-        let now = Instant::now();
-
-        let md = Sha1::digest(ctx);
-
-        let mut counter: i64 = 0;
-        let target: i64 = BigEndian::read_i64(&md[12..20]);
-
-        let suffix = loop {
-            if now.elapsed().as_secs() >= TIMEOUT {
-                return Err(Error::InvalidStateError(
-                    format!("{TIMEOUT} seconds expired").into(),
-                ));
+        if let Some(auth_token) = &*cur_token {
+            if !auth_token.is_expired() {
+                return Ok(auth_token.clone());
             }
 
-            let suffix = [(target + counter).to_be_bytes(), counter.to_be_bytes()].concat();
+            *cur_token = None;
+            log::debug!("Auth token expired");
+        }
 
-            let mut hasher = Sha1::new();
-            hasher.update(prefix);
-            hasher.update(&suffix);
-            let md = hasher.finalize();
 
-            if BigEndian::read_i64(&md[12..20]).trailing_zeros() >= (length as u32) {
-                break suffix;
-            }
+        log::debug!("Requesting new auth token");
 
-            counter += 1;
-        };
+        // Conversion from psst protocol structs to librespot protocol structs
+        let method = Login_method::StoredCredential(StoredCredential {
+            username: login_creds.username.clone().unwrap(),
+            data: auth_data,
+            ..Default::default()
+        });
 
-        dst.copy_from_slice(&suffix);
+        let new_token = self.request_new_access_token(method)?;
 
-        Ok(now.elapsed())
+        log::debug!("Successfully requested new auth token");
+
+        *cur_token = Some(new_token.clone());
+        Ok(new_token)
     }
 }

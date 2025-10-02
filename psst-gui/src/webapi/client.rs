@@ -21,7 +21,7 @@ use parking_lot::Mutex;
 use serde::{de::DeserializeOwned, Deserialize};
 use serde_json::json;
 
-use psst_core::session::{access_token::TokenProvider, SessionService};
+use psst_core::session::{SessionService};
 use ureq::{
     http::{Response, StatusCode},
     Agent, Body,
@@ -41,16 +41,13 @@ use crate::{
 use super::{cache::WebApiCache, local::LocalTrackManager};
 use sanitize_html::rules::predefined::DEFAULT;
 use sanitize_html::sanitize_str;
-use psst_core::session::login5::Login5Manager;
-use psst_core::session::spclient::SpClient;
+use psst_core::session::login5::Login5;
 
 pub struct WebApi {
     session: SessionService,
     agent: Agent,
     cache: WebApiCache,
-    token_provider: TokenProvider,
-    login5: Login5Manager,
-    spclient: SpClient,
+    login5: Login5,
     local_track_manager: Mutex<LocalTrackManager>,
     paginated_limit: usize,
 }
@@ -71,9 +68,7 @@ impl WebApi {
             session,
             agent: agent.build().into(),
             cache: WebApiCache::new(cache_base),
-            token_provider: TokenProvider::new(),
-            login5: Login5Manager::new(proxy_url),
-            spclient: SpClient::new(proxy_url),
+            login5: Login5::new(None, proxy_url),
             local_track_manager: Mutex::new(LocalTrackManager::new()),
             paginated_limit,
         }
@@ -81,7 +76,7 @@ impl WebApi {
 
     fn access_token(&self) -> Result<String, Error> {
         self.login5
-            .auth_token(&self.session, &self.spclient)
+            .get_access_token(&self.session)
             .map_err(|err| Error::WebApiError(err.to_string()))
             .map(|t| t.access_token)
     }

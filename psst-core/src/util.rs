@@ -1,8 +1,9 @@
 use std::{io, io::SeekFrom, mem, time::Duration};
-
+use std::time::Instant;
+use byteorder::{BigEndian, ByteOrder};
 use num_traits::{One, WrappingAdd};
 use quick_protobuf::{BytesReader, MessageRead, MessageWrite, Writer};
-
+use sha1::{Digest, Sha1};
 use crate::error::Error;
 
 pub const NET_CONNECT_TIMEOUT: Duration = Duration::from_millis(8 * 1000);
@@ -24,6 +25,47 @@ pub fn default_ureq_agent_builder(
     }
 
     agent
+}
+
+pub fn solve_hash_cash(
+    ctx: &[u8],
+    prefix: &[u8],
+    length: i32,
+    dst: &mut [u8],
+) -> Result<Duration, Error> {
+    // after a certain number of seconds, the challenge expires
+    const TIMEOUT: u64 = 5; // seconds
+    let now = Instant::now();
+
+    let md = Sha1::digest(ctx);
+
+    let mut counter: i64 = 0;
+    let target: i64 = BigEndian::read_i64(&md[12..20]);
+
+    let suffix = loop {
+        if now.elapsed().as_secs() >= TIMEOUT {
+            return Err(Error::InvalidStateError(
+                format!("{TIMEOUT} seconds expired").into(),
+            ));
+        }
+
+        let suffix = [(target + counter).to_be_bytes(), counter.to_be_bytes()].concat();
+
+        let mut hasher = Sha1::new();
+        hasher.update(prefix);
+        hasher.update(&suffix);
+        let md = hasher.finalize();
+
+        if BigEndian::read_i64(&md[12..20]).trailing_zeros() >= (length as u32) {
+            break suffix;
+        }
+
+        counter += 1;
+    };
+
+    dst.copy_from_slice(&suffix);
+
+    Ok(now.elapsed())
 }
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord, Default)]
