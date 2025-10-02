@@ -86,7 +86,7 @@ impl Login5 {
     /// # Arguments
     ///
     /// * `client_token_provider`: Can be optionally injected to control which client-id is
-    /// used for it.
+    ///   used for it.
     ///
     /// returns: Login5
     pub fn new(client_token_provider: Option<ClientTokenProvider>, proxy_url: Option<&str>) -> Self {

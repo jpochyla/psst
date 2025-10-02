@@ -11,7 +11,7 @@ use librespot_protocol::clienttoken_http::{
 use parking_lot::Mutex;
 use protobuf::{Enum, Message};
 use std::time::{Duration, Instant};
-use crate::system_info::{CLIENT_ID, DEVICE_ID, SPOTIFY_SEMANTIC_VERSION};
+use crate::system_info::{CLIENT_ID, DEVICE_ID, OS, SPOTIFY_SEMANTIC_VERSION};
 
 pub struct ClientTokenProvider {
     token: Mutex<Option<Token>>,
@@ -60,8 +60,7 @@ impl ClientTokenProvider {
         let os_version = sysinfo::System::os_version().unwrap_or("0".into());
         let kernel_version = sysinfo::System::kernel_version().unwrap_or_else(|| String::from("0"));
 
-        // TODO: consider making this dynamic later
-        match "windows" {
+        match OS {
             "windows" => {
                 let os_version = os_version.parse::<f32>().unwrap_or(10.) as i32;
                 let kernel_version = kernel_version.parse::<i32>().unwrap_or(21370);
