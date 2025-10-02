@@ -8,16 +8,9 @@ const EXPIRY_THRESHOLD: Duration = Duration::from_secs(10);
 pub struct Token {
     pub access_token: String,
     pub expires_in: Duration,
-    pub token_type: TokenType,
-    pub token_type_s: String,
+    pub token_type: String,
     pub scopes: Vec<String>,
     pub timestamp: Instant,
-}
-
-#[derive(Clone, Debug)]
-pub enum TokenType {
-    AuthToken,
-    ClientToken,
 }
 
 impl Token {

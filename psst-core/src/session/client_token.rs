@@ -1,7 +1,7 @@
 // Ported from librespot
 
 use crate::error::Error;
-use crate::session::token::{Token, TokenType};
+use crate::session::token::{Token};
 use crate::util::{default_ureq_agent_builder, solve_hash_cash};
 use data_encoding::HEXUPPER_PERMISSIVE;
 use librespot_protocol::clienttoken_http::{
@@ -221,8 +221,7 @@ impl ClientTokenProvider {
                     .try_into()
                     .unwrap_or(7200),
             ),
-            token_type: TokenType::ClientToken,
-            token_type_s: "client-token".to_string(),
+            token_type: "client-token".to_string(),
             scopes: granted_token
                 .domains
                 .iter()

@@ -3,7 +3,6 @@
 use crate::error::Error;
 use crate::session::client_token::ClientTokenProvider;
 use crate::session::token::Token;
-use crate::session::token::TokenType::AuthToken;
 use crate::session::SessionService;
 use crate::util::{default_ureq_agent_builder, solve_hash_cash};
 use librespot_protocol::login5::login_response::Response;
@@ -136,8 +135,7 @@ impl Login5 {
                 return Ok(Token {
                     access_token: ok.access_token,
                     expires_in: Duration::from_secs(ok.access_token_expires_in.try_into().unwrap_or(3600)),
-                    token_type: AuthToken,
-                    token_type_s: "Bearer".to_string(),
+                    token_type: "Bearer".to_string(),
                     scopes: vec![],
                     timestamp: Instant::now(),
                 });
