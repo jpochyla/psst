@@ -129,8 +129,6 @@ impl Login5 {
             count += 1;
 
             let message = LoginResponse::parse_from_bytes(&response)?;
-            log::debug!("Login5 attempt responded with {message:?}");
-
             if let Some(Response::Ok(ok)) = message.response {
                 return Ok(Token {
                     access_token: ok.access_token,
