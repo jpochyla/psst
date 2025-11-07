@@ -91,6 +91,7 @@ pub fn preferences_widget() -> impl Widget<AppState> {
                 |state: &AppState, _| state.preferences.active,
                 |active, _, _| match active {
                     PreferencesTab::General => general_tab_widget().boxed(),
+                    PreferencesTab::Appearance => appearance_tab_widget().boxed(),
                     PreferencesTab::Account => {
                         account_tab_widget(AccountTab::InPreferences).boxed()
                     }
@@ -108,16 +109,20 @@ pub fn preferences_widget() -> impl Widget<AppState> {
             }
 
             // Propagate some flags further to the state.
-            if !old_data
-                .config
-                .show_track_cover
-                .same(&data.config.show_track_cover)
-            {
+            let track_cover_changed =
+                old_data.config.show_track_cover != data.config.show_track_cover;
+            let playlist_covers_changed =
+                old_data.config.show_playlist_images != data.config.show_playlist_images;
+            if track_cover_changed || playlist_covers_changed {
                 ctx.submit_command(PROPAGATE_FLAGS);
             }
         })
         .on_command(PROPAGATE_FLAGS, |_, (), data| {
-            data.common_ctx_mut().show_track_cover = data.config.show_track_cover;
+            let show_track_cover = data.config.show_track_cover;
+            let show_playlist_images = data.config.show_playlist_images;
+            let common = data.common_ctx_mut();
+            common.show_track_cover = show_track_cover;
+            common.show_playlist_images = show_playlist_images;
         })
         .scroll()
         .vertical()
@@ -138,6 +143,12 @@ fn tabs_widget() -> impl Widget<AppState> {
             "General",
             &icons::PREFERENCES,
             PreferencesTab::General,
+        ))
+        .with_default_spacer()
+        .with_child(tab_link_widget(
+            "Appearance",
+            &icons::PLAYLIST,
+            PreferencesTab::Appearance,
         ))
         .with_default_spacer()
         .with_child(tab_link_widget(
@@ -184,25 +195,6 @@ fn general_tab_widget() -> impl Widget<AppState> {
     let mut col = Flex::column()
         .cross_axis_alignment(CrossAxisAlignment::Start)
         .must_fill_main_axis(true);
-
-    // Theme
-    col = col
-        .with_child(Label::new("Theme").with_font(theme::UI_FONT_MEDIUM))
-        .with_spacer(theme::grid(2.0))
-        .with_child(
-            RadioGroup::column(vec![("Light", Theme::Light), ("Dark", Theme::Dark)])
-                .lens(AppState::config.then(Config::theme)),
-        );
-
-    col = col.with_spacer(theme::grid(1.5));
-
-    // Show track covers
-    col = col.with_child(
-        Checkbox::new("Show album covers for tracks")
-            .lens(AppState::config.then(Config::show_track_cover)),
-    );
-
-    col = col.with_spacer(theme::grid(3.0));
 
     // Audio quality
     col = col
@@ -273,6 +265,37 @@ fn general_tab_widget() -> impl Widget<AppState> {
                     )),
                 )
                 .lens(AppState::config.then(Config::paginated_limit)),
+        );
+
+    col
+}
+
+fn appearance_tab_widget() -> impl Widget<AppState> {
+    let mut col = Flex::column()
+        .cross_axis_alignment(CrossAxisAlignment::Start)
+        .must_fill_main_axis(true);
+
+    col = col
+        .with_child(Label::new("Theme").with_font(theme::UI_FONT_MEDIUM))
+        .with_spacer(theme::grid(2.0))
+        .with_child(
+            RadioGroup::column(vec![("Light", Theme::Light), ("Dark", Theme::Dark)])
+                .lens(AppState::config.then(Config::theme)),
+        );
+
+    col = col.with_spacer(theme::grid(3.0));
+
+    col = col
+        .with_child(Label::new("Artwork").with_font(theme::UI_FONT_MEDIUM))
+        .with_spacer(theme::grid(1.5))
+        .with_child(
+            Checkbox::new("Show album covers for tracks")
+                .lens(AppState::config.then(Config::show_track_cover)),
+        )
+        .with_spacer(theme::grid(1.0))
+        .with_child(
+            Checkbox::new("Show playlist cover images in sidebar")
+                .lens(AppState::config.then(Config::show_playlist_images)),
         );
 
     col

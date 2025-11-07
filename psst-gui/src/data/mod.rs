@@ -103,6 +103,7 @@ impl AppState {
             now_playing: None,
             library: Arc::clone(&library),
             show_track_cover: config.show_track_cover,
+            show_playlist_images: config.show_playlist_images,
             nav: Nav::Home,
         });
         let playback = Playback {
@@ -540,6 +541,7 @@ pub struct CommonCtx {
     pub now_playing: Option<Playable>,
     pub library: Arc<Library>,
     pub show_track_cover: bool,
+    pub show_playlist_images: bool,
     pub nav: Nav,
 }
 

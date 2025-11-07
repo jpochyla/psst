@@ -2,7 +2,9 @@ use std::{cell::RefCell, cmp::Ordering, rc::Rc, sync::Arc};
 
 use druid::{
     im::Vector,
-    widget::{Button, Either, Flex, Label, LensWrap, LineBreaking, List, TextBox},
+    widget::{
+        Button, CrossAxisAlignment, Either, Flex, Label, LensWrap, LineBreaking, List, TextBox,
+    },
     Insets, Lens, LensExt, LocalizedString, Menu, MenuItem, Selector, Size, UnitPoint, Widget,
     WidgetExt, WindowDesc,
 };
@@ -48,10 +50,27 @@ pub fn list_widget() -> impl Widget<AppState> {
         utils::spinner_widget,
         || {
             List::new(|| {
-                Label::raw()
+                let cover_size = theme::grid(3.0);
+                let cover = rounded_cover_widget(cover_size).lens(Ctx::data()).boxed();
+                let cover_with_spacing = Flex::row()
+                    .with_child(cover)
+                    .with_spacer(theme::grid(1.0))
+                    .boxed();
+                let cover_section = Either::new(
+                    |playlist: &WithCtx<Playlist>, _| playlist.ctx.show_playlist_images,
+                    cover_with_spacing,
+                    Empty.boxed(),
+                );
+
+                let title = Label::raw()
                     .with_line_break_mode(LineBreaking::WordWrap)
                     .with_text_size(theme::TEXT_SIZE_SMALL)
-                    .lens(Ctx::data().then(Playlist::name))
+                    .lens(Ctx::data().then(Playlist::name));
+
+                Flex::row()
+                    .cross_axis_alignment(CrossAxisAlignment::Center)
+                    .with_child(cover_section)
+                    .with_flex_child(title, 1.0)
                     .expand_width()
                     .padding(Insets::uniform_xy(theme::grid(2.0), theme::grid(0.6)))
                     .link()
