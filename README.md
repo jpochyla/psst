@@ -7,7 +7,7 @@ Contributions are welcome!
 
 **Note:** A Spotify Premium account is required.
 
-[![Build](https://github.com/jpochyla/psst/actions/workflows/build.yml/badge.svg)](https://github.com/jpochyla/psst/actions)
+[![CI](https://github.com/isaaclins/psst/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/isaaclins/psst/actions/workflows/build.yml)
 
 ![Screenshot](./psst-gui/assets/screenshot.png)
 
