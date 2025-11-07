@@ -100,6 +100,8 @@ fn main() {
         launcher = AppLauncher::with_window(window).configure_env(ui::theme::setup);
     };
 
+    WebApi::global().set_event_sink(launcher.get_external_handle());
+
     launcher
         .delegate(delegate)
         .launch(state)

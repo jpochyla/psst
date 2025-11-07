@@ -14,6 +14,7 @@ use crate::ui::DOWNLOAD_ARTWORK;
 use crate::{
     cmd,
     data::{AppState, Config},
+    token_utils::TokenUtils,
     ui,
     webapi::WebApi,
     widget::remote_image,
@@ -139,6 +140,7 @@ impl AppDelegate<AppState> for Delegate {
         data: &mut AppState,
         _env: &Env,
     ) -> Handled {
+        WebApi::global().set_event_sink(ctx.get_external_handle());
         if cmd.is(cmd::SHOW_CREDITS_WINDOW) {
             let _window_id = self.show_credits(ctx);
             if let Some(track) = cmd.get(cmd::SHOW_CREDITS_WINDOW) {
@@ -217,6 +219,15 @@ impl AppDelegate<AppState> for Delegate {
                     }
                 }
             }
+            Handled::Yes
+        } else if let Some((access, refresh)) = cmd.get(cmd::OAUTH_TOKENS_REFRESHED) {
+            TokenUtils::apply_refresh_result(
+                &data.session,
+                &mut data.config,
+                access.clone(),
+                refresh.clone(),
+                true,
+            );
             Handled::Yes
         } else {
             Handled::No

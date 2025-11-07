@@ -11,7 +11,7 @@ use std::{
 use druid::{
     im::Vector,
     image::{self, ImageFormat},
-    Data, ImageBuf,
+    Data, ExtEventSink, ImageBuf, Target,
 };
 
 use itertools::Itertools;
@@ -27,6 +27,7 @@ use ureq::{
 };
 
 use crate::{
+    cmd,
     data::{
         self, utils::sanitize_html_string, Album, AlbumType, Artist, ArtistAlbums, ArtistInfo,
         ArtistLink, ArtistStats, AudioAnalysis, Cached, Episode, EpisodeId, EpisodeLink, Image,
@@ -48,6 +49,7 @@ pub struct WebApi {
     oauth_bearer: Mutex<Option<String>>,
     oauth_refresh_token: Mutex<Option<String>>,
     local_track_manager: Mutex<LocalTrackManager>,
+    event_sink: Mutex<Option<ExtEventSink>>,
     paginated_limit: usize,
 }
 
@@ -68,6 +70,7 @@ impl WebApi {
             oauth_bearer: Mutex::new(None),
             oauth_refresh_token: Mutex::new(None),
             local_track_manager: Mutex::new(LocalTrackManager::new()),
+            event_sink: Mutex::new(None),
             paginated_limit,
         }
     }
@@ -87,6 +90,10 @@ impl WebApi {
     /// Optionally set the OAuth refresh token for Web API. Pass None to clear.
     pub fn set_oauth_refresh_token(&self, token: Option<String>) {
         *self.oauth_refresh_token.lock() = token;
+    }
+
+    pub fn set_event_sink(&self, sink: ExtEventSink) {
+        *self.event_sink.lock() = Some(sink);
     }
 
     fn request(&self, request: &RequestBuilder) -> Result<Response<Body>, Error> {
@@ -129,8 +136,21 @@ impl WebApi {
                 if let Some(rtok) = self.oauth_refresh_token.lock().clone() {
                     if let Ok((new_access, new_refresh)) = refresh_access_token(&rtok) {
                         *self.oauth_bearer.lock() = Some(new_access.clone());
-                        if let Some(r) = new_refresh {
-                            *self.oauth_refresh_token.lock() = Some(r);
+                        {
+                            let mut refresh_lock = self.oauth_refresh_token.lock();
+                            if let Some(ref r) = new_refresh {
+                                *refresh_lock = Some(r.clone());
+                            }
+                        }
+                        if let Some(sink) = self.event_sink.lock().as_ref().cloned() {
+                            let payload = (new_access.clone(), new_refresh.clone());
+                            if let Err(err) = sink.submit_command(
+                                cmd::OAUTH_TOKENS_REFRESHED,
+                                payload,
+                                Target::Global,
+                            ) {
+                                log::warn!("failed to submit OAuth refresh command to UI: {err}");
+                            }
                         }
                         call(&new_access)?
                     } else {
