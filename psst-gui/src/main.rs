@@ -6,15 +6,17 @@ mod controller;
 mod data;
 mod delegate;
 mod error;
+mod token_utils;
 mod ui;
 mod webapi;
 mod widget;
 
 use druid::AppLauncher;
 use env_logger::{Builder, Env};
+use token_utils::TokenUtils;
 use webapi::WebApi;
 
-use psst_core::cache::Cache;
+use psst_core::{cache::Cache, oauth::refresh_access_token};
 
 use crate::{
     data::{AppState, Config},
@@ -51,12 +53,35 @@ fn main() {
     }
 
     WebApi::new(
-        state.session.clone(),
         Config::proxy().as_deref(),
         Config::cache_dir(),
         paginated_limit,
     )
     .install_as_global();
+
+    if let Some(refresh_token) = state.config.oauth_refresh_token.clone() {
+        match refresh_access_token(&refresh_token) {
+            Ok((access_token, maybe_refresh_token)) => {
+                TokenUtils::apply_refresh_result(
+                    &state.session,
+                    &mut state.config,
+                    access_token,
+                    maybe_refresh_token,
+                    true,
+                );
+            }
+            Err(e) => {
+                log::warn!(
+                    "Failed to refresh OAuth token at startup: {e}. Falling back to persisted access token if any."
+                );
+                // Install tokens from config into runtime holders as-is
+                TokenUtils::install_from_config(&state.session, &state.config);
+            }
+        }
+    } else {
+        // No refresh token; install any persisted tokens as-is
+        TokenUtils::install_from_config(&state.session, &state.config);
+    }
 
     let delegate;
     let launcher;

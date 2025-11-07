@@ -21,6 +21,7 @@ pub enum Error {
     SendError,
     RecvTimeoutError(RecvTimeoutError),
     JoinError,
+    HttpStatus(u16),
     OAuthError(String),
 }
 
@@ -62,6 +63,7 @@ impl fmt::Display for Error {
             Self::SendError => write!(f, "Failed to send into a channel"),
             Self::RecvTimeoutError(err) => write!(f, "Channel receive timeout: {err}"),
             Self::JoinError => write!(f, "Failed to join thread"),
+            Self::HttpStatus(code) => write!(f, "HTTP status {}", code),
             Self::OAuthError(msg) => write!(f, "OAuth error: {msg}"),
         }
     }

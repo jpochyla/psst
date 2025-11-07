@@ -13,6 +13,12 @@ impl SessionController {
         // Update the session configuration, any active session will get shut down.
         data.session.update_config(data.config.session());
 
+        // Re-apply persisted OAuth bearer to both core session and Web API, if present.
+        if let Some(tok) = data.config.oauth_bearer.clone() {
+            data.session.set_oauth_bearer(Some(tok.clone()));
+            crate::webapi::WebApi::global().set_oauth_bearer(Some(tok));
+        }
+
         // Reload the global, usually visible data.
         ctx.submit_command(playlist::LOAD_LIST);
         ctx.submit_command(home::LOAD_MADE_FOR_YOU);

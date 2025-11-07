@@ -1,3 +1,7 @@
+// Keymaster token acquisition is deprecated in Psst.
+// OAuth/PKCE is the primary auth path; Keymaster remains only for legacy compatibility.
+// See librespot discussion for context (403/code=4, scope restrictions):
+// https://github.com/librespot-org/librespot/issues/1532#issuecomment-3188123661
 use std::time::{Duration, Instant};
 
 use parking_lot::Mutex;
@@ -11,12 +15,13 @@ use super::SessionService;
 pub const CLIENT_ID: &str = "65b708073fc0480ea92a077233ca87bd";
 
 // All scopes we could possibly require.
-pub const ACCESS_SCOPES: &str = "streaming,user-read-email,user-read-private,playlist-read-private,playlist-read-collaborative,playlist-modify-public,playlist-modify-private,user-follow-modify,user-follow-read,user-library-read,user-library-modify,user-top-read,user-read-recently-played";
+pub const ACCESS_SCOPES: &str = "user-read-email,user-read-private,playlist-read-private,playlist-read-collaborative,playlist-modify-public,playlist-modify-private,user-follow-modify,user-follow-read,user-library-read,user-library-modify,user-top-read,user-read-recently-played";
 
 // Consider token expired even before the official expiration time.  Spotify
 // seems to be reporting excessive token TTLs so let's cut it down by 30
 // minutes.
 const EXPIRATION_TIME_THRESHOLD: Duration = Duration::from_secs(60 * 30);
+// Avoid repeatedly hammering keymaster when errors occur.
 
 #[derive(Clone)]
 pub struct AccessToken {
@@ -35,10 +40,10 @@ impl AccessToken {
     pub fn request(session: &SessionService) -> Result<Self, Error> {
         #[derive(Deserialize)]
         struct MercuryAccessToken {
-            #[serde(rename = "expiresIn")]
-            expires_in: u64,
-            #[serde(rename = "accessToken")]
+            #[serde(alias = "accessToken", alias = "access_token")]
             access_token: String,
+            #[serde(alias = "expiresIn", alias = "expires_in")]
+            expires_in: u64,
         }
 
         let token: MercuryAccessToken = session.connected()?.get_mercury_json(format!(
@@ -67,10 +72,24 @@ impl TokenProvider {
         }
     }
 
+    pub fn invalidate(&self) {
+        let mut token = self.token.lock();
+        *token = AccessToken::expired();
+    }
+
     pub fn get(&self, session: &SessionService) -> Result<AccessToken, Error> {
+        // Prefer an OAuth bearer if the session provides one.
+        if let Some(tok) = session.oauth_bearer() {
+            return Ok(AccessToken {
+                token: tok,
+                // Give the bearer a reasonable lifetime; it will be replaced when refreshed.
+                expires: Instant::now() + Duration::from_secs(3600),
+            });
+        }
+
         let mut token = self.token.lock();
         if token.is_expired() {
-            log::info!("access token expired, requesting");
+            log::debug!("access token expired, requesting");
             *token = AccessToken::request(session)?;
         }
         Ok(token.clone())

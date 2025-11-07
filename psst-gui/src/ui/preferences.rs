@@ -1,6 +1,8 @@
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
-use std::thread::{self, JoinHandle};
-use std::time::Duration;
+use std::{
+    net::{IpAddr, Ipv4Addr, SocketAddr},
+    thread::{self, JoinHandle},
+    time::Duration,
+};
 
 use crate::{
     cmd,
@@ -581,17 +583,19 @@ impl Authenticate {
                 )
                 .map_err(|e| e.to_string())?;
 
-                // Exchange code for access token
-                let token = oauth::exchange_code_for_token(8888, code, pkce_verifier);
+                // Exchange code for access and refresh tokens
+                let (access, refresh) = oauth::exchange_code_for_token(8888, code, pkce_verifier);
 
                 // Try to authenticate with token, with retries
                 let mut retries = 3;
                 while retries > 0 {
                     match Authentication::authenticate_and_get_credentials(SessionConfig {
-                        login_creds: Credentials::from_access_token(token.clone()),
+                        login_creds: Credentials::from_access_token(access.clone()),
                         ..config.clone()
                     }) {
-                        Ok(credentials) => return Ok(credentials),
+                        Ok(credentials) => {
+                            return Ok((credentials, access.clone(), refresh.clone()))
+                        }
                         Err(e) if retries > 1 => {
                             log::warn!("authentication failed, retrying: {e:?}");
                             retries -= 1;
@@ -620,7 +624,7 @@ impl Authenticate {
 impl Authenticate {
     pub const SPOTIFY_REQUEST: Selector =
         Selector::new("app.preferences.spotify.authenticate-request");
-    pub const SPOTIFY_RESPONSE: Selector<Result<Credentials, String>> =
+    pub const SPOTIFY_RESPONSE: Selector<Result<(Credentials, String, Option<String>), String>> =
         Selector::new("app.preferences.spotify.authenticate-response");
 
     // Selector for initializing fields
@@ -632,6 +636,14 @@ impl Authenticate {
         Selector::new("app.preferences.lastfm.authenticate-request");
     pub const LASTFM_RESPONSE: Selector<Result<String, String>> =
         Selector::new("app.preferences.lastfm.authenticate-response");
+}
+
+fn logout_and_reset(ctx: &mut EventCtx, data: &mut AppState) {
+    data.config.clear_credentials();
+    crate::token_utils::TokenUtils::clear_all(&data.session, &mut data.config, true);
+    data.session.shutdown();
+    ctx.submit_command(cmd::CLOSE_ALL_WINDOWS);
+    ctx.submit_command(cmd::SHOW_ACCOUNT_SETUP);
 }
 
 impl<W: Widget<AppState>> Controller<AppState, W> for Authenticate {
@@ -656,11 +668,7 @@ impl<W: Widget<AppState>> Controller<AppState, W> for Authenticate {
                 ctx.set_handled();
             }
             Event::Command(cmd) if cmd.is(cmd::LOG_OUT) => {
-                data.config.clear_credentials();
-                data.config.save();
-                data.session.shutdown();
-                ctx.submit_command(cmd::CLOSE_ALL_WINDOWS);
-                ctx.submit_command(cmd::SHOW_ACCOUNT_SETUP);
+                logout_and_reset(ctx, data);
                 ctx.set_handled();
             }
             Event::Command(cmd) if cmd.is(Self::LASTFM_REQUEST) => {
@@ -714,14 +722,34 @@ impl<W: Widget<AppState>> Controller<AppState, W> for Authenticate {
             Event::Command(cmd) if cmd.is(Self::SPOTIFY_RESPONSE) => {
                 let result = cmd.get_unchecked(Self::SPOTIFY_RESPONSE);
                 match result {
-                    Ok(credentials) => {
+                    Ok((credentials, token, refresh)) => {
+                        log::info!(
+                            "OAuth: Spotify auth response success (access_token_present={}, refresh_token_present={})",
+                            !token.is_empty(),
+                            refresh.as_ref().is_some()
+                        );
+                        // Apply and persist tokens atomically (runtime + config) to keep
+                        // Session/WebApi in sync.
+                        log::info!(
+                            "OAuth: installing tokens into Session/WebApi and persisting to Config"
+                        );
+                        crate::token_utils::TokenUtils::apply_and_persist(
+                            &data.session,
+                            &mut data.config,
+                            Some(token.clone()),
+                            refresh.clone(),
+                            /* clear_refresh_if_none = */ false,
+                            /* save = */ false,
+                        );
                         // Update session config with the new credentials
+                        log::info!("OAuth: updating session config with new credentials");
                         data.session.update_config(SessionConfig {
                             login_creds: credentials.clone(),
                             proxy_url: Config::proxy(),
                         });
                         data.config.store_credentials(credentials.clone());
                         data.config.save();
+                        log::info!("OAuth: config saved and tokens applied");
                         data.preferences.auth.result.resolve((), ());
                         // Handle UI flow based on tab type
                         if matches!(self.tab, AccountTab::FirstSetup) {
@@ -730,6 +758,7 @@ impl<W: Widget<AppState>> Controller<AppState, W> for Authenticate {
                         }
                     }
                     Err(err) => {
+                        log::warn!("OAuth: Spotify authentication failed: {}", err);
                         data.preferences.auth.result.reject((), err.clone());
                     }
                 }

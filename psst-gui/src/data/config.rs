@@ -110,6 +110,9 @@ const PROXY_ENV_VAR: &str = "SOCKS_PROXY";
 pub struct Config {
     #[data(ignore)]
     credentials: Option<Credentials>,
+    #[serde(alias = "oauth_token_override")]
+    pub oauth_bearer: Option<String>,
+    pub oauth_refresh_token: Option<String>,
     pub audio_quality: AudioQuality,
     pub theme: Theme,
     pub volume: f64,
@@ -132,6 +135,8 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             credentials: Default::default(),
+            oauth_bearer: None,
+            oauth_refresh_token: None,
             audio_quality: Default::default(),
             theme: Default::default(),
             volume: 1.0,

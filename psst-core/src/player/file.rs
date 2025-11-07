@@ -233,8 +233,11 @@ impl StreamedFile {
 
     fn service_streaming(&self) -> Result<(), Error> {
         let mut last_url = self.url.clone();
+        let force_resolve = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
         let mut fresh_url = || -> Result<CdnUrl, Error> {
-            if last_url.is_expired() {
+            if last_url.is_expired()
+                || force_resolve.swap(false, std::sync::atomic::Ordering::SeqCst)
+            {
                 last_url = self.cdn.resolve_audio_file_url(self.path.file_id)?;
             }
             Ok(last_url.clone())
@@ -254,6 +257,7 @@ impl StreamedFile {
                 let mut writer = self.storage.writer()?;
                 let file_path = self.storage.path().to_path_buf();
                 let file_id = self.path.file_id;
+                let force_resolve = force_resolve.clone();
                 move || {
                     match load_range(&mut writer, &cdn, &url, offset, length) {
                         Ok(_) => {
@@ -266,9 +270,19 @@ impl StreamedFile {
                             }
                         }
                         Err(err) => {
-                            log::error!("failed to download: {err}");
-                            // Range failed to download, remove it from the requested set.
-                            writer.mark_as_not_requested(offset, length);
+                            // On auth error, try once to re-resolve the CDN URL and retry; otherwise mark as not requested.
+                            let retry_after_auth = |w: &mut StreamWriter| -> Result<(), ()> {
+                                let new_url = cdn.resolve_audio_file_url(file_id).map_err(|_| ())?;
+                                load_range(w, &cdn, &new_url.url, offset, length).map_err(|_| ())
+                            };
+
+                            let retried_ok = matches!(err, Error::HttpStatus(code) if code == 401 || code == 403)
+                                && retry_after_auth(&mut writer).is_ok();
+
+                            if !retried_ok {
+                                force_resolve.store(true, std::sync::atomic::Ordering::SeqCst);
+                                writer.mark_as_not_requested(offset, length);
+                            }
                         }
                     }
                 }
