@@ -105,6 +105,7 @@ impl AppState {
             show_track_cover: config.show_track_cover,
             show_playlist_images: config.show_playlist_images,
             nav: Nav::Home,
+            playback_progress: None,
         });
         let playback = Playback {
             state: PlaybackState::Stopped,
@@ -229,7 +230,9 @@ impl AppState {
     }
 
     pub fn loading_playback(&mut self, item: Playable, origin: PlaybackOrigin) {
-        self.common_ctx_mut().now_playing.take();
+        let ctx = self.common_ctx_mut();
+        ctx.now_playing.take();
+        ctx.playback_progress = Some(0);
         self.playback.state = PlaybackState::Loading;
         self.playback.now_playing.replace(NowPlaying {
             item,
@@ -240,7 +243,10 @@ impl AppState {
     }
 
     pub fn start_playback(&mut self, item: Playable, origin: PlaybackOrigin, progress: Duration) {
-        self.common_ctx_mut().now_playing.replace(item.clone());
+        let progress_ms = progress.as_millis() as u64;
+        let ctx = self.common_ctx_mut();
+        ctx.now_playing.replace(item.clone());
+        ctx.playback_progress = Some(progress_ms);
         self.playback.state = PlaybackState::Playing;
         self.playback.now_playing.replace(NowPlaying {
             item,
@@ -254,6 +260,7 @@ impl AppState {
         if let Some(now_playing) = &mut self.playback.now_playing {
             now_playing.progress = progress;
         }
+        self.common_ctx_mut().playback_progress = Some(progress.as_millis() as u64);
     }
 
     pub fn pause_playback(&mut self) {
@@ -271,7 +278,9 @@ impl AppState {
     pub fn stop_playback(&mut self) {
         self.playback.state = PlaybackState::Stopped;
         self.playback.now_playing.take();
-        self.common_ctx_mut().now_playing.take();
+        let ctx = self.common_ctx_mut();
+        ctx.now_playing.take();
+        ctx.playback_progress = None;
     }
 
     pub fn set_queue_behavior(&mut self, queue_behavior: QueueBehavior) {
@@ -532,6 +541,7 @@ impl Shows {
 #[derive(Clone, Data)]
 pub struct CommonCtx {
     pub now_playing: Option<Playable>,
+    pub playback_progress: Option<u64>,
     pub library: Arc<Library>,
     pub show_track_cover: bool,
     pub show_playlist_images: bool,
