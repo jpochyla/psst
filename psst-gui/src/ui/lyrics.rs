@@ -76,7 +76,7 @@ fn track_info_widget() -> impl Widget<AppState> {
 fn track_lyrics_widget() -> impl Widget<AppState> {
     Async::new(
         utils::spinner_widget,
-        || List::new(|| lyric_line_widget()),
+        || List::new(lyric_line_widget),
         || Label::new("No lyrics found for this track").center(),
     )
     .lens(Ctx::make(AppState::common_ctx, AppState::lyrics).then(Ctx::in_promise()))
