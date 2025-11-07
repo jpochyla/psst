@@ -410,6 +410,7 @@ impl WebApi {
             avatar_image: CoverArt,
         }
 
+        #[allow(dead_code)]
         #[derive(Deserialize)]
         pub struct Artists {
             items: Vec<ArtistsItem>,
@@ -443,6 +444,7 @@ impl WebApi {
             url: String,
         }
 
+        #[allow(dead_code)]
         #[derive(Deserialize)]
         pub enum MediaType {
             #[serde(rename = "AUDIO")]
@@ -719,6 +721,7 @@ impl WebApi {
     }
 
     pub fn get_user_top_artist(&self) -> Result<Vector<Artist>, Error> {
+        #[allow(dead_code)]
         #[derive(Clone, Data, Deserialize)]
         struct Artists {
             artists: Artist,

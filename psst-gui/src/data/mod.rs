@@ -211,24 +211,17 @@ impl AppState {
 
 impl AppState {
     pub fn queued_entry(&self, item_id: ItemId) -> Option<QueueEntry> {
-        if let Some(queued) = self
-            .playback
+        self.playback
             .queue
             .iter()
             .find(|queued| queued.item.id() == item_id)
             .cloned()
-        {
-            Some(queued)
-        } else if let Some(queued) = self
-            .added_queue
-            .iter()
-            .find(|queued| queued.item.id() == item_id)
-            .cloned()
-        {
-            Some(queued)
-        } else {
-            None
-        }
+            .or_else(|| {
+                self.added_queue
+                    .iter()
+                    .find(|queued| queued.item.id() == item_id)
+                    .cloned()
+            })
     }
 
     pub fn add_queued_entry(&mut self, queue_entry: QueueEntry) {
