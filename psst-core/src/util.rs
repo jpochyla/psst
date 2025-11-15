@@ -1,10 +1,10 @@
-use std::{io, io::SeekFrom, mem, time::Duration};
-use std::time::Instant;
+use crate::error::Error;
 use byteorder::{BigEndian, ByteOrder};
 use num_traits::{One, WrappingAdd};
 use quick_protobuf::{BytesReader, MessageRead, MessageWrite, Writer};
 use sha1::{Digest, Sha1};
-use crate::error::Error;
+use std::time::Instant;
+use std::{io, io::SeekFrom, mem, time::Duration};
 
 pub const NET_CONNECT_TIMEOUT: Duration = Duration::from_millis(8 * 1000);
 
@@ -33,39 +33,38 @@ pub fn solve_hash_cash(
     length: i32,
     dst: &mut [u8],
 ) -> Result<Duration, Error> {
-    // after a certain number of seconds, the challenge expires
-    const TIMEOUT: u64 = 5; // seconds
+    const TIMEOUT: Duration = Duration::from_secs(5);
+    // SHA-1 produces a 20-byte hash, we check the trailing 8 bytes.
+    const OFFSET_LEN: usize = 8;
+    const CHECK_OFFSET: usize = 20 - OFFSET_LEN;
+
     let now = Instant::now();
+    let initial_digest = Sha1::digest(ctx);
+    let target = BigEndian::read_i64(&initial_digest[CHECK_OFFSET..]);
 
-    let md = Sha1::digest(ctx);
+    let mut suffix = [0u8; 16];
+    let mut counter = 0i64;
 
-    let mut counter: i64 = 0;
-    let target: i64 = BigEndian::read_i64(&md[12..20]);
+    while now.elapsed() < TIMEOUT {
+        suffix[..OFFSET_LEN].copy_from_slice(&target.wrapping_add(counter).to_be_bytes());
+        suffix[OFFSET_LEN..].copy_from_slice(&counter.to_be_bytes());
 
-    let suffix = loop {
-        if now.elapsed().as_secs() >= TIMEOUT {
-            return Err(Error::InvalidStateError(
-                format!("{TIMEOUT} seconds expired").into(),
-            ));
-        }
+        let final_digest = Sha1::new()
+            .chain_update(prefix)
+            .chain_update(&suffix)
+            .finalize();
 
-        let suffix = [(target + counter).to_be_bytes(), counter.to_be_bytes()].concat();
-
-        let mut hasher = Sha1::new();
-        hasher.update(prefix);
-        hasher.update(&suffix);
-        let md = hasher.finalize();
-
-        if BigEndian::read_i64(&md[12..20]).trailing_zeros() >= (length as u32) {
-            break suffix;
+        if BigEndian::read_i64(&final_digest[CHECK_OFFSET..]).trailing_zeros() >= (length as u32) {
+            dst.copy_from_slice(&suffix);
+            return Ok(now.elapsed());
         }
 
         counter += 1;
-    };
+    }
 
-    dst.copy_from_slice(&suffix);
-
-    Ok(now.elapsed())
+    Err(Error::InvalidStateError(
+        format!("{TIMEOUT:?} expired").into(),
+    ))
 }
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord, Default)]

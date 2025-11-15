@@ -4,15 +4,15 @@ use crate::error::Error;
 use crate::session::client_token::ClientTokenProvider;
 use crate::session::token::Token;
 use crate::session::SessionService;
+use crate::system_info::{CLIENT_ID, DEVICE_ID};
 use crate::util::{default_ureq_agent_builder, solve_hash_cash};
 use librespot_protocol::login5::login_response::Response;
 use librespot_protocol::{
     client_info::ClientInfo,
-    credentials::{StoredCredential},
+    credentials::StoredCredential,
     hashcash::HashcashSolution,
     login5::{
-        login_request::Login_method, ChallengeSolution, LoginError, LoginRequest,
-        LoginResponse,
+        login_request::Login_method, ChallengeSolution, LoginError, LoginRequest, LoginResponse,
     },
 };
 use parking_lot::Mutex;
@@ -21,17 +21,28 @@ use protobuf::{Message, MessageField};
 use std::fmt::Formatter;
 use std::time::{Duration, Instant};
 use std::{error, fmt, thread};
-use crate::system_info::{CLIENT_ID, DEVICE_ID};
 
 const MAX_LOGIN_TRIES: u8 = 3;
 const LOGIN_TIMEOUT: Duration = Duration::from_secs(3);
 
 #[derive(Debug)]
+pub enum ChallengeError {
+    Unsupported,
+    NoneFound,
+}
+
+#[derive(Debug)]
 enum Login5Error {
-    FaultyRequest(LoginError),
-    CodeChallenge,
-    NoStoredCredentials,
-    RetriesFailed(u8),
+    /// The server denied the request with a specific error code.
+    RequestDenied(LoginError),
+    /// The server issued a challenge that we could not solve.
+    Challenge(ChallengeError),
+    /// The operation could not be performed due to invalid local state.
+    InvalidState(String),
+    /// The login attempt failed after multiple retries.
+    RetriesExceeded(u8),
+    /// The server's response was malformed or missing expected fields.
+    MalformedResponse,
 }
 
 impl error::Error for Login5Error {}
@@ -39,18 +50,16 @@ impl error::Error for Login5Error {}
 impl fmt::Display for Login5Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            Login5Error::FaultyRequest(e) => {
-                write!(f, "Login request was denied {:?}", e)
+            Login5Error::RequestDenied(e) => write!(f, "Login request was denied: {:?}", e),
+            Login5Error::Challenge(c) => match c {
+                ChallengeError::Unsupported => write!(f, "Login5 code challenge is not supported"),
+                ChallengeError::NoneFound => write!(f, "No challenges found in response"),
+            },
+            Login5Error::InvalidState(s) => write!(f, "Invalid state: {}", s),
+            Login5Error::RetriesExceeded(n) => {
+                write!(f, "Couldn't successfully authenticate after {} times", n)
             }
-            Login5Error::CodeChallenge => {
-                write!(f, "Login5 code challenge is not supported")
-            }
-            Login5Error::NoStoredCredentials => {
-                write!(f, "Tried to acquire access token without stored credentials")
-            }
-            Login5Error::RetriesFailed(u8) => {
-                write!(f, "Couldn't successfully authenticate after {:?} times", u8)
-            }
+            Login5Error::MalformedResponse => write!(f, "Missing response from login server"),
         }
     }
 }
@@ -58,19 +67,13 @@ impl fmt::Display for Login5Error {
 impl From<Login5Error> for Error {
     fn from(err: Login5Error) -> Self {
         match err {
-            Login5Error::NoStoredCredentials | Login5Error::RetriesFailed(_) | Login5Error::FaultyRequest(_) => {
-                Error::InvalidStateError(err.into())
-            }
-            Login5Error::CodeChallenge => Error::UnimplementedError(err.into()),
+            Login5Error::RequestDenied(_)
+            | Login5Error::InvalidState(_)
+            | Login5Error::RetriesExceeded(_)
+            | Login5Error::MalformedResponse => Error::InvalidStateError(err.into()),
+            Login5Error::Challenge(_) => Error::UnimplementedError(err.into()),
         }
     }
-}
-
-#[derive(Debug)]
-pub struct Login5Request {
-    pub uri: String,
-    pub method: String,
-    pub payload: Vec<Vec<u8>>,
 }
 
 pub struct Login5 {
@@ -88,10 +91,14 @@ impl Login5 {
     ///   used for it.
     ///
     /// returns: Login5
-    pub fn new(client_token_provider: Option<ClientTokenProvider>, proxy_url: Option<&str>) -> Self {
+    pub fn new(
+        client_token_provider: Option<ClientTokenProvider>,
+        proxy_url: Option<&str>,
+    ) -> Self {
         Self {
             auth_token: Mutex::new(None),
-            client_token_provider: client_token_provider.unwrap_or_else(|| ClientTokenProvider::new(proxy_url)),
+            client_token_provider: client_token_provider
+                .unwrap_or_else(|| ClientTokenProvider::new(proxy_url)),
             agent: default_ureq_agent_builder(proxy_url).build().into(),
         }
     }
@@ -111,7 +118,7 @@ impl Login5 {
         Ok(vec)
     }
 
-    fn request_new_access_token(&self, login: Login_method) -> Result<Token, Error> {
+    fn request_new_token(&self, login: Login_method) -> Result<Token, Error> {
         let mut login_request = LoginRequest {
             client_info: MessageField::some(ClientInfo {
                 client_id: String::from(CLIENT_ID),
@@ -128,40 +135,47 @@ impl Login5 {
         loop {
             count += 1;
 
-            let message = LoginResponse::parse_from_bytes(&response)?;
-            if let Some(Response::Ok(ok)) = message.response {
-                return Ok(Token {
-                    access_token: ok.access_token,
-                    expires_in: Duration::from_secs(ok.access_token_expires_in.try_into().unwrap_or(3600)),
-                    token_type: "Bearer".to_string(),
-                    scopes: vec![],
-                    timestamp: Instant::now(),
-                });
-            }
-
-            if message.has_error() {
-                match message.error() {
-                    LoginError::TIMEOUT | LoginError::TOO_MANY_ATTEMPTS => {
+            let mut message = LoginResponse::parse_from_bytes(&response)?;
+            match message.response.take() {
+                Some(Response::Ok(ok)) => {
+                    let expiry_secs = ok.access_token_expires_in.try_into().unwrap_or(3600);
+                    return Ok(Token {
+                        access_token: ok.access_token,
+                        expires_in: Duration::from_secs(expiry_secs),
+                        token_type: "Bearer".to_string(),
+                        scopes: vec![],
+                        timestamp: Instant::now(),
+                    });
+                }
+                Some(Response::Error(err)) => match err.enum_value() {
+                    Ok(LoginError::TIMEOUT) | Ok(LoginError::TOO_MANY_ATTEMPTS) => {
                         log::debug!("Too many login5 requests... timeout!");
                         thread::sleep(LOGIN_TIMEOUT)
                     }
-                    others => {
+                    Ok(other) => {
                         log::debug!("Login5 request failed!");
-
-                        return Err(Login5Error::FaultyRequest(others).into());
+                        return Err(Login5Error::RequestDenied(other).into());
                     }
+                    Err(other) => {
+                        log::warn!("Unknown login error: {}", other);
+                    }
+                },
+                Some(Response::Challenges(_)) => {
+                    // handles the challenges, and updates the login context with the response
+                    Self::handle_challenges(&mut login_request, message)?;
                 }
-            }
-
-            if message.has_challenges() {
-                // handles the challenges, and updates the login context with the response
-                Self::handle_challenges(&mut login_request, message)?;
+                None => {
+                    return Err(Login5Error::MalformedResponse.into());
+                }
+                _ => {
+                    log::warn!("Unhandled login response");
+                }
             }
 
             if count < MAX_LOGIN_TRIES {
                 response = self.request(&login_request)?;
             } else {
-                return Err(Login5Error::RetriesFailed(MAX_LOGIN_TRIES).into());
+                return Err(Login5Error::RetriesExceeded(MAX_LOGIN_TRIES).into());
             }
         }
     }
@@ -176,12 +190,14 @@ impl Login5 {
             challenges.challenges.len()
         );
 
+        if challenges.challenges.is_empty() {
+            return Err(Login5Error::Challenge(ChallengeError::NoneFound).into());
+        }
+
         for challenge in &challenges.challenges {
-            if challenge.has_code() {
-                return Err(Login5Error::CodeChallenge.into());
-            } else if !challenge.has_hashcash() {
-                log::debug!("Challenge was empty, skipping...");
-                continue;
+            if challenge.has_code() || !challenge.has_hashcash() {
+                // We only solve hashcash challenges.
+                return Err(Login5Error::Challenge(ChallengeError::Unsupported).into());
             }
 
             let hash_cash_challenge = challenge.hashcash();
@@ -193,7 +209,6 @@ impl Login5 {
                 hash_cash_challenge.length,
                 &mut suffix,
             )?;
-
             let (seconds, nanos) = (duration.as_secs() as i64, duration.subsec_nanos() as i32);
             log::debug!("Solving hashcash took {seconds}s {nanos}ns");
 
@@ -228,16 +243,16 @@ impl Login5 {
     /// the client token (see also `Login5::new(...)`). For example, if you previously generated
     /// stored credentials with an android client-id, they won't work within login5 using a desktop
     /// client-id.
-    pub fn get_access_token(
-        &self,
-        session: &SessionService,
-    ) -> Result<Token, Error> {
+    pub fn get_access_token(&self, session: &SessionService) -> Result<Token, Error> {
         let mut cur_token = self.auth_token.lock();
 
         let login_creds = session.config.lock().as_ref().unwrap().login_creds.clone();
         let auth_data = login_creds.auth_data.clone();
         if auth_data.is_empty() {
-            return Err(Login5Error::NoStoredCredentials.into());
+            return Err(Login5Error::InvalidState(
+                "Tried to acquire access token without stored credentials".to_string(),
+            )
+            .into());
         }
 
         if let Some(auth_token) = &*cur_token {
@@ -249,7 +264,6 @@ impl Login5 {
             log::debug!("Auth token expired");
         }
 
-
         log::debug!("Requesting new auth token");
 
         // Conversion from psst protocol structs to librespot protocol structs
@@ -259,7 +273,7 @@ impl Login5 {
             ..Default::default()
         });
 
-        let new_token = self.request_new_access_token(method)?;
+        let new_token = self.request_new_token(method)?;
 
         log::debug!("Successfully requested new auth token");
 
