@@ -252,10 +252,11 @@ impl Config {
     }
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Data, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Data, Serialize, Deserialize, Default)]
 pub enum AudioQuality {
     Low,
     Normal,
+    #[default]
     High,
 }
 
@@ -269,33 +270,18 @@ impl AudioQuality {
     }
 }
 
-impl Default for AudioQuality {
-    fn default() -> Self {
-        Self::High
-    }
-}
-
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Data, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Data, Serialize, Deserialize, Default)]
 pub enum Theme {
+    #[default]
     Light,
     Dark,
 }
 
-impl Default for Theme {
-    fn default() -> Self {
-        Self::Light
-    }
-}
-
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Data, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Data, Serialize, Deserialize, Default)]
 pub enum SortOrder {
+    #[default]
     Ascending,
     Descending,
-}
-impl Default for SortOrder {
-    fn default() -> Self {
-        Self::Ascending
-    }
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Data, Serialize, Deserialize, Default)]

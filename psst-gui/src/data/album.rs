@@ -109,19 +109,14 @@ impl AlbumLink {
     }
 }
 
-#[derive(Clone, Debug, Data, Eq, PartialEq, Hash, Deserialize)]
+#[derive(Clone, Debug, Data, Eq, PartialEq, Hash, Deserialize, Serialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum AlbumType {
+    #[default]
     Album,
     Single,
     Compilation,
     AppearsOn,
-}
-
-impl Default for AlbumType {
-    fn default() -> Self {
-        Self::Album
-    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Data, Deserialize)]
