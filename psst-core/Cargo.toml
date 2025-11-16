@@ -13,6 +13,12 @@ time = { version = "0.3.36", features = ["local-offset"] }
 psst-protocol = { path = "../psst-protocol" }
 rustfm-scrobble = "1.1.1"
 
+# Login5 dependencies
+librespot-protocol = "0.7.1"
+protobuf = "3"
+sysinfo = "0.35.0"
+data-encoding = "2.9"
+
 # Common
 byteorder = { version = "1.5.0" }
 crossbeam-channel = { version = "0.5.13" }

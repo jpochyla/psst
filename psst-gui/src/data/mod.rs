@@ -218,15 +218,11 @@ impl AppState {
             .cloned()
         {
             Some(queued)
-        } else if let Some(queued) = self
-            .added_queue
-            .iter()
-            .find(|queued| queued.item.id() == item_id)
-            .cloned()
-        {
-            return Some(queued);
         } else {
-            None
+            self.added_queue
+                .iter()
+                .find(|queued| queued.item.id() == item_id)
+                .cloned()
         }
     }
 

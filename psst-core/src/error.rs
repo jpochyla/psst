@@ -10,6 +10,8 @@ pub enum Error {
     AuthFailed { code: i32 },
     ConnectionFailed,
     JsonError(Box<dyn error::Error + Send>),
+    InvalidStateError(Box<dyn error::Error + Send + Sync>),
+    UnimplementedError(Box<dyn error::Error + Send + Sync>),
     AudioFetchingError(Box<dyn error::Error + Send>),
     AudioDecodingError(Box<dyn error::Error + Send>),
     AudioOutputError(Box<dyn error::Error + Send>),
@@ -58,6 +60,8 @@ impl fmt::Display for Error {
             | Self::AudioOutputError(err)
             | Self::ScrobblerError(err)
             | Self::AudioProbeError(err) => err.fmt(f),
+            Self::InvalidStateError(err)
+            | Self::UnimplementedError(err) => err.fmt(f),
             Self::IoError(err) => err.fmt(f),
             Self::SendError => write!(f, "Failed to send into a channel"),
             Self::RecvTimeoutError(err) => write!(f, "Channel receive timeout: {err}"),
@@ -83,4 +87,8 @@ impl From<RecvTimeoutError> for Error {
     fn from(err: RecvTimeoutError) -> Self {
         Error::RecvTimeoutError(err)
     }
+}
+
+impl From<protobuf::Error> for Error {
+    fn from(err: protobuf::Error) -> Self { Error::InvalidStateError(err.into()) }
 }
