@@ -51,7 +51,7 @@ pub fn solve_hash_cash(
 
         let final_digest = Sha1::new()
             .chain_update(prefix)
-            .chain_update(&suffix)
+            .chain_update(suffix)
             .finalize();
 
         if BigEndian::read_i64(&final_digest[CHECK_OFFSET..]).trailing_zeros() >= (length as u32) {
