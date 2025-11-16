@@ -224,7 +224,7 @@ impl AppState {
             .find(|queued| queued.item.id() == item_id)
             .cloned()
         {
-            return Some(queued);
+            Some(queued)
         } else {
             None
         }

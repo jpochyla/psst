@@ -298,18 +298,14 @@ impl Default for SortOrder {
     }
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Data, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Data, Serialize, Deserialize, Default)]
 pub enum SortCriteria {
     Title,
     Artist,
     Album,
     Duration,
+    #[default]
     DateAdded,
-}
-impl Default for SortCriteria {
-    fn default() -> Self {
-        Self::DateAdded
-    }
 }
 
 fn get_dir_size(path: &Path) -> Option<u64> {

@@ -415,6 +415,7 @@ impl WebApi {
         }
 
         #[derive(Deserialize)]
+        #[allow(dead_code)]
         pub enum MediaType {
             #[serde(rename = "AUDIO")]
             Audio,
@@ -691,6 +692,7 @@ impl WebApi {
 
     pub fn get_user_top_artist(&self) -> Result<Vector<Artist>, Error> {
         #[derive(Clone, Data, Deserialize)]
+        #[allow(dead_code)]
         struct Artists {
             artists: Artist,
         }
