@@ -1037,15 +1037,14 @@ impl WebApi {
 
     // https://developer.spotify.com/documentation/web-api/reference/save-albums-user/
     pub fn save_album(&self, id: &str) -> Result<(), Error> {
-        let request = &RequestBuilder::new("v1/me/albums", Method::Put, Some(json!({"ids": id})));
-
+        let request = &RequestBuilder::new("v1/me/albums", Method::Put, None).query("ids", id);
         self.send_empty_json(request)
     }
 
     // https://developer.spotify.com/documentation/web-api/reference/remove-albums-user/
     pub fn unsave_album(&self, id: &str) -> Result<(), Error> {
         let request =
-            &RequestBuilder::new("v1/me/albums", Method::Delete, Some(json!({"ids": id})));
+            &RequestBuilder::new("v1/me/albums", Method::Delete, None).query("ids", id);
         self.send_empty_json(request)
     }
 
