@@ -16,12 +16,18 @@ use druid::{
 
 use itertools::Itertools;
 use log::info;
-use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
 use serde::{de::DeserializeOwned, Deserialize};
 use serde_json::json;
+use std::sync::OnceLock;
 
-use psst_core::session::{SessionService};
+use psst_core::{
+    item_id::{FileId, ItemId, ItemIdType},
+    metadata::Fetch,
+    protocol::metadata::Artist as ProtocolArtist,
+    session::login5::Login5,
+    session::SessionService,
+};
 use ureq::{
     http::{Response, StatusCode},
     Agent, Body,
@@ -30,7 +36,7 @@ use ureq::{
 use crate::{
     data::{
         self, utils::sanitize_html_string, Album, AlbumType, Artist, ArtistAlbums, ArtistInfo,
-        ArtistLink, ArtistStats, AudioAnalysis, Cached, Episode, EpisodeId, EpisodeLink, Image,
+        ArtistLink, ArtistStats, AudioAnalysis, Cached, Episode, EpisodeId, EpisodeLink,
         MixedView, Nav, Page, Playlist, PublicUser, Range, Recommendations, RecommendationsRequest,
         SearchResults, SearchTopic, Show, SpotifyUrl, Track, TrackLines, UserProfile,
     },
@@ -41,7 +47,6 @@ use crate::{
 use super::{cache::WebApiCache, local::LocalTrackManager};
 use sanitize_html::rules::predefined::DEFAULT;
 use sanitize_html::sanitize_str;
-use psst_core::session::login5::Login5;
 
 pub struct WebApi {
     session: SessionService,
@@ -657,7 +662,7 @@ impl WebApi {
     }
 }
 
-static GLOBAL_WEBAPI: OnceCell<Arc<WebApi>> = OnceCell::new();
+static GLOBAL_WEBAPI: OnceLock<Arc<WebApi>> = OnceLock::new();
 
 /// Global instance.
 impl WebApi {
@@ -789,116 +794,57 @@ impl WebApi {
     }
 
     pub fn get_artist_info(&self, id: &str) -> Result<ArtistInfo, Error> {
-        #[derive(Clone, Data, Deserialize)]
-        pub struct Welcome {
-            data: Data1,
-        }
+        let artist_id = ItemId::from_base62(id, ItemIdType::Unknown).unwrap();
+        let artist = ProtocolArtist::fetch(&self.session, artist_id)?;
 
-        #[derive(Clone, Data, Deserialize)]
-        #[serde(rename_all = "camelCase")]
-        pub struct Data1 {
-            artist_union: ArtistUnion,
-        }
+        let bio = artist
+            .biography
+            .first()
+            .and_then(|b| b.text.clone())
+            .unwrap_or_default();
 
-        #[derive(Clone, Data, Deserialize)]
-        pub struct ArtistUnion {
-            profile: Profile,
-            stats: Stats,
-            visuals: Visuals,
-        }
+        let bio = sanitize_str(&DEFAULT, &bio).unwrap_or_default();
+        let bio = bio.replace("&amp;", "&");
 
-        #[derive(Clone, Data, Deserialize)]
-        #[serde(rename_all = "camelCase")]
-        pub struct Profile {
-            biography: Biography,
-            external_links: ExternalLinks,
-        }
+        let portrait_group = artist.portrait_group;
+        let images = portrait_group.map(|g| g.image).unwrap_or_default();
+        let main_image_id = images.first().and_then(|i| i.file_id.clone());
 
-        #[derive(Clone, Data, Deserialize)]
-        pub struct Biography {
-            text: String,
-        }
+        let main_image_url = if let Some(file_id) = main_image_id {
+            let file_id = FileId::from_raw(&file_id).unwrap();
+            format!("https://i.scdn.co/image/{}", file_id.to_base16())
+        } else {
+            String::new()
+        };
 
-        #[derive(Clone, Data, Deserialize)]
-        pub struct ExternalLinks {
-            items: Vector<ExternalLinksItem>,
-        }
-
-        #[derive(Clone, Data, Deserialize)]
-        #[serde(rename_all = "camelCase")]
-        pub struct Visuals {
-            avatar_image: AvatarImage,
-        }
-        #[derive(Clone, Data, Deserialize)]
-        pub struct AvatarImage {
-            sources: Vector<Image>,
-        }
-        #[derive(Clone, Data, Deserialize)]
-        pub struct ExternalLinksItem {
-            url: String,
-        }
-
-        #[derive(Clone, Data, Deserialize)]
-        #[serde(rename_all = "camelCase")]
-        pub struct Stats {
-            followers: i64,
-            monthly_listeners: i64,
-            world_rank: i64,
-        }
-
-        let variables = json!( {
-            "locale": "",
-            "uri": format!("spotify:artist:{}", id),
-        });
-        let json = json!({
-            "extensions": {
-                "persistedQuery": {
-                    "version": 1,
-                    "sha256Hash": "1ac33ddab5d39a3a9c27802774e6d78b9405cc188c6f75aed007df2a32737c72"
+        let links = artist
+            .external_id
+            .iter()
+            .filter_map(|ext| {
+                // We only want to show links to other services, not internal Spotify IDs
+                // external_id entries are often like (type: "twitter", id: "username")
+                // We need to construct a URL from this.
+                let typ = ext.typ.as_deref()?;
+                let id = ext.id.as_deref()?;
+                match typ {
+                    "twitter" => Some(format!("https://twitter.com/{id}")),
+                    "facebook" => Some(format!("https://facebook.com/{id}")),
+                    "instagram" => Some(format!("https://instagram.com/{id}")),
+                    "wikipedia" => Some(format!("https://wikipedia.org/wiki/{id}")),
+                    _ => None,
                 }
-            },
-            "operationName": "queryArtistOverview",
-            "variables": variables,
-        });
-
-        let request =
-            &RequestBuilder::new("pathfinder/v2/query".to_string(), Method::Post, Some(json))
-                .set_base_uri("api-partner.spotify.com");
-
-        let result: Cached<Welcome> = self.load_cached(request, "artist-info", id)?;
-
-        let hrefs: Vector<String> = result
-            .data
-            .data
-            .artist_union
-            .profile
-            .external_links
-            .items
-            .into_iter()
-            .map(|link| link.url)
+            })
             .collect();
 
         Ok(ArtistInfo {
-            main_image: Arc::from(
-                result.data.data.artist_union.visuals.avatar_image.sources[0]
-                    .url
-                    .to_string(),
-            ),
+            main_image: Arc::from(main_image_url),
             stats: ArtistStats {
-                followers: result.data.data.artist_union.stats.followers,
-                monthly_listeners: result.data.data.artist_union.stats.monthly_listeners,
-                world_rank: result.data.data.artist_union.stats.world_rank,
+                followers: artist.popularity.map(|p| p as i64).unwrap_or(0),        // Mapped from popularity
+                monthly_listeners: 0, // Not available via Mercury metadata
+                world_rank: artist.popularity.map(|p| (101 - p) as i64).unwrap_or(0), // Mapped from inverted popularity
             },
-            bio: {
-                let sanitized_bio = sanitize_str(
-                    &DEFAULT,
-                    &result.data.data.artist_union.profile.biography.text,
-                )
-                .unwrap_or_default();
-                sanitized_bio.replace("&amp;", "&")
-            },
-
-            artist_links: hrefs,
+            bio,
+            artist_links: links,
         })
     }
 }

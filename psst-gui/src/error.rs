@@ -16,3 +16,9 @@ impl fmt::Display for Error {
         }
     }
 }
+
+impl From<psst_core::error::Error> for Error {
+    fn from(err: psst_core::error::Error) -> Self {
+        Self::WebApiError(err.to_string())
+    }
+}

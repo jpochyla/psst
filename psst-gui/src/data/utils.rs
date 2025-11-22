@@ -6,6 +6,7 @@ use std::{
 };
 
 use druid::{im::Vector, Data, Lens};
+use druid::image::DynamicImage;
 use sanitize_html::rules::predefined::DEFAULT;
 use sanitize_html::sanitize_str;
 use serde::{Deserialize, Deserializer, Serialize};
@@ -72,6 +73,15 @@ impl Image {
             .find(|img| !img.fits(width, height))
             .or_else(|| images.back())
     }
+}
+
+pub fn crop_to_square(image: DynamicImage) -> DynamicImage {
+    let width = image.width();
+    let height = image.height();
+    let size = width.min(height);
+    let x = (width - size) / 2;
+    let y = (height - size) / 2;
+    image.crop_imm(x, y, size, size)
 }
 
 pub fn default_str() -> Arc<str> {

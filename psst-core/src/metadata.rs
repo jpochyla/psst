@@ -6,7 +6,7 @@ use crate::{
     error::Error,
     item_id::{FileId, ItemId, ItemIdType},
     player::file::{AudioFormat, MediaFile, MediaPath},
-    protocol::metadata::{AudioFile, Episode, Restriction, Track},
+    protocol::metadata::{AudioFile, Episode, Restriction, Track, Artist},
     session::SessionService,
 };
 
@@ -20,6 +20,12 @@ pub trait Fetch: MessageRead<'static> {
 impl Fetch for Track {
     fn uri(id: ItemId) -> String {
         format!("hm://metadata/3/track/{}", id.to_base16())
+    }
+}
+
+impl Fetch for Artist {
+    fn uri(id: ItemId) -> String {
+        format!("hm://metadata/3/artist/{}", id.to_base16())
     }
 }
 

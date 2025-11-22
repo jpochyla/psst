@@ -40,6 +40,7 @@ impl WebApiCache {
         self.key("images", &format!("{hash:016x}"))
             .and_then(|path| std::fs::read(path).ok())
             .and_then(|bytes| image::load_from_memory(&bytes).ok())
+            .map(crate::data::utils::crop_to_square)
             .map(ImageBuf::from_dynamic_image)
     }
 
