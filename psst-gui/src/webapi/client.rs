@@ -16,12 +16,11 @@ use druid::{
 
 use itertools::Itertools;
 use log::info;
-use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
 use serde::{de::DeserializeOwned, Deserialize};
 use serde_json::json;
-
-use psst_core::session::{SessionService};
+use std::sync::OnceLock;
+use psst_core::session::{login5::Login5, SessionService};
 use ureq::{
     http::{Response, StatusCode},
     Agent, Body,
@@ -39,9 +38,9 @@ use crate::{
 };
 
 use super::{cache::WebApiCache, local::LocalTrackManager};
+use crate::data::utils::crop_to_square;
 use sanitize_html::rules::predefined::DEFAULT;
 use sanitize_html::sanitize_str;
-use psst_core::session::login5::Login5;
 
 pub struct WebApi {
     session: SessionService,
@@ -657,7 +656,7 @@ impl WebApi {
     }
 }
 
-static GLOBAL_WEBAPI: OnceCell<Arc<WebApi>> = OnceCell::new();
+static GLOBAL_WEBAPI: OnceLock<Arc<WebApi>> = OnceLock::new();
 
 /// Global instance.
 impl WebApi {
@@ -1495,7 +1494,8 @@ impl WebApi {
         } else {
             image::load_from_memory(&body)?
         };
-        let image_buf = ImageBuf::from_dynamic_image(image);
+        let cropped_image = crop_to_square(image);
+        let image_buf = ImageBuf::from_dynamic_image(cropped_image);
         self.cache.set_image(uri, image_buf.clone());
         Ok(image_buf)
     }
