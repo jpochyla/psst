@@ -1,18 +1,18 @@
+use std::sync::Arc;
+
 use druid::{
     im::Vector,
     kurbo::Circle,
-    widget::{CrossAxisAlignment, Either, Flex, Label, LabelText, LineBreaking, List, Scroll},
-    Data, Insets, LensExt, LocalizedString, Menu, MenuItem, Selector, Size, UnitPoint, Widget,
-    WidgetExt,
+    widget::{Either, Flex, Label, LineBreaking, List, Scroll},
+    Lens, LensExt, LocalizedString, Menu, MenuItem, Selector, Size, UnitPoint, Widget, WidgetExt,
 };
 
 use crate::{
     cmd,
     data::{
-        AppState, Artist, ArtistAlbums, ArtistDetail, ArtistInfo, ArtistLink, ArtistTracks, Cached,
-        Ctx, Nav, WithCtx,
+        Album, AppState, Artist, ArtistAlbums, ArtistDetail, ArtistInfo, ArtistLink, ArtistTracks,
+        Cached, Ctx, Nav, WithCtx,
     },
-    ui::utils::{stat_row, InfoLayout},
     webapi::WebApi,
     widget::{Async, Empty, MyWidgetExt, RemoteImage},
 };
@@ -26,8 +26,8 @@ pub const LOAD_DETAIL: Selector<ArtistLink> = Selector::new("app.artist.load-det
 
 pub fn detail_widget() -> impl Widget<AppState> {
     Flex::column()
-        .with_child(async_artist_info().padding((theme::grid(1.0), 0.0)))
-        .with_child(async_top_tracks_widget())
+        .with_child(async_artist_info())
+        .with_child(async_top_tracks_widget().padding((theme::grid(1.0), 0.0)))
         .with_child(async_albums_widget().padding((theme::grid(1.0), 0.0)))
         .with_child(async_related_widget().padding((theme::grid(1.0), 0.0)))
 }
@@ -78,7 +78,7 @@ fn async_albums_widget() -> impl Widget<AppState> {
 }
 
 fn async_artist_info() -> impl Widget<AppState> {
-    Async::new(utils::spinner_widget, artist_info_widget, || Empty)
+    Async::new(utils::spinner_widget, artist_info_view_switcher, utils::error_widget)
         .lens(
             Ctx::make(
                 AppState::common_ctx,
@@ -92,6 +92,16 @@ fn async_artist_info() -> impl Widget<AppState> {
             |_, data, d| data.artist_detail.artist_info.defer(d),
             |_, data, r| data.artist_detail.artist_info.update(r),
         )
+}
+
+fn artist_info_view_switcher() -> impl Widget<WithCtx<ArtistInfo>> {
+    Either::new(
+        |data: &WithCtx<ArtistInfo>, _| data.data.bio.is_empty(),
+        Empty,
+        Flex::column()
+            .with_child(artist_info_widget())
+            .padding((theme::grid(1.0), 0.0)),
+    )
 }
 
 fn async_related_widget() -> impl Widget<AppState> {
@@ -115,14 +125,20 @@ pub fn artist_widget(horizontal: bool) -> impl Widget<Artist> {
     artist = if horizontal {
         artist
             .with_child(artist_image)
-            .with_default_spacer()
+            .with_spacer(theme::grid(1.0))
             .with_child(
-                Label::raw()
+                Label::dynamic(|artist: &Artist, _| {
+                    let name = artist.name.as_ref();
+                    if name.chars().count() > 20 {
+                        format!("{:.<20}...", name)
+                    } else {
+                        name.to_string()
+                    }
+                })
                     .with_font(theme::UI_FONT_MEDIUM)
+                    .with_line_break_mode(LineBreaking::Clip)
                     .align_horizontal(UnitPoint::CENTER)
-                    .align_vertical(UnitPoint::TOP)
-                    .fix_size(theme::grid(16.0), theme::grid(8.0))
-                    .lens(Artist::name),
+                    .fix_width(theme::grid(16.0)), // Set a fixed width for the text, same as image
             )
     } else {
         artist
@@ -184,82 +200,71 @@ fn artist_info_widget() -> impl Widget<WithCtx<ArtistInfo>> {
             .with_text_size(theme::TEXT_SIZE_NORMAL)
             .lens(Ctx::data()),
     )
-    .vertical();
-
-    let artist_stats = Flex::column()
-        .with_child(stat_row("Followers:", |info: &ArtistInfo| {
-            utils::format_number_with_commas(info.stats.followers)
-        }))
-        .with_default_spacer()
-        .with_child(stat_row("Monthly Listeners:", |info: &ArtistInfo| {
-            utils::format_number_with_commas(info.stats.monthly_listeners)
-        }))
-        .with_default_spacer()
-        .with_child(Either::new(
-            |ctx: &WithCtx<ArtistInfo>, _| ctx.data.stats.world_rank > 0,
-            stat_row("Ranking:", |info: &ArtistInfo| {
-                format!(
-                    "#{} in the world",
-                    utils::format_number_with_commas(info.stats.world_rank)
-                )
-            }),
-            Empty,
-        ));
+    .vertical()
+    .fix_height(size);
 
     Flex::row()
         .with_child(artist_image)
         .with_spacer(theme::grid(1.0))
-        .with_flex_child(
-            Flex::row().with_flex_child(InfoLayout::new(biography, artist_stats), 1.0),
-            1.0,
-        )
+        .with_flex_child(biography, 1.0)
         .context_menu(|artist| artist_info_menu(&artist.data))
         .padding((0.0, theme::grid(1.0))) // Keep overall vertical padding
 }
 
 fn top_tracks_widget() -> impl Widget<WithCtx<ArtistTracks>> {
-    playable::list_widget(playable::Display {
-        track: track::Display {
-            title: true,
-            album: true,
-            popularity: true,
-            cover: true,
-            ..track::Display::empty()
-        },
-    })
+    Either::new(
+        |data: &WithCtx<ArtistTracks>, _| data.data.tracks.is_empty(),
+        Empty,
+        Flex::column()
+            .with_child(utils::header_widget("Popular"))
+            .with_child(playable::list_widget(playable::Display {
+                track: track::Display {
+                    title: true,
+                    album: true,
+                    popularity: true,
+                    cover: true,
+                    ..track::Display::empty()
+                },
+            })),
+    )
 }
 
 fn albums_widget() -> impl Widget<WithCtx<ArtistAlbums>> {
     Flex::column()
-        .cross_axis_alignment(CrossAxisAlignment::Start)
-        .with_child(header_widget("Albums"))
-        .with_child(List::new(|| album::album_widget(false)).lens(Ctx::map(ArtistAlbums::albums)))
-        .with_child(header_widget("Singles"))
-        .with_child(List::new(|| album::album_widget(false)).lens(Ctx::map(ArtistAlbums::singles)))
-        .with_child(header_widget("Compilations"))
-        .with_child(
-            List::new(|| album::album_widget(false)).lens(Ctx::map(ArtistAlbums::compilations)),
-        )
-        .with_child(header_widget("Appears On"))
-        .with_child(
-            List::new(|| album::album_widget(false)).lens(Ctx::map(ArtistAlbums::appears_on)),
-        )
+        .with_child(album_section("Albums", ArtistAlbums::albums))
+        .with_child(album_section("Singles", ArtistAlbums::singles))
+        .with_child(album_section(
+            "Compilations",
+            ArtistAlbums::compilations,
+        ))
+        .with_child(album_section("Appears On", ArtistAlbums::appears_on))
+}
+
+fn album_section<L>(
+    title: &'static str,
+    lens: L,
+) -> impl Widget<WithCtx<ArtistAlbums>>
+where
+    L: Lens<ArtistAlbums, Vector<Arc<Album>>> + Clone + 'static,
+{
+    let lens_clone = lens.clone();
+    Either::new(
+        move |data: &WithCtx<ArtistAlbums>, _| lens_clone.get(&data.data).is_empty(),
+        Empty,
+        Flex::column()
+            .with_child(utils::header_widget(title))
+            .with_child(List::new(|| album::album_widget(false)).lens(Ctx::map(lens))),
+    )
 }
 
 fn related_widget() -> impl Widget<Cached<Vector<Artist>>> {
-    Flex::column()
-        .cross_axis_alignment(CrossAxisAlignment::Start)
-        .with_child(header_widget("Related Artists"))
-        .with_child(List::new(|| artist_widget(false)))
-        .lens(Cached::data)
-}
-
-fn header_widget<T: Data>(text: impl Into<LabelText<T>>) -> impl Widget<T> {
-    Label::new(text)
-        .with_font(theme::UI_FONT_MEDIUM)
-        .with_text_color(theme::PLACEHOLDER_COLOR)
-        .with_text_size(theme::TEXT_SIZE_SMALL)
-        .padding(Insets::new(0.0, theme::grid(2.0), 0.0, theme::grid(1.0)))
+    Either::new(
+        |data: &Cached<Vector<Artist>>, _| data.data.is_empty(),
+        Empty,
+        Flex::column()
+            .with_child(utils::header_widget("Related Artists"))
+            .with_child(List::new(|| artist_widget(false)).lens(Cached::data)),
+    )
 }
 
 fn artist_info_menu(artist: &ArtistInfo) -> Menu<AppState> {

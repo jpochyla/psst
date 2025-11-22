@@ -8,7 +8,6 @@ use druid::{
 use crate::{
     cmd,
     data::{AppState, Ctx, Library, Nav, Show, ShowDetail, ShowEpisodes, ShowLink, WithCtx},
-    ui::utils::{stat_row, InfoLayout},
     webapi::WebApi,
     widget::{Async, MyWidgetExt, RemoteImage},
 };
@@ -61,30 +60,42 @@ fn info_widget() -> impl Widget<WithCtx<Arc<Show>>> {
             .with_text_size(theme::TEXT_SIZE_NORMAL),
     )
     .vertical()
+    .fix_height(size)
     .lens(Ctx::data());
 
+    // Publisher and Episode count stats
     let stats = Flex::column()
-        .with_child(stat_row("Publisher:", |info: &Arc<Show>| {
-            if info.publisher.is_empty() {
-                String::new()
-            } else {
-                info.publisher.to_string()
-            }
-        }))
-        .with_default_spacer()
-        .with_child(stat_row("Episodes:", |info: &Arc<Show>| {
-            match info.total_episodes {
-                Some(count) => format!("{} episode{}", count, if count == 1 { "" } else { "s" }),
+        .cross_axis_alignment(CrossAxisAlignment::Start)
+        .with_child(
+            Label::dynamic(|show: &Arc<Show>, _| {
+                if !show.publisher.is_empty() {
+                    format!("Publisher: {}", show.publisher)
+                } else {
+                    String::new()
+                }
+            })
+            .with_text_color(theme::PLACEHOLDER_COLOR),
+        )
+        .with_child(
+            Label::dynamic(|show: &Arc<Show>, _| match show.total_episodes {
+                Some(count) => format!("Episodes: {}", count),
                 None => String::new(),
-            }
-        }));
-
-    let me = InfoLayout::new(biography, stats);
+            })
+            .with_text_color(theme::PLACEHOLDER_COLOR),
+        )
+        .padding((0.0, theme::grid(1.0)))
+        .lens(Ctx::data());
 
     Flex::row()
         .with_child(image)
         .with_spacer(theme::grid(1.0))
-        .with_flex_child(me, 1.0)
+        .with_flex_child(
+            Flex::column()
+                .cross_axis_alignment(CrossAxisAlignment::Start)
+                .with_child(biography)
+                .with_child(stats),
+            1.0,
+        )
         .padding(theme::grid(1.0))
 }
 
