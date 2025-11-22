@@ -9,7 +9,7 @@ use std::{
 use std::os::unix::fs::OpenOptionsExt;
 
 use druid::{Data, Lens, Size};
-use platform_dirs::AppDirs;
+use directories::ProjectDirs;
 use psst_core::{
     cache::{mkdir_if_not_exists, CacheHandle},
     connection::Credentials,
@@ -153,25 +153,23 @@ impl Default for Config {
 }
 
 impl Config {
-    fn app_dirs() -> Option<AppDirs> {
-        const USE_XDG_ON_MACOS: bool = false;
-
-        AppDirs::new(Some(APP_NAME), USE_XDG_ON_MACOS)
+    fn app_dirs() -> Option<ProjectDirs> {
+        ProjectDirs::from("", "", APP_NAME)
     }
 
     pub fn spotify_local_files_file(username: &str) -> Option<PathBuf> {
-        AppDirs::new(Some("spotify"), false).map(|dir| {
+        ProjectDirs::from("", "", "spotify").map(|dir| {
             let path = format!("Users/{username}-user/local-files.bnk");
-            dir.config_dir.join(path)
+            dir.config_dir().join(path)
         })
     }
 
     pub fn cache_dir() -> Option<PathBuf> {
-        Self::app_dirs().map(|dirs| dirs.cache_dir)
+        Self::app_dirs().map(|dirs| dirs.cache_dir().to_path_buf())
     }
 
     pub fn config_dir() -> Option<PathBuf> {
-        Self::app_dirs().map(|dirs| dirs.config_dir)
+        Self::app_dirs().map(|dirs| dirs.config_dir().to_path_buf())
     }
 
     fn config_path() -> Option<PathBuf> {
