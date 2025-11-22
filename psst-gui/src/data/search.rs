@@ -7,7 +7,8 @@ use crate::data::{Album, Artist, Playlist, Promise, Show, Track};
 #[derive(Clone, Data, Lens)]
 pub struct Search {
     pub input: String,
-    pub results: Promise<SearchResults, Arc<str>>,
+    pub topic: Option<SearchTopic>,
+    pub results: Promise<SearchResults, (Arc<str>, Option<SearchTopic>)>,
 }
 
 #[derive(Copy, Clone, Data, Eq, PartialEq)]

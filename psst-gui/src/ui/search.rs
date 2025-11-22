@@ -2,8 +2,11 @@ use std::sync::Arc;
 
 use druid::{
     im::Vector,
-    widget::{CrossAxisAlignment, Either, Flex, Label, LabelText, List, TextBox},
-    Data, LensExt, Selector, Widget, WidgetExt,
+    widget::{
+        CrossAxisAlignment, Either, Flex, Label, LabelText, List, MainAxisAlignment, Scroll,
+        TextBox,
+    },
+    Data, Env, Insets, LensExt, RenderContext, Selector, Widget, WidgetExt,
 };
 
 use crate::{
@@ -21,9 +24,12 @@ use crate::{
 use super::{album, artist, playable, playlist, theme, track, utils};
 
 const NUMBER_OF_RESULTS_PER_TOPIC: usize = 5;
+const INDIVIDUAL_TOPIC_RESULTS_LIMIT: usize = 50;
 
-pub const LOAD_RESULTS: Selector<Arc<str>> = Selector::new("app.search.load-results");
+pub const LOAD_RESULTS: Selector<(Arc<str>, Option<SearchTopic>)> =
+    Selector::new("app.search.load-results");
 pub const OPEN_LINK: Selector<SpotifyUrl> = Selector::new("app.search.open-link");
+pub const SET_TOPIC: Selector<Option<SearchTopic>> = Selector::new("app.search.set-topic");
 
 pub fn input_widget() -> impl Widget<AppState> {
     TextBox::new()
@@ -40,6 +46,58 @@ pub fn input_widget() -> impl Widget<AppState> {
 }
 
 pub fn results_widget() -> impl Widget<AppState> {
+    Flex::column()
+        .cross_axis_alignment(CrossAxisAlignment::Center)
+        .with_spacer(theme::grid(1.0))
+        .with_child(topic_widget())
+        .with_spacer(theme::grid(1.0))
+        .with_child(async_results_widget())
+}
+
+fn topic_widget() -> impl Widget<AppState> {
+    let topics = Flex::row()
+        .with_child(topic_button("All", None))
+        .with_spacer(theme::grid(1.0))
+        .with_child(topic_button("Artists", Some(SearchTopic::Artist)))
+        .with_spacer(theme::grid(1.0))
+        .with_child(topic_button("Albums", Some(SearchTopic::Album)))
+        .with_spacer(theme::grid(1.0))
+        .with_child(topic_button("Tracks", Some(SearchTopic::Track)))
+        .with_spacer(theme::grid(1.0))
+        .with_child(topic_button("Playlists", Some(SearchTopic::Playlist)))
+        .with_spacer(theme::grid(1.0))
+        .with_child(topic_button("Podcasts", Some(SearchTopic::Show)))
+        .main_axis_alignment(MainAxisAlignment::Center);
+
+    Scroll::new(topics).horizontal()
+}
+
+fn topic_button(label: &str, topic: Option<SearchTopic>) -> impl Widget<AppState> {
+    Label::new(label)
+        .with_text_size(theme::TEXT_SIZE_SMALL)
+        .padding(Insets::uniform_xy(theme::grid(1.5), theme::grid(0.5)))
+        .background(druid::widget::Painter::new(
+            move |ctx, data: &AppState, env: &Env| {
+                let is_selected = data.search.topic == topic;
+                let color = if is_selected {
+                    env.get(theme::GREY_500)
+                } else if ctx.is_hot() {
+                    env.get(theme::GREY_600)
+                } else {
+                    env.get(theme::GREY_700)
+                };
+                let bounds = ctx
+                    .size()
+                    .to_rounded_rect(env.get(theme::BUTTON_BORDER_RADIUS));
+                ctx.fill(bounds, &color);
+            },
+        ))
+        .on_click(move |ctx, _, _| {
+            ctx.submit_command(SET_TOPIC.with(topic));
+        })
+}
+
+fn async_results_widget() -> impl Widget<AppState> {
     Async::new(
         utils::spinner_widget,
         loaded_results_widget,
@@ -51,21 +109,39 @@ pub fn results_widget() -> impl Widget<AppState> {
     )
     .on_command_async(
         LOAD_RESULTS,
-        |q| WebApi::global().search(&q, SearchTopic::all(), NUMBER_OF_RESULTS_PER_TOPIC),
-        |_, data, q| data.search.results.defer(q),
+        |(q, t)| {
+            let topics = t
+                .map(|t| vec![t])
+                .unwrap_or_else(|| SearchTopic::all().to_vec());
+            let limit = if topics.len() == 1 {
+                INDIVIDUAL_TOPIC_RESULTS_LIMIT
+            } else {
+                NUMBER_OF_RESULTS_PER_TOPIC
+            };
+            WebApi::global().search(&q, &topics, limit)
+        },
+        |_, data, (q, t)| data.search.results.defer((q, t)),
         |_, data, r| data.search.results.update(r),
     )
+    .on_command(SET_TOPIC, |ctx, topic, data: &mut AppState| {
+        data.search.topic = *topic;
+        if !data.search.input.is_empty() {
+            ctx.submit_command(
+                LOAD_RESULTS.with((data.search.input.clone().into(), data.search.topic)),
+            );
+        }
+    })
     .on_command_async(
         OPEN_LINK,
         |l| WebApi::global().load_spotify_link(&l),
-        |_, data, l| data.search.results.defer(l.id()),
+        |_, data, l| data.search.results.defer((l.id(), None)),
         |ctx, data, (l, r)| match r {
             Ok(nav) => {
                 data.search.results.clear();
                 ctx.submit_command(cmd::NAVIGATE.with(nav));
             }
             Err(err) => {
-                data.search.results.reject(l.id(), err);
+                data.search.results.reject((l.id(), None), err);
             }
         },
     )
