@@ -17,6 +17,15 @@ pub struct CpalOutput {
 }
 
 impl CpalOutput {
+    fn preferred_output_config(
+        device: &cpal::Device,
+    ) -> Result<cpal::SupportedStreamConfig, Error> {
+        // On macOS, enumerating supported configs via `supported_output_configs` can sometimes
+        // cause a SIGSEGV (segmentation fault) in CoreAudio. To be safe, we strictly use
+        // the default output configuration, which is generally what we want anyway.
+        Ok(device.default_output_config()?)
+    }
+
     pub fn open() -> Result<Self, Error> {
         // Open the default output device.
         let device = cpal::default_host()
@@ -49,26 +58,6 @@ impl CpalOutput {
             _handle: handle,
             sink,
         })
-    }
-
-    fn preferred_output_config(
-        device: &cpal::Device,
-    ) -> Result<cpal::SupportedStreamConfig, Error> {
-        const PREFERRED_SAMPLE_FORMAT: cpal::SampleFormat = cpal::SampleFormat::F32;
-        const PREFERRED_SAMPLE_RATE: cpal::SampleRate = cpal::SampleRate(44_100);
-        const PREFERRED_CHANNELS: cpal::ChannelCount = 2;
-
-        for s in device.supported_output_configs()? {
-            let rates = s.min_sample_rate()..=s.max_sample_rate();
-            if s.channels() == PREFERRED_CHANNELS
-                && s.sample_format() == PREFERRED_SAMPLE_FORMAT
-                && rates.contains(&PREFERRED_SAMPLE_RATE)
-            {
-                return Ok(s.with_sample_rate(PREFERRED_SAMPLE_RATE));
-            }
-        }
-
-        Ok(device.default_output_config()?)
     }
 }
 

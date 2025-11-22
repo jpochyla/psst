@@ -1,11 +1,12 @@
 use crate::error::Error;
 use oauth2::{
-    basic::BasicClient, reqwest::http_client, AuthUrl, AuthorizationCode, ClientId, CsrfToken,
-    PkceCodeChallenge, PkceCodeVerifier, RedirectUrl, Scope, TokenResponse, TokenUrl,
+    basic::BasicClient, AuthUrl, AuthorizationCode, ClientId, CsrfToken, PkceCodeChallenge,
+    PkceCodeVerifier, RedirectUrl, Scope, TokenResponse, TokenUrl,
 };
 use std::{
     io::{BufRead, BufReader, Write},
     net::TcpStream,
+
     net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener},
     sync::mpsc,
     time::Duration,
@@ -148,21 +149,17 @@ pub fn send_success_response(stream: &mut TcpStream) {
     let _ = stream.write_all(response.as_bytes());
 }
 
-fn create_spotify_oauth_client(redirect_port: u16) -> BasicClient {
+pub fn generate_auth_url(redirect_port: u16) -> (String, PkceCodeVerifier) {
     let redirect_address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), redirect_port);
     let redirect_uri = format!("http://{redirect_address}/login");
 
-    BasicClient::new(
+    let client = BasicClient::new(
         ClientId::new(crate::session::access_token::CLIENT_ID.to_string()),
-        None,
-        AuthUrl::new("https://accounts.spotify.com/authorize".to_string()).unwrap(),
-        Some(TokenUrl::new("https://accounts.spotify.com/api/token".to_string()).unwrap()),
     )
-    .set_redirect_uri(RedirectUrl::new(redirect_uri).expect("Invalid redirect URL"))
-}
-
-pub fn generate_auth_url(redirect_port: u16) -> (String, PkceCodeVerifier) {
-    let client = create_spotify_oauth_client(redirect_port);
+    .set_auth_uri(AuthUrl::new("https://accounts.spotify.com/authorize".to_string()).unwrap())
+    .set_token_uri(TokenUrl::new("https://accounts.spotify.com/api/token".to_string()).unwrap())
+    .set_redirect_uri(RedirectUrl::new(redirect_uri).expect("Invalid redirect URL"));
+    
     let (pkce_challenge, pkce_verifier) = PkceCodeChallenge::new_random_sha256();
 
     let (auth_url, _) = client
@@ -179,12 +176,69 @@ pub fn exchange_code_for_token(
     code: AuthorizationCode,
     pkce_verifier: PkceCodeVerifier,
 ) -> String {
-    let client = create_spotify_oauth_client(redirect_port);
+    let redirect_address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), redirect_port);
+    let redirect_uri = format!("http://{redirect_address}/login");
+
+    let client = BasicClient::new(
+        ClientId::new(crate::session::access_token::CLIENT_ID.to_string()),
+    )
+    .set_auth_uri(AuthUrl::new("https://accounts.spotify.com/authorize".to_string()).unwrap())
+    .set_token_uri(TokenUrl::new("https://accounts.spotify.com/api/token".to_string()).unwrap())
+    .set_redirect_uri(RedirectUrl::new(redirect_uri).expect("Invalid redirect URL"));
 
     let token_response = client
         .exchange_code(code)
         .set_pkce_verifier(pkce_verifier)
-        .request(http_client)
+        .request(&|request: oauth2::HttpRequest| {
+            let method = request.method().as_str();
+            let url = request.uri().to_string();
+
+            let agent = ureq::Agent::new_with_defaults();
+
+            let result = match method {
+                "POST" => {
+                    let mut builder = agent.post(&url);
+                    for (name, value) in request.headers().iter() {
+                        if let Ok(v) = value.to_str() {
+                            builder = builder.header(name.as_str(), v);
+                        }
+                    }
+                    builder.send(request.body())
+                }
+                "GET" => {
+                    let mut builder = agent.get(&url);
+                    for (name, value) in request.headers().iter() {
+                        if let Ok(v) = value.to_str() {
+                            builder = builder.header(name.as_str(), v);
+                        }
+                    }
+                    builder.call()
+                }
+                _ => return Err(Error::OAuthError(format!("Unsupported method: {}", method))),
+            };
+
+            let response = result.map_err(|e| Error::OAuthError(e.to_string()))?;
+
+            let mut response_builder = oauth2::http::Response::builder()
+                .status(response.status())
+                .version(response.version());
+
+            for (name, value) in response.headers().iter() {
+                response_builder = response_builder.header(name, value);
+            }
+
+            let mut body = Vec::new();
+            use std::io::Read;
+            response
+                .into_body()
+                .into_reader()
+                .read_to_end(&mut body)
+                .map_err(|e| Error::OAuthError(e.to_string()))?;
+
+            response_builder
+                .body(body)
+                .map_err(|e| Error::OAuthError(e.to_string()))
+        })
         .expect("Failed to exchange code for token");
 
     token_response.access_token().secret().to_string()

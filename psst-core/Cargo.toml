@@ -6,38 +6,37 @@ edition = "2021"
 
 
 [build-dependencies]
-gix-config = "0.45.1"
-time = { version = "0.3.36", features = ["local-offset"] }
+gix-config = "0.47.1"
+time = { version = "0.3.44", features = ["local-offset"] }
 
 [dependencies]
 psst-protocol = { path = "../psst-protocol" }
 rustfm-scrobble = "1.1.1"
 
 # Login5 dependencies
-librespot-protocol = "0.7.1"
+librespot-protocol = "0.8.0"
 protobuf = "3"
-sysinfo = "0.35.0"
+sysinfo = "0.37.2"
 data-encoding = "2.9"
 
 # Common
 byteorder = { version = "1.5.0" }
-crossbeam-channel = { version = "0.5.13" }
+crossbeam-channel = { version = "0.5.15" }
 git-version = { version = "0.3.9" }
-log = { version = "0.4.22" }
+log = { version = "0.4.28" }
 num-bigint = { version = "0.4.6", features = ["rand"] }
 num-traits = { version = "0.2.19" }
-oauth2 = { version = "4.4.2" }
-once_cell = { version = "1.20.2" }
-parking_lot = { version = "0.12.3" }
+oauth2 = { version = "5.0.0" }
+parking_lot = { version = "0.12.5" }
 quick-protobuf = { version = "0.8.1" }
-rand = { version = "0.9.1" }
-rangemap = { version = "1.5.1" }
-serde = { version = "1.0.210", features = ["derive"] }
-serde_json = { version = "1.0.132" }
+rand = { version = "0.9.2" }
+rangemap = { version = "1.7.0" }
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = { version = "1.0.145" }
 socks = { version = "0.3.4" }
-tempfile = { version = "3.13.0" }
-ureq = { version = "3.0.11", features = ["json"] }
-url = { version = "2.5.2" }
+tempfile = { version = "3.23.0" }
+ureq = { version = "3.1.4", features = ["json"] }
+url = { version = "2.5.7" }
 
 # Cryptography
 aes = { version = "0.8.4" }
@@ -47,16 +46,16 @@ sha-1 = { version = "0.10.1" }
 shannon = { version = "0.2.0" }
 
 # Audio
-audio_thread_priority = "0.33.0"
-cpal = { version = "0.15.3", optional = true }
+audio_thread_priority = "0.34.0"
+cpal = { version = "0.16.0", optional = true }
 cubeb = { git = "https://github.com/mozilla/cubeb-rs", optional = true }
 libsamplerate = { version = "0.1.0" }
 rb = { version = "0.4.1" }
-symphonia = { version = "0.5.4", default-features = false, features = [
+symphonia = { version = "0.5.5", default-features = false, features = [
   "ogg",
   "vorbis",
   "mp3",
 ] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
-windows = { version = "0.61.1", features = ["Win32_System_Com"], default-features = false }
+windows = { version = "0.62.2", features = ["Win32_System_Com"], default-features = false }

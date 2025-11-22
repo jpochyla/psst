@@ -1495,7 +1495,9 @@ impl WebApi {
         } else {
             image::load_from_memory(&body)?
         };
-        let image_buf = ImageBuf::from_dynamic_image(image);
+
+        let cropped_image = crate::data::utils::crop_to_square(image);
+        let image_buf = ImageBuf::from_dynamic_image(cropped_image);
         self.cache.set_image(uri, image_buf.clone());
         Ok(image_buf)
     }
