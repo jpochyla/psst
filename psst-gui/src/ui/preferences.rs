@@ -582,7 +582,8 @@ impl Authenticate {
                 .map_err(|e| e.to_string())?;
 
                 // Exchange code for access token
-                let token = oauth::exchange_code_for_token(8888, code, pkce_verifier);
+                let token = oauth::exchange_code_for_token(8888, code, pkce_verifier)
+                    .map_err(|e| e.to_string())?;
 
                 // Try to authenticate with token, with retries
                 let mut retries = 3;
