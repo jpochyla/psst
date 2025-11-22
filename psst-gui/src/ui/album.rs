@@ -143,7 +143,7 @@ pub fn album_widget(horizontal: bool) -> impl Widget<WithCtx<Arc<Album>>> {
     let album_layout = if horizontal {
         Flex::column()
             .with_child(album_cover)
-            .with_default_spacer()
+            .with_spacer(theme::grid(1.0))
             .with_child(
                 Flex::column()
                     .cross_axis_alignment(CrossAxisAlignment::Start)
@@ -153,8 +153,7 @@ pub fn album_widget(horizontal: bool) -> impl Widget<WithCtx<Arc<Album>>> {
                     .with_spacer(1.0)
                     .with_child(album_date)
                     .align_horizontal(UnitPoint::CENTER)
-                    .align_vertical(UnitPoint::TOP)
-                    .fix_size(theme::grid(16.0), theme::grid(8.0)),
+                    .fix_width(theme::grid(16.0)), // Fixed width to match image
             )
             .align_left()
     } else {

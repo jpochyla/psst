@@ -334,10 +334,12 @@ pub fn playlist_widget(horizontal: bool) -> impl Widget<WithCtx<Playlist>> {
 
     let (playlist_name, playlist_description) = if horizontal {
         (
-            playlist_name.fix_width(playlist_image_size).align_left(),
+            playlist_name
+                .fix_width(playlist_image_size)
+                .align_horizontal(UnitPoint::CENTER),
             playlist_description
                 .fix_width(playlist_image_size)
-                .align_left(),
+                .align_horizontal(UnitPoint::CENTER),
         )
     } else {
         (
@@ -349,7 +351,7 @@ pub fn playlist_widget(horizontal: bool) -> impl Widget<WithCtx<Playlist>> {
     let playlist = if horizontal {
         Flex::column()
             .with_child(playlist_image)
-            .with_default_spacer()
+            .with_spacer(theme::grid(1.0))
             .with_child(
                 Flex::column()
                     .with_child(playlist_name)

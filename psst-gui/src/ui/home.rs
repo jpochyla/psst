@@ -1,23 +1,16 @@
 use std::sync::Arc;
 
 use druid::im::Vector;
-use druid::widget::{Either, Flex, Label, Scroll};
+use druid::widget::{Either, Flex, Scroll};
 use druid::{widget::List, LensExt, Selector, Widget, WidgetExt};
 
-use crate::data::{Artist, Ctx, HomeDetail, MixedView, Show, Shows, Track, WithCtx};
+use crate::data::{AppState, Artist, Ctx, HomeDetail, MixedView, Show, Shows, Track, WithCtx};
 use crate::ui::library::{LOAD_SHOWS, SAVE_SHOW, UNSAVE_SHOW};
-use crate::widget::Empty;
-use crate::{
-    data::AppState,
-    webapi::WebApi,
-    widget::{Async, MyWidgetExt},
-};
+use crate::webapi::WebApi;
+use crate::widget::{Async, Empty, MyWidgetExt};
 
-use super::{album, artist, playable, show, theme, track};
-use super::{
-    playlist,
-    utils::{error_widget, spinner_widget},
-};
+use super::{album, artist, playable, playlist, show, track, utils};
+use crate::ui::utils::{error_widget, spinner_widget};
 
 pub const LOAD_MADE_FOR_YOU: Selector = Selector::new("app.home.load-made-for-your");
 
@@ -31,19 +24,8 @@ pub fn home_widget() -> impl Widget<AppState> {
         .with_child(uniquely_yours())
         .with_child(your_shows())
         .with_child(shows_that_you_might_like())
-        .with_child(simple_title_label("Your top artists"))
         .with_child(user_top_artists_widget())
-        .with_child(simple_title_label("Your top tracks"))
         .with_child(user_top_tracks_widget())
-}
-
-fn simple_title_label(title: &str) -> impl Widget<AppState> {
-    Flex::column().with_default_spacer().with_child(
-        Label::new(title)
-            .with_text_size(theme::grid(2.5))
-            .align_left()
-            .padding((theme::grid(1.5), 0.0)),
-    )
 }
 
 fn made_for_you() -> impl Widget<AppState> {
@@ -85,13 +67,7 @@ fn uniquely_yours_results_widget() -> impl Widget<WithCtx<MixedView>> {
         |results: &WithCtx<MixedView>, _| results.data.playlists.is_empty(),
         Empty,
         Flex::column()
-            .with_default_spacer()
-            .with_child(
-                Label::new("Uniquely yours")
-                    .with_text_size(theme::grid(2.5))
-                    .align_left()
-                    .padding((theme::grid(1.5), theme::grid(1.5))),
-            )
+            .with_child(utils::header_widget("Uniquely yours"))
             .with_child(
                 Scroll::new(Flex::row().with_child(playlist_results_widget())).align_left(),
             ),
@@ -283,16 +259,7 @@ fn title_label() -> impl Widget<WithCtx<MixedView>> {
     Either::new(
         |title_check: &Arc<str>, _| title_check.is_empty(),
         Empty,
-        Flex::column()
-            .with_default_spacer()
-            .with_child(
-                Label::raw()
-                    .with_text_size(theme::grid(2.5))
-                    .align_left()
-                    .padding((theme::grid(1.5), theme::grid(0.5))),
-            )
-            .with_default_spacer()
-            .align_left(),
+        utils::header_widget(|data: &Arc<str>, _: &_| data.to_string()),
     )
     .lens(Ctx::data().then(MixedView::title))
 }
@@ -348,7 +315,18 @@ fn show_results_widget() -> impl Widget<WithCtx<MixedView>> {
 fn user_top_artists_widget() -> impl Widget<AppState> {
     Async::new(
         spinner_widget,
-        || Scroll::new(List::new(|| artist::artist_widget(true)).horizontal()).horizontal(),
+        || {
+            Either::new(
+                |data: &Vector<Artist>, _| data.is_empty(),
+                Empty,
+                Flex::column()
+                    .with_child(utils::header_widget("Your top artists"))
+                    .with_child(
+                        Scroll::new(List::new(|| artist::artist_widget(true)).horizontal())
+                            .horizontal(),
+                    ),
+            )
+        },
         error_widget,
     )
     .lens(AppState::home_detail.then(HomeDetail::user_top_artists))
@@ -361,15 +339,21 @@ fn user_top_artists_widget() -> impl Widget<AppState> {
 }
 
 fn top_tracks_widget() -> impl Widget<WithCtx<Vector<Arc<Track>>>> {
-    playable::list_widget(playable::Display {
-        track: track::Display {
-            title: true,
-            album: true,
-            popularity: true,
-            cover: true,
-            ..track::Display::empty()
-        },
-    })
+    Either::new(
+        |data: &WithCtx<Vector<Arc<Track>>>, _| data.data.is_empty(),
+        Empty,
+        Flex::column()
+            .with_child(utils::header_widget("Your top tracks"))
+            .with_child(playable::list_widget(playable::Display {
+                track: track::Display {
+                    title: true,
+                    album: true,
+                    popularity: true,
+                    cover: true,
+                    ..track::Display::empty()
+                },
+            })),
+    )
 }
 
 fn user_top_tracks_widget() -> impl Widget<AppState> {
