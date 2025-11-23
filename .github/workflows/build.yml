@@ -104,17 +104,17 @@ jobs:
         if: runner.os == 'macOS' && !steps.cache-tools.outputs.cache-hit
         run: brew install create-dmg
 
-      - name: Create macOS universal binary
-        if: runner.os == 'macOS'
-        run: |
-          mkdir -p psst-gui/target/release
-          lipo -create -output psst-gui/target/release/psst-gui \
-            target/x86_64-apple-darwin/release/psst-gui \
-            target/aarch64-apple-darwin/release/psst-gui
-
       - name: Bundle macOS Release
         if: runner.os == 'macOS'
         run: cargo bundle --release
+        working-directory: psst-gui
+
+      - name: Create macOS universal binary
+        if: runner.os == 'macOS'
+        run: |
+          lipo -create -output ../target/release/bundle/osx/Psst.app/Contents/MacOS/Psst \
+            ../target/x86_64-apple-darwin/release/psst-gui \
+            ../target/aarch64-apple-darwin/release/psst-gui
         working-directory: psst-gui
 
       - name: Create DMG
