@@ -38,8 +38,7 @@ use crate::{
 };
 
 use super::{cache::WebApiCache, local::LocalTrackManager};
-use sanitize_html::rules::predefined::DEFAULT;
-use sanitize_html::sanitize_str;
+use sanitize_html::{rules::predefined::DEFAULT, sanitize_str};
 
 pub struct WebApi {
     session: SessionService,
@@ -81,8 +80,6 @@ impl WebApi {
 
     fn request(&self, request: &RequestBuilder) -> Result<Response<Body>, Error> {
         let token = self.access_token()?;
-        let request = request.clone().query("market", "from_token");
-
         match request.get_method() {
             Method::Get => {
                 let mut req = self
@@ -96,12 +93,18 @@ impl WebApi {
                 req.call()
                     .map_err(|err| Error::WebApiError(err.to_string()))
             }
-            Method::Post => self
-                .agent
-                .post(request.build())
-                .header("Authorization", &format!("Bearer {token}"))
-                .send_json(request.get_body())
-                .map_err(|err| Error::WebApiError(err.to_string())),
+            Method::Post => {
+                let mut req = self
+                    .agent
+                    .post(request.build())
+                    .header("Authorization", &format!("Bearer {token}"));
+                for header in request.get_headers() {
+                    req = req.header(header.0, header.1);
+                }
+                println!("{:#?}", req);
+                req.send_json(request.get_body())
+                    .map_err(|err| Error::WebApiError(err.to_string()))
+            }
             Method::Put => self
                 .agent
                 .put(request.build())
@@ -211,7 +214,8 @@ impl WebApi {
         }
     }
 
-    /// Very similar to `for_all_pages`, but only returns a certain number of results
+    /// Very similar to `for_all_pages`, but only returns a certain number of
+    /// results
     fn for_some_pages<T: DeserializeOwned + Clone>(
         &self,
         request: &RequestBuilder,
@@ -270,7 +274,8 @@ impl WebApi {
         Ok(results)
     }
 
-    /// Does a similar thing as `load_all_pages`, but limiting the number of results
+    /// Does a similar thing as `load_all_pages`, but limiting the number of
+    /// results
     fn load_some_pages<T: DeserializeOwned + Clone>(
         &self,
         request: &RequestBuilder,
@@ -731,10 +736,12 @@ impl WebApi {
 
         for album in result {
             match album.album_type {
-                // Spotify is labeling albums and singles that should be labeled `appears_on` as `album` or `single`.
-                // They are still ordered properly though, with the most recent first, then 'appears_on'.
-                // So we just wait until they are no longer descending, then start putting them in the 'appears_on' Vec.
-                // NOTE: This will break if an artist has released 'appears_on' albums/singles before their first actual album/single.
+                // Spotify is labeling albums and singles that should be labeled `appears_on` as
+                // `album` or `single`. They are still ordered properly though, with
+                // the most recent first, then 'appears_on'. So we just wait until
+                // they are no longer descending, then start putting them in the 'appears_on' Vec.
+                // NOTE: This will break if an artist has released 'appears_on' albums/singles
+                // before their first actual album/single.
                 AlbumType::Album => {
                     if album.release_year_int() > last_album_release_year {
                         artist_albums.appears_on.push_back(album)
@@ -1131,8 +1138,6 @@ impl WebApi {
             "extensions": {
                 "persistedQuery": {
                     "version": 1,
-                    // From https://github.com/KRTirtho/spotube/blob/9b024120601c0d381edeab4460cb22f87149d0f8/lib%2Fservices%2Fcustom_spotify_endpoints%2Fspotify_endpoints.dart
-                    // Keep and eye on this and change accordingly
                     "sha256Hash": "eb3fba2d388cf4fc4d696b1757a58584e9538a3b515ea742e9cc9465807340be"
                 }
             },
@@ -1150,16 +1155,18 @@ impl WebApi {
         let request =
             &RequestBuilder::new("pathfinder/v2/query".to_string(), Method::Post, Some(json))
                 .set_base_uri("api-partner.spotify.com")
-                .header("app-platform", "WebPlayer")
-                .header("Content-Type", "application/json");
+                .header(
+                    "User-Agent",
+                    "Mozilla/5.0 (X11; Linux x86_64; rv:143.0) Gecko/20100101 Firefox/143.0",
+                );
 
         // Extract the playlists
         self.load_and_return_home_section(request)
     }
 
     pub fn get_made_for_you(&self) -> Result<MixedView, Error> {
-        // 0JQ5DAqAJXkJGsa2DyEjKi -> Made for you
-        self.get_section("spotify:section:0JQ5DAqAJXkJGsa2DyEjKi")
+        // 0JQ5DAUnp4wcj0bCb3wh3S -> Made for you
+        self.get_section("spotify:section:0JQ5DAUnp4wcj0bCb3wh3S")
     }
 
     pub fn get_top_mixes(&self) -> Result<MixedView, Error> {
@@ -1173,8 +1180,8 @@ impl WebApi {
     }
 
     pub fn uniquely_yours(&self) -> Result<MixedView, Error> {
-        // 0JQ5DAqAJXkJGsa2DyEjKi -> Uniquely yours
-        self.get_section("spotify:section:0JQ5DAqAJXkJGsa2DyEjKi")
+        // 0JQ5DAUnp4wcj0bCb3wh3S -> Uniquely yours
+        self.get_section("spotify:section:0JQ5DAUnp4wcj0bCb3wh3S")
     }
 
     pub fn best_of_artists(&self) -> Result<MixedView, Error> {
@@ -1218,11 +1225,8 @@ impl WebApi {
     }
 
     pub fn unfollow_playlist(&self, id: &str) -> Result<(), Error> {
-        let request = &RequestBuilder::new(
-            format!("v1/playlists/{id}/followers"),
-            Method::Delete,
-            None,
-        );
+        let request =
+            &RequestBuilder::new(format!("v1/playlists/{id}/followers"), Method::Delete, None);
         self.request(request)?;
         Ok(())
     }
@@ -1251,10 +1255,9 @@ impl WebApi {
             Json(serde_json::Value),
         }
 
-        let request =
-            &RequestBuilder::new(format!("v1/playlists/{id}/tracks"), Method::Get, None)
-                .query("marker", "from_token")
-                .query("additional_types", "track");
+        let request = &RequestBuilder::new(format!("v1/playlists/{id}/tracks"), Method::Get, None)
+            .query("marker", "from_token")
+            .query("additional_types", "track");
 
         let result: Vector<PlaylistItem> = self.load_all_pages(request)?;
 
@@ -1275,9 +1278,8 @@ impl WebApi {
     }
 
     pub fn change_playlist_details(&self, id: &str, name: &str) -> Result<(), Error> {
-        let request =
-            &RequestBuilder::new(format!("v1/playlists/{id}/tracks"), Method::Get, None)
-                .set_body(Some(json!({ "name": name })));
+        let request = &RequestBuilder::new(format!("v1/playlists/{id}/tracks"), Method::Get, None)
+            .set_body(Some(json!({ "name": name })));
         self.request(request)?;
         Ok(())
     }
@@ -1530,7 +1532,8 @@ enum Method {
     Get,
 }
 
-// Creating a new URI builder so aid in the creation of uris with extendable queries.
+// Creating a new URI builder so aid in the creation of uris with extendable
+// queries.
 #[derive(Debug, Clone)]
 struct RequestBuilder {
     protocol: String,
