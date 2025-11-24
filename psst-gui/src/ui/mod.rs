@@ -282,7 +282,7 @@ fn root_widget() -> impl Widget<AppState> {
                 }
                 Err(err) => {
                     log::error!("Failed to fetch credits for {}: {:?}", _track.name, err);
-                    data.error_alert(format!("Failed to fetch track credits: {}", err));
+                    data.error_alert(format!("Failed to fetch track credits: {err}"));
                 }
             },
         )

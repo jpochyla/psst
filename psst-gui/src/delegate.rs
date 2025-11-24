@@ -225,7 +225,7 @@ impl AppDelegate<AppState> for Delegate {
             Handled::Yes
         } else if let Some((url, title)) = cmd.get(DOWNLOAD_ARTWORK) {
             let safe_title = title.replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|'], "_");
-            let file_name = format!("{} cover.jpg", safe_title);
+            let file_name = format!("{safe_title} cover.jpg");
 
             if let Some(user_dirs) = UserDirs::new() {
                 if let Some(download_dir) = user_dirs.download_dir() {
@@ -341,7 +341,7 @@ impl Delegate {
                                 .unwrap();
                         }
                         Err(err) => {
-                            log::warn!("failed to fetch image: {}", err)
+                            log::warn!("failed to fetch image: {err}")
                         }
                     }
                 });

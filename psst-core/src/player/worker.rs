@@ -290,7 +290,7 @@ impl Worker {
         if let Err(err) =
             audio_thread_priority::promote_current_thread_to_real_time(0, input.signal_spec().rate)
         {
-            log::warn!("failed to promote thread to audio priority: {}", err);
+            log::warn!("failed to promote thread to audio priority: {err}");
         }
 
         Self {
@@ -337,7 +337,7 @@ impl Worker {
                 self.output.clear();
             }
             Err(err) => {
-                log::error!("failed to seek: {}", err);
+                log::error!("failed to seek: {err}");
             }
         }
         Ok(Act::Continue)

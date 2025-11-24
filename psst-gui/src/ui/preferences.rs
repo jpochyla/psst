@@ -312,7 +312,7 @@ impl<W: Widget<Preferences>> Controller<Preferences, W> for CacheController {
             Event::Command(cmd) if cmd.is(CLEAR_CACHE) => {
                 if let Some(cache) = &data.cache {
                     if let Err(err) = cache.clear() {
-                        log::error!("Failed to clear cache: {}", err);
+                        log::error!("Failed to clear cache: {err}");
                     } else {
                         // After clearing, re-measure the cache size.
                         self.start_measuring(ctx.get_external_handle(), ctx.widget_id());
@@ -593,7 +593,7 @@ impl Authenticate {
                     }) {
                         Ok(credentials) => return Ok(credentials),
                         Err(e) if retries > 1 => {
-                            log::warn!("authentication failed, retrying: {:?}", e);
+                            log::warn!("authentication failed, retrying: {e:?}");
                             retries -= 1;
                         }
                         Err(e) => return Err(e),
@@ -677,7 +677,7 @@ impl<W: Widget<AppState>> Controller<AppState, W> for Authenticate {
 
                 data.preferences.lastfm_auth_result = Some("Connecting...".to_string());
                 let port = 8889;
-                let callback_url = format!("http://127.0.0.1:{}/lastfm_callback", port);
+                let callback_url = format!("http://127.0.0.1:{port}/lastfm_callback");
                 let socket_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), port);
 
                 match lastfm::generate_lastfm_auth_url(&api_key, &callback_url) {
@@ -692,7 +692,7 @@ impl<W: Widget<AppState>> Controller<AppState, W> for Authenticate {
                                 .map_err(|e| e.to_string())?;
                                 log::info!("received Last.fm token, exchanging...");
                                 lastfm::exchange_token_for_session(&api_key, &api_secret, &token)
-                                    .map_err(|e| format!("Token exchange failed: {}", e))
+                                    .map_err(|e| format!("Token exchange failed: {e}"))
                             },
                             Self::LASTFM_RESPONSE,
                             self.lastfm_thread.take(),
@@ -706,7 +706,7 @@ impl<W: Widget<AppState>> Controller<AppState, W> for Authenticate {
                     }
                     Err(e) => {
                         data.preferences.lastfm_auth_result =
-                            Some(format!("Failed to create auth URL: {}", e));
+                            Some(format!("Failed to create auth URL: {e}"));
                     }
                 }
                 ctx.set_handled();

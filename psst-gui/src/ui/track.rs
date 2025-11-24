@@ -112,9 +112,9 @@ pub fn playable_widget(track: &Track, display: Display) -> impl Widget<PlayRow<A
             String::new()
         };
         if !artist.is_empty() && !album.is_empty() {
-            format!("{} • {}", artist, album)
+            format!("{artist} • {album}")
         } else {
-            format!("{}{}", artist, album)
+            format!("{artist}{album}")
         }
     })
     .with_line_break_mode(LineBreaking::Clip)

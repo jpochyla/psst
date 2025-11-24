@@ -30,7 +30,7 @@ fn create_cache_dirs(base: &Path) -> io::Result<()> {
 
 impl Cache {
     pub fn new(base: PathBuf) -> Result<CacheHandle, Error> {
-        log::info!("using cache: {:?}", base);
+        log::info!("using cache: {base:?}");
 
         // Create the cache structure.
         create_cache_dirs(&base)?;
@@ -65,7 +65,7 @@ impl Cache {
     }
 
     pub fn save_track(&self, item_id: ItemId, track: &Track) -> Result<(), Error> {
-        log::debug!("saving track to cache: {:?}", item_id);
+        log::debug!("saving track to cache: {item_id:?}");
         fs::write(self.track_path(item_id), serialize_protobuf(track)?)?;
         Ok(())
     }
@@ -83,7 +83,7 @@ impl Cache {
     }
 
     pub fn save_episode(&self, item_id: ItemId, episode: &Episode) -> Result<(), Error> {
-        log::debug!("saving episode to cache: {:?}", item_id);
+        log::debug!("saving episode to cache: {item_id:?}");
         fs::write(self.episode_path(item_id), serialize_protobuf(episode)?)?;
         Ok(())
     }
@@ -106,7 +106,7 @@ impl Cache {
         file_id: FileId,
         key: &AudioKey,
     ) -> Result<(), Error> {
-        log::debug!("saving audio key to cache: {:?}:{:?}", item_id, file_id);
+        log::debug!("saving audio key to cache: {item_id:?}:{file_id:?}");
         fs::write(self.audio_key_path(item_id, file_id), key.0)?;
         Ok(())
     }
@@ -126,7 +126,7 @@ impl Cache {
     }
 
     pub fn save_audio_file(&self, file_id: FileId, from_path: PathBuf) -> Result<(), Error> {
-        log::debug!("saving audio file to cache: {:?}", file_id);
+        log::debug!("saving audio file to cache: {file_id:?}");
         fs::copy(from_path, self.audio_file_path(file_id))?;
         Ok(())
     }
