@@ -38,8 +38,7 @@ use crate::{
 };
 
 use super::{cache::WebApiCache, local::LocalTrackManager};
-use sanitize_html::rules::predefined::DEFAULT;
-use sanitize_html::sanitize_str;
+use sanitize_html::{rules::predefined::DEFAULT, sanitize_str};
 
 pub struct WebApi {
     session: SessionService,
@@ -211,7 +210,8 @@ impl WebApi {
         }
     }
 
-    /// Very similar to `for_all_pages`, but only returns a certain number of results
+    /// Very similar to `for_all_pages`, but only returns a certain number of
+    /// results
     fn for_some_pages<T: DeserializeOwned + Clone>(
         &self,
         request: &RequestBuilder,
@@ -270,7 +270,8 @@ impl WebApi {
         Ok(results)
     }
 
-    /// Does a similar thing as `load_all_pages`, but limiting the number of results
+    /// Does a similar thing as `load_all_pages`, but limiting the number of
+    /// results
     fn load_some_pages<T: DeserializeOwned + Clone>(
         &self,
         request: &RequestBuilder,
@@ -671,6 +672,26 @@ impl WebApi {
     }
 }
 
+/// Public user endpoints.
+impl WebApi {
+    // User profile
+    // https://spclient.wg.spotify.com/user-profile-view/v3/profile/florence.flossie.morrison?playlist_limit=10&artist_limit=10&episode_limit=10&market=from_token
+    // Get public playlists
+    // https://spclient.wg.spotify.com/user-profile-view/v3/profile/florence.flossie.morrison/playlists?offset=0&limit=200&market=from_token
+    // Recenlty played
+    // https://spclient.wg.spotify.com/recently-played/v3/user/27062006so9010sami/recently-played?format=json&offset=0&limit=50&filter=default%2Ccollection-new-episodes&market=from_token
+    // Followers
+    // https://spclient.wg.spotify.com/user-profile-view/v3/profile/florence.flossie.morrison/followers?market=from_token
+    // Following
+    // https://spclient.wg.spotify.com/user-profile-view/v3/profile/florence.flossie.morrison/following?market=from_token
+    // Follow/unfollow
+    // https://api-partner.spotify.com/pathfinder/v2/query
+    /*
+        {"variables":{"usernames":["florence.flossie.morrison"]},"operationName":"followUsers","extensions":{"persistedQuery":{"version":1,"sha256Hash":"c00e0cb6c7766e7230fc256cf4fe07aec63b53d1160a323940fce7b664e95596"}}}
+    */
+    pub fn get_public_user_profile(&self, user: PublicUser) {}
+}
+
 /// User endpoints.
 impl WebApi {
     // https://developer.spotify.com/documentation/web-api/reference/get-users-profile
@@ -731,10 +752,12 @@ impl WebApi {
 
         for album in result {
             match album.album_type {
-                // Spotify is labeling albums and singles that should be labeled `appears_on` as `album` or `single`.
-                // They are still ordered properly though, with the most recent first, then 'appears_on'.
-                // So we just wait until they are no longer descending, then start putting them in the 'appears_on' Vec.
-                // NOTE: This will break if an artist has released 'appears_on' albums/singles before their first actual album/single.
+                // Spotify is labeling albums and singles that should be labeled `appears_on` as
+                // `album` or `single`. They are still ordered properly though, with
+                // the most recent first, then 'appears_on'. So we just wait until
+                // they are no longer descending, then start putting them in the 'appears_on' Vec.
+                // NOTE: This will break if an artist has released 'appears_on' albums/singles
+                // before their first actual album/single.
                 AlbumType::Album => {
                     if album.release_year_int() > last_album_release_year {
                         artist_albums.appears_on.push_back(album)
@@ -1218,11 +1241,8 @@ impl WebApi {
     }
 
     pub fn unfollow_playlist(&self, id: &str) -> Result<(), Error> {
-        let request = &RequestBuilder::new(
-            format!("v1/playlists/{id}/followers"),
-            Method::Delete,
-            None,
-        );
+        let request =
+            &RequestBuilder::new(format!("v1/playlists/{id}/followers"), Method::Delete, None);
         self.request(request)?;
         Ok(())
     }
@@ -1251,10 +1271,9 @@ impl WebApi {
             Json(serde_json::Value),
         }
 
-        let request =
-            &RequestBuilder::new(format!("v1/playlists/{id}/tracks"), Method::Get, None)
-                .query("marker", "from_token")
-                .query("additional_types", "track");
+        let request = &RequestBuilder::new(format!("v1/playlists/{id}/tracks"), Method::Get, None)
+            .query("marker", "from_token")
+            .query("additional_types", "track");
 
         let result: Vector<PlaylistItem> = self.load_all_pages(request)?;
 
@@ -1275,9 +1294,8 @@ impl WebApi {
     }
 
     pub fn change_playlist_details(&self, id: &str, name: &str) -> Result<(), Error> {
-        let request =
-            &RequestBuilder::new(format!("v1/playlists/{id}/tracks"), Method::Get, None)
-                .set_body(Some(json!({ "name": name })));
+        let request = &RequestBuilder::new(format!("v1/playlists/{id}/tracks"), Method::Get, None)
+            .set_body(Some(json!({ "name": name })));
         self.request(request)?;
         Ok(())
     }
@@ -1530,7 +1548,8 @@ enum Method {
     Get,
 }
 
-// Creating a new URI builder so aid in the creation of uris with extendable queries.
+// Creating a new URI builder so aid in the creation of uris with extendable
+// queries.
 #[derive(Debug, Clone)]
 struct RequestBuilder {
     protocol: String,
