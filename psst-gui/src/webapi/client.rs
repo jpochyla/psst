@@ -17,10 +17,10 @@ use druid::{
 use itertools::Itertools;
 use log::info;
 use parking_lot::Mutex;
+use psst_core::session::{login5::Login5, SessionService};
 use serde::{de::DeserializeOwned, Deserialize};
 use serde_json::json;
 use std::sync::OnceLock;
-use psst_core::session::{login5::Login5, SessionService};
 use ureq::{
     http::{Response, StatusCode},
     Agent, Body,
@@ -28,17 +28,18 @@ use ureq::{
 
 use crate::{
     data::{
-        self, utils::sanitize_html_string, Album, AlbumType, Artist, ArtistAlbums, ArtistInfo,
-        ArtistLink, ArtistStats, AudioAnalysis, Cached, Episode, EpisodeId, EpisodeLink, Image,
-        MixedView, Nav, Page, Playlist, PublicUser, Range, Recommendations, RecommendationsRequest,
-        SearchResults, SearchTopic, Show, SpotifyUrl, Track, TrackLines, UserProfile,
+        self,
+        utils::{crop_to_square, sanitize_html_string},
+        Album, AlbumType, Artist, ArtistAlbums, ArtistInfo, ArtistLink, ArtistStats, AudioAnalysis,
+        Cached, Episode, EpisodeId, EpisodeLink, Image, MixedView, Nav, Page, Playlist, PublicUser,
+        Range, Recommendations, RecommendationsRequest, SearchResults, SearchTopic, Show,
+        SpotifyUrl, Track, TrackLines, UserProfile,
     },
     error::Error,
     ui::credits::TrackCredits,
 };
 
 use super::{cache::WebApiCache, local::LocalTrackManager};
-use crate::data::utils::crop_to_square;
 use sanitize_html::rules::predefined::DEFAULT;
 use sanitize_html::sanitize_str;
 
