@@ -157,19 +157,27 @@ impl Config {
         ProjectDirs::from("", "", APP_NAME)
     }
 
+    fn platform_path(path: &Path) -> PathBuf {
+        if cfg!(target_os = "windows") {
+            path.parent().unwrap_or(path).to_path_buf()
+        } else {
+            path.to_path_buf()
+        }
+    }
+
     pub fn spotify_local_files_file(username: &str) -> Option<PathBuf> {
         ProjectDirs::from("", "", "spotify").map(|dir| {
             let path = format!("Users/{username}-user/local-files.bnk");
-            dir.config_dir().join(path)
+            Self::platform_path(dir.config_dir()).join(path)
         })
     }
 
     pub fn cache_dir() -> Option<PathBuf> {
-        Self::app_dirs().map(|dirs| dirs.cache_dir().to_path_buf())
+        Self::app_dirs().map(|dirs| Self::platform_path(dirs.cache_dir()))
     }
 
     pub fn config_dir() -> Option<PathBuf> {
-        Self::app_dirs().map(|dirs| dirs.config_dir().to_path_buf())
+        Self::app_dirs().map(|dirs| Self::platform_path(dirs.config_dir()))
     }
 
     fn config_path() -> Option<PathBuf> {
