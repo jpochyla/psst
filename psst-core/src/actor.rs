@@ -50,7 +50,7 @@ pub trait Actor: Sized {
             act = match self.handle(msg) {
                 Ok(act) => act,
                 Err(err) => {
-                    log::error!("error: {}", err);
+                    log::error!("error: {err}");
                     break;
                 }
             };

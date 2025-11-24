@@ -42,8 +42,7 @@ impl AccessToken {
         }
 
         let token: MercuryAccessToken = session.connected()?.get_mercury_json(format!(
-            "hm://keymaster/token/authenticated?client_id={}&scope={}",
-            CLIENT_ID, ACCESS_SCOPES
+            "hm://keymaster/token/authenticated?client_id={CLIENT_ID}&scope={ACCESS_SCOPES}",
         ))?;
 
         Ok(Self {

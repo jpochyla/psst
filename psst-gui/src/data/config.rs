@@ -161,7 +161,7 @@ impl Config {
 
     pub fn spotify_local_files_file(username: &str) -> Option<PathBuf> {
         AppDirs::new(Some("spotify"), false).map(|dir| {
-            let path = format!("Users/{}-user/local-files.bnk", username);
+            let path = format!("Users/{username}-user/local-files.bnk");
             dir.config_dir.join(path)
         })
     }
@@ -252,10 +252,11 @@ impl Config {
     }
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Data, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Data, Serialize, Deserialize, Default)]
 pub enum AudioQuality {
     Low,
     Normal,
+    #[default]
     High,
 }
 
@@ -269,47 +270,28 @@ impl AudioQuality {
     }
 }
 
-impl Default for AudioQuality {
-    fn default() -> Self {
-        Self::High
-    }
-}
-
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Data, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Data, Serialize, Deserialize, Default)]
 pub enum Theme {
+    #[default]
     Light,
     Dark,
 }
 
-impl Default for Theme {
-    fn default() -> Self {
-        Self::Light
-    }
-}
-
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Data, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Data, Serialize, Deserialize, Default)]
 pub enum SortOrder {
+    #[default]
     Ascending,
     Descending,
 }
-impl Default for SortOrder {
-    fn default() -> Self {
-        Self::Ascending
-    }
-}
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Data, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Data, Serialize, Deserialize, Default)]
 pub enum SortCriteria {
     Title,
     Artist,
     Album,
     Duration,
+    #[default]
     DateAdded,
-}
-impl Default for SortCriteria {
-    fn default() -> Self {
-        Self::DateAdded
-    }
 }
 
 fn get_dir_size(path: &Path) -> Option<u64> {

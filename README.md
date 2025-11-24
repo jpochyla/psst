@@ -23,7 +23,7 @@ You can download the latest release for Windows, Linux, and macOS from the [GitH
 | Debian Package (amd64) | [Download](https://github.com/jpochyla/psst/releases/latest/download/psst-amd64.deb)     |
 | Debian Package (arm64) | [Download](https://github.com/jpochyla/psst/releases/latest/download/psst-arm64.deb)     |
 | macOS                  | [Download](https://github.com/jpochyla/psst/releases/latest/download/Psst.dmg)           |
-| Windows                | [Download](https://github.com/jpochyla/psst/releases/latest/download/psst-gui.exe)       |
+| Windows                | [Download](https://github.com/jpochyla/psst/releases/latest/download/Psst.exe)           |
 
 Unofficial builds of Psst are also available through the [AUR](https://aur.archlinux.org/packages/psst-git) and [Homebrew](https://formulae.brew.sh/cask/psst).
 
@@ -39,13 +39,13 @@ Our user-interface library, Druid, has two possible backends on Linux: GTK and p
 The default Linux backend is GTK.
 Before building on Linux, make sure the required dependencies are installed.
 
-#### Debian/Ubuntu:
+### Debian/Ubuntu
 
 ```shell
 sudo apt-get install libssl-dev libgtk-3-dev libcairo2-dev libasound2-dev
 ```
 
-#### RHEL/Fedora:
+### RHEL/Fedora
 
 ```shell
 sudo dnf install openssl-devel gtk3-devel cairo-devel alsa-lib-devel
@@ -86,21 +86,21 @@ ulimit -d $(( 2 * `ulimit -d` ))
 
 ---
 
-#### Build from Source:
+#### Build from Source
 
 ```shell
 cargo build
 # Append `--release` for a release build.
 ```
 
-#### Run from Source:
+#### Run from Source
 
 ```shell
 cargo run --bin psst-gui
 # Append `--release` for a release build.
 ```
 
-#### Build Installation Bundle (i.e., macOS .app):
+#### Build Installation Bundle (i.e., macOS .app)
 
 ```shell
 cargo install cargo-bundle

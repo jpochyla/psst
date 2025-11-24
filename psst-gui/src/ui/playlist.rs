@@ -434,7 +434,8 @@ fn playlist_info_widget() -> impl Widget<WithCtx<Playlist>> {
     let size = theme::grid(10.0);
     let playlist_cover = cover_widget(size)
         .lens(Ctx::data())
-        .clip(Size::new(size, size).to_rounded_rect(4.0));
+        .clip(Size::new(size, size).to_rounded_rect(4.0))
+        .context_menu(playlist_menu_ctx);
 
     let owner_label = Label::dynamic(|p: &Playlist, _| p.owner.display_name.as_ref().to_string());
 
@@ -443,7 +444,7 @@ fn playlist_info_widget() -> impl Widget<WithCtx<Playlist>> {
         if count == 1 {
             "1 song".to_string()
         } else {
-            format!("{} songs", count)
+            format!("{count} songs")
         }
     })
     .with_text_size(theme::TEXT_SIZE_SMALL);
