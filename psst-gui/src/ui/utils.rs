@@ -14,8 +14,7 @@ use super::theme;
 pub fn header_widget<T: Data>(text: impl Into<LabelText<T>>) -> impl Widget<T> {
     Label::new(text)
         .with_font(theme::UI_FONT_MEDIUM)
-        .with_text_color(theme::PLACEHOLDER_COLOR)
-        .with_text_size(theme::TEXT_SIZE_SMALL)
+        .with_text_size(theme::TEXT_SIZE_NORMAL)
         .padding(Insets::new(0.0, theme::grid(2.0), 0.0, theme::grid(1.0)))
 }
 

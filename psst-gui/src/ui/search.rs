@@ -101,7 +101,7 @@ fn artist_results_widget() -> impl Widget<WithCtx<SearchResults>> {
         Empty,
         Flex::column()
             .with_child(header_widget("Artists"))
-            .with_child(List::new(|| artist::artist_widget(false))),
+            .with_child(List::new(|| artist::artist_widget(false, theme::grid(6.0)))),
     )
     .lens(Ctx::data().then(SearchResults::artists))
 }

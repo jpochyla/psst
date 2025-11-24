@@ -2,14 +2,14 @@ use std::sync::Arc;
 
 use druid::im::Vector;
 use druid::widget::{Either, Flex, Scroll};
-use druid::{widget::List, LensExt, Selector, Widget, WidgetExt};
+use druid::{widget::List, Data, LensExt, Selector, Widget, WidgetExt};
 
 use crate::data::{AppState, Artist, Ctx, HomeDetail, MixedView, Show, Shows, Track, WithCtx};
 use crate::ui::library::{LOAD_SHOWS, SAVE_SHOW, UNSAVE_SHOW};
 use crate::webapi::WebApi;
 use crate::widget::{Async, Empty, MyWidgetExt};
 
-use super::{album, artist, playable, playlist, show, track, utils};
+use super::{album, artist, playable, playlist, show, theme, track, utils};
 use crate::ui::utils::{error_widget, spinner_widget};
 
 pub const LOAD_MADE_FOR_YOU: Selector = Selector::new("app.home.load-made-for-your");
@@ -63,14 +63,10 @@ fn recommended_stations() -> impl Widget<AppState> {
 }
 
 fn uniquely_yours_results_widget() -> impl Widget<WithCtx<MixedView>> {
-    Either::new(
-        |results: &WithCtx<MixedView>, _| results.data.playlists.is_empty(),
-        Empty,
-        Flex::column()
-            .with_child(utils::header_widget("Uniquely yours"))
-            .with_child(
-                Scroll::new(Flex::row().with_child(playlist_results_widget())).align_left(),
-            ),
+    section_widget(
+        "Uniquely yours",
+        || Scroll::new(Flex::row().with_child(playlist_results_widget())).align_left(),
+        |results: &WithCtx<MixedView>| results.data.playlists.is_empty(),
     )
 }
 
@@ -268,7 +264,7 @@ fn artist_results_widget() -> impl Widget<WithCtx<MixedView>> {
     Either::new(
         |artists: &Vector<Artist>, _| artists.is_empty(),
         Empty,
-        Scroll::new(List::new(|| artist::artist_widget(true)).horizontal())
+        Scroll::new(List::new(|| artist::artist_widget(true, theme::grid(16.0))).horizontal())
             .horizontal()
             .align_left(),
     )
@@ -312,19 +308,33 @@ fn show_results_widget() -> impl Widget<WithCtx<MixedView>> {
     .lens(Ctx::map(MixedView::shows))
 }
 
+fn section_widget<T: Data, W: Widget<T> + 'static>(
+    title: &'static str,
+    content: impl Fn() -> W + 'static,
+    is_empty: impl Fn(&T) -> bool + 'static,
+) -> impl Widget<T> {
+    Either::new(
+        move |data: &T, _| is_empty(data),
+        Empty,
+        Flex::column()
+            .with_child(utils::header_widget(title))
+            .with_child(content()),
+    )
+}
+
 fn user_top_artists_widget() -> impl Widget<AppState> {
     Async::new(
         spinner_widget,
         || {
-            Either::new(
-                |data: &Vector<Artist>, _| data.is_empty(),
-                Empty,
-                Flex::column()
-                    .with_child(utils::header_widget("Your top artists"))
-                    .with_child(
-                        Scroll::new(List::new(|| artist::artist_widget(true)).horizontal())
-                            .horizontal(),
-                    ),
+            section_widget(
+                "Your top artists",
+                || {
+                    Scroll::new(
+                        List::new(|| artist::artist_widget(true, theme::grid(16.0))).horizontal(),
+                    )
+                    .horizontal()
+                },
+                |data: &Vector<Artist>| data.is_empty(),
             )
         },
         error_widget,
@@ -339,12 +349,10 @@ fn user_top_artists_widget() -> impl Widget<AppState> {
 }
 
 fn top_tracks_widget() -> impl Widget<WithCtx<Vector<Arc<Track>>>> {
-    Either::new(
-        |data: &WithCtx<Vector<Arc<Track>>>, _| data.data.is_empty(),
-        Empty,
-        Flex::column()
-            .with_child(utils::header_widget("Your top tracks"))
-            .with_child(playable::list_widget(playable::Display {
+    section_widget(
+        "Your top tracks",
+        || {
+            playable::list_widget(playable::Display {
                 track: track::Display {
                     title: true,
                     album: true,
@@ -352,7 +360,9 @@ fn top_tracks_widget() -> impl Widget<WithCtx<Vector<Arc<Track>>>> {
                     cover: true,
                     ..track::Display::empty()
                 },
-            })),
+            })
+        },
+        |data: &WithCtx<Vector<Arc<Track>>>| data.data.is_empty(),
     )
 }
 

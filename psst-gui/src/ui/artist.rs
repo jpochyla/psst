@@ -119,11 +119,11 @@ fn async_related_widget() -> impl Widget<AppState> {
         )
 }
 
-pub fn artist_widget(horizontal: bool) -> impl Widget<Artist> {
+pub fn artist_widget(horizontal: bool, size: f64) -> impl Widget<Artist> {
     let (mut artist, artist_image) = if horizontal {
-        (Flex::column(), cover_widget(theme::grid(16.0)))
+        (Flex::column(), cover_widget(size))
     } else {
-        (Flex::row(), cover_widget(theme::grid(6.0)))
+        (Flex::row(), cover_widget(size))
     };
 
     artist = if horizontal {
@@ -142,7 +142,7 @@ pub fn artist_widget(horizontal: bool) -> impl Widget<Artist> {
                 .with_font(theme::UI_FONT_MEDIUM)
                 .with_line_break_mode(LineBreaking::Clip)
                 .align_horizontal(UnitPoint::CENTER)
-                .fix_width(theme::grid(16.0)), // Set a fixed width for the text, same as image
+                .fix_width(size), // Set a fixed width for the text, same as image
             )
     } else {
         artist
@@ -261,7 +261,7 @@ fn related_widget() -> impl Widget<Cached<Vector<Artist>>> {
         Empty,
         Flex::column()
             .with_child(utils::header_widget("Related Artists"))
-            .with_child(List::new(|| artist_widget(false)).lens(Cached::data)),
+            .with_child(List::new(|| artist_widget(false, theme::grid(6.0))).lens(Cached::data)),
     )
 }
 
