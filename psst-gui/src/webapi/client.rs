@@ -16,12 +16,11 @@ use druid::{
 
 use itertools::Itertools;
 use log::info;
-use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
+use psst_core::session::{login5::Login5, SessionService};
 use serde::{de::DeserializeOwned, Deserialize};
 use serde_json::json;
-
-use psst_core::session::{SessionService};
+use std::sync::OnceLock;
 use ureq::{
     http::{Response, StatusCode},
     Agent, Body,
@@ -41,7 +40,6 @@ use crate::{
 use super::{cache::WebApiCache, local::LocalTrackManager};
 use sanitize_html::rules::predefined::DEFAULT;
 use sanitize_html::sanitize_str;
-use psst_core::session::login5::Login5;
 
 pub struct WebApi {
     session: SessionService,
@@ -657,7 +655,7 @@ impl WebApi {
     }
 }
 
-static GLOBAL_WEBAPI: OnceCell<Arc<WebApi>> = OnceCell::new();
+static GLOBAL_WEBAPI: OnceLock<Arc<WebApi>> = OnceLock::new();
 
 /// Global instance.
 impl WebApi {
@@ -1043,8 +1041,7 @@ impl WebApi {
 
     // https://developer.spotify.com/documentation/web-api/reference/remove-albums-user/
     pub fn unsave_album(&self, id: &str) -> Result<(), Error> {
-        let request =
-            &RequestBuilder::new("v1/me/albums", Method::Delete, None).query("ids", id);
+        let request = &RequestBuilder::new("v1/me/albums", Method::Delete, None).query("ids", id);
         self.send_empty_json(request)
     }
 

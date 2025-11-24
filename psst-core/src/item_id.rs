@@ -1,8 +1,14 @@
-use once_cell::sync::Lazy;
-use std::{collections::HashMap, convert::TryInto, fmt, ops::Deref, path::PathBuf, sync::Mutex};
+use std::{
+    collections::HashMap,
+    convert::TryInto,
+    fmt,
+    ops::Deref,
+    path::PathBuf,
+    sync::{LazyLock, Mutex},
+};
 
-static LOCAL_REGISTRY: Lazy<Mutex<LocalItemRegistry>> =
-    Lazy::new(|| Mutex::new(LocalItemRegistry::new()));
+static LOCAL_REGISTRY: LazyLock<Mutex<LocalItemRegistry>> =
+    LazyLock::new(|| Mutex::new(LocalItemRegistry::new()));
 
 // LocalItemRegistry allows generating IDs for local music files, so they can be
 // treated similarly to files hosted on Spotify's remote servers. IDs are
