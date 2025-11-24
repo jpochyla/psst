@@ -13,8 +13,6 @@ use lru::LruCache;
 use parking_lot::Mutex;
 use psst_core::cache::mkdir_if_not_exists;
 
-use crate::data::utils::crop_to_square;
-
 pub struct WebApiCache {
     base: Option<PathBuf>,
     images: Mutex<LruCache<Arc<str>, ImageBuf>>,
@@ -42,7 +40,6 @@ impl WebApiCache {
         self.key("images", &format!("{hash:016x}"))
             .and_then(|path| std::fs::read(path).ok())
             .and_then(|bytes| image::load_from_memory(&bytes).ok())
-            .map(crop_to_square)
             .map(ImageBuf::from_dynamic_image)
     }
 

@@ -28,12 +28,10 @@ use ureq::{
 
 use crate::{
     data::{
-        self,
-        utils::{crop_to_square, sanitize_html_string},
-        Album, AlbumType, Artist, ArtistAlbums, ArtistInfo, ArtistLink, ArtistStats, AudioAnalysis,
-        Cached, Episode, EpisodeId, EpisodeLink, Image, MixedView, Nav, Page, Playlist, PublicUser,
-        Range, Recommendations, RecommendationsRequest, SearchResults, SearchTopic, Show,
-        SpotifyUrl, Track, TrackLines, UserProfile,
+        self, utils::sanitize_html_string, Album, AlbumType, Artist, ArtistAlbums, ArtistInfo,
+        ArtistLink, ArtistStats, AudioAnalysis, Cached, Episode, EpisodeId, EpisodeLink, Image,
+        MixedView, Nav, Page, Playlist, PublicUser, Range, Recommendations, RecommendationsRequest,
+        SearchResults, SearchTopic, Show, SpotifyUrl, Track, TrackLines, UserProfile,
     },
     error::Error,
     ui::credits::TrackCredits,
@@ -1043,8 +1041,7 @@ impl WebApi {
 
     // https://developer.spotify.com/documentation/web-api/reference/remove-albums-user/
     pub fn unsave_album(&self, id: &str) -> Result<(), Error> {
-        let request =
-            &RequestBuilder::new("v1/me/albums", Method::Delete, None).query("ids", id);
+        let request = &RequestBuilder::new("v1/me/albums", Method::Delete, None).query("ids", id);
         self.send_empty_json(request)
     }
 
@@ -1495,8 +1492,7 @@ impl WebApi {
         } else {
             image::load_from_memory(&body)?
         };
-        let cropped_image = crop_to_square(image);
-        let image_buf = ImageBuf::from_dynamic_image(cropped_image);
+        let image_buf = ImageBuf::from_dynamic_image(image);
         self.cache.set_image(uri, image_buf.clone());
         Ok(image_buf)
     }
