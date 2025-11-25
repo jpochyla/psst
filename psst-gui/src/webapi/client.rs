@@ -904,8 +904,7 @@ impl WebApi {
         let request =
             &RequestBuilder::new("pathfinder/v2/query".to_string(), Method::Post, Some(json))
                 .set_base_uri("api-partner.spotify.com")
-                .header("User-Agent", &Self::user_agent());
-
+                .header("User-Agent", Self::user_agent());
         let result: Cached<Welcome> = self.load_cached(request, "artist-info", id)?;
 
         let hrefs: Vector<String> = result
@@ -1191,7 +1190,7 @@ impl WebApi {
         let request =
             &RequestBuilder::new("pathfinder/v2/query".to_string(), Method::Post, Some(json))
                 .set_base_uri("api-partner.spotify.com")
-                .header("User-Agent", &Self::user_agent());
+                .header("User-Agent", Self::user_agent());
 
         // Extract the playlists
         self.load_and_return_home_section(request)
