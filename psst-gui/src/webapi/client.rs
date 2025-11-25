@@ -880,7 +880,11 @@ impl WebApi {
 
         let request =
             &RequestBuilder::new("pathfinder/v2/query".to_string(), Method::Post, Some(json))
-                .set_base_uri("api-partner.spotify.com");
+                .set_base_uri("api-partner.spotify.com")
+                .header(
+                    "User-Agent",
+                    "Mozilla/5.0 (X11; Linux x86_64; rv:143.0) Gecko/20100101 Firefox/143.0",
+                );
 
         let result: Cached<Welcome> = self.load_cached(request, "artist-info", id)?;
 
