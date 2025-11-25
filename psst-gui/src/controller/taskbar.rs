@@ -42,6 +42,15 @@ pub struct TaskbarManager {
 }
 
 #[cfg(not(windows))]
+use druid::{ExtEventSink, WidgetId};
+
+#[cfg(not(windows))]
+use raw_window_handle::HasRawWindowHandle;
+
+#[cfg(not(windows))]
+use crate::data::PlaybackState;
+
+#[cfg(not(windows))]
 pub struct TaskbarManager;
 
 impl TaskbarManager {
@@ -81,7 +90,7 @@ impl TaskbarManager {
         _window_handle: &dyn HasRawWindowHandle,
         _event_sink: ExtEventSink,
         _widget_id: WidgetId,
-    ) -> Result<Self> {
+    ) -> std::result::Result<Self, ()> {
         Ok(Self)
     }
 
@@ -129,7 +138,8 @@ impl TaskbarManager {
     }
 
     #[cfg(not(windows))]
-    fn initialize(&mut self) -> Result<()> {
+    #[allow(dead_code)]
+    fn initialize(&mut self) -> std::result::Result<(), ()> {
         Ok(())
     }
 
@@ -229,7 +239,7 @@ impl TaskbarManager {
     }
 
     #[cfg(not(windows))]
-    pub fn setup_buttons(&self, _playback_state: PlaybackState) -> Result<()> {
+    pub fn setup_buttons(&self, _playback_state: PlaybackState) -> std::result::Result<(), ()> {
         Ok(())
     }
 
@@ -310,7 +320,7 @@ impl TaskbarManager {
     }
 
     #[cfg(not(windows))]
-    pub fn update_all_buttons(&self, _playback_state: PlaybackState) -> Result<()> {
+    pub fn update_all_buttons(&self, _playback_state: PlaybackState) -> std::result::Result<(), ()> {
         Ok(())
     }
 
