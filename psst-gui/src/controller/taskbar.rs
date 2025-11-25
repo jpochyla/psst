@@ -90,7 +90,10 @@ impl TaskbarManager {
         unsafe {
             let com_result = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
             if !com_result.is_ok() {
-                log::warn!("COM initialization failed or already initialized: {:?}", com_result);
+                log::warn!(
+                    "COM initialization failed or already initialized: {:?}",
+                    com_result
+                );
             }
 
             let taskbar_list: ITaskbarList3 =
@@ -171,7 +174,11 @@ impl TaskbarManager {
             };
 
             let buttons_enabled = playback_state != PlaybackState::Stopped;
-            let button_flags = if buttons_enabled { THBF_ENABLED } else { THBF_DISABLED };
+            let button_flags = if buttons_enabled {
+                THBF_ENABLED
+            } else {
+                THBF_DISABLED
+            };
 
             let mut buttons = [
                 THUMBBUTTON {
@@ -209,7 +216,10 @@ impl TaskbarManager {
             match result {
                 Ok(_) => {}
                 Err(e) => {
-                    log::error!("Failed to add taskbar buttons: HRESULT 0x{:08x}", e.code().0);
+                    log::error!(
+                        "Failed to add taskbar buttons: HRESULT 0x{:08x}",
+                        e.code().0
+                    );
                     return Err(e.into());
                 }
             }
@@ -250,7 +260,11 @@ impl TaskbarManager {
             };
 
             let buttons_enabled = playback_state != PlaybackState::Stopped;
-            let button_flags = if buttons_enabled { THBF_ENABLED } else { THBF_DISABLED };
+            let button_flags = if buttons_enabled {
+                THBF_ENABLED
+            } else {
+                THBF_DISABLED
+            };
 
             let mut buttons = [
                 THUMBBUTTON {

@@ -255,7 +255,7 @@ impl PlaybackController {
                     if let Err(e) = taskbar_manager.update_all_buttons(playback_state) {
                         log::error!("Failed to update taskbar buttons: {:?}", e);
                     }
-                }   
+                }
             }
             self.last_taskbar_state = Some(playback_state);
         }
