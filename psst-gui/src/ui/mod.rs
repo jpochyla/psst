@@ -1,15 +1,13 @@
-use crate::data::config::SortCriteria;
-use crate::data::Track;
-use crate::error::Error;
 use crate::{
     cmd,
     controller::{
         AfterDelay, AlertCleanupController, NavController, SessionController, SortController,
     },
     data::{
-        config::SortOrder, Alert, AlertStyle, AppState, Config, Nav, Playable, Playback, Route,
-        ALERT_DURATION,
+        config::{SortCriteria, SortOrder},
+        Alert, AlertStyle, AppState, Config, Nav, Playable, Playback, Route, Track, ALERT_DURATION,
     },
+    error::Error,
     webapi::WebApi,
     widget::{
         icons, icons::SvgIcon, Border, Empty, MyWidgetExt, Overlay, RemoteImage, ThemeScope,
@@ -17,16 +15,17 @@ use crate::{
     },
 };
 use credits::TrackCredits;
-use druid::widget::Controller;
-use druid::KbKey;
 use druid::{
     im::Vector,
-    widget::{CrossAxisAlignment, Either, Flex, Label, List, Scroll, Slider, Split, ViewSwitcher},
-    Color, Env, Insets, Key, LensExt, Menu, MenuItem, Selector, Widget, WidgetExt, WindowDesc,
+    widget::{
+        Controller, CrossAxisAlignment, Either, Flex, Label, List, Scroll, Slider, Split,
+        ViewSwitcher,
+    },
+    Color, Env, Insets, KbKey, Key, LensExt, Menu, MenuItem, Selector, Widget, WidgetExt,
+    WindowDesc,
 };
 use druid_shell::Cursor;
-use std::sync::Arc;
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
 pub mod album;
 pub mod artist;
@@ -41,6 +40,7 @@ pub mod playable;
 pub mod playback;
 pub mod playlist;
 pub mod preferences;
+pub mod public_user;
 pub mod recommend;
 pub mod search;
 pub mod show;
@@ -106,7 +106,8 @@ pub fn account_setup_window() -> WindowDesc<AppState> {
 pub fn artwork_window() -> WindowDesc<AppState> {
     let win_size = (theme::grid(50.0), theme::grid(50.0));
 
-    // On Windows, the window size includes the titlebar, so we need to account for it
+    // On Windows, the window size includes the titlebar, so we need to account for
+    // it
     let win_size = if cfg!(target_os = "windows") {
         const WINDOWS_TITLEBAR_OFFSET: f64 = 24.0; // Standard Windows titlebar height
         (win_size.0, win_size.1 + WINDOWS_TITLEBAR_OFFSET)
@@ -355,6 +356,11 @@ fn route_widget() -> impl Widget<AppState> {
                     .vertical()
                     .boxed()
             }
+            Route::PublicUser => {
+                Scroll::new(public_user::detail_widget().padding(theme::grid(1.0)))
+                    .vertical()
+                    .boxed()
+            }
             Route::Shows => Scroll::new(library::saved_shows_widget().padding(theme::grid(1.0)))
                 .vertical()
                 .boxed(),
@@ -595,6 +601,7 @@ fn route_icon_widget() -> impl Widget<Nav> {
                     Empty.boxed()
                 }
                 Nav::SearchResults(_) | Nav::Recommendations(_) => icon(&icons::SEARCH).boxed(),
+                Nav::PublicUserDetail(_) => icon(&icons::ACCOUNT).boxed(),
                 Nav::AlbumDetail(_, _) => icon(&icons::ALBUM).boxed(),
                 Nav::ArtistDetail(_) => icon(&icons::ARTIST).boxed(),
                 Nav::PlaylistDetail(_) => icon(&icons::PLAYLIST).boxed(),

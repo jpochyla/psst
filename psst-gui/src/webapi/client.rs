@@ -28,10 +28,11 @@ use ureq::{
 
 use crate::{
     data::{
-        self, utils::sanitize_html_string, Album, AlbumType, Artist, ArtistAlbums, ArtistInfo,
-        ArtistLink, ArtistStats, AudioAnalysis, Cached, Episode, EpisodeId, EpisodeLink, Image,
-        MixedView, Nav, Page, Playlist, PublicUser, Range, Recommendations, RecommendationsRequest,
-        SearchResults, SearchTopic, Show, SpotifyUrl, Track, TrackLines, UserProfile,
+        self, public_user::PublicUserInformation, utils::sanitize_html_string, Album, AlbumType,
+        Artist, ArtistAlbums, ArtistInfo, ArtistLink, ArtistStats, AudioAnalysis, Cached, Episode,
+        EpisodeId, EpisodeLink, Image, MixedView, Nav, Page, Playlist, PublicUser, Range,
+        Recommendations, RecommendationsRequest, SearchResults, SearchTopic, Show, SpotifyUrl,
+        Track, TrackLines, UserProfile,
     },
     error::Error,
     ui::credits::TrackCredits,
@@ -675,21 +676,114 @@ impl WebApi {
 /// Public user endpoints.
 impl WebApi {
     // User profile
-    // https://spclient.wg.spotify.com/user-profile-view/v3/profile/florence.flossie.morrison?playlist_limit=10&artist_limit=10&episode_limit=10&market=from_token
+    // https://spclient.wg.spotify.com/user-profile-view/v3/profile/<urs>?playlist_limit=10&artist_limit=10&episode_limit=10&market=from_token
     // Get public playlists
-    // https://spclient.wg.spotify.com/user-profile-view/v3/profile/florence.flossie.morrison/playlists?offset=0&limit=200&market=from_token
+    // https://spclient.wg.spotify.com/user-profile-view/v3/profile/<urs>/playlists?offset=0&limit=200&market=from_token
     // Recenlty played
-    // https://spclient.wg.spotify.com/recently-played/v3/user/27062006so9010sami/recently-played?format=json&offset=0&limit=50&filter=default%2Ccollection-new-episodes&market=from_token
+    // https://spclient.wg.spotify.com/user-profile-view/v3/profile/<urs>/artists?limit=50&market=from_token
     // Followers
-    // https://spclient.wg.spotify.com/user-profile-view/v3/profile/florence.flossie.morrison/followers?market=from_token
+    // https://spclient.wg.spotify.com/user-profile-view/v3/profile/<urs>/followers?market=from_token
     // Following
-    // https://spclient.wg.spotify.com/user-profile-view/v3/profile/florence.flossie.morrison/following?market=from_token
+    // https://spclient.wg.spotify.com/user-profile-view/v3/profile/<urs>/following?market=from_token
+    // Follow/unfollow
+    // https://api-partner.spotify.com/pathfinder/v2/query
+    /*
+        {"variables":{"usernames":["<urs>"]},"operationName":"followUsers","extensions":{"persistedQuery":{"version":1,"sha256Hash":"c00e0cb6c7766e7230fc256cf4fe07aec63b53d1160a323940fce7b664e95596"}}}
+    */
+    pub fn get_public_user_profile(&self, id: Arc<str>) -> Result<PublicUserInformation, Error> {
+        let req = &RequestBuilder::new(
+            format!("user-profile-view/v3/profile/{}", id),
+            Method::Get,
+            None,
+        )
+        .set_base_uri("spclient.wg.spotify.com")
+        .query("playlist_limit", 10)
+        .query("artist_limit", 10)
+        .query("episode_limit", 10)
+        .query("market", "from_token");
+        let result: serde_json::Value = self.load(&req.clone())?;
+        println!("{:#?}", result);
+        let result = self.load(req)?;
+        Ok(result)
+    }
+
+    pub fn get_public_user_playlists(&self, id: Arc<str>) -> Result<serde_json::Value, Error> {
+        let req = &RequestBuilder::new(
+            format!("user-profile-view/v3/profile/{}/playlists", id),
+            Method::Get,
+            None,
+        )
+        .set_base_uri("spclient.wg.spotify.com")
+        .query("offset", "0")
+        .query("limit", "200")
+        .query("market", "from_token");
+
+        let result: serde_json::Value = self.load(req)?;
+        Ok(result)
+    }
+
+    pub fn get_public_user_recently_played(
+        &self,
+        id: Arc<str>,
+    ) -> Result<serde_json::Value, Error> {
+        let req = &RequestBuilder::new(
+            format!("user-profile-view/v3/profile/{}/artists", id),
+            Method::Get,
+            None,
+        )
+        .set_base_uri("spclient.wg.spotify.com")
+        .query("limit", "50")
+        .query("market", "from_token");
+
+        let result: serde_json::Value = self.load(req)?;
+        Ok(result)
+    }
+
+    pub fn get_public_user_followers(&self, id: Arc<str>) -> Result<serde_json::Value, Error> {
+        let req = &RequestBuilder::new(
+            format!("user-profile-view/v3/profile/{}/followers", id),
+            Method::Post,
+            None,
+        )
+        .set_base_uri("spclient.wg.spotify.com")
+        .header("market", "from_token");
+
+        let result: serde_json::Value = self.load(req)?;
+        Ok(result)
+    }
+
+    pub fn get_public_user_following(&self, id: Arc<str>) -> Result<serde_json::Value, Error> {
+        let req = &RequestBuilder::new(
+            format!("user-profile-view/v3/profile/{}/following", id),
+            Method::Post,
+            None,
+        )
+        .set_base_uri("spclient.wg.spotify.com")
+        .header("market", "from_token");
+
+        let result: serde_json::Value = self.load(req)?;
+        Ok(result)
+    }
+    /*
     // Follow/unfollow
     // https://api-partner.spotify.com/pathfinder/v2/query
     /*
         {"variables":{"usernames":["florence.flossie.morrison"]},"operationName":"followUsers","extensions":{"persistedQuery":{"version":1,"sha256Hash":"c00e0cb6c7766e7230fc256cf4fe07aec63b53d1160a323940fce7b664e95596"}}}
     */
-    pub fn get_public_user_profile(&self, user: PublicUser) {}
+    pub fn follow_public_user(&self, id: Arc<str>) -> Result<serde_json::Value, Error> {
+        let req = &RequestBuilder::new(
+            format!("user-profile-view/v3/profile/{}/artists", id),
+            Method::Post,
+            None,
+        )
+        .set_base_uri("spclient.wg.spotify.com")
+        .header("limit", 50)
+        .header("market", "from_token");
+
+        let result: serde_json::Value = self.load(req)?;
+        Ok(result)
+    }
+    */
 }
 
 /// User endpoints.
