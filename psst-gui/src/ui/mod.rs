@@ -394,19 +394,40 @@ fn sidebar_menu_widget() -> impl Widget<AppState> {
     Flex::column()
         .with_default_spacer()
         .with_child(sidebar_link_widget("Home", Some(&icons::HOME), Nav::Home))
-        .with_child(sidebar_link_widget("Tracks", Some(&icons::MUSIC_NOTE), Nav::SavedTracks))
-        .with_child(sidebar_link_widget("Albums", Some(&icons::ALBUM), Nav::SavedAlbums))
-        .with_child(sidebar_link_widget("Podcasts", Some(&icons::PODCAST), Nav::Shows))
+        .with_child(sidebar_link_widget(
+            "Tracks",
+            Some(&icons::MUSIC_NOTE),
+            Nav::SavedTracks,
+        ))
+        .with_child(sidebar_link_widget(
+            "Albums",
+            Some(&icons::ALBUM),
+            Nav::SavedAlbums,
+        ))
+        .with_child(sidebar_link_widget(
+            "Podcasts",
+            Some(&icons::PODCAST),
+            Nav::Shows,
+        ))
         .with_child(search::input_widget().padding((theme::grid(1.0), theme::grid(1.0))))
 }
 
-fn sidebar_link_widget(title: &str, icon: Option<&icons::SvgIcon>, link_nav: Nav) -> impl Widget<AppState> {
-    let mut row = Flex::row();
-    if let Some(icon) = icon {
-        row.add_child(icon.scale((20.0, 20.0)).padding((0.0, 0.0, 8.0, 0.0)));
-    }
-    row.add_child(Label::new(title));
-    row
+fn sidebar_link_widget(
+    title: &str,
+    icon: Option<&icons::SvgIcon>,
+    link_nav: Nav,
+) -> impl Widget<AppState> {
+    Flex::row()
+        .with_child(
+            icon.map(|i| {
+                i.scale((18.0, 18.0))
+                    .padding_right(theme::grid(1.0))
+                    .boxed()
+            })
+            .unwrap_or_else(|| Empty.boxed()),
+        )
+        .with_child(Label::new(title))
+        .with_flex_spacer(1.0)
         .padding((theme::grid(2.0), theme::grid(1.0)))
         .expand_width()
         .link()
