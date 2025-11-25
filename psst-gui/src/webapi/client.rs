@@ -21,7 +21,7 @@ use parking_lot::Mutex;
 use serde::{de::DeserializeOwned, Deserialize};
 use serde_json::json;
 
-use psst_core::session::{SessionService};
+use psst_core::session::SessionService;
 use ureq::{
     http::{Response, StatusCode},
     Agent, Body,
@@ -39,9 +39,9 @@ use crate::{
 };
 
 use super::{cache::WebApiCache, local::LocalTrackManager};
+use psst_core::session::login5::Login5;
 use sanitize_html::rules::predefined::DEFAULT;
 use sanitize_html::sanitize_str;
-use psst_core::session::login5::Login5;
 
 pub struct WebApi {
     session: SessionService,
@@ -711,7 +711,7 @@ impl WebApi {
     // https://developer.spotify.com/documentation/web-api/reference/get-artist/
     pub fn get_artist(&self, id: &str) -> Result<Artist, Error> {
         let request = &RequestBuilder::new(format!("v1/artists/{id}"), Method::Get, None);
-        let result = self.load_cached(request, "artist", id)?;
+        let result = self.load_cached(request, "artists", id)?;
         Ok(result.data)
     }
 
@@ -909,7 +909,7 @@ impl WebApi {
     pub fn get_album(&self, id: &str) -> Result<Cached<Arc<Album>>, Error> {
         let request = &RequestBuilder::new(format!("v1/albums/{id}"), Method::Get, None)
             .query("market", "from_token");
-        let result = self.load_cached(request, "album", id)?;
+        let result = self.load_cached(request, "albums", id)?;
         Ok(result)
     }
 }
@@ -921,7 +921,7 @@ impl WebApi {
         let request = &RequestBuilder::new(format!("v1/shows/{id}"), Method::Get, None)
             .query("market", "from_token");
 
-        let result = self.load_cached(request, "show", id)?;
+        let result = self.load_cached(request, "shows", id)?;
 
         Ok(result)
     }
@@ -1043,8 +1043,7 @@ impl WebApi {
 
     // https://developer.spotify.com/documentation/web-api/reference/remove-albums-user/
     pub fn unsave_album(&self, id: &str) -> Result<(), Error> {
-        let request =
-            &RequestBuilder::new("v1/me/albums", Method::Delete, None).query("ids", id);
+        let request = &RequestBuilder::new("v1/me/albums", Method::Delete, None).query("ids", id);
         self.send_empty_json(request)
     }
 
@@ -1221,11 +1220,8 @@ impl WebApi {
     }
 
     pub fn unfollow_playlist(&self, id: &str) -> Result<(), Error> {
-        let request = &RequestBuilder::new(
-            format!("v1/playlists/{id}/followers"),
-            Method::Delete,
-            None,
-        );
+        let request =
+            &RequestBuilder::new(format!("v1/playlists/{id}/followers"), Method::Delete, None);
         self.request(request)?;
         Ok(())
     }
@@ -1254,10 +1250,9 @@ impl WebApi {
             Json(serde_json::Value),
         }
 
-        let request =
-            &RequestBuilder::new(format!("v1/playlists/{id}/tracks"), Method::Get, None)
-                .query("marker", "from_token")
-                .query("additional_types", "track");
+        let request = &RequestBuilder::new(format!("v1/playlists/{id}/tracks"), Method::Get, None)
+            .query("marker", "from_token")
+            .query("additional_types", "track");
 
         let result: Vector<PlaylistItem> = self.load_all_pages(request)?;
 
@@ -1278,9 +1273,8 @@ impl WebApi {
     }
 
     pub fn change_playlist_details(&self, id: &str, name: &str) -> Result<(), Error> {
-        let request =
-            &RequestBuilder::new(format!("v1/playlists/{id}/tracks"), Method::Get, None)
-                .set_body(Some(json!({ "name": name })));
+        let request = &RequestBuilder::new(format!("v1/playlists/{id}/tracks"), Method::Get, None)
+            .set_body(Some(json!({ "name": name })));
         self.request(request)?;
         Ok(())
     }

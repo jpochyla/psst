@@ -21,10 +21,10 @@ pub struct Cache {
 
 fn create_cache_dirs(base: &Path) -> io::Result<()> {
     mkdir_if_not_exists(base)?;
-    mkdir_if_not_exists(&base.join("track"))?;
-    mkdir_if_not_exists(&base.join("episode"))?;
+    mkdir_if_not_exists(&base.join("tracks"))?;
+    mkdir_if_not_exists(&base.join("episodes"))?;
     mkdir_if_not_exists(&base.join("audio"))?;
-    mkdir_if_not_exists(&base.join("key"))?;
+    mkdir_if_not_exists(&base.join("keys"))?;
     Ok(())
 }
 
@@ -71,7 +71,7 @@ impl Cache {
     }
 
     fn track_path(&self, item_id: ItemId) -> PathBuf {
-        self.base.join("track").join(item_id.to_base62())
+        self.base.join("tracks").join(item_id.to_base62())
     }
 }
 
@@ -89,7 +89,7 @@ impl Cache {
     }
 
     fn episode_path(&self, item_id: ItemId) -> PathBuf {
-        self.base.join("episode").join(item_id.to_base62())
+        self.base.join("episodes").join(item_id.to_base62())
     }
 }
 
@@ -115,7 +115,7 @@ impl Cache {
         let mut key_id = String::new();
         key_id += &item_id.to_base62()[..16];
         key_id += &file_id.to_base16()[..16];
-        self.base.join("key").join(key_id)
+        self.base.join("keys").join(key_id)
     }
 }
 

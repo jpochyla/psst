@@ -4,6 +4,7 @@ pub mod config;
 mod ctx;
 mod find;
 mod id;
+mod migration;
 mod nav;
 mod playback;
 mod playlist;
