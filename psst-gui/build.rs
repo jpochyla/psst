@@ -26,7 +26,7 @@ fn add_windows_icon() {
             .iter()
             .map(|s| {
                 IcoFrame::as_png(
-                    image::open(format!("assets/logo_{}.png", s))
+                    image::open(format!("assets/logo_{s}.png"))
                         .unwrap()
                         .as_bytes(),
                     *s,

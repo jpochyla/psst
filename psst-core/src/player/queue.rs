@@ -2,18 +2,13 @@ use rand::prelude::SliceRandom;
 
 use super::PlaybackItem;
 
-#[derive(Debug)]
+#[derive(Default, Debug)]
 pub enum QueueBehavior {
+    #[default]
     Sequential,
     Random,
     LoopTrack,
     LoopAll,
-}
-
-impl Default for QueueBehavior {
-    fn default() -> Self {
-        Self::Sequential
-    }
 }
 
 pub struct Queue {

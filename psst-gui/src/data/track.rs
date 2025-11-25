@@ -111,11 +111,13 @@ impl From<TrackId> for String {
 }
 
 #[derive(Clone, Data, Debug, Deserialize)]
+#[allow(dead_code)]
 pub struct AudioAnalysis {
     pub segments: Vector<AudioSegment>,
 }
 
 #[derive(Clone, Data, Debug, Deserialize)]
+#[allow(dead_code)]
 pub struct AudioSegment {
     #[serde(flatten)]
     pub interval: TimeInterval,
@@ -125,6 +127,7 @@ pub struct AudioSegment {
 }
 
 #[derive(Clone, Data, Debug, Deserialize)]
+#[allow(dead_code)]
 pub struct TimeInterval {
     #[serde(deserialize_with = "super::utils::deserialize_secs")]
     pub start: Duration,

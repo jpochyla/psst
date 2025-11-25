@@ -60,7 +60,7 @@ fn init_scrobbler_instance(data: &AppState) -> Option<Scrobbler> {
                     return Some(scr);
                 }
                 Err(e) => {
-                    log::warn!("Failed to create/update Last.fm Scrobbler instance: {}", e);
+                    log::warn!("Failed to create/update Last.fm Scrobbler instance: {e}");
                 }
             }
         } else {
@@ -108,7 +108,7 @@ impl PlaybackController {
         );
 
         self.media_controls = Self::create_media_controls(player.sender(), window)
-            .map_err(|err| log::error!("failed to connect to media control interface: {:?}", err))
+            .map_err(|err| log::error!("failed to connect to media control interface: {err:?}"))
             .ok();
 
         self.taskbar_manager = TaskbarManager::new(window, event_sink.clone(), widget_id)
@@ -294,7 +294,7 @@ impl PlaybackController {
     fn send(&mut self, event: PlayerEvent) {
         if let Some(s) = &self.sender {
             s.send(event)
-                .map_err(|e| log::error!("error sending message: {:?}", e))
+                .map_err(|e| log::error!("error sending message: {e:?}"))
                 .ok();
         }
     }
@@ -313,9 +313,9 @@ impl PlaybackController {
                         title.as_ref(),
                         album.as_ref().map(|a| a.name.as_ref()),
                     ) {
-                        log::warn!("failed to report 'Now Playing' to Last.fm: {}", e);
+                        log::warn!("failed to report 'Now Playing' to Last.fm: {e}");
                     } else {
-                        log::info!("reported 'Now Playing' to Last.fm: {} - {}", artist, title);
+                        log::info!("reported 'Now Playing' to Last.fm: {artist} - {title}");
                     }
                 } else {
                     log::debug!("Last.fm not configured, skipping now_playing report.");
@@ -339,9 +339,9 @@ impl PlaybackController {
                             title.as_ref(),
                             album.as_ref().map(|a| a.name.as_ref()),
                         ) {
-                            log::warn!("failed to scrobble track to Last.fm: {}", e);
+                            log::warn!("failed to scrobble track to Last.fm: {e}");
                         } else {
-                            log::info!("scrobbled track to Last.fm: {} - {}", artist, title);
+                            log::info!("scrobbled track to Last.fm: {artist} - {title}");
                             self.has_scrobbled = true;
                         }
                     } else {

@@ -116,7 +116,7 @@ impl AudioDecoder {
                     return None; // End of this stream.
                 }
                 Err(err) => {
-                    log::error!("format error: {}", err);
+                    log::error!("format error: {err}");
                     return None; // We cannot recover from format errors, quit.
                 }
             };
@@ -137,16 +137,16 @@ impl AudioDecoder {
                 }
                 Err(SymphoniaError::IoError(err)) => {
                     // The packet failed to decode due to an IO error, skip the packet.
-                    log::error!("io decode error: {}", err);
+                    log::error!("io decode error: {err}");
                     continue;
                 }
                 Err(SymphoniaError::DecodeError(err)) => {
                     // The packet failed to decode due to invalid data, skip the packet.
-                    log::error!("decode error: {}", err);
+                    log::error!("decode error: {err}");
                     continue;
                 }
                 Err(err) => {
-                    log::error!("fatal decode error: {}", err);
+                    log::error!("fatal decode error: {err}");
                     return None;
                 }
             };

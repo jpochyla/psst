@@ -155,7 +155,7 @@ fn get_country_code(session: &SessionService, cache: &CacheHandle) -> Option<Str
     } else {
         let country_code = session.connected().ok()?.get_country_code()?;
         if let Err(err) = cache.save_country_code(&country_code) {
-            log::warn!("failed to save country code to cache: {:?}", err);
+            log::warn!("failed to save country code to cache: {err:?}");
         }
         Some(country_code)
     }
@@ -171,7 +171,7 @@ fn load_track(
     } else {
         let track = Track::fetch(session, item_id)?;
         if let Err(err) = cache.save_track(item_id, &track) {
-            log::warn!("failed to save track to cache: {:?}", err);
+            log::warn!("failed to save track to cache: {err:?}");
         }
         Ok(track)
     }
@@ -187,7 +187,7 @@ fn load_episode(
     } else {
         let episode = Episode::fetch(session, item_id)?;
         if let Err(err) = cache.save_episode(item_id, &episode) {
-            log::warn!("failed to save episode to cache: {:?}", err);
+            log::warn!("failed to save episode to cache: {err:?}");
         }
         Ok(episode)
     }
@@ -205,7 +205,7 @@ fn load_audio_key(
             .connected()?
             .get_audio_key(path.item_id, path.file_id)?;
         if let Err(err) = cache.save_audio_key(path.item_id, path.file_id, &key) {
-            log::warn!("failed to save audio key to cache: {:?}", err);
+            log::warn!("failed to save audio key to cache: {err:?}");
         }
         Ok(key)
     }

@@ -18,9 +18,7 @@ pub fn listen_for_callback_parameter(
     parameter_name: &'static str,
 ) -> Result<String, Error> {
     log::info!(
-        "starting callback listener for '{}' on {:?}",
-        parameter_name,
-        socket_address
+        "starting callback listener for '{parameter_name}' on {socket_address:?}",
     );
 
     // Create a simpler, linear flow
@@ -31,7 +29,7 @@ pub fn listen_for_callback_parameter(
             l
         }
         Err(e) => {
-            log::error!("Failed to bind listener: {}", e);
+            log::error!("Failed to bind listener: {e}");
             return Err(Error::IoError(e));
         }
     };
@@ -55,7 +53,7 @@ pub fn listen_for_callback_parameter(
     let result = match rx.recv_timeout(timeout) {
         Ok(r) => r,
         Err(e) => {
-            log::error!("Timed out or channel error: {}", e);
+            log::error!("Timed out or channel error: {e}");
             return Err(Error::from(e));
         }
     };
@@ -81,16 +79,15 @@ fn handle_callback_connection(
     if reader.read_line(&mut request_line).is_ok() {
         match extract_parameter_from_request(&request_line, parameter_name) {
             Some(value) => {
-                log::info!("received callback parameter '{}'.", parameter_name);
+                log::info!("received callback parameter '{parameter_name}'.");
                 send_success_response(stream);
                 let _ = tx.send(Ok(value));
             }
             None => {
                 let err_msg = format!(
-                    "Failed to extract parameter '{}' from request: {}",
-                    parameter_name, request_line
+                    "Failed to extract parameter '{parameter_name}' from request: {request_line}",
                 );
-                log::error!("{}", err_msg);
+                log::error!("{err_msg}");
                 let _ = tx.send(Err(Error::OAuthError(err_msg)));
             }
         }
@@ -107,7 +104,7 @@ fn extract_parameter_from_request(request_line: &str, parameter_name: &str) -> O
     request_line
         .split_whitespace()
         .nth(1)
-        .and_then(|path| Url::parse(&format!("http://localhost{}", path)).ok())
+        .and_then(|path| Url::parse(&format!("http://localhost{path}")).ok())
         .and_then(|url| {
             url.query_pairs()
                 .find(|(key, _)| key == parameter_name)

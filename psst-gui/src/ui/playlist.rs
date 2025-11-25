@@ -444,7 +444,7 @@ fn playlist_info_widget() -> impl Widget<WithCtx<Playlist>> {
         if count == 1 {
             "1 song".to_string()
         } else {
-            format!("{} songs", count)
+            format!("{count} songs")
         }
     })
     .with_text_size(theme::TEXT_SIZE_SMALL);

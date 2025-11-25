@@ -22,7 +22,6 @@ env_logger = { version = "0.11.8" }
 itertools = "0.14.0"
 log = { version = "0.4.27" }
 lru = "0.14.0"
-once_cell = { version = "1.21.3" }
 parking_lot = { version = "0.12.3" }
 platform-dirs = { version = "0.3.0" }
 rand = { version = "0.9.1" }
@@ -42,6 +41,7 @@ druid = { git = "https://github.com/jpochyla/druid", branch = "psst", features =
   "image",
   "jpeg",
   "png",
+  "webp",
   "serde",
 ] }
 druid-enums = { git = "https://github.com/jpochyla/druid-enums" }
