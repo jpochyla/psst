@@ -17,7 +17,10 @@ use druid::{
 use itertools::Itertools;
 use log::info;
 use parking_lot::Mutex;
-use psst_core::session::{login5::Login5, SessionService};
+use psst_core::{
+    session::{login5::Login5, SessionService},
+    system_info::{OS, SPOTIFY_SEMANTIC_VERSION},
+};
 use serde::{de::DeserializeOwned, Deserialize};
 use serde_json::json;
 use std::sync::OnceLock;
@@ -69,6 +72,21 @@ impl WebApi {
             local_track_manager: Mutex::new(LocalTrackManager::new()),
             paginated_limit,
         }
+    }
+
+    // Similar to how librespot does this https://github.com/librespot-org/librespot/blob/dev/core/src/version.rs
+    fn user_agent() -> String {
+        let platform = match OS {
+            "macos" => "OSX",
+            "windows" => "Win32",
+            _ => "Linux",
+        };
+        format!(
+            "Spotify/{} {}/0 (psst/{})",
+            SPOTIFY_SEMANTIC_VERSION,
+            platform,
+            env!("CARGO_PKG_VERSION")
+        )
     }
 
     fn access_token(&self) -> Result<String, Error> {
@@ -371,7 +389,7 @@ impl WebApi {
             #[serde(rename = "__typename")]
             typename: DataTypename,
             name: Option<String>,
-            uri: String,
+            uri: Option<String>,
 
             // Playlist-specific fields
             attributes: Option<Vec<Attribute>>,
@@ -449,6 +467,7 @@ impl WebApi {
             Playlist,
             Artist,
             Album,
+            NotFound,
         }
 
         #[derive(Deserialize)]
@@ -497,7 +516,9 @@ impl WebApi {
                 title = section.data.title.text.clone().into();
 
                 section.section_items.items.iter().for_each(|item| {
-                    let uri = item.content.data.uri.clone();
+                    let Some(uri) = &item.content.data.uri else {
+                        return;
+                    };
                     let id = uri.split(':').next_back().unwrap_or("").to_string();
 
                     match item.content.data.typename {
@@ -658,6 +679,8 @@ impl WebApi {
                             ),
                             total_episodes: item.content.data.total_episodes,
                         })),
+                        // For section items we don't cover yet
+                        DataTypename::NotFound => {}
                     }
                 });
             });
@@ -881,10 +904,7 @@ impl WebApi {
         let request =
             &RequestBuilder::new("pathfinder/v2/query".to_string(), Method::Post, Some(json))
                 .set_base_uri("api-partner.spotify.com")
-                .header(
-                    "User-Agent",
-                    "Mozilla/5.0 (X11; Linux x86_64; rv:143.0) Gecko/20100101 Firefox/143.0",
-                );
+                .header("User-Agent", &Self::user_agent());
 
         let result: Cached<Welcome> = self.load_cached(request, "artist-info", id)?;
 
@@ -1171,10 +1191,7 @@ impl WebApi {
         let request =
             &RequestBuilder::new("pathfinder/v2/query".to_string(), Method::Post, Some(json))
                 .set_base_uri("api-partner.spotify.com")
-                .header(
-                    "User-Agent",
-                    "Mozilla/5.0 (X11; Linux x86_64; rv:143.0) Gecko/20100101 Firefox/143.0",
-                );
+                .header("User-Agent", &Self::user_agent());
 
         // Extract the playlists
         self.load_and_return_home_section(request)
