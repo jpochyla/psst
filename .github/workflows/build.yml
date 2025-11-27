@@ -40,7 +40,7 @@ jobs:
             target: x86_64-unknown-linux-gnu
           - os: ubuntu-latest
             target: aarch64-unknown-linux-gnu
-          - os: macos-latest
+          - os: macOS-latest
           - os: windows-latest
 
     runs-on: ${{ matrix.os }}
@@ -130,8 +130,9 @@ jobs:
             --icon "Psst.app" 150 160 \
             --hide-extension "Psst.app" \
             --app-drop-link 450 160 \
+            --no-internet-enable \
             "Psst.dmg" \
-            "../target/release/bundle/osx/Psst.app"
+            "target/release/bundle/osx/Psst.app"
         working-directory: psst-gui
 
       - name: Upload macOS DMG

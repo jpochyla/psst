@@ -202,22 +202,9 @@ impl AppState {
         }
     }
 
-    pub fn refresh_all(&mut self) {
-        self.album_detail.album = Promise::Empty;
-        self.artist_detail.artist_info = Promise::Empty;
-        self.artist_detail.albums = Promise::Empty;
-        self.artist_detail.artist = Promise::Empty;
-        self.artist_detail.related_artists = Promise::Empty;
-        self.artist_detail.top_tracks = Promise::Empty;
-        self.playlist_detail.playlist = Promise::Empty;
-        self.playlist_detail.tracks = Promise::Empty;
-        self.show_detail.episodes = Promise::Empty;
-        self.show_detail.show = Promise::Empty;
-    }
-
-    pub fn refresh_playlist(&mut self) {
-        self.playlist_detail.tracks = Promise::Empty;
-        self.playlist_detail.playlist = Promise::Empty;
+    pub fn refresh(&mut self) {
+        let current: Nav = mem::replace(&mut self.nav, Nav::Home);
+        self.nav = current;
     }
 }
 
@@ -231,11 +218,15 @@ impl AppState {
             .cloned()
         {
             Some(queued)
+        } else if let Some(queued) = self
+            .added_queue
+            .iter()
+            .find(|queued| queued.item.id() == item_id)
+            .cloned()
+        {
+            return Some(queued);
         } else {
-            self.added_queue
-                .iter()
-                .find(|queued| queued.item.id() == item_id)
-                .cloned()
+            None
         }
     }
 

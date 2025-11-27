@@ -45,7 +45,7 @@ fn main() {
                 state.preferences.cache = Some(cache);
             }
             Err(err) => {
-                log::error!("Failed to create cache: {err}");
+                log::error!("Failed to create cache: {}", err);
             }
         }
     }

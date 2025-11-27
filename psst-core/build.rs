@@ -4,11 +4,11 @@ use time::OffsetDateTime;
 
 fn main() {
     let outdir = env::var("OUT_DIR").unwrap();
-    let outfile = format!("{outdir}/build-time.txt");
+    let outfile = format!("{}/build-time.txt", outdir);
 
     let mut fh = fs::File::create(outfile).unwrap();
     let now = OffsetDateTime::now_local().unwrap_or_else(|_| OffsetDateTime::now_utc());
-    write!(fh, r#""{now}""#).ok();
+    write!(fh, r#""{}""#, now).ok();
 
     let git_config = File::from_git_dir("../.git/".into()).expect("Git Config not found!");
     // Get Git's 'Origin' URL
@@ -37,7 +37,7 @@ fn main() {
     let trimmed_url = remote_url.trim_end_matches(".git");
     remote_url.clone_from(&String::from(trimmed_url));
 
-    let outfile = format!("{outdir}/remote-url.txt");
+    let outfile = format!("{}/remote-url.txt", outdir);
     let mut file = fs::File::create(outfile).unwrap();
-    write!(file, r#""{remote_url}""#).ok();
+    write!(file, r#""{}""#, remote_url).ok();
 }

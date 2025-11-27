@@ -1,16 +1,16 @@
+use std::{fs, sync::Arc};
+
 use directories::UserDirs;
 use druid::{
     commands, AppDelegate, Application, Command, DelegateCtx, Env, Event, Handled, Target,
     WindowDesc, WindowId,
 };
-use std::fs;
 use threadpool::ThreadPool;
+use ureq;
 
-use crate::ui::playlist::{
-    RENAME_PLAYLIST, RENAME_PLAYLIST_CONFIRM, UNFOLLOW_PLAYLIST, UNFOLLOW_PLAYLIST_CONFIRM,
-};
-use crate::ui::theme;
-use crate::ui::DOWNLOAD_ARTWORK;
+#[cfg(target_os = "windows")]
+mod windows_tray;
+
 use crate::{
     cmd,
     data::{AppState, Config},
@@ -19,6 +19,15 @@ use crate::{
     widget::remote_image,
 };
 
+use crate::ui::playlist::{
+    RENAME_PLAYLIST, RENAME_PLAYLIST_CONFIRM, UNFOLLOW_PLAYLIST, UNFOLLOW_PLAYLIST_CONFIRM,
+};
+use crate::ui::theme;
+use crate::ui::DOWNLOAD_ARTWORK;
+
+#[cfg(target_os = "windows")]
+use windows_tray::WindowsTray;
+
 pub struct Delegate {
     main_window: Option<WindowId>,
     preferences_window: Option<WindowId>,
@@ -26,20 +35,26 @@ pub struct Delegate {
     artwork_window: Option<WindowId>,
     image_pool: ThreadPool,
     size_updated: bool,
+    #[cfg(target_os = "windows")]
+    systray: Option<Arc<std::sync::Mutex<WindowsTray>>>,
 }
 
 impl Delegate {
     pub fn new() -> Self {
         const MAX_IMAGE_THREADS: usize = 32;
 
-        Self {
+        let delegate = Self {
             main_window: None,
             preferences_window: None,
             credits_window: None,
             artwork_window: None,
             image_pool: ThreadPool::with_name("image_loading".into(), MAX_IMAGE_THREADS),
             size_updated: false,
-        }
+            #[cfg(target_os = "windows")]
+            systray: None,
+        };
+
+        delegate
     }
 
     pub fn with_main(main_window: WindowId) -> Self {
@@ -128,6 +143,14 @@ impl Delegate {
     fn show_artwork(&mut self, ctx: &mut DelegateCtx) {
         Self::show_or_create_window(&mut self.artwork_window, ui::artwork_window, ctx);
     }
+
+    fn quit_app_clean(&mut self, ctx: &mut DelegateCtx, data: &mut AppState) {
+        data.config.volume = data.playback.volume;
+        data.config.save();
+
+        ctx.submit_command(commands::CLOSE_ALL_WINDOWS);
+        ctx.submit_command(commands::QUIT_APP);
+    }
 }
 
 impl AppDelegate<AppState> for Delegate {
@@ -172,6 +195,104 @@ impl AppDelegate<AppState> for Delegate {
                     self.close_credits(ctx);
                     return Handled::Yes;
                 }
+            } else if let Some(window_id) = self.main_window {
+                if target == Target::Window(window_id) {
+                    if data.config.close_to_tray {
+                        #[cfg(target_os = "windows")]
+                        {
+                            if self.systray.is_none() {
+                                let mut app = WindowsTray::new().expect("Could not create systray");
+
+                                let tmp_icon_path = std::env::temp_dir().join("psst_tray.ico");
+                                std::fs::write(
+                                    &tmp_icon_path,
+                                    include_bytes!("../assets/logo.ico"),
+                                )
+                                .expect("write ico");
+                                app.set_icon(&tmp_icon_path).expect("tray icon");
+
+                                let win_id = window_id;
+                                let handle = ctx.get_external_handle();
+                                let handle_prev = ctx.get_external_handle();
+                                let handle_pp = ctx.get_external_handle();
+                                let handle_next = ctx.get_external_handle();
+                                let handle_restore = handle.clone();
+
+                                let handle_prev = handle_prev.clone();
+                                let handle_pp = handle_pp.clone();
+                                let handle_next = handle_next.clone();
+
+                                app.set_callbacks(
+                                    move || {
+                                        handle_restore
+                                            .submit_command(
+                                                druid::commands::SHOW_WINDOW,
+                                                (),
+                                                druid::Target::Window(win_id),
+                                            )
+                                            .ok();
+                                        handle_restore
+                                            .submit_command(
+                                                crate::cmd::TRAY_REMOVED,
+                                                (),
+                                                druid::Target::Global,
+                                            )
+                                            .ok();
+                                    },
+                                    move |menu_id| match menu_id {
+                                        1001 => {
+                                            handle_prev
+                                                .submit_command(
+                                                    crate::cmd::PLAY_PREVIOUS,
+                                                    (),
+                                                    druid::Target::Global,
+                                                )
+                                                .ok();
+                                        }
+                                        1002 => {
+                                            handle_pp
+                                                .submit_command(
+                                                    crate::cmd::PLAY_PAUSE_TOGGLE,
+                                                    (),
+                                                    druid::Target::Global,
+                                                )
+                                                .ok();
+                                        }
+                                        1003 => {
+                                            handle_next
+                                                .submit_command(
+                                                    crate::cmd::PLAY_NEXT,
+                                                    (),
+                                                    druid::Target::Global,
+                                                )
+                                                .ok();
+                                        }
+                                        1004 => {
+                                            handle_next
+                                                .submit_command(
+                                                    crate::cmd::QUIT_APP_CLEAN,
+                                                    (),
+                                                    druid::Target::Global,
+                                                )
+                                                .ok();
+                                        }
+                                        _ => (),
+                                    },
+                                )
+                                .expect("set callbacks");
+
+                                let tray_arc = Arc::new(std::sync::Mutex::new(app));
+                                WindowsTray::set_as_global_instance(tray_arc.clone());
+                                self.systray = Some(tray_arc);
+                            }
+                        }
+                        ctx.submit_command(commands::HIDE_WINDOW.to(window_id));
+                        return Handled::Yes;
+                    } else {
+                        self.quit_app_clean(ctx, data);
+                        return Handled::Yes;
+                    }
+                }
             }
             Handled::No
         } else if let Some(text) = cmd.get(cmd::COPY) {
@@ -191,14 +312,24 @@ impl AppDelegate<AppState> for Delegate {
         } else if cmd.is(cmd::QUIT_APP_WITH_SAVE) {
             ctx.submit_command(commands::QUIT_APP);
             Handled::Yes
+        } else if cmd.is(cmd::QUIT_APP_CLEAN) {
+            self.quit_app_clean(ctx, data);
+            Handled::Yes
         } else if cmd.is(commands::QUIT_APP) {
             Handled::No
         } else if cmd.is(crate::cmd::SHOW_ARTWORK) {
             self.show_artwork(ctx);
             Handled::Yes
+        } else if cmd.is(crate::cmd::TRAY_REMOVED) {
+            #[cfg(target_os = "windows")]
+            {
+                WindowsTray::clear_global_instance();
+                self.systray = None;
+            }
+            Handled::Yes
         } else if let Some((url, title)) = cmd.get(DOWNLOAD_ARTWORK) {
             let safe_title = title.replace(['/', '\\', ':', '*', '?', '"', '<', '>', '|'], "_");
-            let file_name = format!("{safe_title} cover.jpg");
+            let file_name = format!("{} cover.jpg", safe_title);
 
             if let Some(user_dirs) = UserDirs::new() {
                 if let Some(download_dir) = user_dirs.download_dir() {
@@ -240,10 +371,7 @@ impl AppDelegate<AppState> for Delegate {
             data.preferences.auth.clear();
         }
         if self.main_window == Some(id) {
-            data.config.volume = data.playback.volume;
-            data.config.save();
-            ctx.submit_command(commands::CLOSE_ALL_WINDOWS);
-            ctx.submit_command(commands::QUIT_APP);
+            self.quit_app_clean(ctx, data);
         }
         if self.artwork_window == Some(id) {
             self.artwork_window = None;
@@ -314,7 +442,7 @@ impl Delegate {
                                 .unwrap();
                         }
                         Err(err) => {
-                            log::warn!("failed to fetch image: {err}")
+                            log::warn!("failed to fetch image: {}", err)
                         }
                     }
                 });

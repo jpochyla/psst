@@ -56,10 +56,10 @@ impl AudioKeyDispatcher {
             payload.read_exact(&mut key).unwrap();
 
             if tx.send(Ok(AudioKey(key))).is_err() {
-                log::warn!("missing receiver for audio key, seq: {seq}");
+                log::warn!("missing receiver for audio key, seq: {}", seq);
             }
         } else {
-            log::warn!("received unexpected audio key msg, seq: {seq}");
+            log::warn!("received unexpected audio key msg, seq: {}", seq);
         }
     }
 
@@ -70,10 +70,10 @@ impl AudioKeyDispatcher {
         if let Some(tx) = self.pending.remove(&seq) {
             log::error!("audio key error");
             if tx.send(Err(Error::UnexpectedResponse)).is_err() {
-                log::warn!("missing receiver for audio key error, seq: {seq}");
+                log::warn!("missing receiver for audio key error, seq: {}", seq);
             }
         } else {
-            log::warn!("received unknown audio key, seq: {seq}");
+            log::warn!("received unknown audio key, seq: {}", seq);
         }
     }
 }

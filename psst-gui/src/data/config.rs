@@ -116,6 +116,8 @@ pub struct Config {
     pub last_route: Option<Nav>,
     pub queue_behavior: QueueBehavior,
     pub show_track_cover: bool,
+    #[cfg(target_os = "windows")]
+    pub close_to_tray: bool,
     pub window_size: Size,
     pub slider_scroll_scale: SliderScrollScale,
     pub sort_order: SortOrder,
@@ -138,6 +140,8 @@ impl Default for Config {
             last_route: Default::default(),
             queue_behavior: Default::default(),
             show_track_cover: Default::default(),
+            #[cfg(target_os = "windows")]
+            close_to_tray: false,
             window_size: Size::new(theme::grid(80.0), theme::grid(100.0)),
             slider_scroll_scale: Default::default(),
             sort_order: Default::default(),
@@ -161,7 +165,7 @@ impl Config {
 
     pub fn spotify_local_files_file(username: &str) -> Option<PathBuf> {
         AppDirs::new(Some("spotify"), false).map(|dir| {
-            let path = format!("Users/{username}-user/local-files.bnk");
+            let path = format!("Users/{}-user/local-files.bnk", username);
             dir.config_dir.join(path)
         })
     }
@@ -252,11 +256,10 @@ impl Config {
     }
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Data, Serialize, Deserialize, Default)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Data, Serialize, Deserialize)]
 pub enum AudioQuality {
     Low,
     Normal,
-    #[default]
     High,
 }
 
@@ -270,28 +273,47 @@ impl AudioQuality {
     }
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Data, Serialize, Deserialize, Default)]
+impl Default for AudioQuality {
+    fn default() -> Self {
+        Self::High
+    }
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Data, Serialize, Deserialize)]
 pub enum Theme {
-    #[default]
     Light,
     Dark,
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Data, Serialize, Deserialize, Default)]
+impl Default for Theme {
+    fn default() -> Self {
+        Self::Light
+    }
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Data, Serialize, Deserialize)]
 pub enum SortOrder {
-    #[default]
     Ascending,
     Descending,
 }
+impl Default for SortOrder {
+    fn default() -> Self {
+        Self::Ascending
+    }
+}
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Data, Serialize, Deserialize, Default)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Data, Serialize, Deserialize)]
 pub enum SortCriteria {
     Title,
     Artist,
     Album,
     Duration,
-    #[default]
     DateAdded,
+}
+impl Default for SortCriteria {
+    fn default() -> Self {
+        Self::DateAdded
+    }
 }
 
 fn get_dir_size(path: &Path) -> Option<u64> {

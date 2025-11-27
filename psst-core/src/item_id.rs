@@ -1,14 +1,8 @@
-use std::{
-    collections::HashMap,
-    convert::TryInto,
-    fmt,
-    ops::Deref,
-    path::PathBuf,
-    sync::{LazyLock, Mutex},
-};
+use once_cell::sync::Lazy;
+use std::{collections::HashMap, convert::TryInto, fmt, ops::Deref, path::PathBuf, sync::Mutex};
 
-static LOCAL_REGISTRY: LazyLock<Mutex<LocalItemRegistry>> =
-    LazyLock::new(|| Mutex::new(LocalItemRegistry::new()));
+static LOCAL_REGISTRY: Lazy<Mutex<LocalItemRegistry>> =
+    Lazy::new(|| Mutex::new(LocalItemRegistry::new()));
 
 // LocalItemRegistry allows generating IDs for local music files, so they can be
 // treated similarly to files hosted on Spotify's remote servers. IDs are
@@ -117,8 +111,8 @@ impl ItemId {
     pub fn to_uri(&self) -> Option<String> {
         let b64 = self.to_base62();
         match self.id_type {
-            ItemIdType::Track => Some(format!("spotify:track:{b64}")),
-            ItemIdType::Podcast => Some(format!("spotify:podcast:{b64}")),
+            ItemIdType::Track => Some(format!("spotify:track:{}", b64)),
+            ItemIdType::Podcast => Some(format!("spotify:podcast:{}", b64)),
             // TODO: support adding local files to playlists
             ItemIdType::LocalFile => None,
             ItemIdType::Unknown => None,
@@ -182,7 +176,7 @@ impl FileId {
     pub fn to_base16(&self) -> String {
         self.0
             .iter()
-            .map(|b| format!("{b:02x}"))
+            .map(|b| format!("{:02x}", b))
             .collect::<Vec<String>>()
             .concat()
     }

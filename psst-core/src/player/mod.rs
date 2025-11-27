@@ -137,10 +137,10 @@ impl Player {
                 Err(err) => {
                     self.consecutive_loading_failures += 1;
                     if self.consecutive_loading_failures < STOP_AFTER_CONSECUTIVE_LOADING_FAILURES {
-                        log::error!("skipping, error while loading: {err}");
+                        log::error!("skipping, error while loading: {}", err);
                         self.next();
                     } else {
-                        log::error!("stopping, error while loading: {err}");
+                        log::error!("stopping, error while loading: {}", err);
                         self.stop();
                     }
                 }
@@ -162,7 +162,7 @@ impl Player {
                     self.preload = PreloadState::Preloaded { item, loaded_item };
                 }
                 Err(err) => {
-                    log::error!("failed to preload audio file, error while opening: {err}");
+                    log::error!("failed to preload audio file, error while opening: {}", err);
                     self.preload = PreloadState::None;
                 }
             },

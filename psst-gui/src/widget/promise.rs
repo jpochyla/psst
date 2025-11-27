@@ -76,7 +76,7 @@ impl<D: Data, T: Data, E: Data> Widget<Promise<T, D, E>> for Async<T, D, E> {
             // or on WidgetAdded.
             self.rebuild_widget(data.state());
         }
-        assert_eq!(data.state(), self.widget.state(), "{event:?}");
+        assert_eq!(data.state(), self.widget.state(), "{:?}", event);
         match data {
             Promise::Empty => {}
             Promise::Deferred { def } => {

@@ -113,7 +113,6 @@ impl From<Float64> for f64 {
     }
 }
 
-#[allow(dead_code)]
 pub fn deserialize_secs<'de, D>(deserializer: D) -> Result<Duration, D::Error>
 where
     D: Deserializer<'de>,

@@ -261,12 +261,12 @@ impl StreamedFile {
                             if writer.is_complete() && !cache.audio_file_path(file_id).exists() {
                                 // TODO: We should do this atomically.
                                 if let Err(err) = cache.save_audio_file(file_id, file_path) {
-                                    log::warn!("failed to save audio file to cache: {err:?}");
+                                    log::warn!("failed to save audio file to cache: {:?}", err);
                                 }
                             }
                         }
                         Err(err) => {
-                            log::error!("failed to download: {err}");
+                            log::error!("failed to download: {}", err);
                             // Range failed to download, remove it from the requested set.
                             writer.mark_as_not_requested(offset, length);
                         }
@@ -281,11 +281,11 @@ impl StreamedFile {
             match req {
                 StreamRequest::Preload { offset, length } => {
                     if let Err(err) = download_range(offset, length) {
-                        log::error!("failed to request audio range: {err:?}");
+                        log::error!("failed to request audio range: {:?}", err);
                     }
                 }
                 StreamRequest::Blocked { offset } => {
-                    log::info!("blocked at {offset}");
+                    log::info!("blocked at {}", offset);
                 }
             }
         }

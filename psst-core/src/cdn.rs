@@ -9,17 +9,16 @@ use serde::Deserialize;
 use crate::{
     error::Error,
     item_id::FileId,
-    session::{SessionService},
+    session::{access_token::TokenProvider, SessionService},
     util::default_ureq_agent_builder,
 };
-use crate::session::login5::Login5;
 
 pub type CdnHandle = Arc<Cdn>;
 
 pub struct Cdn {
     session: SessionService,
     agent: ureq::Agent,
-    login5: Login5,
+    token_provider: TokenProvider,
 }
 
 impl Cdn {
@@ -28,7 +27,7 @@ impl Cdn {
         Ok(Arc::new(Self {
             session,
             agent: agent.into(),
-            login5: Login5::new(None, proxy_url),
+            token_provider: TokenProvider::new(),
         }))
     }
 
@@ -37,7 +36,7 @@ impl Cdn {
             "https://api.spotify.com/v1/storage-resolve/files/audio/interactive/{}",
             id.to_base16()
         );
-        let access_token = self.login5.get_access_token(&self.session)?;
+        let access_token = self.token_provider.get(&self.session)?;
         let response = self
             .agent
             .get(&locations_uri)
@@ -45,7 +44,7 @@ impl Cdn {
             .query("product", "9")
             .query("platform", "39")
             .query("alt", "json")
-            .header("Authorization", &format!("Bearer {}", access_token.access_token))
+            .header("Authorization", &format!("Bearer {}", access_token.token))
             .call()?;
 
         #[derive(Deserialize)]
@@ -122,7 +121,7 @@ impl From<ureq::Error> for Error {
 /// Constructs a Range header value for given offset and length.
 fn range_header(offfset: u64, length: u64) -> String {
     let last_byte = offfset + length - 1; // Offset of the last byte of the range is inclusive.
-    format!("bytes={offfset}-{last_byte}")
+    format!("bytes={}-{}", offfset, last_byte)
 }
 
 /// Parses a total content length from a Content-Range response header.

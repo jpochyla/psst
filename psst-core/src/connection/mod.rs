@@ -106,7 +106,7 @@ impl Transport {
                 ap_list
             }
             Err(err) => {
-                log::error!("error while resolving APs, using fallback: {err:?}");
+                log::error!("error while resolving APs, using fallback: {:?}", err);
                 vec![AP_FALLBACK.into()]
             }
         }
@@ -119,7 +119,7 @@ impl Transport {
         }
 
         let agent: ureq::Agent = default_ureq_agent_builder(proxy_url).build().into();
-        log::info!("requesting AP list from {AP_RESOLVE_ENDPOINT}");
+        log::info!("requesting AP list from {}", AP_RESOLVE_ENDPOINT);
         let data: APResolveData = agent
             .get(AP_RESOLVE_ENDPOINT)
             .call()?
@@ -145,7 +145,7 @@ impl Transport {
                 match Self::stream_through_proxy(ap, url) {
                     Ok(s) => s,
                     Err(e) => {
-                        log::warn!("failed to connect to AP {ap} through proxy: {e:?}");
+                        log::warn!("failed to connect to AP {} through proxy: {:?}", ap, e);
                         continue;
                     }
                 }
@@ -153,15 +153,15 @@ impl Transport {
                 match Self::stream_without_proxy(ap) {
                     Ok(s) => s,
                     Err(e) => {
-                        log::warn!("failed to connect to AP {ap} without proxy: {e:?}");
+                        log::warn!("failed to connect to AP {} without proxy: {:?}", ap, e);
                         continue;
                     }
                 }
             };
             if let Err(err) = stream.set_write_timeout(Some(NET_IO_TIMEOUT)) {
-                log::warn!("failed to set TCP write timeout: {err:?}");
+                log::warn!("failed to set TCP write timeout: {:?}", err);
             }
-            log::info!("successfully connected to AP: {ap}");
+            log::info!("successfully connected to AP: {}", ap);
             return Self::exchange_keys(stream);
         }
         log::error!("failed to connect to any access point");
