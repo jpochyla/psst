@@ -98,54 +98,33 @@ impl WebApi {
 
     fn request(&self, request: &RequestBuilder) -> Result<Response<Body>, Error> {
         let token = self.access_token()?;
+        let url = request.build();
+
+        fn configure_request<B>(
+            req_builder: ureq::RequestBuilder<B>,
+            token: &str,
+            headers: &HashMap<String, String>,
+        ) -> ureq::RequestBuilder<B> {
+            headers.iter().fold(
+                req_builder.header("Authorization", &format!("Bearer {token}")),
+                |current_req, (k, v)| current_req.header(k, v),
+            )
+        }
+
         match request.get_method() {
-            Method::Get => {
-                let mut req = self
-                    .agent
-                    .get(request.build())
-                    .header("Authorization", &format!("Bearer {token}"));
-                for header in request.get_headers() {
-                    req = req.header(header.0, header.1);
-                }
-
-                req.call()
-                    .map_err(|err| Error::WebApiError(err.to_string()))
-            }
-            Method::Post => {
-                let mut req = self
-                    .agent
-                    .post(request.build())
-                    .header("Authorization", &format!("Bearer {token}"));
-                for header in request.get_headers() {
-                    req = req.header(header.0, header.1);
-                }
-
-                req.send_json(request.get_body())
-                    .map_err(|err| Error::WebApiError(err.to_string()))
-            }
-            Method::Put => {
-                let mut req = self
-                    .agent
-                    .put(request.build())
-                    .header("Authorization", &format!("Bearer {token}"));
-                for header in request.get_headers() {
-                    req = req.header(header.0, header.1);
-                }
-
-                req.send_json(request.get_body())
-                    .map_err(|err| Error::WebApiError(err.to_string()))
-            }
+            Method::Get => configure_request(self.agent.get(&url), &token, request.get_headers())
+                .call()
+                .map_err(|err| Error::WebApiError(err.to_string())),
+            Method::Post => configure_request(self.agent.post(&url), &token, request.get_headers())
+                .send_json(request.get_body())
+                .map_err(|err| Error::WebApiError(err.to_string())),
+            Method::Put => configure_request(self.agent.put(&url), &token, request.get_headers())
+                .send_json(request.get_body())
+                .map_err(|err| Error::WebApiError(err.to_string())),
             Method::Delete => {
-                let mut req = self
-                    .agent
-                    .delete(request.build())
-                    .header("Authorization", &format!("Bearer {token}"))
-                    .force_send_body();
-                for header in request.get_headers() {
-                    req = req.header(header.0, header.1);
-                }
-
-                req.send_json(request.get_body())
+                configure_request(self.agent.delete(&url), &token, request.get_headers())
+                    .force_send_body()
+                    .send_json(request.get_body())
                     .map_err(|err| Error::WebApiError(err.to_string()))
             }
         }
