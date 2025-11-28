@@ -223,8 +223,7 @@ impl WebApi {
         }
     }
 
-    /// Very similar to `for_all_pages`, but only returns a certain number of
-    /// results
+    /// Very similar to `for_all_pages`, but only returns a certain number of results
     fn for_some_pages<T: DeserializeOwned + Clone>(
         &self,
         request: &RequestBuilder,
@@ -283,8 +282,7 @@ impl WebApi {
         Ok(results)
     }
 
-    /// Does a similar thing as `load_all_pages`, but limiting the number of
-    /// results
+    /// Does a similar thing as `load_all_pages`, but limiting the number of results
     fn load_some_pages<T: DeserializeOwned + Clone>(
         &self,
         request: &RequestBuilder,
@@ -750,12 +748,10 @@ impl WebApi {
 
         for album in result {
             match album.album_type {
-                // Spotify is labeling albums and singles that should be labeled `appears_on` as
-                // `album` or `single`. They are still ordered properly though, with
-                // the most recent first, then 'appears_on'. So we just wait until
-                // they are no longer descending, then start putting them in the 'appears_on' Vec.
-                // NOTE: This will break if an artist has released 'appears_on' albums/singles
-                // before their first actual album/single.
+                // Spotify is labeling albums and singles that should be labeled `appears_on` as `album` or `single`.
+                // They are still ordered properly though, with the most recent first, then 'appears_on'.
+                // So we just wait until they are no longer descending, then start putting them in the 'appears_on' Vec.
+                // NOTE: This will break if an artist has released 'appears_on' albums/singles before their first actual album/single.
                 AlbumType::Album => {
                     if album.release_year_int() > last_album_release_year {
                         artist_albums.appears_on.push_back(album)
@@ -1543,8 +1539,7 @@ enum Method {
     Get,
 }
 
-// Creating a new URI builder so aid in the creation of uris with extendable
-// queries.
+// Creating a new URI builder so aid in the creation of uris with extendable queries.
 #[derive(Debug, Clone)]
 struct RequestBuilder {
     protocol: String,
