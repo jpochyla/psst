@@ -7,7 +7,7 @@ use crossbeam_channel::Sender;
 use druid::{
     im::Vector,
     widget::{prelude::*, Controller},
-    Code, ExtEventSink, InternalLifeCycle, KbKey, WindowHandle,
+    Code, ExtEventSink, InternalLifeCycle, KbKey, Target, WindowHandle,
 };
 use psst_core::{
     audio::{normalize::NormalizationLevel, output::DefaultAudioOutput},
@@ -25,6 +25,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::{
     cmd,
+    controller::taskbar::TaskbarManager,
     data::Nav,
     data::{
         AppState, Config, NowPlaying, Playable, Playback, PlaybackOrigin, PlaybackState,
@@ -38,6 +39,9 @@ pub struct PlaybackController {
     thread: Option<JoinHandle<()>>,
     output: Option<DefaultAudioOutput>,
     media_controls: Option<MediaControls>,
+    taskbar_manager: Option<TaskbarManager>,
+    taskbar_buttons_initialized: bool,
+    last_taskbar_state: Option<PlaybackState>,
     has_scrobbled: bool,
     scrobbler: Option<Scrobbler>,
     startup: bool,
@@ -75,6 +79,9 @@ impl PlaybackController {
             thread: None,
             output: None,
             media_controls: None,
+            taskbar_manager: None,
+            taskbar_buttons_initialized: false,
+            last_taskbar_state: None,
             has_scrobbled: false,
             scrobbler: None,
             startup: true,
@@ -104,6 +111,9 @@ impl PlaybackController {
             .map_err(|err| log::error!("failed to connect to media control interface: {err:?}"))
             .ok();
 
+        self.taskbar_manager = TaskbarManager::new(window, event_sink.clone(), widget_id)
+            .map_err(|err| log::error!("failed to initialize taskbar manager: {:?}", err))
+            .ok();
         self.sender = Some(player.sender());
         self.thread = Some(thread::spawn(move || {
             Self::service_events(player, event_sink, widget_id);
@@ -221,6 +231,33 @@ impl PlaybackController {
                     PlaybackState::Paused => MediaPlayback::Paused { progress },
                 })
                 .unwrap_or_default();
+        }
+
+        self.update_taskbar_buttons(playback.state);
+    }
+
+    fn setup_taskbar_buttons_on_first_play(&mut self, playback_state: PlaybackState) {
+        if !self.taskbar_buttons_initialized {
+            if let Some(taskbar_manager) = &self.taskbar_manager {
+                if let Err(e) = taskbar_manager.setup_buttons(playback_state) {
+                    log::error!("Failed to setup taskbar buttons: {:?}", e);
+                } else {
+                    self.taskbar_buttons_initialized = true;
+                }
+            }
+        }
+    }
+
+    fn update_taskbar_buttons(&mut self, playback_state: PlaybackState) {
+        if Some(playback_state) != self.last_taskbar_state {
+            if self.taskbar_buttons_initialized {
+                if let Some(taskbar_manager) = &self.taskbar_manager {
+                    if let Err(e) = taskbar_manager.update_all_buttons(playback_state) {
+                        log::error!("Failed to update taskbar buttons: {:?}", e);
+                    }
+                }
+            }
+            self.last_taskbar_state = Some(playback_state);
         }
     }
 
@@ -506,6 +543,10 @@ where
                 self.resume();
                 ctx.set_handled();
             }
+            Event::Command(cmd) if cmd.is(cmd::PLAY_PAUSE_OR_RESUME) => {
+                self.pause_or_resume();
+                ctx.set_handled();
+            }
             Event::Command(cmd) if cmd.is(cmd::PLAY_PREVIOUS) => {
                 self.previous();
                 ctx.set_handled();
@@ -545,6 +586,10 @@ where
             Event::Command(cmd) if cmd.is(cmd::SKIP_TO_POSITION) => {
                 let location = cmd.get_unchecked(cmd::SKIP_TO_POSITION);
                 self.seek(Duration::from_millis(*location));
+                ctx.set_handled();
+            }
+            Event::Command(cmd) if cmd.is(cmd::INITIALIZE_TASKBAR) => {
+                self.setup_taskbar_buttons_on_first_play(PlaybackState::Stopped);
                 ctx.set_handled();
             }
             // Keyboard shortcuts.
@@ -601,6 +646,17 @@ where
                 // Initialize values loaded from the config.
                 self.set_volume(data.playback.volume);
                 self.set_queue_behavior(data.playback.queue_behavior);
+
+                let event_sink = ctx.get_external_handle();
+                let widget_id = ctx.widget_id();
+                std::thread::spawn(move || {
+                    std::thread::sleep(std::time::Duration::from_millis(100));
+                    let _ = event_sink.submit_command(
+                        cmd::INITIALIZE_TASKBAR,
+                        (),
+                        Target::Widget(widget_id),
+                    );
+                });
 
                 // Request focus so we can receive keyboard events.
                 ctx.submit_command(cmd::SET_FOCUS.to(ctx.widget_id()));
