@@ -31,8 +31,14 @@ impl NavController {
             Nav::SearchResults(query) => {
                 if let Some(link) = SpotifyUrl::parse(query) {
                     ctx.submit_command(search::OPEN_LINK.with(link));
-                } else if !data.search.results.contains(query) {
-                    ctx.submit_command(search::LOAD_RESULTS.with(query.to_owned()));
+                } else if !data
+                    .search
+                    .results
+                    .contains(&(query.clone(), data.search.topic))
+                {
+                    ctx.submit_command(
+                        search::LOAD_RESULTS.with((query.to_owned(), data.search.topic)),
+                    );
                 }
             }
             Nav::AlbumDetail(link, _) => {
