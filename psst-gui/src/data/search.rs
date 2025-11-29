@@ -31,6 +31,16 @@ impl SearchTopic {
         }
     }
 
+    pub fn display_name(&self) -> &'static str {
+        match self {
+            SearchTopic::Artist => "Artists",
+            SearchTopic::Album => "Albums",
+            SearchTopic::Track => "Tracks",
+            SearchTopic::Playlist => "Playlists",
+            SearchTopic::Show => "Podcasts",
+        }
+    }
+
     pub fn all() -> &'static [Self] {
         &[
             Self::Artist,
@@ -50,4 +60,14 @@ pub struct SearchResults {
     pub tracks: Vector<Arc<Track>>,
     pub playlists: Vector<Playlist>,
     pub shows: Vector<Arc<Show>>,
+}
+
+impl SearchResults {
+    pub fn is_empty(&self) -> bool {
+        self.artists.is_empty()
+            && self.albums.is_empty()
+            && self.tracks.is_empty()
+            && self.playlists.is_empty()
+            && self.shows.is_empty()
+    }
 }

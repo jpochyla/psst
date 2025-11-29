@@ -1,21 +1,17 @@
 use std::sync::Arc;
 
 use druid::{
-    im::Vector,
     widget::{
         CrossAxisAlignment, Either, Flex, Label, LabelText, List, MainAxisAlignment, Scroll,
         TextBox,
     },
-    Data, Env, Insets, LensExt, RenderContext, Selector, Widget, WidgetExt,
+    Data, Env, Insets, Lens, LensExt, RenderContext, Selector, Widget, WidgetExt,
 };
 
 use crate::{
     cmd,
     controller::InputController,
-    data::{
-        Album, AppState, Artist, Ctx, Nav, Search, SearchResults, SearchTopic, Show, SpotifyUrl,
-        WithCtx,
-    },
+    data::{AppState, Ctx, Nav, Search, SearchResults, SearchTopic, SpotifyUrl, WithCtx},
     ui::show,
     webapi::WebApi,
     widget::{Async, Empty, MyWidgetExt},
@@ -50,26 +46,25 @@ pub fn results_widget() -> impl Widget<AppState> {
         .cross_axis_alignment(CrossAxisAlignment::Center)
         .with_spacer(theme::grid(1.0))
         .with_child(topic_widget())
-        .with_spacer(theme::grid(1.0))
-        .with_child(async_results_widget())
+        .with_flex_child(Scroll::new(async_results_widget()).vertical(), 1.0)
 }
 
 fn topic_widget() -> impl Widget<AppState> {
-    let topics = Flex::row()
-        .with_child(topic_button("All", None))
-        .with_spacer(theme::grid(1.0))
-        .with_child(topic_button("Artists", Some(SearchTopic::Artist)))
-        .with_spacer(theme::grid(1.0))
-        .with_child(topic_button("Albums", Some(SearchTopic::Album)))
-        .with_spacer(theme::grid(1.0))
-        .with_child(topic_button("Tracks", Some(SearchTopic::Track)))
-        .with_spacer(theme::grid(1.0))
-        .with_child(topic_button("Playlists", Some(SearchTopic::Playlist)))
-        .with_spacer(theme::grid(1.0))
-        .with_child(topic_button("Podcasts", Some(SearchTopic::Show)))
-        .main_axis_alignment(MainAxisAlignment::Center);
+    let mut topics = Flex::row();
 
-    Scroll::new(topics).horizontal()
+    topics.add_child(topic_button("All", None));
+
+    for &topic in SearchTopic::all() {
+        topics.add_default_spacer();
+        topics.add_child(topic_button(topic.display_name(), Some(topic)));
+    }
+
+    Scroll::new(
+        topics
+            .main_axis_alignment(MainAxisAlignment::Center)
+            .padding(Insets::new(0.0, 0.0, 0.0, theme::grid(1.0))),
+    )
+    .horizontal()
 }
 
 fn topic_button(label: &str, topic: Option<SearchTopic>) -> impl Widget<AppState> {
@@ -92,6 +87,7 @@ fn topic_button(label: &str, topic: Option<SearchTopic>) -> impl Widget<AppState
                 ctx.fill(bounds, &color);
             },
         ))
+        .link()
         .on_click(move |ctx, _, _| {
             ctx.submit_command(SET_TOPIC.with(topic));
         })
@@ -149,13 +145,7 @@ fn async_results_widget() -> impl Widget<AppState> {
 
 fn loaded_results_widget() -> impl Widget<WithCtx<SearchResults>> {
     Either::new(
-        |results: &WithCtx<SearchResults>, _| {
-            results.data.artists.is_empty()
-                && results.data.albums.is_empty()
-                && results.data.tracks.is_empty()
-                && results.data.playlists.is_empty()
-                && results.data.shows.is_empty()
-        },
+        |results: &WithCtx<SearchResults>, _| results.data.is_empty(),
         Label::new("No results")
             .with_text_size(theme::TEXT_SIZE_LARGE)
             .with_text_color(theme::PLACEHOLDER_COLOR)
@@ -171,35 +161,48 @@ fn loaded_results_widget() -> impl Widget<WithCtx<SearchResults>> {
     )
 }
 
-fn artist_results_widget() -> impl Widget<WithCtx<SearchResults>> {
+fn section_widget<T: Data, W: Widget<T> + 'static>(
+    header: &str,
+    lens: impl Lens<WithCtx<SearchResults>, T> + 'static,
+    is_empty: impl Fn(&T) -> bool + 'static,
+    content: impl Fn() -> W + 'static,
+) -> impl Widget<WithCtx<SearchResults>> {
+    let header = header.to_string();
     Either::new(
-        |artists: &Vector<Artist>, _| artists.is_empty(),
+        move |data: &T, _| is_empty(data),
         Empty,
         Flex::column()
-            .with_child(header_widget("Artists"))
-            .with_child(List::new(|| artist::artist_widget(false))),
+            .with_child(header_widget(header))
+            .with_child(content()),
     )
-    .lens(Ctx::data().then(SearchResults::artists))
+    .lens(lens)
+}
+
+fn artist_results_widget() -> impl Widget<WithCtx<SearchResults>> {
+    section_widget(
+        SearchTopic::Artist.display_name(),
+        Ctx::data().then(SearchResults::artists),
+        |artists| artists.is_empty(),
+        || List::new(|| artist::artist_widget(false)),
+    )
 }
 
 fn album_results_widget() -> impl Widget<WithCtx<SearchResults>> {
-    Either::new(
-        |albums: &WithCtx<Vector<Arc<Album>>>, _| albums.data.is_empty(),
-        Empty,
-        Flex::column()
-            .with_child(header_widget("Albums"))
-            .with_child(List::new(|| album::album_widget(false))),
+    section_widget(
+        SearchTopic::Album.display_name(),
+        Ctx::map(SearchResults::albums),
+        |albums| albums.data.is_empty(),
+        || List::new(|| album::album_widget(false)),
     )
-    .lens(Ctx::map(SearchResults::albums))
 }
 
 fn track_results_widget() -> impl Widget<WithCtx<SearchResults>> {
-    Either::new(
-        |results: &WithCtx<SearchResults>, _| results.data.tracks.is_empty(),
-        Empty,
-        Flex::column()
-            .with_child(header_widget("Tracks"))
-            .with_child(playable::list_widget(playable::Display {
+    section_widget(
+        SearchTopic::Track.display_name(),
+        druid::lens::Identity,
+        |results| results.data.tracks.is_empty(),
+        || {
+            playable::list_widget(playable::Display {
                 track: track::Display {
                     title: true,
                     artist: true,
@@ -207,32 +210,27 @@ fn track_results_widget() -> impl Widget<WithCtx<SearchResults>> {
                     cover: true,
                     ..track::Display::empty()
                 },
-            })),
+            })
+        },
     )
 }
 
 fn playlist_results_widget() -> impl Widget<WithCtx<SearchResults>> {
-    Either::new(
-        |playlists: &WithCtx<SearchResults>, _| playlists.data.playlists.is_empty(),
-        Empty,
-        Flex::column()
-            .with_child(header_widget("Playlists"))
-            .with_child(
-                List::new(|| playlist::playlist_widget(false))
-                    .lens(Ctx::map(SearchResults::playlists)),
-            ),
+    section_widget(
+        SearchTopic::Playlist.display_name(),
+        Ctx::map(SearchResults::playlists),
+        |playlists| playlists.data.is_empty(),
+        || List::new(|| playlist::playlist_widget(false)),
     )
 }
 
 fn show_results_widget() -> impl Widget<WithCtx<SearchResults>> {
-    Either::new(
-        |shows: &WithCtx<Vector<Arc<Show>>>, _| shows.data.is_empty(),
-        Empty,
-        Flex::column()
-            .with_child(header_widget("Podcasts"))
-            .with_child(List::new(|| show::show_widget(false))),
+    section_widget(
+        SearchTopic::Show.display_name(),
+        Ctx::map(SearchResults::shows),
+        |shows| shows.data.is_empty(),
+        || List::new(|| show::show_widget(false)),
     )
-    .lens(Ctx::map(SearchResults::shows))
 }
 
 fn header_widget<T: Data>(text: impl Into<LabelText<T>>) -> impl Widget<T> {
