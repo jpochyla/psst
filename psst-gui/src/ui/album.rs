@@ -52,7 +52,7 @@ fn loaded_detail_widget() -> impl Widget<WithCtx<Cached<Arc<Album>>>> {
         .with_text_size(theme::TEXT_SIZE_SMALL);
 
     let album_label = Label::raw()
-        .with_line_break_mode(LineBreaking::WordWrap)
+        .with_line_break_mode(LineBreaking::Clip)
         .with_text_size(theme::TEXT_SIZE_SMALL)
         .with_text_color(theme::PLACEHOLDER_COLOR)
         .lens(Album::label.in_arc());
@@ -70,7 +70,7 @@ fn loaded_detail_widget() -> impl Widget<WithCtx<Cached<Arc<Album>>>> {
         .with_spacer(theme::grid(4.2))
         .with_child(album_cover)
         .with_default_spacer()
-        .with_child(album_info.lens(Ctx::data()));
+        .with_flex_child(album_info.lens(Ctx::data()), 1.0);
 
     let album_tracks = playable::list_widget(playable::Display {
         track: track::Display {
