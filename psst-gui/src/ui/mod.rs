@@ -21,7 +21,10 @@ use druid::widget::Controller;
 use druid::KbKey;
 use druid::{
     im::Vector,
-    widget::{CrossAxisAlignment, Either, Flex, Label, List, Scroll, Slider, Split, ViewSwitcher},
+    widget::{
+        CrossAxisAlignment, Either, Flex, Label, LineBreaking, List, Scroll, Slider, Split,
+        ViewSwitcher,
+    },
     Color, Env, Insets, Key, LensExt, Menu, MenuItem, Selector, Widget, WidgetExt, WindowDesc,
 };
 use druid_shell::Cursor;
@@ -243,7 +246,7 @@ fn root_widget() -> impl Widget<AppState> {
     let topbar = Flex::row()
         .must_fill_main_axis(true)
         .with_child(topbar_back_button_widget())
-        .with_child(topbar_title_widget())
+        .with_flex_child(topbar_title_widget(), 1.0)
         .with_child(topbar_sort_widget())
         .background(Border::Bottom.with_color(theme::BACKGROUND_DARK));
 
@@ -605,7 +608,7 @@ fn sorting_menu(app_state: &AppState) -> Menu<AppState> {
 fn topbar_title_widget() -> impl Widget<AppState> {
     Flex::row()
         .cross_axis_alignment(CrossAxisAlignment::Center)
-        .with_child(route_title_widget())
+        .with_flex_child(route_title_widget(), 1.0)
         .with_spacer(theme::grid(0.5))
         .with_child(route_icon_widget())
         .lens(AppState::nav)
@@ -632,6 +635,7 @@ fn route_icon_widget() -> impl Widget<Nav> {
 
 fn route_title_widget() -> impl Widget<Nav> {
     Label::dynamic(|nav: &Nav, _| nav.title())
+        .with_line_break_mode(LineBreaking::Clip)
         .with_font(theme::UI_FONT_MEDIUM)
         .with_text_size(theme::TEXT_SIZE_LARGE)
 }
