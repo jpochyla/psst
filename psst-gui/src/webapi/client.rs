@@ -559,6 +559,7 @@ impl WebApi {
                                             .map(|owner| owner.data.name.as_str())
                                             .unwrap_or_default(),
                                     ),
+                                    ..Default::default()
                                 },
                                 collaborative: false,
                                 public: None,
@@ -772,9 +773,9 @@ impl WebApi {
             None,
         )
         .set_base_uri("spclient.wg.spotify.com")
-        .query("playlist_limit", 10)
-        .query("artist_limit", 10)
-        .query("episode_limit", 10)
+        .query("playlist_limit", 20)
+        .query("artist_limit", 20)
+        .query("episode_limit", 20)
         .query("market", "from_token");
 
         let result: PublicUserInfo = self.load(req)?;
@@ -814,6 +815,7 @@ impl WebApi {
                 owner: PublicUser {
                     id: Arc::from(p.owner_uri.split(':').nth(2).unwrap_or("")),
                     display_name: Arc::from(p.owner_name.clone()),
+                    ..Default::default()
                 },
                 collaborative: false,
                 public: None,
@@ -837,6 +839,14 @@ impl WebApi {
                 },
             });
         });
+
+        let followers = self
+            .get_public_user_followers(id.clone())
+            .unwrap_or_else(|_| Vector::new());
+        let following = self
+            .get_public_user_following(id)
+            .unwrap_or_else(|_| Vector::new());
+
         Ok(PublicUserInformation {
             uri: result.uri,
             name: result.name,
@@ -848,65 +858,45 @@ impl WebApi {
             recently_played_artists: artist,
             public_playlists: playlist,
             allow_follows: result.allow_follows,
+            followers,
+            following,
         })
     }
 
-    pub fn get_public_user_playlists(&self, id: Arc<str>) -> Result<serde_json::Value, Error> {
-        let req = &RequestBuilder::new(
-            format!("user-profile-view/v3/profile/{}/playlists", id),
-            Method::Get,
-            None,
-        )
-        .set_base_uri("spclient.wg.spotify.com")
-        .query("offset", "0")
-        .query("limit", "200")
-        .query("market", "from_token");
+    pub fn get_public_user_followers(&self, id: Arc<str>) -> Result<Vector<PublicUser>, Error> {
+        #[derive(Deserialize)]
+        struct FollowersResponse {
+            profiles: Vector<PublicUser>,
+        }
 
-        let result: serde_json::Value = self.load(req)?;
-        Ok(result)
-    }
-
-    pub fn get_public_user_recently_played(
-        &self,
-        id: Arc<str>,
-    ) -> Result<serde_json::Value, Error> {
-        let req = &RequestBuilder::new(
-            format!("user-profile-view/v3/profile/{}/artists", id),
-            Method::Get,
-            None,
-        )
-        .set_base_uri("spclient.wg.spotify.com")
-        .query("limit", "50")
-        .query("market", "from_token");
-
-        let result: serde_json::Value = self.load(req)?;
-        Ok(result)
-    }
-
-    pub fn get_public_user_followers(&self, id: Arc<str>) -> Result<serde_json::Value, Error> {
         let req = &RequestBuilder::new(
             format!("user-profile-view/v3/profile/{}/followers", id),
-            Method::Post,
+            Method::Get,
             None,
         )
         .set_base_uri("spclient.wg.spotify.com")
-        .header("market", "from_token");
+        .query("market", "from_token");
 
-        let result: serde_json::Value = self.load(req)?;
-        Ok(result)
+        let result: FollowersResponse = self.load(req)?;
+        Ok(result.profiles)
     }
 
-    pub fn get_public_user_following(&self, id: Arc<str>) -> Result<serde_json::Value, Error> {
+    pub fn get_public_user_following(&self, id: Arc<str>) -> Result<Vector<PublicUser>, Error> {
+        #[derive(Deserialize)]
+        struct FollowingResponse {
+            profiles: Vector<PublicUser>,
+        }
+
         let req = &RequestBuilder::new(
             format!("user-profile-view/v3/profile/{}/following", id),
-            Method::Post,
+            Method::Get,
             None,
         )
         .set_base_uri("spclient.wg.spotify.com")
-        .header("market", "from_token");
+        .query("market", "from_token");
 
-        let result: serde_json::Value = self.load(req)?;
-        Ok(result)
+        let result: FollowingResponse = self.load(req)?;
+        Ok(result.profiles)
     }
     /*
     // Follow/unfollow

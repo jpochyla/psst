@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use druid::{im::Vector, Data, Lens};
-use serde::Deserialize;
 
 use crate::data::{Cached, MixedView, Promise, PublicUser};
 
@@ -22,4 +21,6 @@ pub struct PublicUserInformation {
     pub recently_played_artists: MixedView,
     pub public_playlists: MixedView,
     pub allow_follows: bool,
+    pub followers: Vector<PublicUser>,
+    pub following: Vector<PublicUser>,
 }
