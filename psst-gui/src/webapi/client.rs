@@ -709,6 +709,63 @@ impl WebApi {
         {"variables":{"usernames":["<urs>"]},"operationName":"followUsers","extensions":{"persistedQuery":{"version":1,"sha256Hash":"c00e0cb6c7766e7230fc256cf4fe07aec63b53d1160a323940fce7b664e95596"}}}
     */
     pub fn get_public_user_profile(&self, id: Arc<str>) -> Result<PublicUserInformation, Error> {
+        #[derive(Clone, Data, Deserialize)]
+        pub struct PublicUserArtist {
+            #[serde(default)]
+            pub followers_count: i64,
+            pub image_url: String,
+            #[serde(default)]
+            pub is_following: bool,
+            pub name: String,
+            pub uri: String,
+        }
+
+        #[derive(Clone, Data, Deserialize)]
+        pub struct PublicUserPlaylist {
+            pub image_url: String,
+            pub name: String,
+            pub owner_name: String,
+            pub owner_uri: String,
+            pub uri: String,
+            #[serde(default)]
+            pub followers_count: Option<i64>,
+            #[serde(default)]
+            pub is_following: Option<bool>,
+        }
+
+        #[derive(Clone, Data, Deserialize)]
+        pub struct PublicUserInfo {
+            #[serde(default)]
+            pub uri: String,
+            pub name: String,
+            #[serde(default)]
+            pub image_url: Option<String>,
+            #[serde(default)]
+            pub followers_count: i64,
+            #[serde(default)]
+            pub following_count: i64,
+            #[serde(default)]
+            pub is_following: Option<bool>,
+            #[serde(default)]
+            pub is_current_user: Option<bool>,
+            #[serde(default)]
+            pub recently_played_artists: Vector<PublicUserArtist>,
+            #[serde(default)]
+            pub public_playlists: Vector<PublicUserPlaylist>,
+            #[serde(default)]
+            pub total_public_playlists_count: i64,
+            #[serde(default)]
+            pub has_spotify_name: bool,
+            #[serde(default)]
+            pub has_spotify_image: bool,
+            #[serde(default)]
+            pub color: i64,
+            #[serde(default)]
+            pub allow_follows: bool,
+            #[serde(default)]
+            pub show_follows: bool,
+        }
+
         let req = &RequestBuilder::new(
             format!("user-profile-view/v3/profile/{}", id),
             Method::Get,
@@ -719,10 +776,79 @@ impl WebApi {
         .query("artist_limit", 10)
         .query("episode_limit", 10)
         .query("market", "from_token");
-        let result: serde_json::Value = self.load(&req.clone())?;
-        println!("{:#?}", result);
-        let result = self.load(req)?;
-        Ok(result)
+
+        let result: PublicUserInfo = self.load(req)?;
+
+        let mut playlist = MixedView {
+            title: Arc::from("Public Playlists"),
+            playlists: Vector::new(),
+            artists: Vector::new(),
+            albums: Vector::new(),
+            shows: Vector::new(),
+        };
+        let mut artist = MixedView {
+            title: Arc::from("Recently Played Artists"),
+            playlists: Vector::new(),
+            artists: Vector::new(),
+            albums: Vector::new(),
+            shows: Vector::new(),
+        };
+
+        result.public_playlists.iter().for_each(|p| {
+            playlist.playlists.push_back(Playlist {
+                id: Arc::from(p.uri.split(':').nth(2).unwrap_or("")),
+                name: Arc::from(p.name.clone()),
+                images: Some(if p.image_url.is_empty() {
+                    Vector::new()
+                } else {
+                    let mut images = Vector::new();
+                    images.push_back(data::utils::Image {
+                        url: Arc::from(p.image_url.clone()),
+                        width: None,
+                        height: None,
+                    });
+                    images
+                }),
+                description: Arc::from(""),
+                track_count: None,
+                owner: PublicUser {
+                    id: Arc::from(p.owner_uri.split(':').nth(2).unwrap_or("")),
+                    display_name: Arc::from(p.owner_name.clone()),
+                },
+                collaborative: false,
+                public: None,
+            });
+        });
+
+        result.recently_played_artists.iter().for_each(|a| {
+            artist.artists.push_back(Artist {
+                id: Arc::from(a.uri.split(':').nth(2).unwrap_or("")),
+                name: Arc::from(a.name.clone()),
+                images: if a.image_url.is_empty() {
+                    Vector::new()
+                } else {
+                    let mut images = Vector::new();
+                    images.push_back(data::utils::Image {
+                        url: Arc::from(a.image_url.clone()),
+                        width: None,
+                        height: None,
+                    });
+                    images
+                },
+            });
+        });
+        Ok(PublicUserInformation {
+            uri: result.uri,
+            name: result.name,
+            image_url: result.image_url,
+            followers_count: result.followers_count,
+            following_count: result.following_count,
+            is_following: result.is_following,
+            is_current_user: result.is_current_user,
+            recently_played_artists: artist,
+            public_playlists: playlist,
+            allow_follows: result.allow_follows,
+        })
     }
 
     pub fn get_public_user_playlists(&self, id: Arc<str>) -> Result<serde_json::Value, Error> {

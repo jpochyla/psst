@@ -18,8 +18,8 @@ use credits::TrackCredits;
 use druid::{
     im::Vector,
     widget::{
-        Controller, CrossAxisAlignment, Either, Flex, Label, LineBreaking, List, Scroll, Slider, Split,
-        ViewSwitcher,
+        Controller, CrossAxisAlignment, Either, Flex, Label, LineBreaking, List, Scroll, Slider,
+        Split, ViewSwitcher,
     },
     Color, Env, Insets, KbKey, Key, LensExt, Menu, MenuItem, Selector, Widget, WidgetExt,
     WindowDesc,

@@ -3,10 +3,10 @@ use std::sync::Arc;
 use crate::{
     data::{
         public_user::{PublicUserDetail, PublicUserInformation},
-        AppState, Cached, Ctx, PublicUser, WithCtx,
+        AppState, Cached, Ctx, MixedView, PublicUser, WithCtx,
     },
     ui::{
-        theme,
+        artist, playlist, theme,
         utils::{self, spinner_widget},
     },
     webapi::WebApi,
@@ -14,7 +14,8 @@ use crate::{
 };
 use druid::{
     kurbo::Circle,
-    widget::{CrossAxisAlignment, Either, Flex, Label},
+    lens::Map,
+    widget::{CrossAxisAlignment, Either, Flex, Label, List, Scroll},
     LensExt, Selector, Widget, WidgetExt,
 };
 
@@ -45,8 +46,20 @@ pub fn detail_widget() -> impl Widget<AppState> {
 fn loaded_detail_widget() -> impl Widget<WithCtx<Cached<Arc<PublicUserInformation>>>> {
     let user_profile_top = user_info_widget().padding(theme::grid(1.0));
 
-    let user_playlists = user_playlists_widget();
-    let user_artists = user_artists_widget();
+    let user_playlists = user_playlists_widget().lens(Map::new(
+        |data: &WithCtx<Cached<Arc<PublicUserInformation>>>| WithCtx {
+            ctx: data.ctx.clone(),
+            data: data.data.data.public_playlists.clone(),
+        },
+        |_, _| {},
+    ));
+    let user_artists = user_artists_widget().lens(Map::new(
+        |data: &WithCtx<Cached<Arc<PublicUserInformation>>>| WithCtx {
+            ctx: data.ctx.clone(),
+            data: data.data.data.recently_played_artists.clone(),
+        },
+        |_, _| {},
+    ));
 
     Flex::column()
         .cross_axis_alignment(CrossAxisAlignment::Start)
@@ -107,11 +120,9 @@ fn user_info_widget() -> impl Widget<WithCtx<Cached<Arc<PublicUserInformation>>>
         .with_child(user_info)
 }
 
-fn user_playlists_widget() -> impl Widget<WithCtx<Cached<Arc<PublicUserInformation>>>> {
+fn user_playlists_widget() -> impl Widget<WithCtx<MixedView>> {
     Either::new(
-        |info: &WithCtx<Cached<Arc<PublicUserInformation>>>, _| {
-            info.data.data.public_playlists.is_empty()
-        },
+        |playlists: &WithCtx<MixedView>, &_| playlists.data.playlists.is_empty(),
         Empty,
         Flex::column()
             .with_child(
@@ -121,21 +132,17 @@ fn user_playlists_widget() -> impl Widget<WithCtx<Cached<Arc<PublicUserInformati
                     .padding((theme::grid(1.5), theme::grid(0.5))),
             )
             .with_child(
-                Label::dynamic(|info: &WithCtx<Cached<Arc<PublicUserInformation>>>, _| {
-                    format!("{} public playlists", info.data.data.public_playlists.len())
-                })
-                .with_text_size(theme::TEXT_SIZE_SMALL)
-                .with_text_color(theme::PLACEHOLDER_COLOR)
-                .padding((theme::grid(1.5), theme::grid(0.5))),
+                Scroll::new(List::new(|| playlist::playlist_widget(true)).horizontal())
+                    .horizontal()
+                    .align_left()
+                    .lens(Ctx::map(MixedView::playlists)),
             ),
     )
 }
 
-fn user_artists_widget() -> impl Widget<WithCtx<Cached<Arc<PublicUserInformation>>>> {
+fn user_artists_widget() -> impl Widget<WithCtx<MixedView>> {
     Either::new(
-        |info: &WithCtx<Cached<Arc<PublicUserInformation>>>, _| {
-            info.data.data.recently_played_artists.is_empty()
-        },
+        |artists: &WithCtx<MixedView>, &_| artists.data.artists.is_empty(),
         Empty,
         Flex::column()
             .with_child(
@@ -145,15 +152,10 @@ fn user_artists_widget() -> impl Widget<WithCtx<Cached<Arc<PublicUserInformation
                     .padding((theme::grid(1.5), theme::grid(0.5))),
             )
             .with_child(
-                Label::dynamic(|info: &WithCtx<Cached<Arc<PublicUserInformation>>>, _| {
-                    format!(
-                        "{} recently played artists",
-                        info.data.data.recently_played_artists.len()
-                    )
-                })
-                .with_text_size(theme::TEXT_SIZE_SMALL)
-                .with_text_color(theme::PLACEHOLDER_COLOR)
-                .padding((theme::grid(1.5), theme::grid(0.5))),
+                Scroll::new(List::new(|| artist::artist_widget(true)).horizontal())
+                    .horizontal()
+                    .align_left()
+                    .lens(Ctx::data().then(MixedView::artists)),
             ),
     )
 }
