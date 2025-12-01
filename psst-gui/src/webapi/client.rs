@@ -799,17 +799,30 @@ impl WebApi {
             playlist.playlists.push_back(Playlist {
                 id: Arc::from(p.uri.split(':').nth(2).unwrap_or("")),
                 name: Arc::from(p.name.clone()),
-                images: Some(if p.image_url.is_empty() {
-                    Vector::new()
-                } else {
-                    let mut images = Vector::new();
-                    images.push_back(data::utils::Image {
-                        url: Arc::from(p.image_url.clone()),
-                        width: None,
-                        height: None,
-                    });
-                    images
-                }),
+                images: Some(
+                    if p.image_url.is_empty() || p.image_url.contains("spotify:mosaic:") {
+                        {
+                            let mut images = Vector::new();
+                            images.push_back(data::utils::Image {
+                            url: Arc::from(
+                                "https://t.scdn.co/images/728ed47fc1674feb95f7ac20236eb6d7.jpeg",
+                            ),
+                            width: None,
+                            height: None,
+                        });
+                            images
+                        }
+                    } else {
+                        println!("{:#?}", p.image_url);
+                        let mut images = Vector::new();
+                        images.push_back(data::utils::Image {
+                            url: Arc::from(p.image_url.clone()),
+                            width: None,
+                            height: None,
+                        });
+                        images
+                    },
+                ),
                 description: Arc::from(""),
                 track_count: None,
                 owner: PublicUser {
