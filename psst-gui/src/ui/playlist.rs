@@ -456,7 +456,7 @@ fn playlist_info_widget() -> impl Widget<WithCtx<Playlist>> {
         |p: &Playlist, _| !p.description.is_empty(),
         Flex::column().with_default_spacer().with_child(
             Label::dynamic(|p: &Playlist, _| p.description.to_string())
-                .with_line_break_mode(LineBreaking::WordWrap)
+                .with_line_break_mode(LineBreaking::Clip)
                 .with_text_size(theme::TEXT_SIZE_SMALL)
                 .with_text_color(theme::PLACEHOLDER_COLOR),
         ),
@@ -491,13 +491,12 @@ fn playlist_info_widget() -> impl Widget<WithCtx<Playlist>> {
         .with_default_spacer()
         .with_child(track_count_label)
         .with_child(description_widget)
-        .with_child(visibility_widget)
-        .padding(theme::grid(1.0));
+        .with_child(visibility_widget);
 
     Flex::row()
         .with_child(playlist_cover)
         .with_default_spacer()
-        .with_child(playlist_info.lens(Ctx::data()))
+        .with_flex_child(playlist_info.lens(Ctx::data()), 1.0)
 }
 
 fn async_tracks_widget() -> impl Widget<AppState> {

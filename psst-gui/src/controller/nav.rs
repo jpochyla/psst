@@ -103,7 +103,7 @@ where
                 self.load_route_data(ctx, data);
             }
             Event::Command(cmd) if cmd.is(cmd::NAVIGATE_REFRESH) => {
-                data.refresh();
+                data.refresh_playlist();
                 ctx.set_handled();
                 self.load_route_data(ctx, data);
             }
@@ -125,8 +125,8 @@ where
                 ctx.set_handled();
                 self.load_route_data(ctx, data);
             }
-            Event::KeyDown(key) if key.mods.meta() && key.code == Code::KeyR => {
-                data.refresh();
+            Event::KeyDown(key) if key.mods.ctrl() && key.code == Code::KeyR => {
+                data.refresh_all();
                 ctx.set_handled();
                 self.load_route_data(ctx, data);
             }

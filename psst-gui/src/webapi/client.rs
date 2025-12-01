@@ -17,7 +17,10 @@ use druid::{
 use itertools::Itertools;
 use log::info;
 use parking_lot::Mutex;
-use psst_core::session::{login5::Login5, SessionService};
+use psst_core::{
+    session::{login5::Login5, SessionService},
+    system_info::{OS, SPOTIFY_SEMANTIC_VERSION},
+};
 use serde::{de::DeserializeOwned, Deserialize};
 use serde_json::json;
 use std::sync::OnceLock;
@@ -72,6 +75,21 @@ impl WebApi {
         }
     }
 
+    // Similar to how librespot does this https://github.com/librespot-org/librespot/blob/dev/core/src/version.rs
+    fn user_agent() -> String {
+        let platform = match OS {
+            "macos" => "OSX",
+            "windows" => "Win32",
+            _ => "Linux",
+        };
+        format!(
+            "Spotify/{} {}/0 (psst/{})",
+            SPOTIFY_SEMANTIC_VERSION,
+            platform,
+            env!("CARGO_PKG_VERSION")
+        )
+    }
+
     fn access_token(&self) -> Result<String, Error> {
         self.login5
             .get_access_token(&self.session)
@@ -81,40 +99,35 @@ impl WebApi {
 
     fn request(&self, request: &RequestBuilder) -> Result<Response<Body>, Error> {
         let token = self.access_token()?;
-        let request = request.clone().query("market", "from_token");
+        let url = request.build();
+
+        fn configure_request<B>(
+            req_builder: ureq::RequestBuilder<B>,
+            token: &str,
+            headers: &HashMap<String, String>,
+        ) -> ureq::RequestBuilder<B> {
+            headers.iter().fold(
+                req_builder.header("Authorization", &format!("Bearer {token}")),
+                |current_req, (k, v)| current_req.header(k, v),
+            )
+        }
 
         match request.get_method() {
-            Method::Get => {
-                let mut req = self
-                    .agent
-                    .get(request.build())
-                    .header("Authorization", &format!("Bearer {token}"));
-                for header in request.get_headers() {
-                    req = req.header(header.0, header.1);
-                }
-
-                req.call()
+            Method::Get => configure_request(self.agent.get(&url), &token, request.get_headers())
+                .call()
+                .map_err(|err| Error::WebApiError(err.to_string())),
+            Method::Post => configure_request(self.agent.post(&url), &token, request.get_headers())
+                .send_json(request.get_body())
+                .map_err(|err| Error::WebApiError(err.to_string())),
+            Method::Put => configure_request(self.agent.put(&url), &token, request.get_headers())
+                .send_json(request.get_body())
+                .map_err(|err| Error::WebApiError(err.to_string())),
+            Method::Delete => {
+                configure_request(self.agent.delete(&url), &token, request.get_headers())
+                    .force_send_body()
+                    .send_json(request.get_body())
                     .map_err(|err| Error::WebApiError(err.to_string()))
             }
-            Method::Post => self
-                .agent
-                .post(request.build())
-                .header("Authorization", &format!("Bearer {token}"))
-                .send_json(request.get_body())
-                .map_err(|err| Error::WebApiError(err.to_string())),
-            Method::Put => self
-                .agent
-                .put(request.build())
-                .header("Authorization", &format!("Bearer {token}"))
-                .send_json(request.get_body())
-                .map_err(|err| Error::WebApiError(err.to_string())),
-            Method::Delete => self
-                .agent
-                .delete(request.build())
-                .header("Authorization", &format!("Bearer {token}"))
-                .force_send_body()
-                .send_json(request.get_body())
-                .map_err(|err| Error::WebApiError(err.to_string())),
         }
     }
 
@@ -356,7 +369,7 @@ impl WebApi {
             #[serde(rename = "__typename")]
             typename: DataTypename,
             name: Option<String>,
-            uri: String,
+            uri: Option<String>,
 
             // Playlist-specific fields
             attributes: Option<Vec<Attribute>>,
@@ -434,6 +447,7 @@ impl WebApi {
             Playlist,
             Artist,
             Album,
+            NotFound,
         }
 
         #[derive(Deserialize)]
@@ -482,7 +496,9 @@ impl WebApi {
                 title = section.data.title.text.clone().into();
 
                 section.section_items.items.iter().for_each(|item| {
-                    let uri = item.content.data.uri.clone();
+                    let Some(uri) = &item.content.data.uri else {
+                        return;
+                    };
                     let id = uri.split(':').next_back().unwrap_or("").to_string();
 
                     match item.content.data.typename {
@@ -643,6 +659,8 @@ impl WebApi {
                             ),
                             total_episodes: item.content.data.total_episodes,
                         })),
+                        // For section items we don't cover yet
+                        DataTypename::NotFound => {}
                     }
                 });
             });
@@ -978,8 +996,8 @@ impl WebApi {
 
         let request =
             &RequestBuilder::new("pathfinder/v2/query".to_string(), Method::Post, Some(json))
-                .set_base_uri("api-partner.spotify.com");
-
+                .set_base_uri("api-partner.spotify.com")
+                .header("User-Agent", Self::user_agent());
         let result: Cached<Welcome> = self.load_cached(request, "artist-info", id)?;
 
         let hrefs: Vector<String> = result
@@ -1248,8 +1266,6 @@ impl WebApi {
             "extensions": {
                 "persistedQuery": {
                     "version": 1,
-                    // From https://github.com/KRTirtho/spotube/blob/9b024120601c0d381edeab4460cb22f87149d0f8/lib%2Fservices%2Fcustom_spotify_endpoints%2Fspotify_endpoints.dart
-                    // Keep and eye on this and change accordingly
                     "sha256Hash": "eb3fba2d388cf4fc4d696b1757a58584e9538a3b515ea742e9cc9465807340be"
                 }
             },
@@ -1267,16 +1283,15 @@ impl WebApi {
         let request =
             &RequestBuilder::new("pathfinder/v2/query".to_string(), Method::Post, Some(json))
                 .set_base_uri("api-partner.spotify.com")
-                .header("app-platform", "WebPlayer")
-                .header("Content-Type", "application/json");
+                .header("User-Agent", Self::user_agent());
 
         // Extract the playlists
         self.load_and_return_home_section(request)
     }
 
     pub fn get_made_for_you(&self) -> Result<MixedView, Error> {
-        // 0JQ5DAqAJXkJGsa2DyEjKi -> Made for you
-        self.get_section("spotify:section:0JQ5DAqAJXkJGsa2DyEjKi")
+        // 0JQ5DAUnp4wcj0bCb3wh3S -> Made for you
+        self.get_section("spotify:section:0JQ5DAUnp4wcj0bCb3wh3S")
     }
 
     pub fn get_top_mixes(&self) -> Result<MixedView, Error> {
@@ -1290,8 +1305,8 @@ impl WebApi {
     }
 
     pub fn uniquely_yours(&self) -> Result<MixedView, Error> {
-        // 0JQ5DAqAJXkJGsa2DyEjKi -> Uniquely yours
-        self.get_section("spotify:section:0JQ5DAqAJXkJGsa2DyEjKi")
+        // 0JQ5DAUnp4wcj0bCb3wh3S -> Uniquely yours
+        self.get_section("spotify:section:0JQ5DAUnp4wcj0bCb3wh3S")
     }
 
     pub fn best_of_artists(&self) -> Result<MixedView, Error> {
