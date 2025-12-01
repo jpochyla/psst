@@ -488,8 +488,7 @@ fn playlist_info_widget() -> impl Widget<WithCtx<Playlist>> {
         .with_default_spacer()
         .with_child(track_count_label)
         .with_child(description_widget)
-        .with_child(visibility_widget)
-        .padding(theme::grid(1.0));
+        .with_child(visibility_widget);
 
     Flex::row()
         .with_child(playlist_cover)
