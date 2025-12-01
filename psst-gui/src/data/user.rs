@@ -32,11 +32,26 @@ pub struct PublicUser {
 }
 
 impl PublicUser {
+    /// Get the display name, falling back to `name` field if `display_name` is
+    /// empty
     pub fn get_display_name(&self) -> Arc<str> {
         if self.display_name.is_empty() {
             self.name.clone().unwrap_or_default()
         } else {
             self.display_name.clone()
+        }
+    }
+
+    /// Get the user ID, extracting from URI if `id` is empty.
+    /// URI format is "spotify:user:abc123", extracts "abc123".
+    pub fn get_id(&self) -> Arc<str> {
+        if self.id.is_empty() {
+            self.uri
+                .as_ref()
+                .and_then(|uri| uri.split(':').nth(2).map(Arc::from))
+                .unwrap_or_default()
+        } else {
+            self.id.clone()
         }
     }
 }

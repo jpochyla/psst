@@ -878,7 +878,17 @@ impl WebApi {
         .query("market", "from_token");
 
         let result: FollowersResponse = self.load(req)?;
-        Ok(result.profiles)
+        Ok(result
+            .profiles
+            .into_iter()
+            .take(20)
+            .map(|mut user| {
+                if user.id.is_empty() {
+                    user.id = user.get_id();
+                }
+                user
+            })
+            .collect())
     }
 
     pub fn get_public_user_following(&self, id: Arc<str>) -> Result<Vector<PublicUser>, Error> {
@@ -896,7 +906,17 @@ impl WebApi {
         .query("market", "from_token");
 
         let result: FollowingResponse = self.load(req)?;
-        Ok(result.profiles)
+        Ok(result
+            .profiles
+            .into_iter()
+            .take(20)
+            .map(|mut user| {
+                if user.id.is_empty() {
+                    user.id = user.get_id();
+                }
+                user
+            })
+            .collect())
     }
     /*
     // Follow/unfollow

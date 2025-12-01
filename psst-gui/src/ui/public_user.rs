@@ -4,7 +4,7 @@ use crate::{
     cmd,
     data::{
         public_user::{PublicUserDetail, PublicUserInformation},
-        AppState, Cached, Ctx, MixedView, Nav, PublicUser, WithCtx,
+        AppState, ArtistLink, Cached, Ctx, MixedView, Nav, PublicUser, WithCtx,
     },
     ui::{
         artist, playlist, theme,
@@ -257,7 +257,14 @@ pub fn public_user_widget(horizontal: bool) -> impl Widget<PublicUser> {
         .link()
         .rounded(theme::BUTTON_BORDER_RADIUS)
         .on_left_click(|ctx, _, user, _| {
-            ctx.submit_command(cmd::NAVIGATE.with(Nav::PublicUserDetail(user.clone())));
+            if user.uri.as_ref().unwrap().contains("artist") {
+                ctx.submit_command(cmd::NAVIGATE.with(Nav::ArtistDetail(ArtistLink {
+                    id: user.id.clone(),
+                    name: user.get_display_name(),
+                })));
+            } else {
+                ctx.submit_command(cmd::NAVIGATE.with(Nav::PublicUserDetail(user.clone())));
+            }
         })
 }
 
