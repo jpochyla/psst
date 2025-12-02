@@ -808,7 +808,6 @@ impl WebApi {
                             .to_string();
                         image_url = image_url.replace(":", "");
                         let mut images = Vector::new();
-                        println!("https://mosaic.scdn.co/300/{}", image_url);
                         images.push_back(data::utils::Image {
                             url: Arc::from(format!("https://mosaic.scdn.co/300/{}", image_url)),
                             width: None,
