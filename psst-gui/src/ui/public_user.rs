@@ -86,7 +86,7 @@ pub fn detail_widget() -> impl Widget<AppState> {
 fn loaded_detail_widget() -> impl Widget<WithCtx<Cached<Arc<PublicUserInformation>>>> {
     let user_profile_top = user_info_widget().padding(theme::grid(1.0));
 
-    // This puts it as read only, it is needed to trainsform the context into what
+    // This puts it as read only, it is needed to transform the context into what
     // is needed
     let user_playlists = user_playlists_widget().lens(Map::new(
         |data: &WithCtx<Cached<Arc<PublicUserInformation>>>| WithCtx {
