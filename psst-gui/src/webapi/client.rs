@@ -799,30 +799,32 @@ impl WebApi {
             playlist.playlists.push_back(Playlist {
                 id: Arc::from(p.uri.split(':').nth(2).unwrap_or("")),
                 name: Arc::from(p.name.clone()),
-                images: Some(
-                    if p.image_url.is_empty() || p.image_url.contains("spotify:mosaic:") {
-                        {
-                            let mut images = Vector::new();
-                            images.push_back(data::utils::Image {
-                            url: Arc::from(
-                                "https://t.scdn.co/images/728ed47fc1674feb95f7ac20236eb6d7.jpeg",
-                            ),
-                            width: None,
-                            height: None,
-                        });
-                            images
-                        }
-                    } else {
-                        println!("{:#?}", p.image_url);
+                images: Some(if p.image_url.contains("spotify:mosaic:") {
+                    {
+                        let mut image_url = p.image_url.clone();
+                        image_url = image_url
+                            .strip_prefix("spotify:mosaic:")
+                            .unwrap_or(&image_url)
+                            .to_string();
+                        image_url = image_url.replace(":", "");
                         let mut images = Vector::new();
+                        println!("https://mosaic.scdn.co/300/{}", image_url);
                         images.push_back(data::utils::Image {
-                            url: Arc::from(p.image_url.clone()),
+                            url: Arc::from(format!("https://mosaic.scdn.co/300/{}", image_url)),
                             width: None,
                             height: None,
                         });
                         images
-                    },
-                ),
+                    }
+                } else {
+                    let mut images = Vector::new();
+                    images.push_back(data::utils::Image {
+                        url: Arc::from(p.image_url.clone()),
+                        width: None,
+                        height: None,
+                    });
+                    images
+                }),
                 description: Arc::from(""),
                 track_count: None,
                 owner: PublicUser {
