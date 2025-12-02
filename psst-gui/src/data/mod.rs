@@ -128,6 +128,7 @@ impl AppState {
             added_queue: Vector::new(),
             search: Search {
                 input: "".into(),
+                topic: None,
                 results: Promise::Empty,
             },
             recommend: Recommend {

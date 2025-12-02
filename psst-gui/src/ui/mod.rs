@@ -361,9 +361,7 @@ fn route_widget() -> impl Widget<AppState> {
             Route::Shows => Scroll::new(library::saved_shows_widget().padding(theme::grid(1.0)))
                 .vertical()
                 .boxed(),
-            Route::SearchResults => Scroll::new(search::results_widget().padding(theme::grid(1.0)))
-                .vertical()
-                .boxed(),
+            Route::SearchResults => search::results_widget().padding(theme::grid(1.0)).boxed(),
             Route::AlbumDetail => Scroll::new(album::detail_widget().padding(theme::grid(1.0)))
                 .vertical()
                 .boxed(),
