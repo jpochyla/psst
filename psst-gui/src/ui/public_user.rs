@@ -11,14 +11,14 @@ use crate::{
         utils::{self, spinner_widget},
     },
     webapi::WebApi,
-    widget::{Async, Empty, MyWidgetExt, RemoteImage},
+    widget::{icons, Async, Empty, MyWidgetExt, RemoteImage},
 };
 use druid::{
     im::Vector,
     kurbo::Circle,
     lens::Map,
     widget::{CrossAxisAlignment, Either, Flex, Label, List, Scroll},
-    LensExt, Selector, UnitPoint, Widget, WidgetExt,
+    Color, LensExt, Selector, UnitPoint, Widget, WidgetExt,
 };
 
 pub const LOAD_DETAIL: Selector<(PublicUser, AppState)> =
@@ -95,14 +95,29 @@ fn loaded_detail_widget() -> impl Widget<WithCtx<Cached<Arc<PublicUserInformatio
 
 pub fn cover_widget(size: f64) -> impl Widget<WithCtx<Cached<Arc<PublicUserInformation>>>> {
     let radius = size / 2.0;
-    RemoteImage::new(
-        utils::placeholder_widget(),
-        move |ctx: &WithCtx<Cached<Arc<PublicUserInformation>>>, _| {
-            ctx.data.data.image_url.clone().map(|url| url.into())
-        },
+
+    // Placeholder widget showing a user icon
+    let placeholder = icons::USER
+        .scale((size * 0.9, size * 0.9))
+        .with_color(Color::rgb8(0x53, 0x53, 0x53))
+        .padding((size * 0.05, size * 0.05))
+        .center()
+        .fix_size(size, size)
+        .background(Color::rgb8(0x28, 0x28, 0x28))
+        .clip(Circle::new((radius, radius), radius));
+
+    Either::new(
+        |ctx: &WithCtx<Cached<Arc<PublicUserInformation>>>, _| ctx.data.data.image_url.is_some(),
+        RemoteImage::new(
+            utils::placeholder_widget(),
+            move |ctx: &WithCtx<Cached<Arc<PublicUserInformation>>>, _| {
+                ctx.data.data.image_url.clone().map(|url| url.into())
+            },
+        )
+        .fix_size(size, size)
+        .clip(Circle::new((radius, radius), radius)),
+        placeholder,
     )
-    .fix_size(size, size)
-    .clip(Circle::new((radius, radius), radius))
 }
 
 fn user_info_widget() -> impl Widget<WithCtx<Cached<Arc<PublicUserInformation>>>> {
@@ -270,9 +285,24 @@ pub fn public_user_widget(horizontal: bool) -> impl Widget<PublicUser> {
 
 fn user_cover_widget(size: f64) -> impl Widget<PublicUser> {
     let radius = size / 2.0;
-    RemoteImage::new(utils::placeholder_widget(), move |user: &PublicUser, _| {
-        user.image_url.clone().map(|url| url.into())
-    })
-    .fix_size(size, size)
-    .clip(Circle::new((radius, radius), radius))
+
+    // Placeholder widget showing a user icon
+    let placeholder = icons::USER
+        .scale((size * 0.9, size * 0.9))
+        .with_color(Color::rgb8(0x53, 0x53, 0x53))
+        .padding((size * 0.05, size * 0.05))
+        .center()
+        .fix_size(size, size)
+        .background(Color::rgb8(0x28, 0x28, 0x28))
+        .clip(Circle::new((radius, radius), radius));
+
+    Either::new(
+        |user: &PublicUser, _| user.image_url.is_some(),
+        RemoteImage::new(utils::placeholder_widget(), move |user: &PublicUser, _| {
+            user.image_url.clone().map(|url| url.into())
+        })
+        .fix_size(size, size)
+        .clip(Circle::new((radius, radius), radius)),
+        placeholder,
+    )
 }
