@@ -17,12 +17,14 @@ use druid::{
     im::Vector,
     kurbo::Circle,
     lens::Map,
-    widget::{CrossAxisAlignment, Either, Flex, Label, List, Scroll},
+    widget::{Button, CrossAxisAlignment, Either, Flex, Label, List, Scroll},
     Color, LensExt, Selector, UnitPoint, Widget, WidgetExt,
 };
 
 pub const LOAD_DETAIL: Selector<(PublicUser, AppState)> =
     Selector::new("app.publicUser.load-detail");
+pub const FOLLOW_USER: Selector<Arc<str>> = Selector::new("app.publicUser.follow");
+pub const UNFOLLOW_USER: Selector<Arc<str>> = Selector::new("app.publicUser.unfollow");
 
 pub fn detail_widget() -> impl Widget<AppState> {
     Async::new(spinner_widget, loaded_detail_widget, || Empty)
@@ -41,6 +43,42 @@ pub fn detail_widget() -> impl Widget<AppState> {
                 data.public_user_detail
                     .info
                     .update((r.0 .0, r.1.map(|info| Cached::fresh(Arc::new(info)))))
+            },
+        )
+        .on_command_async(
+            FOLLOW_USER,
+            |username| WebApi::global().follow_user(&username),
+            |_, _, _| {},
+            |_, data, (_username, r)| {
+                if let Err(err) = r {
+                    data.error_alert(err);
+                } else {
+                    data.info_alert("User followed.");
+                    // Update the is_following state in the cached data
+                    if let Some(cached) = data.public_user_detail.info.resolved_mut() {
+                        let info = Arc::make_mut(&mut cached.data);
+                        info.is_following = Some(true);
+                        info.followers_count += 1;
+                    }
+                }
+            },
+        )
+        .on_command_async(
+            UNFOLLOW_USER,
+            |username| WebApi::global().unfollow_user(&username),
+            |_, _, _| {},
+            |_, data, (_username, r)| {
+                if let Err(err) = r {
+                    data.error_alert(err);
+                } else {
+                    data.info_alert("User unfollowed.");
+                    // Update the is_following state in the cached data
+                    if let Some(cached) = data.public_user_detail.info.resolved_mut() {
+                        let info = Arc::make_mut(&mut cached.data);
+                        info.is_following = Some(false);
+                        info.followers_count -= 1;
+                    }
+                }
             },
         )
 }
@@ -140,6 +178,26 @@ fn user_info_widget() -> impl Widget<WithCtx<Cached<Arc<PublicUserInformation>>>
     .with_text_size(theme::TEXT_SIZE_SMALL)
     .with_text_color(theme::PLACEHOLDER_COLOR);
 
+    let follow_unfollow_button = Button::dynamic(|info: &Arc<PublicUserInformation>, _| {
+        if info.is_following.unwrap_or(false) {
+            "Unfollow".to_string()
+        } else {
+            "Follow".to_string()
+        }
+    })
+    .disabled_if(|info: &Arc<PublicUserInformation>, _| {
+        !info.allow_follows || info.is_current_user.unwrap_or(false)
+    })
+    .on_click(|ctx, info: &mut Arc<PublicUserInformation>, _| {
+        // Extract username from URI (format: spotify:user:USERNAME)
+        let username: Arc<str> = Arc::from(info.uri.split(':').nth(2).unwrap_or(&info.uri));
+        if info.is_following.unwrap_or(false) {
+            ctx.submit_command(UNFOLLOW_USER.with(username));
+        } else {
+            ctx.submit_command(FOLLOW_USER.with(username));
+        }
+    });
+
     let user_info = Flex::column()
         .cross_axis_alignment(CrossAxisAlignment::Start)
         .with_child(user_name)
@@ -147,6 +205,8 @@ fn user_info_widget() -> impl Widget<WithCtx<Cached<Arc<PublicUserInformation>>>
         .with_child(follower_count)
         .with_spacer(theme::grid(0.5))
         .with_child(following_count)
+        .with_default_spacer()
+        .with_child(follow_unfollow_button)
         .padding(theme::grid(1.0))
         .lens(Ctx::data().then(Cached::data));
 

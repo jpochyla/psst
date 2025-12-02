@@ -694,21 +694,6 @@ impl WebApi {
 
 /// Public user endpoints.
 impl WebApi {
-    // User profile
-    // https://spclient.wg.spotify.com/user-profile-view/v3/profile/<urs>?playlist_limit=10&artist_limit=10&episode_limit=10&market=from_token
-    // Get public playlists
-    // https://spclient.wg.spotify.com/user-profile-view/v3/profile/<urs>/playlists?offset=0&limit=200&market=from_token
-    // Recenlty played
-    // https://spclient.wg.spotify.com/user-profile-view/v3/profile/<urs>/artists?limit=50&market=from_token
-    // Followers
-    // https://spclient.wg.spotify.com/user-profile-view/v3/profile/<urs>/followers?market=from_token
-    // Following
-    // https://spclient.wg.spotify.com/user-profile-view/v3/profile/<urs>/following?market=from_token
-    // Follow/unfollow
-    // https://api-partner.spotify.com/pathfinder/v2/query
-    /*
-        {"variables":{"usernames":["<urs>"]},"operationName":"followUsers","extensions":{"persistedQuery":{"version":1,"sha256Hash":"c00e0cb6c7766e7230fc256cf4fe07aec63b53d1160a323940fce7b664e95596"}}}
-    */
     pub fn get_public_user_profile(&self, id: Arc<str>) -> Result<PublicUserInformation, Error> {
         #[derive(Clone, Data, Deserialize)]
         pub struct PublicUserArtist {
@@ -932,26 +917,54 @@ impl WebApi {
             })
             .collect())
     }
-    /*
+
     // Follow/unfollow
     // https://api-partner.spotify.com/pathfinder/v2/query
-    /*
-        {"variables":{"usernames":["florence.flossie.morrison"]},"operationName":"followUsers","extensions":{"persistedQuery":{"version":1,"sha256Hash":"c00e0cb6c7766e7230fc256cf4fe07aec63b53d1160a323940fce7b664e95596"}}}
-    */
-    pub fn follow_public_user(&self, id: Arc<str>) -> Result<serde_json::Value, Error> {
-        let req = &RequestBuilder::new(
-            format!("user-profile-view/v3/profile/{}/artists", id),
-            Method::Post,
-            None,
-        )
-        .set_base_uri("spclient.wg.spotify.com")
-        .header("limit", 50)
-        .header("market", "from_token");
+    pub fn follow_user(&self, username: &str) -> Result<(), Error> {
+        let json = json!({
+            "variables": {
+                "usernames": [username]
+            },
+            "operationName": "followUsers",
+            "extensions": {
+                "persistedQuery": {
+                    "version": 1,
+                    "sha256Hash": "c00e0cb6c7766e7230fc256cf4fe07aec63b53d1160a323940fce7b664e95596"
+                }
+            }
+        });
 
-        let result: serde_json::Value = self.load(req)?;
-        Ok(result)
+        let request =
+            &RequestBuilder::new("pathfinder/v2/query".to_string(), Method::Post, Some(json))
+                .set_base_uri("api-partner.spotify.com")
+                .header("User-Agent", Self::user_agent());
+
+        self.request(request)?;
+        Ok(())
     }
-    */
+
+    pub fn unfollow_user(&self, username: &str) -> Result<(), Error> {
+        let json = json!({
+            "variables": {
+                "usernames": [username]
+            },
+            "operationName": "unfollowUsers",
+            "extensions": {
+                "persistedQuery": {
+                    "version": 1,
+                    "sha256Hash": "c00e0cb6c7766e7230fc256cf4fe07aec63b53d1160a323940fce7b664e95596"
+                }
+            }
+        });
+
+        let request =
+            &RequestBuilder::new("pathfinder/v2/query".to_string(), Method::Post, Some(json))
+                .set_base_uri("api-partner.spotify.com")
+                .header("User-Agent", Self::user_agent());
+
+        self.request(request)?;
+        Ok(())
+    }
 }
 
 /// User endpoints.
