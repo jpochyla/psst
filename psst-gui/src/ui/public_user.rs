@@ -359,7 +359,7 @@ fn user_cover_widget(size: f64) -> impl Widget<PublicUser> {
     Either::new(
         |user: &PublicUser, _| user.image_url.is_some(),
         RemoteImage::new(utils::placeholder_widget(), move |user: &PublicUser, _| {
-            user.image_url.clone().map(|url| url.into())
+            user.image_url.clone()
         })
         .fix_size(size, size)
         .clip(Circle::new((radius, radius), radius)),
