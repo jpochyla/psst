@@ -55,6 +55,7 @@ impl SearchTopic {
 #[derive(Clone, Data, Lens)]
 pub struct SearchResults {
     pub query: Arc<str>,
+    pub topic: Option<SearchTopic>,
     pub artists: Vector<Artist>,
     pub albums: Vector<Arc<Album>>,
     pub tracks: Vector<Arc<Track>>,

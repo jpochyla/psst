@@ -62,7 +62,7 @@ fn topic_widget() -> impl Widget<AppState> {
     Scroll::new(
         topics
             .main_axis_alignment(MainAxisAlignment::Center)
-            .padding(Insets::new(0.0, 0.0, 0.0, theme::grid(1.0))),
+            .padding(Insets::new(0.0, 0.0, 0.0, theme::grid(2.0))),
     )
     .horizontal()
 }
@@ -151,54 +151,65 @@ fn loaded_results_widget() -> impl Widget<WithCtx<SearchResults>> {
             .with_text_color(theme::PLACEHOLDER_COLOR)
             .padding(theme::grid(6.0))
             .center(),
-        Flex::column()
-            .cross_axis_alignment(CrossAxisAlignment::Fill)
-            .with_child(artist_results_widget())
-            .with_child(album_results_widget())
-            .with_child(track_results_widget())
-            .with_child(playlist_results_widget())
-            .with_child(show_results_widget()),
+        Either::new(
+            |results: &WithCtx<SearchResults>, _| results.data.topic.is_some(),
+            results_list(false),
+            results_list(true),
+        ),
     )
+}
+
+fn results_list(include_headers: bool) -> Flex<WithCtx<SearchResults>> {
+    let mut column = Flex::column().cross_axis_alignment(CrossAxisAlignment::Fill);
+    column = column.with_child(artist_results_widget(include_headers));
+    column = column.with_child(album_results_widget(include_headers));
+    column = column.with_child(track_results_widget(include_headers));
+    column = column.with_child(playlist_results_widget(include_headers));
+    column.with_child(show_results_widget(include_headers))
 }
 
 fn section_widget<T: Data, W: Widget<T> + 'static>(
     header: &str,
+    include_header: bool,
     lens: impl Lens<WithCtx<SearchResults>, T> + 'static,
     is_empty: impl Fn(&T) -> bool + 'static,
     content: impl Fn() -> W + 'static,
 ) -> impl Widget<WithCtx<SearchResults>> {
-    let header = header.to_string();
-    Either::new(
-        move |data: &T, _| is_empty(data),
-        Empty,
-        Flex::column()
-            .with_child(header_widget(header))
-            .with_child(content()),
-    )
+    let header_text = header.to_string();
+    Either::new(move |data: &T, _| is_empty(data), Empty, {
+        let mut column = Flex::column();
+        if include_header {
+            column = column.with_child(header_widget(header_text.clone()));
+        }
+        column.with_child(content())
+    })
     .lens(lens)
 }
 
-fn artist_results_widget() -> impl Widget<WithCtx<SearchResults>> {
+fn artist_results_widget(include_header: bool) -> impl Widget<WithCtx<SearchResults>> {
     section_widget(
         SearchTopic::Artist.display_name(),
+        include_header,
         Ctx::data().then(SearchResults::artists),
         |artists| artists.is_empty(),
         || List::new(|| artist::artist_widget(false)),
     )
 }
 
-fn album_results_widget() -> impl Widget<WithCtx<SearchResults>> {
+fn album_results_widget(include_header: bool) -> impl Widget<WithCtx<SearchResults>> {
     section_widget(
         SearchTopic::Album.display_name(),
+        include_header,
         Ctx::map(SearchResults::albums),
         |albums| albums.data.is_empty(),
         || List::new(|| album::album_widget(false)),
     )
 }
 
-fn track_results_widget() -> impl Widget<WithCtx<SearchResults>> {
+fn track_results_widget(include_header: bool) -> impl Widget<WithCtx<SearchResults>> {
     section_widget(
         SearchTopic::Track.display_name(),
+        include_header,
         druid::lens::Identity,
         |results| results.data.tracks.is_empty(),
         || {
@@ -215,18 +226,20 @@ fn track_results_widget() -> impl Widget<WithCtx<SearchResults>> {
     )
 }
 
-fn playlist_results_widget() -> impl Widget<WithCtx<SearchResults>> {
+fn playlist_results_widget(include_header: bool) -> impl Widget<WithCtx<SearchResults>> {
     section_widget(
         SearchTopic::Playlist.display_name(),
+        include_header,
         Ctx::map(SearchResults::playlists),
         |playlists| playlists.data.is_empty(),
         || List::new(|| playlist::playlist_widget(false)),
     )
 }
 
-fn show_results_widget() -> impl Widget<WithCtx<SearchResults>> {
+fn show_results_widget(include_header: bool) -> impl Widget<WithCtx<SearchResults>> {
     section_widget(
         SearchTopic::Show.display_name(),
+        include_header,
         Ctx::map(SearchResults::shows),
         |shows| shows.data.is_empty(),
         || List::new(|| show::show_widget(false)),
