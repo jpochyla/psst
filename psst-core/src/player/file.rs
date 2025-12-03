@@ -20,9 +20,10 @@ use crate::{
     cdn::{CdnHandle, CdnUrl},
     error::Error,
     item_id::{FileId, ItemId},
-    protocol::metadata::mod_AudioFile::Format,
     util::OffsetFile,
 };
+
+use librespot_protocol::metadata::audio_file::Format;
 
 use super::storage::{StreamRequest, StreamStorage, StreamWriter};
 

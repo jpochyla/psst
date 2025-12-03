@@ -8,9 +8,10 @@ use crate::{
     audio::decrypt::AudioKey,
     error::Error,
     item_id::{FileId, ItemId},
-    protocol::metadata::{Episode, Track},
-    util::{deserialize_protobuf, serialize_protobuf},
 };
+
+use librespot_protocol::metadata::{Episode, Track};
+use protobuf::Message;
 
 pub type CacheHandle = Arc<Cache>;
 
@@ -61,12 +62,12 @@ impl Cache {
 impl Cache {
     pub fn get_track(&self, item_id: ItemId) -> Option<Track> {
         let buf = fs::read(self.track_path(item_id)).ok()?;
-        deserialize_protobuf(&buf).ok()
+        Track::parse_from_bytes(&buf).ok()
     }
 
     pub fn save_track(&self, item_id: ItemId, track: &Track) -> Result<(), Error> {
         log::debug!("saving track to cache: {item_id:?}");
-        fs::write(self.track_path(item_id), serialize_protobuf(track)?)?;
+        fs::write(self.track_path(item_id), track.write_to_bytes()?)?;
         Ok(())
     }
 
@@ -79,12 +80,12 @@ impl Cache {
 impl Cache {
     pub fn get_episode(&self, item_id: ItemId) -> Option<Episode> {
         let buf = fs::read(self.episode_path(item_id)).ok()?;
-        deserialize_protobuf(&buf).ok()
+        Episode::parse_from_bytes(&buf).ok()
     }
 
     pub fn save_episode(&self, item_id: ItemId, episode: &Episode) -> Result<(), Error> {
         log::debug!("saving episode to cache: {item_id:?}");
-        fs::write(self.episode_path(item_id), serialize_protobuf(episode)?)?;
+        fs::write(self.episode_path(item_id), episode.write_to_bytes()?)?;
         Ok(())
     }
 

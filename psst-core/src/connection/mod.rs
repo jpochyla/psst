@@ -21,12 +21,11 @@ use crate::{
         shannon_codec::{ShannonDecoder, ShannonEncoder, ShannonMsg},
     },
     error::Error,
-    protocol::authentication::AuthenticationType,
-    util::{
-        default_ureq_agent_builder, deserialize_protobuf, serialize_protobuf, NET_CONNECT_TIMEOUT,
-        NET_IO_TIMEOUT,
-    },
+    util::{default_ureq_agent_builder, NET_CONNECT_TIMEOUT, NET_IO_TIMEOUT},
 };
+
+use librespot_protocol::authentication::AuthenticationType;
+use protobuf::{Enum, Message, MessageField, SpecialFields};
 
 // Device ID used for authentication message.
 const DEVICE_ID: &str = "Psst";
@@ -76,7 +75,7 @@ impl From<SerializedCredentials> for Credentials {
         Self {
             username: Some(value.username),
             auth_data: value.auth_data.into_bytes(),
-            auth_type: value.auth_type.into(),
+            auth_type: AuthenticationType::from_i32(value.auth_type).unwrap_or_default(),
         }
     }
 }
@@ -215,7 +214,7 @@ impl Transport {
     }
 
     pub fn exchange_keys(mut stream: TcpStream) -> Result<Self, Error> {
-        use crate::protocol::keyexchange::APResponseMessage;
+        use librespot_protocol::keyexchange::APResponseMessage;
 
         let local_keys = DHLocalKeys::random();
 
@@ -232,17 +231,18 @@ impl Transport {
         // hashed together with the shared secret to make a key pair).
         log::trace!("waiting for AP response");
         let apresp_packet = read_packet(&mut stream)?;
-        let apresp: APResponseMessage = deserialize_protobuf(&apresp_packet[4..])?;
+        let apresp = APResponseMessage::parse_from_bytes(&apresp_packet[4..])?;
         log::trace!("received AP response");
 
         // Compute the challenge response and the sending/receiving keys.
-        let remote_key = &apresp
+        let remote_key = apresp
             .challenge
-            .expect("Missing data")
             .login_crypto_challenge
             .diffie_hellman
-            .expect("Missing data")
-            .gs;
+            .gs
+            .as_ref()
+            .expect("Missing data");
+
         let (challenge, send_key, recv_key) = compute_keys(
             &local_keys.shared_secret(remote_key),
             &hello_packet,
@@ -268,7 +268,7 @@ impl Transport {
     }
 
     pub fn authenticate(&mut self, credentials: Credentials) -> Result<Credentials, Error> {
-        use crate::protocol::{authentication::APWelcome, keyexchange::APLoginFailed};
+        use librespot_protocol::{authentication::APWelcome, keyexchange::APLoginFailed};
 
         // Send a login request with the client credentials.
         let request = client_response_encrypted(credentials);
@@ -279,19 +279,20 @@ impl Transport {
 
         match response.cmd {
             ShannonMsg::AP_WELCOME => {
-                let welcome_data: APWelcome =
-                    deserialize_protobuf(&response.payload).expect("Missing data");
+                let welcome_data =
+                    APWelcome::parse_from_bytes(&response.payload).expect("Missing data");
+
                 Ok(Credentials {
-                    username: Some(welcome_data.canonical_username),
-                    auth_data: welcome_data.reusable_auth_credentials,
-                    auth_type: welcome_data.reusable_auth_credentials_type,
+                    username: Some(welcome_data.canonical_username().to_string()),
+                    auth_data: welcome_data.reusable_auth_credentials().to_vec(),
+                    auth_type: welcome_data.reusable_auth_credentials_type(),
                 })
             }
             ShannonMsg::AUTH_FAILURE => {
-                let error_data: APLoginFailed =
-                    deserialize_protobuf(&response.payload).expect("Missing data");
+                let error_data =
+                    APLoginFailed::parse_from_bytes(&response.payload).expect("Missing data");
                 Err(Error::AuthFailed {
-                    code: error_data.error_code as _,
+                    code: error_data.error_code() as _,
                 })
             }
             _ => {
@@ -321,44 +322,57 @@ fn make_packet(prefix: &[u8], data: &[u8]) -> Vec<u8> {
 }
 
 fn client_hello(public_key: Vec<u8>, nonce: Vec<u8>) -> Vec<u8> {
-    use crate::protocol::keyexchange::*;
+    use librespot_protocol::keyexchange::*;
 
     let hello = ClientHello {
-        build_info: BuildInfo {
-            platform: Platform::PLATFORM_LINUX_X86,
-            product: Product::PRODUCT_PARTNER,
+        build_info: MessageField::some(BuildInfo {
+            platform: Some(Platform::PLATFORM_LINUX_X86.into()),
+            product: Some(Product::PRODUCT_PARTNER.into()),
             product_flags: vec![],
-            version: 109_800_078,
-        },
-        cryptosuites_supported: vec![Cryptosuite::CRYPTO_SUITE_SHANNON],
+            version: Some(109_800_078),
+            special_fields: SpecialFields::new(),
+        }),
+        cryptosuites_supported: vec![Cryptosuite::CRYPTO_SUITE_SHANNON.into()],
         fingerprints_supported: vec![],
         powschemes_supported: vec![],
-        login_crypto_hello: LoginCryptoHelloUnion {
-            diffie_hellman: Some(LoginCryptoDiffieHellmanHello {
-                gc: public_key,
-                server_keys_known: 1,
+        login_crypto_hello: MessageField::some(LoginCryptoHelloUnion {
+            diffie_hellman: MessageField::some(LoginCryptoDiffieHellmanHello {
+                gc: Some(public_key),
+                server_keys_known: Some(1),
+                special_fields: SpecialFields::new(),
             }),
-        },
-        client_nonce: nonce,
+            special_fields: SpecialFields::new(),
+        }),
+        client_nonce: Some(nonce),
         padding: Some(vec![0x1e]),
-        feature_set: None,
+        feature_set: None.into(),
+        special_fields: SpecialFields::new(),
     };
 
-    serialize_protobuf(&hello).expect("Failed to serialize")
+    hello
+        .write_to_bytes()
+        .expect("Failed to serialize client hello")
 }
 
 fn client_response_plaintext(challenge: Vec<u8>) -> Vec<u8> {
-    use crate::protocol::keyexchange::*;
+    use librespot_protocol::keyexchange::*;
 
     let response = ClientResponsePlaintext {
-        login_crypto_response: LoginCryptoResponseUnion {
-            diffie_hellman: Some(LoginCryptoDiffieHellmanResponse { hmac: challenge }),
-        },
-        pow_response: PoWResponseUnion::default(),
-        crypto_response: CryptoResponseUnion::default(),
+        login_crypto_response: MessageField::some(LoginCryptoResponseUnion {
+            diffie_hellman: MessageField::some(LoginCryptoDiffieHellmanResponse {
+                hmac: Some(challenge),
+                special_fields: SpecialFields::new(),
+            }),
+            special_fields: SpecialFields::new(),
+        }),
+        pow_response: MessageField::some(PoWResponseUnion::default()),
+        crypto_response: MessageField::some(CryptoResponseUnion::default()),
+        special_fields: SpecialFields::new(),
     };
 
-    serialize_protobuf(&response).expect("Failed to serialize")
+    response
+        .write_to_bytes()
+        .expect("Failed to serialize client response")
 }
 
 fn compute_keys(
@@ -389,22 +403,27 @@ fn compute_keys(
 }
 
 fn client_response_encrypted(credentials: Credentials) -> ShannonMsg {
-    use crate::protocol::authentication::{ClientResponseEncrypted, LoginCredentials, SystemInfo};
+    use librespot_protocol::authentication::{
+        ClientResponseEncrypted, LoginCredentials, SystemInfo, Os, CpuFamily
+    };
 
     let response = ClientResponseEncrypted {
-        login_credentials: LoginCredentials {
+        login_credentials: MessageField::some(LoginCredentials {
             username: credentials.username,
             auth_data: Some(credentials.auth_data),
-            typ: credentials.auth_type,
-        },
-        system_info: SystemInfo {
+            typ: Some(credentials.auth_type.into()),
+            special_fields: SpecialFields::new(),
+        }),
+        system_info: MessageField::some(SystemInfo {
             device_id: Some(DEVICE_ID.to_string()),
             system_information_string: Some("librespot_but_actually_psst".to_string()),
+            os: Some(Os::default().into()),
+            cpu_family: Some(CpuFamily::default().into()),
             ..SystemInfo::default()
-        },
+        }),
         ..ClientResponseEncrypted::default()
     };
 
-    let buf = serialize_protobuf(&response).expect("Failed to serialize");
+    let buf = response.write_to_bytes().expect("Failed to serialize");
     ShannonMsg::new(ShannonMsg::LOGIN, buf)
 }

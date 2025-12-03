@@ -6,12 +6,10 @@ use std::{
 use byteorder::{ReadBytesExt, BE};
 use crossbeam_channel::Sender;
 
-use crate::{
-    connection::shannon_codec::ShannonMsg,
-    error::Error,
-    protocol::mercury::Header,
-    util::{deserialize_protobuf, serialize_protobuf, Sequence},
-};
+use crate::{connection::shannon_codec::ShannonMsg, util::Sequence};
+
+use librespot_protocol::mercury::Header;
+use protobuf::Message;
 
 pub struct MercuryDispatcher {
     sequence: Sequence<u64>,
@@ -100,7 +98,10 @@ impl MercuryRequest {
             method: Some(self.method),
             ..Header::default()
         };
-        let header_part = serialize_protobuf(&header).expect("Failed to serialize message header");
+        let header_part = header
+            .write_to_bytes()
+            .expect("Failed to serialize message header");
+
         let mut parts = self.payload;
         parts.insert(0, header_part);
         parts
@@ -117,8 +118,9 @@ pub struct MercuryResponse {
 impl MercuryResponse {
     fn decode_from_parts(mut parts: Vec<Vec<u8>>) -> Self {
         let header_part = parts.remove(0);
-        let header: Header =
-            deserialize_protobuf(&header_part).expect("Failed to deserialize message header");
+        let header = Header::parse_from_bytes(&header_part)
+            .expect("Failed to deserialize message header");
+
         Self {
             uri: header.uri.unwrap(),
             status_code: header.status_code.unwrap(),
@@ -213,11 +215,5 @@ impl Msg {
         }
 
         results
-    }
-}
-
-impl From<quick_protobuf::Error> for Error {
-    fn from(err: quick_protobuf::Error) -> Self {
-        Error::IoError(err.into())
     }
 }

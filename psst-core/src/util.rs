@@ -1,7 +1,6 @@
 use crate::error::Error;
 use byteorder::{BigEndian, ByteOrder};
 use num_traits::{One, WrappingAdd};
-use quick_protobuf::{BytesReader, MessageRead, MessageWrite, Writer};
 use sha1::{Digest, Sha1};
 use std::time::Instant;
 use std::{io, io::SeekFrom, mem, time::Duration};
@@ -164,32 +163,4 @@ where
     fn seek(&mut self, pos: io::SeekFrom) -> io::Result<u64> {
         self.stream.seek(pos)
     }
-}
-
-pub fn serialize_protobuf<T>(msg: &T) -> Result<Vec<u8>, Error>
-where
-    T: MessageWrite,
-{
-    let mut buf = Vec::with_capacity(msg.get_size());
-    let mut writer = Writer::new(&mut buf);
-    msg.write_message(&mut writer)?;
-    Ok(buf)
-}
-
-pub fn deserialize_protobuf<T>(buf: &[u8]) -> Result<T, Error>
-where
-    T: MessageRead<'static>,
-{
-    let mut reader = BytesReader::from_bytes(buf);
-    let msg = {
-        let static_buf: &'static [u8] = unsafe {
-            // Sigh.  While `quick-protobuf` supports `--owned` variations of messages, they
-            // are not compatible with `--dont_use_cow` flag, which, by itself, is already
-            // producing messages that fully own their fields.  Therefore, we can pretend
-            // the byte slice is static, because `msg` does not retain it.
-            std::mem::transmute(buf)
-        };
-        T::from_reader(&mut reader, static_buf)?
-    };
-    Ok(msg)
 }
