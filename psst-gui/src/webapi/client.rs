@@ -1336,10 +1336,10 @@ impl WebApi {
             shows: Option<Page<Arc<Show>>>,
         }
 
-        let topics = topics.iter().map(SearchTopic::as_str).join(",");
+        let type_query_param = topics.iter().map(SearchTopic::as_str).join(",");
         let request = &RequestBuilder::new("v1/search", Method::Get, None)
             .query("q", query.replace(" ", "%20"))
-            .query("type", &topics)
+            .query("type", &type_query_param)
             .query("limit", limit.to_string())
             .query("marker", "from_token");
 
@@ -1350,9 +1350,11 @@ impl WebApi {
         let tracks = result.tracks.map_or_else(Vector::new, |page| page.items);
         let playlists = result.playlists.map_or_else(Vector::new, |page| page.items);
         let shows = result.shows.map_or_else(Vector::new, |page| page.items);
+        let topic = (topics.len() == 1).then_some(topics[0]);
 
         Ok(SearchResults {
             query: query.into(),
+            topic,
             artists,
             albums,
             tracks,
