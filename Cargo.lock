@@ -3954,8 +3954,6 @@ dependencies = [
  "oauth2",
  "parking_lot",
  "protobuf",
- "psst-protocol",
- "quick-protobuf",
  "rand 0.9.1",
  "rangemap",
  "rb",
