@@ -8,7 +8,6 @@ use druid::{
 use crate::{
     cmd,
     data::{AppState, Ctx, Library, Nav, Show, ShowDetail, ShowEpisodes, ShowLink, WithCtx},
-    ui::utils::{stat_row, InfoLayout},
     webapi::WebApi,
     widget::{Async, MyWidgetExt, RemoteImage},
 };
@@ -61,30 +60,43 @@ fn info_widget() -> impl Widget<WithCtx<Arc<Show>>> {
             .with_text_size(theme::TEXT_SIZE_NORMAL),
     )
     .vertical()
+    .expand_height()
+    .fix_height(size)
     .lens(Ctx::data());
 
+    // Publisher and Episode count stats
     let stats = Flex::column()
-        .with_child(stat_row("Publisher:", |info: &Arc<Show>| {
-            if info.publisher.is_empty() {
-                String::new()
-            } else {
-                info.publisher.to_string()
-            }
-        }))
-        .with_default_spacer()
-        .with_child(stat_row("Episodes:", |info: &Arc<Show>| {
-            match info.total_episodes {
-                Some(count) => format!("{} episode{}", count, if count == 1 { "" } else { "s" }),
+        .cross_axis_alignment(CrossAxisAlignment::Start)
+        .with_child(
+            Label::dynamic(|show: &Arc<Show>, _| {
+                if !show.publisher.is_empty() {
+                    format!("Publisher: {}", show.publisher)
+                } else {
+                    String::new()
+                }
+            })
+            .with_text_color(theme::PLACEHOLDER_COLOR),
+        )
+        .with_child(
+            Label::dynamic(|show: &Arc<Show>, _| match show.total_episodes {
+                Some(count) => format!("Episodes: {}", count),
                 None => String::new(),
-            }
-        }));
-
-    let me = InfoLayout::new(biography, stats);
+            })
+            .with_text_color(theme::PLACEHOLDER_COLOR),
+        )
+        .padding((0.0, theme::grid(1.0)))
+        .lens(Ctx::data());
 
     Flex::row()
         .with_child(image)
         .with_spacer(theme::grid(1.0))
-        .with_flex_child(me, 1.0)
+        .with_flex_child(
+            Flex::column()
+                .cross_axis_alignment(CrossAxisAlignment::Start)
+                .with_child(biography)
+                .with_child(stats),
+            1.0,
+        )
         .padding(theme::grid(1.0))
 }
 
@@ -141,27 +153,17 @@ pub fn show_widget(horizontal: bool) -> impl Widget<WithCtx<Arc<Show>>> {
     .with_text_color(theme::PLACEHOLDER_COLOR)
     .align_left();
 
-    let show_episodes = Label::<Arc<Show>>::dynamic(|show, _| match show.total_episodes {
-        Some(count) => format!("{} episode{}", count, if count == 1 { "" } else { "s" }),
-        None => String::new(),
-    })
-    .with_line_break_mode(LineBreaking::Clip)
-    .with_text_size(theme::TEXT_SIZE_SMALL)
-    .with_text_color(theme::PLACEHOLDER_COLOR)
-    .align_left();
-
     let show = if horizontal {
         Flex::column()
             .with_child(show_image)
-            .with_default_spacer()
+            .with_spacer(theme::grid(1.0))
             .with_child(
                 Flex::column()
+                    .cross_axis_alignment(CrossAxisAlignment::Start)
                     .with_child(show_name)
                     .with_child(show_publisher)
-                    .with_child(show_episodes)
-                    .align_horizontal(UnitPoint::CENTER)
                     .align_vertical(UnitPoint::TOP)
-                    .fix_size(theme::grid(16.0), theme::grid(8.0)),
+                    .fix_size(theme::grid(16.0), theme::grid(6.5)),
             )
             .padding(theme::grid(1.0))
             .lens(Ctx::data())
@@ -171,9 +173,9 @@ pub fn show_widget(horizontal: bool) -> impl Widget<WithCtx<Arc<Show>>> {
             .with_default_spacer()
             .with_flex_child(
                 Flex::column()
+                    .cross_axis_alignment(CrossAxisAlignment::Start)
                     .with_child(show_name)
-                    .with_child(show_publisher)
-                    .with_child(show_episodes),
+                    .with_child(show_publisher),
                 1.0,
             )
             .padding(theme::grid(1.0))

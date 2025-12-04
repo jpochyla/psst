@@ -1,7 +1,8 @@
 // Ported from librespot
 
 use crate::error::Error;
-use crate::session::token::{Token};
+use crate::session::token::Token;
+use crate::system_info::{CLIENT_ID, DEVICE_ID, OS, SPOTIFY_SEMANTIC_VERSION};
 use crate::util::{default_ureq_agent_builder, solve_hash_cash};
 use data_encoding::HEXUPPER_PERMISSIVE;
 use librespot_protocol::clienttoken_http::{
@@ -11,7 +12,6 @@ use librespot_protocol::clienttoken_http::{
 use parking_lot::Mutex;
 use protobuf::{Enum, Message};
 use std::time::{Duration, Instant};
-use crate::system_info::{CLIENT_ID, DEVICE_ID, OS, SPOTIFY_SEMANTIC_VERSION};
 
 pub struct ClientTokenProvider {
     token: Mutex<Option<Token>>,

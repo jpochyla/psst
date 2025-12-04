@@ -6,13 +6,10 @@ use std::{
 
 use serde::Deserialize;
 
-use crate::{
-    error::Error,
-    item_id::FileId,
-    session::{SessionService},
-    util::default_ureq_agent_builder,
-};
 use crate::session::login5::Login5;
+use crate::{
+    error::Error, item_id::FileId, session::SessionService, util::default_ureq_agent_builder,
+};
 
 pub type CdnHandle = Arc<Cdn>;
 
@@ -45,7 +42,10 @@ impl Cdn {
             .query("product", "9")
             .query("platform", "39")
             .query("alt", "json")
-            .header("Authorization", &format!("Bearer {}", access_token.access_token))
+            .header(
+                "Authorization",
+                &format!("Bearer {}", access_token.access_token),
+            )
             .call()?;
 
         #[derive(Deserialize)]

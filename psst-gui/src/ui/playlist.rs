@@ -2,7 +2,9 @@ use std::{cell::RefCell, cmp::Ordering, rc::Rc, sync::Arc};
 
 use druid::{
     im::Vector,
-    widget::{Button, Either, Flex, Label, LensWrap, LineBreaking, List, TextBox},
+    widget::{
+        Button, Either, Flex, Label, LensWrap, LineBreaking, List, MainAxisAlignment, TextBox,
+    },
     Insets, Lens, LensExt, LocalizedString, Menu, MenuItem, Selector, Size, UnitPoint, Widget,
     WidgetExt, WindowDesc,
 };
@@ -321,46 +323,55 @@ pub fn playlist_widget(horizontal: bool) -> impl Widget<WithCtx<Playlist>> {
     };
     let playlist_image = rounded_cover_widget(playlist_image_size).lens(Ctx::data());
 
-    let playlist_name = Label::raw()
-        .with_font(theme::UI_FONT_MEDIUM)
-        .with_line_break_mode(LineBreaking::Clip)
-        .lens(Ctx::data().then(Playlist::name));
+    let playlist_name_widget = || {
+        Label::raw()
+            .with_font(theme::UI_FONT_MEDIUM)
+            .with_line_break_mode(LineBreaking::Clip)
+            .lens(Ctx::data().then(Playlist::name))
+    };
 
-    let playlist_description = Label::raw()
-        .with_line_break_mode(LineBreaking::WordWrap)
-        .with_text_color(theme::PLACEHOLDER_COLOR)
-        .with_text_size(theme::TEXT_SIZE_SMALL)
-        .lens(Ctx::data().then(Playlist::description));
-
-    let (playlist_name, playlist_description) = if horizontal {
-        (
-            playlist_name.fix_width(playlist_image_size).align_left(),
-            playlist_description
-                .fix_width(playlist_image_size)
-                .align_left(),
-        )
-    } else {
-        (
-            playlist_name.align_left(),
-            playlist_description.align_left(),
-        )
+    let playlist_description_widget = || {
+        Label::raw()
+            .with_line_break_mode(LineBreaking::WordWrap)
+            .with_text_color(theme::PLACEHOLDER_COLOR)
+            .with_text_size(theme::TEXT_SIZE_SMALL)
+            .lens(Ctx::data().then(Playlist::description))
     };
 
     let playlist = if horizontal {
+        let playlist_name = playlist_name_widget()
+            .fix_width(playlist_image_size)
+            .align_left();
+
+        let playlist_description = playlist_description_widget()
+            .fix_width(playlist_image_size)
+            .align_left();
+
+        let playlist_description_section = Either::new(
+            |data: &WithCtx<Playlist>, _| data.data.description.is_empty(),
+            Empty,
+            Flex::column()
+                .with_spacer(2.0)
+                .with_child(playlist_description),
+        );
+
         Flex::column()
             .with_child(playlist_image)
-            .with_default_spacer()
+            .with_spacer(theme::grid(1.0))
             .with_child(
                 Flex::column()
+                    .main_axis_alignment(MainAxisAlignment::Start)
                     .with_child(playlist_name)
-                    .with_spacer(2.0)
-                    .with_child(playlist_description)
-                    .align_horizontal(UnitPoint::CENTER)
+                    .with_child(playlist_description_section)
+                    .align_left()
                     .align_vertical(UnitPoint::TOP)
-                    .fix_size(theme::grid(16.0), theme::grid(8.0)),
+                    .fix_size(theme::grid(16.0), theme::grid(6.5)),
             )
             .padding(theme::grid(1.0))
     } else {
+        let playlist_name = playlist_name_widget().align_left();
+        let playlist_description = playlist_description_widget().align_left();
+
         Flex::row()
             .with_child(playlist_image)
             .with_default_spacer()

@@ -17,9 +17,7 @@ pub fn listen_for_callback_parameter(
     timeout: Duration,
     parameter_name: &'static str,
 ) -> Result<String, Error> {
-    log::info!(
-        "starting callback listener for '{parameter_name}' on {socket_address:?}",
-    );
+    log::info!("starting callback listener for '{parameter_name}' on {socket_address:?}",);
 
     // Create a simpler, linear flow
     // 1. Bind the listener

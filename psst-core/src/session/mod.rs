@@ -1,8 +1,8 @@
 pub mod access_token;
 pub mod audio_key;
-pub mod mercury;
-pub mod login5;
 pub mod client_token;
+pub mod login5;
+pub mod mercury;
 pub mod token;
 
 use std::{
