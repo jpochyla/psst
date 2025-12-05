@@ -44,6 +44,11 @@ use crate::{
 use super::{cache::WebApiCache, local::LocalTrackManager};
 use sanitize_html::{rules::predefined::DEFAULT, sanitize_str};
 
+// persistedQuery sha256Hash constants
+const follow_unfollow = "c00e0cb6c7766e7230fc256cf4fe07aec63b53d1160a323940fce7b664e95596";
+const home_sections = "eb3fba2d388cf4fc4d696b1757a58584e9538a3b515ea742e9cc9465807340be";
+const artist_info = "1ac33ddab5d39a3a9c27802774e6d78b9405cc188c6f75aed007df2a32737c72";
+
 pub struct WebApi {
     session: SessionService,
     agent: Agent,
@@ -74,6 +79,8 @@ impl WebApi {
             paginated_limit,
         }
     }
+
+    
 
     // Similar to how librespot does this https://github.com/librespot-org/librespot/blob/dev/core/src/version.rs
     fn user_agent() -> String {
@@ -929,7 +936,7 @@ impl WebApi {
             "extensions": {
                 "persistedQuery": {
                     "version": 1,
-                    "sha256Hash": "c00e0cb6c7766e7230fc256cf4fe07aec63b53d1160a323940fce7b664e95596"
+                    "sha256Hash": follow_unfollow
                 }
             }
         });
@@ -952,7 +959,7 @@ impl WebApi {
             "extensions": {
                 "persistedQuery": {
                     "version": 1,
-                    "sha256Hash": "c00e0cb6c7766e7230fc256cf4fe07aec63b53d1160a323940fce7b664e95596"
+                    "sha256Hash": follow_unfollow
                 }
             }
         });
@@ -1150,7 +1157,7 @@ impl WebApi {
             "extensions": {
                 "persistedQuery": {
                     "version": 1,
-                    "sha256Hash": "1ac33ddab5d39a3a9c27802774e6d78b9405cc188c6f75aed007df2a32737c72"
+                    "sha256Hash": artist_info
                 }
             },
             "operationName": "queryArtistOverview",
@@ -1402,6 +1409,15 @@ impl WebApi {
 
 /// View endpoints.
 impl WebApi {
+    const HOME_SECTION_MADE_FOR_YOU: &str = "spotify:section:0JQ5DAUnp4wcj0bCb3wh3S";
+    const HOME_SECTION_TOP_MIXES: &str = "spotify:section:0JQ5DAnM3wGh0gz1MXnu89";
+    const HOME_SECTION_RECOMMENDED_STATIONS: &str = "spotify:section:0JQ5DAnM3wGh0gz1MXnu3R";
+    const HOME_SECTION_UNIQUELY_YOURS: &str = "spotify:section:0JQ5DAUnp4wcj0bCb3wh3S";
+    const HOME_SECTION_BEST_OF_ARTISTS: &str = "spotify:section:0JQ5DAnM3wGh0gz1MXnu3n";
+    const HOME_SECTION_JUMP_BACK_IN: &str = "spotify:section:0JQ5DAIiKWzVFULQfUm85X";
+    const HOME_SECTION_YOUR_SHOWS: &str = "spotify:section:0JQ5DAnM3wGh0gz1MXnu3N";
+    const HOME_SECTION_SHOWS_YOU_MIGHT_LIKE: &str = "spotify:section:0JQ5DAnM3wGh0gz1MXnu3P";   
+
     pub fn get_user_info(&self) -> Result<(String, String), Error> {
         #[derive(Deserialize, Clone, Data)]
         struct User {
@@ -1429,7 +1445,7 @@ impl WebApi {
             "extensions": {
                 "persistedQuery": {
                     "version": 1,
-                    "sha256Hash": "eb3fba2d388cf4fc4d696b1757a58584e9538a3b515ea742e9cc9465807340be"
+                    "sha256Hash": home_sections
                 }
             },
             "operationName": "homeSection",
@@ -1453,45 +1469,37 @@ impl WebApi {
     }
 
     pub fn get_made_for_you(&self) -> Result<MixedView, Error> {
-        // 0JQ5DAUnp4wcj0bCb3wh3S -> Made for you
-        self.get_section("spotify:section:0JQ5DAUnp4wcj0bCb3wh3S")
+        self.get_section(Self::HOME_SECTION_MADE_FOR_YOU)
     }
 
     pub fn get_top_mixes(&self) -> Result<MixedView, Error> {
-        // 0JQ5DAnM3wGh0gz1MXnu89 -> Top mixes
-        self.get_section("spotify:section:0JQ5DAnM3wGh0gz1MXnu89")
+        self.get_section(Self::HOME_SECTION_TOP_MIXES)
     }
 
     pub fn recommended_stations(&self) -> Result<MixedView, Error> {
-        // 0JQ5DAnM3wGh0gz1MXnu3R -> Recommended stations
-        self.get_section("spotify:section:0JQ5DAnM3wGh0gz1MXnu3R")
+        self.get_section(Self::HOME_SECTION_RECOMMENDED_STATIONS)
     }
 
     pub fn uniquely_yours(&self) -> Result<MixedView, Error> {
-        // 0JQ5DAUnp4wcj0bCb3wh3S -> Uniquely yours
-        self.get_section("spotify:section:0JQ5DAUnp4wcj0bCb3wh3S")
+        self.get_section(Self::HOME_SECTION_UNIQUELY_YOURS)
     }
 
     pub fn best_of_artists(&self) -> Result<MixedView, Error> {
-        // 0JQ5DAnM3wGh0gz1MXnu3n -> Best of artists
-        self.get_section("spotify:section:0JQ5DAnM3wGh0gz1MXnu3n")
+        self.get_section(Self::HOME_SECTION_BEST_OF_ARTISTS)
     }
 
     // Need to make a mix of it!
     pub fn jump_back_in(&self) -> Result<MixedView, Error> {
-        // 0JQ5DAIiKWzVFULQfUm85X -> Jump back in
-        self.get_section("spotify:section:0JQ5DAIiKWzVFULQfUm85X")
+        self.get_section(Self::HOME_SECTION_JUMP_BACK_IN)
     }
 
     // Shows
     pub fn your_shows(&self) -> Result<MixedView, Error> {
-        // 0JQ5DAnM3wGh0gz1MXnu3N -> Your shows
-        self.get_section("spotify:section:0JQ5DAnM3wGh0gz1MXnu3N")
+        self.get_section(Self::HOME_SECTION_YOUR_SHOWS)
     }
 
     pub fn shows_that_you_might_like(&self) -> Result<MixedView, Error> {
-        // 0JQ5DAnM3wGh0gz1MXnu3P -> Shows that you might like
-        self.get_section("spotify:section:0JQ5DAnM3wGh0gz1MXnu3P")
+        self.get_section(Self::HOME_SECTION_SHOWS_YOU_MIGHT_LIKE)
     }
 }
 
