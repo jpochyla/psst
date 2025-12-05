@@ -253,42 +253,24 @@ fn user_artists_widget() -> impl Widget<WithCtx<MixedView>> {
 }
 
 fn user_followers_widget() -> impl Widget<WithCtx<Vector<PublicUser>>> {
-    Either::new(
-        |followers: &WithCtx<Vector<PublicUser>>, &_| followers.data.is_empty(),
-        Empty,
-        Flex::column()
-            .with_child(
-                Label::new("Followers")
-                    .with_text_size(theme::grid(2.5))
-                    .align_left()
-                    .padding((theme::grid(1.5), theme::grid(0.5))),
-            )
-            .with_child(
-                Scroll::new(List::new(|| public_user_widget(true)).horizontal())
-                    .horizontal()
-                    .align_left()
-                    .lens(Ctx::data()),
-            ),
+    titled_section(
+        "Followers",
+        |followers: &WithCtx<Vector<PublicUser>>, _| followers.data.is_empty(),
+        Scroll::new(List::new(|| public_user_widget(true)).horizontal())
+            .horizontal()
+            .align_left()
+            .lens(Ctx::data()),
     )
 }
 
 fn user_following_widget() -> impl Widget<WithCtx<Vector<PublicUser>>> {
-    Either::new(
-        |following: &WithCtx<Vector<PublicUser>>, &_| following.data.is_empty(),
-        Empty,
-        Flex::column()
-            .with_child(
-                Label::new("Following")
-                    .with_text_size(theme::grid(2.5))
-                    .align_left()
-                    .padding((theme::grid(1.5), theme::grid(0.5))),
-            )
-            .with_child(
-                Scroll::new(List::new(|| public_user_widget(true)).horizontal())
-                    .horizontal()
-                    .align_left()
-                    .lens(Ctx::data()),
-            ),
+    titled_section(
+        "Following",
+        |following: &WithCtx<Vector<PublicUser>>, _| following.data.is_empty(),
+        Scroll::new(List::new(|| public_user_widget(true)).horizontal())
+            .horizontal()
+            .align_left()
+            .lens(Ctx::data()),
     )
 }
 
