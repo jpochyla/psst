@@ -717,13 +717,9 @@ impl WebApi {
         pub struct PublicUserPlaylist {
             pub image_url: String,
             pub name: String,
-            pub owner_name: String,
             pub owner_uri: String,
+            pub owner_name: String,
             pub uri: String,
-            #[serde(default)]
-            pub followers_count: Option<i64>,
-            #[serde(default)]
-            pub is_following: Option<bool>,
         }
 
         #[derive(Clone, Data, Deserialize)]
@@ -748,15 +744,7 @@ impl WebApi {
             #[serde(default)]
             pub total_public_playlists_count: i64,
             #[serde(default)]
-            pub has_spotify_name: bool,
-            #[serde(default)]
-            pub has_spotify_image: bool,
-            #[serde(default)]
-            pub color: i64,
-            #[serde(default)]
             pub allow_follows: bool,
-            #[serde(default)]
-            pub show_follows: bool,
         }
 
         let req = &RequestBuilder::new(

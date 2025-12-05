@@ -306,7 +306,7 @@ pub fn public_user_widget(horizontal: bool) -> impl Widget<PublicUser> {
             .with_child(user_image)
             .with_default_spacer()
             .with_child(
-                Label::dynamic(|user: &PublicUser, _| user.get_display_name().to_string())
+                Label::dynamic(|user: &PublicUser, _| user.display_name.to_string())
                     .with_font(theme::UI_FONT_MEDIUM)
                     .align_horizontal(UnitPoint::CENTER)
                     .align_vertical(UnitPoint::TOP)
@@ -317,7 +317,7 @@ pub fn public_user_widget(horizontal: bool) -> impl Widget<PublicUser> {
             .with_child(user_image)
             .with_default_spacer()
             .with_flex_child(
-                Label::dynamic(|user: &PublicUser, _| user.get_display_name().to_string())
+                Label::dynamic(|user: &PublicUser, _| user.display_name.to_string())
                     .with_font(theme::UI_FONT_MEDIUM),
                 1.0,
             )
@@ -330,7 +330,7 @@ pub fn public_user_widget(horizontal: bool) -> impl Widget<PublicUser> {
             if user.uri.as_ref().unwrap().contains("artist") {
                 ctx.submit_command(cmd::NAVIGATE.with(Nav::ArtistDetail(ArtistLink {
                     id: user.id.clone(),
-                    name: user.get_display_name(),
+                    name: user.display_name.clone(),
                 })));
             } else {
                 ctx.submit_command(cmd::NAVIGATE.with(Nav::PublicUserDetail(user.clone())));
@@ -348,7 +348,7 @@ fn user_cover_widget(size: f64) -> impl Widget<PublicUser> {
         .padding((size * 0.05, size * 0.05))
         .center()
         .fix_size(size, size)
-        .background(Color::rgb8(0x28, 0x28, 0x28))
+        .background(Color::rgba8(0x28, 0x28, 0x28, 0x25))
         .clip(Circle::new((radius, radius), radius));
 
     Either::new(
