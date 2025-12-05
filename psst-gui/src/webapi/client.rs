@@ -45,9 +45,9 @@ use super::{cache::WebApiCache, local::LocalTrackManager};
 use sanitize_html::{rules::predefined::DEFAULT, sanitize_str};
 
 // persistedQuery sha256Hash constants
-const follow_unfollow = "c00e0cb6c7766e7230fc256cf4fe07aec63b53d1160a323940fce7b664e95596";
-const home_sections = "eb3fba2d388cf4fc4d696b1757a58584e9538a3b515ea742e9cc9465807340be";
-const artist_info = "1ac33ddab5d39a3a9c27802774e6d78b9405cc188c6f75aed007df2a32737c72";
+const FOLLOW_UNFOLLOW: &str = "c00e0cb6c7766e7230fc256cf4fe07aec63b53d1160a323940fce7b664e95596";
+const HOME_SECTIONS: &str = "eb3fba2d388cf4fc4d696b1757a58584e9538a3b515ea742e9cc9465807340be";
+const ARTIST_INFO: &str = "1ac33ddab5d39a3a9c27802774e6d78b9405cc188c6f75aed007df2a32737c72";
 
 pub struct WebApi {
     session: SessionService,
@@ -936,7 +936,7 @@ impl WebApi {
             "extensions": {
                 "persistedQuery": {
                     "version": 1,
-                    "sha256Hash": follow_unfollow
+                    "sha256Hash": FOLLOW_UNFOLLOW
                 }
             }
         });
@@ -959,7 +959,7 @@ impl WebApi {
             "extensions": {
                 "persistedQuery": {
                     "version": 1,
-                    "sha256Hash": follow_unfollow
+                    "sha256Hash": FOLLOW_UNFOLLOW
                 }
             }
         });
@@ -1157,7 +1157,7 @@ impl WebApi {
             "extensions": {
                 "persistedQuery": {
                     "version": 1,
-                    "sha256Hash": artist_info
+                    "sha256Hash": ARTIST_INFO
                 }
             },
             "operationName": "queryArtistOverview",
@@ -1445,7 +1445,7 @@ impl WebApi {
             "extensions": {
                 "persistedQuery": {
                     "version": 1,
-                    "sha256Hash": home_sections
+                    "sha256Hash": HOME_SECTIONS
                 }
             },
             "operationName": "homeSection",
