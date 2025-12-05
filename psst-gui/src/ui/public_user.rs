@@ -18,7 +18,7 @@ use druid::{
     kurbo::Circle,
     lens::Map,
     widget::{Button, CrossAxisAlignment, Either, Flex, Label, List, Scroll},
-    Color, LensExt, Selector, UnitPoint, Widget, WidgetExt,
+    Color, Data, LensExt, Selector, UnitPoint, Widget, WidgetExt,
 };
 
 pub const LOAD_DETAIL: Selector<(PublicUser, AppState)> =
@@ -217,43 +217,38 @@ fn user_info_widget() -> impl Widget<WithCtx<Cached<Arc<PublicUserInformation>>>
         .with_child(user_info)
 }
 
+fn titled_section<D: Data, W: Widget<WithCtx<D>> + 'static>(
+    title: &'static str,
+    is_empty: impl Fn(&WithCtx<D>, &druid::Env) -> bool + 'static,
+    content: W,
+) -> impl Widget<WithCtx<D>> {
+    Either::new(is_empty, Empty, Flex::column().with_child(
+        Label::new(title)
+            .with_text_size(theme::grid(2.5))
+            .align_left()
+            .padding((theme::grid(1.5), theme::grid(0.5))),
+    ).with_child(content))
+}
+
 fn user_playlists_widget() -> impl Widget<WithCtx<MixedView>> {
-    Either::new(
+    titled_section(
+        "Public Playlists",
         |playlists: &WithCtx<MixedView>, &_| playlists.data.playlists.is_empty(),
-        Empty,
-        Flex::column()
-            .with_child(
-                Label::new("Public Playlists")
-                    .with_text_size(theme::grid(2.5))
-                    .align_left()
-                    .padding((theme::grid(1.5), theme::grid(0.5))),
-            )
-            .with_child(
-                Scroll::new(List::new(|| playlist::playlist_widget(true)).horizontal())
-                    .horizontal()
-                    .align_left()
-                    .lens(Ctx::map(MixedView::playlists)),
-            ),
+        Scroll::new(List::new(|| playlist::playlist_widget(true)).horizontal())
+            .horizontal()
+            .align_left()
+            .lens(Ctx::map(MixedView::playlists)),
     )
 }
 
 fn user_artists_widget() -> impl Widget<WithCtx<MixedView>> {
-    Either::new(
+    titled_section(
+        "Recently Played Artists",
         |artists: &WithCtx<MixedView>, &_| artists.data.artists.is_empty(),
-        Empty,
-        Flex::column()
-            .with_child(
-                Label::new("Recently Played Artists")
-                    .with_text_size(theme::grid(2.5))
-                    .align_left()
-                    .padding((theme::grid(1.5), theme::grid(0.5))),
-            )
-            .with_child(
-                Scroll::new(List::new(|| artist::artist_widget(true)).horizontal())
-                    .horizontal()
-                    .align_left()
-                    .lens(Ctx::data().then(MixedView::artists)),
-            ),
+        Scroll::new(List::new(|| artist::artist_widget(true)).horizontal())
+            .horizontal()
+            .align_left()
+            .lens(Ctx::data().then(MixedView::artists)),
     )
 }
 
