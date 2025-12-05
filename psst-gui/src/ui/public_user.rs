@@ -135,14 +135,7 @@ pub fn cover_widget(size: f64) -> impl Widget<WithCtx<Cached<Arc<PublicUserInfor
     let radius = size / 2.0;
 
     // Placeholder widget showing a user icon
-    let placeholder = icons::USER
-        .scale((size * 0.9, size * 0.9))
-        .with_color(Color::rgb8(0x53, 0x53, 0x53))
-        .padding((size * 0.05, size * 0.05))
-        .center()
-        .fix_size(size, size)
-        .background(Color::rgb8(0x28, 0x28, 0x28))
-        .clip(Circle::new((radius, radius), radius));
+    let placeholder = round_icon_placeholder(size, Color::rgb8(0x28, 0x28, 0x28));
 
     Either::new(
         |ctx: &WithCtx<Cached<Arc<PublicUserInformation>>>, _| ctx.data.data.image_url.is_some(),
@@ -228,6 +221,19 @@ fn titled_section<D: Data, W: Widget<WithCtx<D>> + 'static>(
             .align_left()
             .padding((theme::grid(1.5), theme::grid(0.5))),
     ).with_child(content))
+}
+
+fn round_icon_placeholder<T: Data>(size: f64, bg_color: Color) -> impl Widget<T> {
+    let radius = size / 2.0;
+    icons::USER
+        .scale((size * 0.9, size * 0.9))
+        .with_color(Color::rgb8(0x53, 0x53, 0x53))
+        .padding((size * 0.05, size * 0.05))
+        .center()
+        .fix_size(size, size)
+        .background(bg_color)
+        .clip(Circle::new((radius, radius), radius))
+        .env_scope(|_, _| {})
 }
 
 fn user_playlists_widget() -> impl Widget<WithCtx<MixedView>> {
@@ -324,14 +330,7 @@ fn user_cover_widget(size: f64) -> impl Widget<PublicUser> {
     let radius = size / 2.0;
 
     // Placeholder widget showing a user icon
-    let placeholder = icons::USER
-        .scale((size * 0.9, size * 0.9))
-        .with_color(Color::rgb8(0x53, 0x53, 0x53))
-        .padding((size * 0.05, size * 0.05))
-        .center()
-        .fix_size(size, size)
-        .background(Color::rgba8(0x28, 0x28, 0x28, 0x25))
-        .clip(Circle::new((radius, radius), radius));
+    let placeholder = round_icon_placeholder(size, Color::rgba8(0x28, 0x28, 0x28, 0x25));
 
     Either::new(
         |user: &PublicUser, _| user.image_url.is_some(),
