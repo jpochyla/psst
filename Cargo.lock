@@ -4008,13 +4008,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "psst-protocol"
-version = "0.1.0"
-dependencies = [
- "quick-protobuf",
-]
-
-[[package]]
 name = "publicsuffix"
 version = "1.5.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4047,15 +4040,6 @@ name = "quick-error"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a993555f31e5a609f617c12db6250dedcac1b0a85076912c436e6fc9b2c8e6a3"
-
-[[package]]
-name = "quick-protobuf"
-version = "0.8.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9d6da84cc204722a989e01ba2f6e1e276e190f22263d0cb6ce8526fcdb0d2e1f"
-dependencies = [
- "byteorder",
-]
 
 [[package]]
 name = "quote"
