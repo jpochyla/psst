@@ -1,8 +1,0 @@
-[package]
-name = "psst-protocol"
-version = "0.1.0"
-authors = ["Jan Pochyla <jpochyla@gmail.com>"]
-edition = "2021"
-
-[dependencies]
-quick-protobuf = "0.8.1"

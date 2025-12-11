@@ -17,7 +17,6 @@ use std::{
 
 use crossbeam_channel::{unbounded, Receiver, Sender};
 use parking_lot::Mutex;
-use quick_protobuf::MessageRead;
 use serde::de::DeserializeOwned;
 
 use crate::{
@@ -28,7 +27,6 @@ use crate::{
     },
     error::Error,
     item_id::{FileId, ItemId},
-    util::deserialize_protobuf,
 };
 
 use self::{
@@ -214,10 +212,10 @@ pub struct SessionHandle {
 impl SessionHandle {
     pub fn get_mercury_protobuf<T>(&self, uri: String) -> Result<T, Error>
     where
-        T: MessageRead<'static>,
+        T: protobuf::Message,
     {
         let payload = self.get_mercury_bytes(uri)?;
-        let message = deserialize_protobuf(&payload)?;
+        let message = T::parse_from_bytes(&payload)?;
         Ok(message)
     }
 

@@ -9,9 +9,10 @@ use crate::{
     error::Error,
     item_id::{ItemId, ItemIdType, LocalItemRegistry},
     metadata::{Fetch, ToMediaPath},
-    protocol::metadata::{Episode, Track},
     session::SessionService,
 };
+
+use librespot_protocol::metadata::{Episode, Track};
 
 use super::{
     file::{AudioFormat, MediaFile, MediaPath},
