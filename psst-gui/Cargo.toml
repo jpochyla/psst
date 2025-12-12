@@ -53,9 +53,19 @@ raw-window-handle = "0.5.2" # Must stay compatible with Druid
 souvlaki = { version = "0.8.2", default-features = false, features = ["use_zbus"] }
 sanitize_html = "0.9.0"
 rustfm-scrobble = "1.1.1"
+
 [target.'cfg(windows)'.build-dependencies]
 winres = { version = "0.1.12" }
 image = { version = "0.25.6" }
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.58.0", features = [
+  "Win32_UI_Shell",
+  "Win32_Foundation",
+  "Win32_System_Com",
+  "Win32_Graphics_Gdi",
+  "Win32_UI_WindowsAndMessaging",
+] }
 
 [package.metadata.bundle]
 name = "Psst"
