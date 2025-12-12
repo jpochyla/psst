@@ -58,9 +58,7 @@ pub struct Authentication {
     pub password: String,
     pub access_token: String,
     pub result: Promise<(), (), String>,
-    #[data(ignore)]
     pub lastfm_api_key_input: String,
-    #[data(ignore)]
     pub lastfm_api_secret_input: String,
 }
 
