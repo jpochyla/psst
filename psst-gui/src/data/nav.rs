@@ -4,8 +4,7 @@ use druid::Data;
 use serde::{Deserialize, Serialize};
 use url::Url;
 
-use crate::data::track::TrackId;
-use crate::data::{AlbumLink, ArtistLink, PlaylistLink, ShowLink};
+use crate::data::{track::TrackId, AlbumLink, ArtistLink, PlaylistLink, PublicUser, ShowLink};
 
 use super::RecommendationsRequest;
 
@@ -16,6 +15,7 @@ pub enum Route {
     SavedTracks,
     SavedAlbums,
     Shows,
+    PublicUser,
     SearchResults,
     ArtistDetail,
     AlbumDetail,
@@ -36,6 +36,7 @@ pub enum Nav {
     AlbumDetail(AlbumLink, Option<TrackId>),
     ArtistDetail(ArtistLink),
     PlaylistDetail(PlaylistLink),
+    PublicUserDetail(PublicUser),
     ShowDetail(ShowLink),
     Recommendations(Arc<RecommendationsRequest>),
 }
@@ -49,6 +50,7 @@ impl Nav {
             Nav::SavedAlbums => Route::SavedAlbums,
             Nav::Shows => Route::Shows,
             Nav::SearchResults(_) => Route::SearchResults,
+            Nav::PublicUserDetail(_) => Route::PublicUser,
             Nav::AlbumDetail(_, _) => Route::AlbumDetail,
             Nav::ArtistDetail(_) => Route::ArtistDetail,
             Nav::PlaylistDetail(_) => Route::PlaylistDetail,
@@ -65,6 +67,7 @@ impl Nav {
             Nav::SavedAlbums => "Saved Albums".to_string(),
             Nav::Shows => "Podcasts".to_string(),
             Nav::SearchResults(query) => query.to_string(),
+            Nav::PublicUserDetail(usr) => usr.display_name.to_string(),
             Nav::AlbumDetail(link, _) => link.name.to_string(),
             Nav::ArtistDetail(link) => link.name.to_string(),
             Nav::PlaylistDetail(link) => link.name.to_string(),
@@ -80,6 +83,7 @@ impl Nav {
             Nav::SavedTracks => "Saved Tracks".to_string(),
             Nav::SavedAlbums => "Saved Albums".to_string(),
             Nav::Shows => "Saved Shows".to_string(),
+            Nav::PublicUserDetail(usr) => format!("User \"{}\"", usr.display_name),
             Nav::SearchResults(query) => format!("Search \"{query}\""),
             Nav::AlbumDetail(link, _) => format!("Album \"{}\"", link.name),
             Nav::ArtistDetail(link) => format!("Artist \"{}\"", link.name),

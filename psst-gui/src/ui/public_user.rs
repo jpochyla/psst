@@ -1,0 +1,344 @@
+use std::sync::Arc;
+
+use crate::{
+    cmd,
+    data::{
+        public_user::{PublicUserDetail, PublicUserInformation},
+        AppState, ArtistLink, Cached, Ctx, MixedView, Nav, PublicUser, WithCtx,
+    },
+    ui::{
+        artist, playlist, theme,
+        utils::{self, spinner_widget},
+    },
+    webapi::WebApi,
+    widget::{icons, Async, Empty, MyWidgetExt, RemoteImage},
+};
+use druid::{
+    im::Vector,
+    kurbo::Circle,
+    lens::Map,
+    widget::{Button, CrossAxisAlignment, Either, Flex, Label, List, Scroll},
+    Color, Data, LensExt, Selector, UnitPoint, Widget, WidgetExt,
+};
+
+pub const LOAD_DETAIL: Selector<(PublicUser, AppState)> =
+    Selector::new("app.publicUser.load-detail");
+pub const FOLLOW_USER: Selector<Arc<str>> = Selector::new("app.publicUser.follow");
+pub const UNFOLLOW_USER: Selector<Arc<str>> = Selector::new("app.publicUser.unfollow");
+
+pub fn detail_widget() -> impl Widget<AppState> {
+    Async::new(spinner_widget, loaded_detail_widget, || Empty)
+        .lens(
+            Ctx::make(
+                AppState::common_ctx,
+                AppState::public_user_detail.then(PublicUserDetail::info),
+            )
+            .then(Ctx::in_promise()),
+        )
+        .on_command_async(
+            LOAD_DETAIL,
+            |d| WebApi::global().get_public_user_profile(d.0.id),
+            |_, data, q| data.public_user_detail.info.defer(q.0),
+            |_, data, r| {
+                data.public_user_detail
+                    .info
+                    .update((r.0 .0, r.1.map(|info| Cached::fresh(Arc::new(info)))))
+            },
+        )
+        .on_command_async(
+            FOLLOW_USER,
+            |username| WebApi::global().follow_user(&username),
+            |_, _, _| {},
+            |_, data, (_username, r)| {
+                if let Err(err) = r {
+                    data.error_alert(err);
+                } else {
+                    data.info_alert("User followed.");
+                    // Update the is_following state in the cached data
+                    if let Some(cached) = data.public_user_detail.info.resolved_mut() {
+                        let info = Arc::make_mut(&mut cached.data);
+                        info.is_following = Some(true);
+                        info.followers_count += 1;
+                    }
+                }
+            },
+        )
+        .on_command_async(
+            UNFOLLOW_USER,
+            |username| WebApi::global().unfollow_user(&username),
+            |_, _, _| {},
+            |_, data, (_username, r)| {
+                if let Err(err) = r {
+                    data.error_alert(err);
+                } else {
+                    data.info_alert("User unfollowed.");
+                    // Update the is_following state in the cached data
+                    if let Some(cached) = data.public_user_detail.info.resolved_mut() {
+                        let info = Arc::make_mut(&mut cached.data);
+                        info.is_following = Some(false);
+                        info.followers_count -= 1;
+                    }
+                }
+            },
+        )
+}
+
+fn loaded_detail_widget() -> impl Widget<WithCtx<Cached<Arc<PublicUserInformation>>>> {
+    let user_profile_top = user_info_widget().padding(theme::grid(1.0));
+
+    // This puts it as read only, it is needed to transform the context into what
+    // is needed
+    let user_playlists = user_playlists_widget().lens(Map::new(
+        |data: &WithCtx<Cached<Arc<PublicUserInformation>>>| WithCtx {
+            ctx: data.ctx.clone(),
+            data: data.data.data.public_playlists.clone(),
+        },
+        |_, _| {},
+    ));
+    let user_artists = user_artists_widget().lens(Map::new(
+        |data: &WithCtx<Cached<Arc<PublicUserInformation>>>| WithCtx {
+            ctx: data.ctx.clone(),
+            data: data.data.data.recently_played_artists.clone(),
+        },
+        |_, _| {},
+    ));
+    let user_followers = user_followers_widget().lens(Map::new(
+        |data: &WithCtx<Cached<Arc<PublicUserInformation>>>| WithCtx {
+            ctx: data.ctx.clone(),
+            data: data.data.data.followers.clone(),
+        },
+        |_, _| {},
+    ));
+    let user_following = user_following_widget().lens(Map::new(
+        |data: &WithCtx<Cached<Arc<PublicUserInformation>>>| WithCtx {
+            ctx: data.ctx.clone(),
+            data: data.data.data.following.clone(),
+        },
+        |_, _| {},
+    ));
+
+    Flex::column()
+        .cross_axis_alignment(CrossAxisAlignment::Start)
+        .with_spacer(theme::grid(1.0))
+        .with_child(user_profile_top)
+        .with_spacer(theme::grid(1.0))
+        .with_child(user_playlists)
+        .with_spacer(theme::grid(1.0))
+        .with_child(user_artists)
+        .with_spacer(theme::grid(1.0))
+        .with_child(user_followers)
+        .with_spacer(theme::grid(1.0))
+        .with_child(user_following)
+}
+
+pub fn cover_widget(size: f64) -> impl Widget<WithCtx<Cached<Arc<PublicUserInformation>>>> {
+    let radius = size / 2.0;
+
+    // Placeholder widget showing a user icon
+    let placeholder = round_icon_placeholder(size, Color::rgb8(0x28, 0x28, 0x28));
+
+    Either::new(
+        |ctx: &WithCtx<Cached<Arc<PublicUserInformation>>>, _| ctx.data.data.image_url.is_some(),
+        RemoteImage::new(
+            utils::placeholder_widget(),
+            move |ctx: &WithCtx<Cached<Arc<PublicUserInformation>>>, _| {
+                ctx.data.data.image_url.clone().map(|url| url.into())
+            },
+        )
+        .fix_size(size, size)
+        .clip(Circle::new((radius, radius), radius)),
+        placeholder,
+    )
+}
+
+fn user_info_widget() -> impl Widget<WithCtx<Cached<Arc<PublicUserInformation>>>> {
+    let size = theme::grid(10.0);
+    let user_cover = cover_widget(size);
+
+    let user_name = Label::dynamic(|info: &Arc<PublicUserInformation>, _| info.name.clone())
+        .with_text_size(theme::TEXT_SIZE_LARGE)
+        .with_font(theme::UI_FONT_MEDIUM);
+
+    let follower_count = Label::dynamic(|info: &Arc<PublicUserInformation>, _| {
+        format!("{} followers", info.followers_count)
+    })
+    .with_text_size(theme::TEXT_SIZE_SMALL)
+    .with_text_color(theme::PLACEHOLDER_COLOR);
+
+    let following_count = Label::dynamic(|info: &Arc<PublicUserInformation>, _| {
+        format!("{} following", info.following_count)
+    })
+    .with_text_size(theme::TEXT_SIZE_SMALL)
+    .with_text_color(theme::PLACEHOLDER_COLOR);
+
+    let follow_unfollow_button = Button::dynamic(|info: &Arc<PublicUserInformation>, _| {
+        if info.is_following.unwrap_or(false) {
+            "Unfollow".to_string()
+        } else {
+            "Follow".to_string()
+        }
+    })
+    .disabled_if(|info: &Arc<PublicUserInformation>, _| {
+        !info.allow_follows || info.is_current_user.unwrap_or(false)
+    })
+    .on_click(|ctx, info: &mut Arc<PublicUserInformation>, _| {
+        // Extract username from URI (format: spotify:user:USERNAME)
+        let username: Arc<str> = Arc::from(info.uri.split(':').nth(2).unwrap_or(&info.uri));
+        if info.is_following.unwrap_or(false) {
+            ctx.submit_command(UNFOLLOW_USER.with(username));
+        } else {
+            ctx.submit_command(FOLLOW_USER.with(username));
+        }
+    });
+
+    let user_info = Flex::column()
+        .cross_axis_alignment(CrossAxisAlignment::Start)
+        .with_child(user_name)
+        .with_default_spacer()
+        .with_child(follower_count)
+        .with_spacer(theme::grid(0.5))
+        .with_child(following_count)
+        .with_default_spacer()
+        .with_child(follow_unfollow_button)
+        .padding(theme::grid(1.0))
+        .lens(Ctx::data().then(Cached::data));
+
+    Flex::row()
+        .with_spacer(theme::grid(4.2))
+        .with_child(user_cover)
+        .with_default_spacer()
+        .with_child(user_info)
+}
+
+fn titled_section<D: Data, W: Widget<WithCtx<D>> + 'static>(
+    title: &'static str,
+    is_empty: impl Fn(&WithCtx<D>, &druid::Env) -> bool + 'static,
+    content: W,
+) -> impl Widget<WithCtx<D>> {
+    Either::new(is_empty, Empty, Flex::column().with_child(
+        Label::new(title)
+            .with_text_size(theme::grid(2.5))
+            .align_left()
+            .padding((theme::grid(1.5), theme::grid(0.5))),
+    ).with_child(content))
+}
+
+fn round_icon_placeholder<T: Data>(size: f64, bg_color: Color) -> impl Widget<T> {
+    let radius = size / 2.0;
+    icons::USER
+        .scale((size * 0.9, size * 0.9))
+        .with_color(Color::rgb8(0x53, 0x53, 0x53))
+        .padding((size * 0.05, size * 0.05))
+        .center()
+        .fix_size(size, size)
+        .background(bg_color)
+        .clip(Circle::new((radius, radius), radius))
+        .env_scope(|_, _| {})
+}
+
+fn user_playlists_widget() -> impl Widget<WithCtx<MixedView>> {
+    titled_section(
+        "Public Playlists",
+        |playlists: &WithCtx<MixedView>, &_| playlists.data.playlists.is_empty(),
+        Scroll::new(List::new(|| playlist::playlist_widget(true)).horizontal())
+            .horizontal()
+            .align_left()
+            .lens(Ctx::map(MixedView::playlists)),
+    )
+}
+
+fn user_artists_widget() -> impl Widget<WithCtx<MixedView>> {
+    titled_section(
+        "Recently Played Artists",
+        |artists: &WithCtx<MixedView>, &_| artists.data.artists.is_empty(),
+        Scroll::new(List::new(|| artist::artist_widget(true)).horizontal())
+            .horizontal()
+            .align_left()
+            .lens(Ctx::data().then(MixedView::artists)),
+    )
+}
+
+fn user_followers_widget() -> impl Widget<WithCtx<Vector<PublicUser>>> {
+    titled_section(
+        "Followers",
+        |followers: &WithCtx<Vector<PublicUser>>, _| followers.data.is_empty(),
+        Scroll::new(List::new(|| public_user_widget(true)).horizontal())
+            .horizontal()
+            .align_left()
+            .lens(Ctx::data()),
+    )
+}
+
+fn user_following_widget() -> impl Widget<WithCtx<Vector<PublicUser>>> {
+    titled_section(
+        "Following",
+        |following: &WithCtx<Vector<PublicUser>>, _| following.data.is_empty(),
+        Scroll::new(List::new(|| public_user_widget(true)).horizontal())
+            .horizontal()
+            .align_left()
+            .lens(Ctx::data()),
+    )
+}
+
+pub fn public_user_widget(horizontal: bool) -> impl Widget<PublicUser> {
+    let size = if horizontal {
+        theme::grid(16.0)
+    } else {
+        theme::grid(6.0)
+    };
+
+    let user_image = user_cover_widget(size);
+
+    let user = if horizontal {
+        Flex::column()
+            .with_child(user_image)
+            .with_default_spacer()
+            .with_child(
+                Label::dynamic(|user: &PublicUser, _| user.display_name.to_string())
+                    .with_font(theme::UI_FONT_MEDIUM)
+                    .align_horizontal(UnitPoint::CENTER)
+                    .align_vertical(UnitPoint::TOP)
+                    .fix_size(theme::grid(16.0), theme::grid(8.0)),
+            )
+    } else {
+        Flex::row()
+            .with_child(user_image)
+            .with_default_spacer()
+            .with_flex_child(
+                Label::dynamic(|user: &PublicUser, _| user.display_name.to_string())
+                    .with_font(theme::UI_FONT_MEDIUM),
+                1.0,
+            )
+    };
+
+    user.padding(theme::grid(1.0))
+        .link()
+        .rounded(theme::BUTTON_BORDER_RADIUS)
+        .on_left_click(|ctx, _, user, _| {
+            if user.uri.as_ref().unwrap().contains("artist") {
+                ctx.submit_command(cmd::NAVIGATE.with(Nav::ArtistDetail(ArtistLink {
+                    id: user.id.clone(),
+                    name: user.display_name.clone(),
+                })));
+            } else {
+                ctx.submit_command(cmd::NAVIGATE.with(Nav::PublicUserDetail(user.clone())));
+            }
+        })
+}
+
+fn user_cover_widget(size: f64) -> impl Widget<PublicUser> {
+    let radius = size / 2.0;
+
+    // Placeholder widget showing a user icon
+    let placeholder = round_icon_placeholder(size, Color::rgba8(0x28, 0x28, 0x28, 0x25));
+
+    Either::new(
+        |user: &PublicUser, _| user.image_url.is_some(),
+        RemoteImage::new(utils::placeholder_widget(), move |user: &PublicUser, _| {
+            user.image_url.clone()
+        })
+        .fix_size(size, size)
+        .clip(Circle::new((radius, radius), radius)),
+        placeholder,
+    )
+}

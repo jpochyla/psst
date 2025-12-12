@@ -1,10 +1,12 @@
 use crate::{
     cmd,
     data::{AppState, Nav, SpotifyUrl},
-    ui::{album, artist, library, lyrics, playlist, recommend, search, show},
+    ui::{album, artist, library, lyrics, playlist, public_user, recommend, search, show},
 };
-use druid::widget::{prelude::*, Controller};
-use druid::Code;
+use druid::{
+    widget::{prelude::*, Controller},
+    Code,
+};
 
 pub struct NavController;
 
@@ -55,6 +57,13 @@ impl NavController {
                 if !data.playlist_detail.playlist.contains(link) {
                     ctx.submit_command(
                         playlist::LOAD_DETAIL.with((link.to_owned(), data.to_owned())),
+                    );
+                }
+            }
+            Nav::PublicUserDetail(public_user) => {
+                if !data.public_user_detail.info.contains(public_user) {
+                    ctx.submit_command(
+                        public_user::LOAD_DETAIL.with((public_user.to_owned(), data.to_owned())),
                     );
                 }
             }
@@ -142,7 +151,8 @@ where
         env: &Env,
     ) {
         if let LifeCycle::WidgetAdded = event {
-            // Loads the library's saved tracks without the user needing to click on the tab.
+            // Loads the library's saved tracks without the user needing to click on the
+            // tab.
             ctx.submit_command(cmd::NAVIGATE.with(Nav::SavedTracks));
             // Load the last route, or the default.
             ctx.submit_command(
