@@ -63,6 +63,7 @@ name = "Psst"
 identifier = "com.jpochyla.psst"
 icon = ["assets/logo.icns"]
 version = "0.1.0"
+osx_minimum_system_version = "10.13"
 resources = []
 copyright = "Copyright (c) Jan Pochyla 2024. All rights reserved."
 category = "Music"

@@ -45,7 +45,7 @@ jobs:
 
     runs-on: ${{ matrix.os }}
     env:
-      MACOSX_DEPLOYMENT_TARGET: 11.0
+      MACOSX_DEPLOYMENT_TARGET: 10.13
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -91,7 +91,6 @@ jobs:
           path: |
             ~/.cargo/bin/cargo-bundle
             ~/Library/Caches/Homebrew
-            /usr/local/Cellar/create-dmg
           key: ${{ runner.os }}-tools-${{ hashFiles('**/Cargo.lock', '.github/workflows/build.yml') }}
           restore-keys: |
             ${{ runner.os }}-tools-
@@ -101,26 +100,35 @@ jobs:
         run: cargo install cargo-bundle
 
       - name: Install create-dmg
-        if: runner.os == 'macOS' && !steps.cache-tools.outputs.cache-hit
-        run: brew install create-dmg
-
-      - name: Bundle macOS Release
         if: runner.os == 'macOS'
-        run: cargo bundle --release
-        working-directory: psst-gui
+        run: brew install create-dmg
 
       - name: Create macOS universal binary
         if: runner.os == 'macOS'
         run: |
-          lipo -create -output ../target/release/bundle/osx/Psst.app/Contents/MacOS/Psst \
-            ../target/x86_64-apple-darwin/release/psst-gui \
-            ../target/aarch64-apple-darwin/release/psst-gui
+          mkdir -p target/release
+          lipo -create \
+            -arch x86_64 target/x86_64-apple-darwin/release/psst-gui \
+            -arch arm64 target/aarch64-apple-darwin/release/psst-gui \
+            -output target/release/psst-gui
+          file target/release/psst-gui
+
+      - name: Bundle macOS Release
+        if: runner.os == 'macOS'
+        env:
+          CARGO_BUNDLE_SKIP_BUILD: "true"
+          MACOSX_DEPLOYMENT_TARGET: 10.13
+        run: cargo bundle --release
+        working-directory: psst-gui
+
+      - name: Verify Bundle Architecture
+        if: runner.os == 'macOS'
+        run: file ../target/release/bundle/osx/Psst.app/Contents/MacOS/Psst
         working-directory: psst-gui
 
       - name: Create DMG
         if: runner.os == 'macOS'
         run: |
-          brew install create-dmg
           create-dmg \
             --volname "Psst" \
             --volicon "assets/logo.icns" \
