@@ -1336,9 +1336,10 @@ impl WebApi {
             shows: Option<Page<Arc<Show>>>,
         }
 
+        let encoded_query = urlencoding::encode(query);
         let type_query_param = topics.iter().map(SearchTopic::as_str).join(",");
         let request = &RequestBuilder::new("v1/search", Method::Get, None)
-            .query("q", query.replace(" ", "%20"))
+            .query("q", encoded_query)
             .query("type", &type_query_param)
             .query("limit", limit.to_string())
             .query("marker", "from_token");
