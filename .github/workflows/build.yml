@@ -45,7 +45,7 @@ jobs:
 
     runs-on: ${{ matrix.os }}
     env:
-      MACOSX_DEPLOYMENT_TARGET: 10.13
+      MACOSX_DEPLOYMENT_TARGET: 11.0
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -111,16 +111,13 @@ jobs:
             -arch x86_64 target/x86_64-apple-darwin/release/psst-gui \
             -arch arm64 target/aarch64-apple-darwin/release/psst-gui \
             -output target/release/psst-gui
-          file target/release/psst-gui
 
       - name: Bundle macOS Release
         if: runner.os == 'macOS'
         env:
           CARGO_BUNDLE_SKIP_BUILD: "true"
         run: |
-          rm -rf target/release/bundle
           cargo bundle --release -p psst-gui
-          file target/release/bundle/osx/Psst.app/Contents/MacOS/*
 
       - name: Create DMG
         if: runner.os == 'macOS'
