@@ -91,7 +91,6 @@ jobs:
           path: |
             ~/.cargo/bin/cargo-bundle
             ~/Library/Caches/Homebrew
-            /usr/local/Cellar/create-dmg
           key: ${{ runner.os }}-tools-${{ hashFiles('**/Cargo.lock', '.github/workflows/build.yml') }}
           restore-keys: |
             ${{ runner.os }}-tools-
@@ -101,29 +100,31 @@ jobs:
         run: cargo install cargo-bundle
 
       - name: Install create-dmg
-        if: runner.os == 'macOS' && !steps.cache-tools.outputs.cache-hit
-        run: brew install create-dmg
+        if: runner.os == 'macOS'
+        run: brew install -q create-dmg
 
       - name: Create macOS universal binary
         if: runner.os == 'macOS'
         run: |
-          mkdir -p psst-gui/target/release
-          lipo -create -output psst-gui/target/release/psst-gui \
-            target/x86_64-apple-darwin/release/psst-gui \
-            target/aarch64-apple-darwin/release/psst-gui
+          mkdir -p target/release
+          lipo -create \
+            -arch x86_64 target/x86_64-apple-darwin/release/psst-gui \
+            -arch arm64 target/aarch64-apple-darwin/release/psst-gui \
+            -output target/release/psst-gui
 
       - name: Bundle macOS Release
         if: runner.os == 'macOS'
-        run: cargo bundle --release
-        working-directory: psst-gui
+        env:
+          CARGO_BUNDLE_SKIP_BUILD: "true"
+        run: |
+          cargo bundle --release -p psst-gui
 
       - name: Create DMG
         if: runner.os == 'macOS'
         run: |
-          brew install create-dmg
           create-dmg \
             --volname "Psst" \
-            --volicon "assets/logo.icns" \
+            --volicon "psst-gui/assets/logo.icns" \
             --window-pos 200 120 \
             --window-size 600 400 \
             --icon-size 100 \
@@ -131,15 +132,14 @@ jobs:
             --hide-extension "Psst.app" \
             --app-drop-link 450 160 \
             "Psst.dmg" \
-            "../target/release/bundle/osx/Psst.app"
-        working-directory: psst-gui
+            "target/release/bundle/osx/Psst.app"
 
       - name: Upload macOS DMG
         uses: actions/upload-artifact@v4
         if: runner.os == 'macOS'
         with:
           name: Psst.dmg
-          path: ./psst-gui/Psst.dmg
+          path: Psst.dmg
 
       - name: Make Linux Binary Executable
         if: runner.os == 'Linux'
