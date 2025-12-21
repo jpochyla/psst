@@ -88,6 +88,7 @@ pub struct AppState {
     pub added_queue: Vector<QueueEntry>,
     pub lyrics: Promise<Vector<TrackLines>>,
     pub credits: Option<TrackCredits>,
+    pub lyrics_offset: Option<f64>,
 }
 
 impl AppState {
@@ -104,6 +105,7 @@ impl AppState {
             library: Arc::clone(&library),
             show_track_cover: config.show_track_cover,
             nav: Nav::Home,
+            progress: Duration::default(),
         });
         let playback = Playback {
             state: PlaybackState::Stopped,
@@ -171,6 +173,7 @@ impl AppState {
             finder: Finder::new(),
             lyrics: Promise::Empty,
             credits: None,
+            lyrics_offset: None,
         }
     }
 }
@@ -246,6 +249,7 @@ impl AppState {
 
     pub fn loading_playback(&mut self, item: Playable, origin: PlaybackOrigin) {
         self.common_ctx_mut().now_playing.take();
+        self.set_common_progress(Duration::default());
         self.playback.state = PlaybackState::Loading;
         self.playback.now_playing.replace(NowPlaying {
             item,
@@ -257,6 +261,7 @@ impl AppState {
 
     pub fn start_playback(&mut self, item: Playable, origin: PlaybackOrigin, progress: Duration) {
         self.common_ctx_mut().now_playing.replace(item.clone());
+        self.set_common_progress(progress);
         self.playback.state = PlaybackState::Playing;
         self.playback.now_playing.replace(NowPlaying {
             item,
@@ -270,6 +275,7 @@ impl AppState {
         if let Some(now_playing) = &mut self.playback.now_playing {
             now_playing.progress = progress;
         }
+        self.set_common_progress(progress);
     }
 
     pub fn pause_playback(&mut self) {
@@ -281,13 +287,14 @@ impl AppState {
     }
 
     pub fn block_playback(&mut self) {
-        // TODO: Figure out how to signal blocked playback properly.
+        self.playback.state = PlaybackState::Loading;
     }
 
     pub fn stop_playback(&mut self) {
         self.playback.state = PlaybackState::Stopped;
         self.playback.now_playing.take();
         self.common_ctx_mut().now_playing.take();
+        self.set_common_progress(Duration::default());
     }
 
     pub fn set_queue_behavior(&mut self, queue_behavior: QueueBehavior) {
@@ -342,6 +349,18 @@ impl AppState {
         let now = Instant::now();
         self.alerts
             .retain(|alert| now.duration_since(alert.created_at) < ALERT_DURATION);
+    }
+}
+
+impl AppState {
+    fn set_common_progress(&mut self, progress: Duration) {
+        let mut ctx = (*self.common_ctx).clone();
+        ctx.progress = progress;
+        self.common_ctx = Arc::new(ctx);
+    }
+
+    pub fn reset_lyrics_offset(&mut self) {
+        self.lyrics_offset = None;
     }
 }
 
@@ -551,11 +570,18 @@ pub struct CommonCtx {
     pub library: Arc<Library>,
     pub show_track_cover: bool,
     pub nav: Nav,
+    pub progress: Duration,
 }
 
 impl CommonCtx {
     pub fn is_playing(&self, item: &Playable) -> bool {
         matches!(&self.now_playing, Some(i) if i.same(item))
+    }
+
+    pub fn current_progress(&self) -> Duration {
+        // Use the stored progress directly for better accuracy
+        // The progress is updated by the audio player events
+        self.progress
     }
 }
 
