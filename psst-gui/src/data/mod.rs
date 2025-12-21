@@ -8,6 +8,7 @@ mod nav;
 mod playback;
 mod playlist;
 mod promise;
+pub mod public_user;
 mod recommend;
 mod search;
 mod show;
@@ -61,7 +62,7 @@ pub use crate::data::{
     user::{PublicUser, UserProfile},
     utils::{Cached, Float64, Image, Page},
 };
-use crate::ui::credits::TrackCredits;
+use crate::{data::public_user::PublicUserDetail, ui::credits::TrackCredits};
 
 pub const ALERT_DURATION: Duration = Duration::from_secs(5);
 
@@ -79,6 +80,7 @@ pub struct AppState {
     pub album_detail: AlbumDetail,
     pub artist_detail: ArtistDetail,
     pub playlist_detail: PlaylistDetail,
+    pub public_user_detail: PublicUserDetail,
     pub show_detail: ShowDetail,
     pub library: Arc<Library>,
     pub common_ctx: Arc<CommonCtx>,
@@ -171,6 +173,9 @@ impl AppState {
             finder: Finder::new(),
             lyrics: Promise::Empty,
             credits: None,
+            public_user_detail: PublicUserDetail {
+                info: Promise::Empty,
+            },
         }
     }
 }

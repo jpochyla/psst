@@ -31,10 +31,11 @@ use ureq::{
 
 use crate::{
     data::{
-        self, utils::sanitize_html_string, Album, AlbumType, Artist, ArtistAlbums, ArtistInfo,
-        ArtistLink, ArtistStats, AudioAnalysis, Cached, Episode, EpisodeId, EpisodeLink, Image,
-        MixedView, Nav, Page, Playlist, PublicUser, Range, Recommendations, RecommendationsRequest,
-        SearchResults, SearchTopic, Show, SpotifyUrl, Track, TrackLines, UserProfile,
+        self, public_user::PublicUserInformation, utils::sanitize_html_string, Album, AlbumType,
+        Artist, ArtistAlbums, ArtistInfo, ArtistLink, ArtistStats, AudioAnalysis, Cached, Episode,
+        EpisodeId, EpisodeLink, Image, MixedView, Nav, Page, Playlist, PublicUser, Range,
+        Recommendations, RecommendationsRequest, SearchResults, SearchTopic, Show, SpotifyUrl,
+        Track, TrackLines, UserProfile,
     },
     error::Error,
     ui::credits::TrackCredits,
@@ -42,6 +43,11 @@ use crate::{
 
 use super::{cache::WebApiCache, local::LocalTrackManager};
 use sanitize_html::{rules::predefined::DEFAULT, sanitize_str};
+
+// persistedQuery sha256Hash constants
+const FOLLOW_UNFOLLOW: &str = "c00e0cb6c7766e7230fc256cf4fe07aec63b53d1160a323940fce7b664e95596";
+const HOME_SECTIONS: &str = "eb3fba2d388cf4fc4d696b1757a58584e9538a3b515ea742e9cc9465807340be";
+const ARTIST_INFO: &str = "1ac33ddab5d39a3a9c27802774e6d78b9405cc188c6f75aed007df2a32737c72";
 
 pub struct WebApi {
     session: SessionService,
@@ -73,6 +79,8 @@ impl WebApi {
             paginated_limit,
         }
     }
+
+    
 
     // Similar to how librespot does this https://github.com/librespot-org/librespot/blob/dev/core/src/version.rs
     fn user_agent() -> String {
@@ -223,7 +231,8 @@ impl WebApi {
         }
     }
 
-    /// Very similar to `for_all_pages`, but only returns a certain number of results
+    /// Very similar to `for_all_pages`, but only returns a certain number of
+    /// results
     fn for_some_pages<T: DeserializeOwned + Clone>(
         &self,
         request: &RequestBuilder,
@@ -282,7 +291,8 @@ impl WebApi {
         Ok(results)
     }
 
-    /// Does a similar thing as `load_all_pages`, but limiting the number of results
+    /// Does a similar thing as `load_all_pages`, but limiting the number of
+    /// results
     fn load_some_pages<T: DeserializeOwned + Clone>(
         &self,
         request: &RequestBuilder,
@@ -556,6 +566,7 @@ impl WebApi {
                                             .map(|owner| owner.data.name.as_str())
                                             .unwrap_or_default(),
                                     ),
+                                    ..Default::default()
                                 },
                                 collaborative: false,
                                 public: None,
@@ -688,6 +699,269 @@ impl WebApi {
     }
 }
 
+/// Public user endpoints.
+impl WebApi {
+    pub fn get_public_user_profile(&self, id: Arc<str>) -> Result<PublicUserInformation, Error> {
+        #[derive(Clone, Data, Deserialize)]
+        pub struct PublicUserArtist {
+            #[serde(default)]
+            pub followers_count: i64,
+            pub image_url: String,
+            #[serde(default)]
+            pub is_following: bool,
+            pub name: String,
+            pub uri: String,
+        }
+
+        #[derive(Clone, Data, Deserialize)]
+        pub struct PublicUserPlaylist {
+            pub image_url: String,
+            pub name: String,
+            pub owner_uri: String,
+            pub owner_name: String,
+            pub uri: String,
+        }
+
+        #[derive(Clone, Data, Deserialize)]
+        pub struct PublicUserInfo {
+            #[serde(default)]
+            pub uri: String,
+            pub name: String,
+            #[serde(default)]
+            pub image_url: Option<String>,
+            #[serde(default)]
+            pub followers_count: i64,
+            #[serde(default)]
+            pub following_count: i64,
+            #[serde(default)]
+            pub is_following: Option<bool>,
+            #[serde(default)]
+            pub is_current_user: Option<bool>,
+            #[serde(default)]
+            pub recently_played_artists: Vector<PublicUserArtist>,
+            #[serde(default)]
+            pub public_playlists: Vector<PublicUserPlaylist>,
+            #[serde(default)]
+            pub total_public_playlists_count: i64,
+            #[serde(default)]
+            pub allow_follows: bool,
+        }
+
+        let req = &RequestBuilder::new(
+            format!("user-profile-view/v3/profile/{}", id),
+            Method::Get,
+            None,
+        )
+        .set_base_uri("spclient.wg.spotify.com")
+        .query("playlist_limit", 20)
+        .query("artist_limit", 20)
+        .query("episode_limit", 20)
+        .query("market", "from_token");
+
+        let result: PublicUserInfo = self.load(req)?;
+
+        let mut playlist = MixedView {
+            title: Arc::from("Public Playlists"),
+            playlists: Vector::new(),
+            artists: Vector::new(),
+            albums: Vector::new(),
+            shows: Vector::new(),
+        };
+        let mut artist = MixedView {
+            title: Arc::from("Recently Played Artists"),
+            playlists: Vector::new(),
+            artists: Vector::new(),
+            albums: Vector::new(),
+            shows: Vector::new(),
+        };
+
+        result.public_playlists.iter().for_each(|p| {
+            playlist.playlists.push_back(Playlist {
+                id: Arc::from(p.uri.split(':').nth(2).unwrap_or("")),
+                name: Arc::from(p.name.clone()),
+                images: Some(if p.image_url.contains("spotify:mosaic:") {
+                    {
+                        let mut image_url = p.image_url.clone();
+                        image_url = image_url
+                            .strip_prefix("spotify:mosaic:")
+                            .unwrap_or(&image_url)
+                            .to_string();
+                        image_url = image_url.replace(":", "");
+                        let mut images = Vector::new();
+                        images.push_back(data::utils::Image {
+                            url: Arc::from(format!("https://mosaic.scdn.co/300/{}", image_url)),
+                            width: None,
+                            height: None,
+                        });
+                        images
+                    }
+                } else {
+                    let mut images = Vector::new();
+                    images.push_back(data::utils::Image {
+                        url: Arc::from(p.image_url.clone()),
+                        width: None,
+                        height: None,
+                    });
+                    images
+                }),
+                description: Arc::from(""),
+                track_count: None,
+                owner: PublicUser {
+                    id: Arc::from(p.owner_uri.split(':').nth(2).unwrap_or("")),
+                    display_name: Arc::from(p.owner_name.clone()),
+                    ..Default::default()
+                },
+                collaborative: false,
+                public: None,
+            });
+        });
+
+        result.recently_played_artists.iter().for_each(|a| {
+            artist.artists.push_back(Artist {
+                id: Arc::from(a.uri.split(':').nth(2).unwrap_or("")),
+                name: Arc::from(a.name.clone()),
+                images: if a.image_url.is_empty() {
+                    Vector::new()
+                } else {
+                    let mut images = Vector::new();
+                    images.push_back(data::utils::Image {
+                        url: Arc::from(a.image_url.clone()),
+                        width: None,
+                        height: None,
+                    });
+                    images
+                },
+            });
+        });
+
+        let followers = self
+            .get_public_user_followers(id.clone())
+            .unwrap_or_else(|_| Vector::new());
+        let following = self
+            .get_public_user_following(id)
+            .unwrap_or_else(|_| Vector::new());
+
+        Ok(PublicUserInformation {
+            uri: result.uri,
+            name: result.name,
+            image_url: result.image_url,
+            followers_count: result.followers_count,
+            following_count: result.following_count,
+            is_following: result.is_following,
+            is_current_user: result.is_current_user,
+            recently_played_artists: artist,
+            public_playlists: playlist,
+            allow_follows: result.allow_follows,
+            followers,
+            following,
+        })
+    }
+
+    pub fn get_public_user_followers(&self, id: Arc<str>) -> Result<Vector<PublicUser>, Error> {
+        #[derive(Deserialize)]
+        struct FollowersResponse {
+            profiles: Vector<PublicUser>,
+        }
+
+        let req = &RequestBuilder::new(
+            format!("user-profile-view/v3/profile/{}/followers", id),
+            Method::Get,
+            None,
+        )
+        .set_base_uri("spclient.wg.spotify.com")
+        .query("market", "from_token");
+
+        let result: FollowersResponse = self.load(req)?;
+        Ok(result
+            .profiles
+            .into_iter()
+            .take(20)
+            .map(|mut user| {
+                if user.id.is_empty() {
+                    user.id = user.get_id();
+                }
+                user
+            })
+            .collect())
+    }
+
+    pub fn get_public_user_following(&self, id: Arc<str>) -> Result<Vector<PublicUser>, Error> {
+        #[derive(Deserialize)]
+        struct FollowingResponse {
+            profiles: Vector<PublicUser>,
+        }
+
+        let req = &RequestBuilder::new(
+            format!("user-profile-view/v3/profile/{}/following", id),
+            Method::Get,
+            None,
+        )
+        .set_base_uri("spclient.wg.spotify.com")
+        .query("market", "from_token");
+
+        let result: FollowingResponse = self.load(req)?;
+        Ok(result
+            .profiles
+            .into_iter()
+            .take(20)
+            .map(|mut user| {
+                if user.id.is_empty() {
+                    user.id = user.get_id();
+                }
+                user
+            })
+            .collect())
+    }
+
+    // Follow/unfollow
+    // https://api-partner.spotify.com/pathfinder/v2/query
+    pub fn follow_user(&self, username: &str) -> Result<(), Error> {
+        let json = json!({
+            "variables": {
+                "usernames": [username]
+            },
+            "operationName": "followUsers",
+            "extensions": {
+                "persistedQuery": {
+                    "version": 1,
+                    "sha256Hash": FOLLOW_UNFOLLOW
+                }
+            }
+        });
+
+        let request =
+            &RequestBuilder::new("pathfinder/v2/query".to_string(), Method::Post, Some(json))
+                .set_base_uri("api-partner.spotify.com")
+                .header("User-Agent", Self::user_agent());
+
+        self.request(request)?;
+        Ok(())
+    }
+
+    pub fn unfollow_user(&self, username: &str) -> Result<(), Error> {
+        let json = json!({
+            "variables": {
+                "usernames": [username]
+            },
+            "operationName": "unfollowUsers",
+            "extensions": {
+                "persistedQuery": {
+                    "version": 1,
+                    "sha256Hash": FOLLOW_UNFOLLOW
+                }
+            }
+        });
+
+        let request =
+            &RequestBuilder::new("pathfinder/v2/query".to_string(), Method::Post, Some(json))
+                .set_base_uri("api-partner.spotify.com")
+                .header("User-Agent", Self::user_agent());
+
+        self.request(request)?;
+        Ok(())
+    }
+}
+
 /// User endpoints.
 impl WebApi {
     // https://developer.spotify.com/documentation/web-api/reference/get-users-profile
@@ -748,10 +1022,12 @@ impl WebApi {
 
         for album in result {
             match album.album_type {
-                // Spotify is labeling albums and singles that should be labeled `appears_on` as `album` or `single`.
-                // They are still ordered properly though, with the most recent first, then 'appears_on'.
-                // So we just wait until they are no longer descending, then start putting them in the 'appears_on' Vec.
-                // NOTE: This will break if an artist has released 'appears_on' albums/singles before their first actual album/single.
+                // Spotify is labeling albums and singles that should be labeled `appears_on` as
+                // `album` or `single`. They are still ordered properly though, with
+                // the most recent first, then 'appears_on'. So we just wait until
+                // they are no longer descending, then start putting them in the 'appears_on' Vec.
+                // NOTE: This will break if an artist has released 'appears_on' albums/singles
+                // before their first actual album/single.
                 AlbumType::Album => {
                     if album.release_year_int() > last_album_release_year {
                         artist_albums.appears_on.push_back(album)
@@ -869,7 +1145,7 @@ impl WebApi {
             "extensions": {
                 "persistedQuery": {
                     "version": 1,
-                    "sha256Hash": "1ac33ddab5d39a3a9c27802774e6d78b9405cc188c6f75aed007df2a32737c72"
+                    "sha256Hash": ARTIST_INFO
                 }
             },
             "operationName": "queryArtistOverview",
@@ -1121,6 +1397,15 @@ impl WebApi {
 
 /// View endpoints.
 impl WebApi {
+    const HOME_SECTION_MADE_FOR_YOU: &str = "spotify:section:0JQ5DAUnp4wcj0bCb3wh3S";
+    const HOME_SECTION_TOP_MIXES: &str = "spotify:section:0JQ5DAnM3wGh0gz1MXnu89";
+    const HOME_SECTION_RECOMMENDED_STATIONS: &str = "spotify:section:0JQ5DAnM3wGh0gz1MXnu3R";
+    const HOME_SECTION_UNIQUELY_YOURS: &str = "spotify:section:0JQ5DAUnp4wcj0bCb3wh3S";
+    const HOME_SECTION_BEST_OF_ARTISTS: &str = "spotify:section:0JQ5DAnM3wGh0gz1MXnu3n";
+    const HOME_SECTION_JUMP_BACK_IN: &str = "spotify:section:0JQ5DAIiKWzVFULQfUm85X";
+    const HOME_SECTION_YOUR_SHOWS: &str = "spotify:section:0JQ5DAnM3wGh0gz1MXnu3N";
+    const HOME_SECTION_SHOWS_YOU_MIGHT_LIKE: &str = "spotify:section:0JQ5DAnM3wGh0gz1MXnu3P";   
+
     pub fn get_user_info(&self) -> Result<(String, String), Error> {
         #[derive(Deserialize, Clone, Data)]
         struct User {
@@ -1148,7 +1433,7 @@ impl WebApi {
             "extensions": {
                 "persistedQuery": {
                     "version": 1,
-                    "sha256Hash": "eb3fba2d388cf4fc4d696b1757a58584e9538a3b515ea742e9cc9465807340be"
+                    "sha256Hash": HOME_SECTIONS
                 }
             },
             "operationName": "homeSection",
@@ -1172,45 +1457,37 @@ impl WebApi {
     }
 
     pub fn get_made_for_you(&self) -> Result<MixedView, Error> {
-        // 0JQ5DAUnp4wcj0bCb3wh3S -> Made for you
-        self.get_section("spotify:section:0JQ5DAUnp4wcj0bCb3wh3S")
+        self.get_section(Self::HOME_SECTION_MADE_FOR_YOU)
     }
 
     pub fn get_top_mixes(&self) -> Result<MixedView, Error> {
-        // 0JQ5DAnM3wGh0gz1MXnu89 -> Top mixes
-        self.get_section("spotify:section:0JQ5DAnM3wGh0gz1MXnu89")
+        self.get_section(Self::HOME_SECTION_TOP_MIXES)
     }
 
     pub fn recommended_stations(&self) -> Result<MixedView, Error> {
-        // 0JQ5DAnM3wGh0gz1MXnu3R -> Recommended stations
-        self.get_section("spotify:section:0JQ5DAnM3wGh0gz1MXnu3R")
+        self.get_section(Self::HOME_SECTION_RECOMMENDED_STATIONS)
     }
 
     pub fn uniquely_yours(&self) -> Result<MixedView, Error> {
-        // 0JQ5DAUnp4wcj0bCb3wh3S -> Uniquely yours
-        self.get_section("spotify:section:0JQ5DAUnp4wcj0bCb3wh3S")
+        self.get_section(Self::HOME_SECTION_UNIQUELY_YOURS)
     }
 
     pub fn best_of_artists(&self) -> Result<MixedView, Error> {
-        // 0JQ5DAnM3wGh0gz1MXnu3n -> Best of artists
-        self.get_section("spotify:section:0JQ5DAnM3wGh0gz1MXnu3n")
+        self.get_section(Self::HOME_SECTION_BEST_OF_ARTISTS)
     }
 
     // Need to make a mix of it!
     pub fn jump_back_in(&self) -> Result<MixedView, Error> {
-        // 0JQ5DAIiKWzVFULQfUm85X -> Jump back in
-        self.get_section("spotify:section:0JQ5DAIiKWzVFULQfUm85X")
+        self.get_section(Self::HOME_SECTION_JUMP_BACK_IN)
     }
 
     // Shows
     pub fn your_shows(&self) -> Result<MixedView, Error> {
-        // 0JQ5DAnM3wGh0gz1MXnu3N -> Your shows
-        self.get_section("spotify:section:0JQ5DAnM3wGh0gz1MXnu3N")
+        self.get_section(Self::HOME_SECTION_YOUR_SHOWS)
     }
 
     pub fn shows_that_you_might_like(&self) -> Result<MixedView, Error> {
-        // 0JQ5DAnM3wGh0gz1MXnu3P -> Shows that you might like
-        self.get_section("spotify:section:0JQ5DAnM3wGh0gz1MXnu3P")
+        self.get_section(Self::HOME_SECTION_SHOWS_YOU_MIGHT_LIKE)
     }
 }
 
@@ -1542,7 +1819,8 @@ enum Method {
     Get,
 }
 
-// Creating a new URI builder so aid in the creation of uris with extendable queries.
+// Creating a new URI builder so aid in the creation of uris with extendable
+// queries.
 #[derive(Debug, Clone)]
 struct RequestBuilder {
     protocol: String,
