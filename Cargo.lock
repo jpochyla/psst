@@ -4002,6 +4002,7 @@ dependencies = [
  "threadpool",
  "time 0.3.41",
  "time-humanize",
+ "toml 0.8.22",
  "ureq 3.0.11",
  "url",
  "urlencoding",
@@ -5440,8 +5441,15 @@ dependencies = [
  "serde",
  "serde_spanned",
  "toml_datetime",
+ "toml_write",
  "winnow 0.7.9",
 ]
+
+[[package]]
+name = "toml_write"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bfb942dfe1d8e29a7ee7fcbde5bd2b9a25fb89aa70caea2eba3bee836ff41076"
 
 [[package]]
 name = "tower-service"
