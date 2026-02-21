@@ -18,7 +18,7 @@ use itertools::Itertools;
 use log::info;
 use parking_lot::Mutex;
 use psst_core::{
-    session::{login5::Login5, SessionService},
+    oauth,
     system_info::{OS, SPOTIFY_SEMANTIC_VERSION},
 };
 use serde::{de::DeserializeOwned, Deserialize};
@@ -44,17 +44,14 @@ use super::{cache::WebApiCache, local::LocalTrackManager};
 use sanitize_html::{rules::predefined::DEFAULT, sanitize_str};
 
 pub struct WebApi {
-    session: SessionService,
     agent: Agent,
     cache: WebApiCache,
-    login5: Login5,
     local_track_manager: Mutex<LocalTrackManager>,
     paginated_limit: usize,
 }
 
 impl WebApi {
     pub fn new(
-        session: SessionService,
         proxy_url: Option<&str>,
         cache_base: Option<PathBuf>,
         paginated_limit: usize,
@@ -65,10 +62,8 @@ impl WebApi {
             agent = agent.proxy(proxy);
         }
         Self {
-            session,
             agent: agent.build().into(),
             cache: WebApiCache::new(cache_base),
-            login5: Login5::new(None, proxy_url),
             local_track_manager: Mutex::new(LocalTrackManager::new()),
             paginated_limit,
         }
@@ -90,10 +85,9 @@ impl WebApi {
     }
 
     fn access_token(&self) -> Result<String, Error> {
-        self.login5
-            .get_access_token(&self.session)
-            .map_err(|err| Error::WebApiError(err.to_string()))
+        oauth::get_or_refresh_webapi_token()
             .map(|t| t.access_token)
+            .map_err(|err| Error::WebApiError(err.to_string()))
     }
 
     fn request(&self, request: &RequestBuilder) -> Result<Response<Body>, Error> {

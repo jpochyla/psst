@@ -561,12 +561,15 @@ impl Authenticate {
         Some(thread)
     }
 
-    // Helper method to simplify Spotify authentication flow
+    // Helper method to simplify Spotify authentication flow.
+    // Performs two back-to-back OAuth flows:
+    // 1. Shannon session OAuth (official Spotify Client ID) - for playback
+    // 2. Web API OAuth (Psst's own Client ID) - for Web API calls
     fn start_spotify_auth(&mut self, ctx: &mut EventCtx, data: &mut AppState) {
         // Set authentication to in-progress state
         data.preferences.auth.result.defer_default();
 
-        // Generate auth URL and store PKCE verifier
+        // Generate auth URL and store PKCE verifier for the first (session) OAuth
         let (auth_url, pkce_verifier) = oauth::generate_auth_url(8888);
         let config = data.preferences.auth.session_config(); // Keep config local
 
@@ -574,6 +577,7 @@ impl Authenticate {
         self.spotify_thread = Authenticate::spawn_auth_thread(
             ctx,
             move || {
+                // ── Step 1: Session OAuth (official Client ID) ──────────────
                 // Listen for authorization code
                 let code = oauth::get_authcode_listener(
                     SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8888),
@@ -585,13 +589,17 @@ impl Authenticate {
                 let token = oauth::exchange_code_for_token(8888, code, pkce_verifier);
 
                 // Try to authenticate with token, with retries
+                let mut credentials = None;
                 let mut retries = 3;
                 while retries > 0 {
                     match Authentication::authenticate_and_get_credentials(SessionConfig {
                         login_creds: Credentials::from_access_token(token.clone()),
                         ..config.clone()
                     }) {
-                        Ok(credentials) => return Ok(credentials),
+                        Ok(creds) => {
+                            credentials = Some(creds);
+                            break;
+                        }
                         Err(e) if retries > 1 => {
                             log::warn!("authentication failed, retrying: {e:?}");
                             retries -= 1;
@@ -599,13 +607,32 @@ impl Authenticate {
                         Err(e) => return Err(e),
                     }
                 }
-                Err("Authentication retries exceeded".to_string())
+                let credentials =
+                    credentials.ok_or_else(|| "Authentication retries exceeded".to_string())?;
+
+                // ── Step 2: Web API OAuth (Psst's own Client ID) ───────────
+                // This gives us a separate token for Web API calls, avoiding
+                // 429 rate-limit errors from Spotify's official Client ID.
+                log::info!("Session auth complete. Starting Web API OAuth flow...");
+                match oauth::perform_webapi_oauth_flow(8888) {
+                    Ok(_token) => {
+                        log::info!("Web API OAuth flow completed successfully");
+                    }
+                    Err(e) => {
+                        // Don't fail the overall login if Web API OAuth fails.
+                        // The app will still work for playback; Web API calls
+                        // will fail gracefully.
+                        log::warn!("Web API OAuth flow failed (non-fatal): {e}");
+                    }
+                }
+
+                Ok(credentials)
             },
             Self::SPOTIFY_RESPONSE,
             self.spotify_thread.take(),
         );
 
-        // Open browser with authorization URL
+        // Open browser with authorization URL (for the first/session OAuth)
         if open::that(&auth_url).is_err() {
             data.error_alert("Failed to open browser");
             // Resolve the promise with an error immediately
@@ -658,6 +685,8 @@ impl<W: Widget<AppState>> Controller<AppState, W> for Authenticate {
             Event::Command(cmd) if cmd.is(cmd::LOG_OUT) => {
                 data.config.clear_credentials();
                 data.config.save();
+                // Also clear the cached Web API token
+                oauth::delete_webapi_token();
                 data.session.shutdown();
                 ctx.submit_command(cmd::CLOSE_ALL_WINDOWS);
                 ctx.submit_command(cmd::SHOW_ACCOUNT_SETUP);
