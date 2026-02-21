@@ -15,6 +15,7 @@ use env_logger::{Builder, Env};
 use webapi::WebApi;
 
 use psst_core::cache::Cache;
+use psst_core::oauth;
 
 use crate::{
     data::{AppState, Config},
@@ -51,7 +52,6 @@ fn main() {
     }
 
     WebApi::new(
-        state.session.clone(),
         Config::proxy().as_deref(),
         Config::cache_dir(),
         paginated_limit,
@@ -62,6 +62,29 @@ fn main() {
     let launcher;
     if state.config.has_credentials() {
         // Credentials are configured, open the main window.
+
+        // Check if we have a valid Web API token. If not, try to refresh or
+        // trigger a browser-based OAuth flow before the main window opens.
+        match oauth::get_or_refresh_webapi_token() {
+            Ok(_) => {
+                log::info!("Web API token is valid");
+            }
+            Err(_) => {
+                log::info!("No valid Web API token found, starting OAuth flow...");
+                match oauth::perform_webapi_oauth_flow(8888) {
+                    Ok(_) => {
+                        log::info!("Web API OAuth flow completed successfully");
+                    }
+                    Err(e) => {
+                        log::warn!(
+                            "Web API OAuth flow failed: {e}. \
+                             Web API features may be unavailable."
+                        );
+                    }
+                }
+            }
+        }
+
         let window = ui::main_window(&state.config);
         delegate = Delegate::with_main(window.id);
         launcher = AppLauncher::with_window(window).configure_env(ui::theme::setup);
