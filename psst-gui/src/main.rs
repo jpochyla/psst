@@ -15,7 +15,6 @@ use env_logger::{Builder, Env};
 use webapi::WebApi;
 
 use psst_core::cache::Cache;
-use psst_core::oauth;
 
 use crate::{
     data::{AppState, Config},
@@ -63,25 +62,27 @@ fn main() {
     if state.config.has_credentials() {
         // Credentials are configured, open the main window.
 
-        // Check if we have a valid Web API token. If not, try to refresh or
-        // trigger a browser-based OAuth flow before the main window opens.
-        match oauth::get_or_refresh_webapi_token() {
-            Ok(_) => {
+        // Check if we have a valid Web API token. If not, try to refresh.
+        // If refresh fails, the user can re-authenticate from preferences.
+        match state.config.get_or_refresh_webapi_token() {
+            Ok(token) => {
                 log::info!("Web API token is valid");
+                // Seed the global WebApi with the valid token
+                WebApi::global().set_webapi_credentials(
+                    state.config.webapi_client_id_value().map(String::from),
+                    Some(token),
+                );
             }
-            Err(_) => {
-                log::info!("No valid Web API token found, starting OAuth flow...");
-                match oauth::perform_webapi_oauth_flow(8888) {
-                    Ok(_) => {
-                        log::info!("Web API OAuth flow completed successfully");
-                    }
-                    Err(e) => {
-                        log::warn!(
-                            "Web API OAuth flow failed: {e}. \
-                             Web API features may be unavailable."
-                        );
-                    }
-                }
+            Err(e) => {
+                log::warn!(
+                    "No valid Web API token: {e}. \
+                     Web API features may be unavailable until re-authentication."
+                );
+                // Still provide the client ID so refresh can be attempted later
+                WebApi::global().set_webapi_credentials(
+                    state.config.webapi_client_id_value().map(String::from),
+                    None,
+                );
             }
         }
 
