@@ -18,7 +18,7 @@ use itertools::Itertools;
 use log::info;
 use parking_lot::Mutex;
 use psst_core::{
-    oauth,
+    oauth::{self, WebApiToken},
     system_info::{OS, SPOTIFY_SEMANTIC_VERSION},
 };
 use serde::{de::DeserializeOwned, Deserialize};
@@ -48,6 +48,8 @@ pub struct WebApi {
     cache: WebApiCache,
     local_track_manager: Mutex<LocalTrackManager>,
     paginated_limit: usize,
+    webapi_token: Mutex<Option<WebApiToken>>,
+    webapi_client_id: Mutex<Option<String>>,
 }
 
 impl WebApi {
@@ -66,6 +68,8 @@ impl WebApi {
             cache: WebApiCache::new(cache_base),
             local_track_manager: Mutex::new(LocalTrackManager::new()),
             paginated_limit,
+            webapi_token: Mutex::new(None),
+            webapi_client_id: Mutex::new(None),
         }
     }
 
@@ -84,10 +88,39 @@ impl WebApi {
         )
     }
 
+    /// Update the cached Web API token and client ID (called from GUI on config changes).
+    pub fn set_webapi_credentials(&self, client_id: Option<String>, token: Option<WebApiToken>) {
+        *self.webapi_client_id.lock() = client_id;
+        *self.webapi_token.lock() = token;
+    }
+
     fn access_token(&self) -> Result<String, Error> {
-        oauth::get_or_refresh_webapi_token()
-            .map(|t| t.access_token)
-            .map_err(|err| Error::WebApiError(err.to_string()))
+        let mut token_guard = self.webapi_token.lock();
+        if let Some(ref token) = *token_guard {
+            if !token.is_expired() {
+                return Ok(token.access_token.clone());
+            }
+            // Try to refresh
+            let client_id_guard = self.webapi_client_id.lock();
+            if let (Some(ref client_id), Some(ref refresh_token)) =
+                (&*client_id_guard, &token.refresh_token)
+            {
+                log::info!("Web API token expired, attempting refresh...");
+                match oauth::refresh_webapi_token(client_id, refresh_token) {
+                    Ok(new_token) => {
+                        let access_token = new_token.access_token.clone();
+                        *token_guard = Some(new_token);
+                        return Ok(access_token);
+                    }
+                    Err(e) => {
+                        log::error!("Failed to refresh Web API token: {e}");
+                    }
+                }
+            }
+        }
+        Err(Error::WebApiError(
+            "No valid Web API token available".to_string(),
+        ))
     }
 
     fn request(&self, request: &RequestBuilder) -> Result<Response<Body>, Error> {

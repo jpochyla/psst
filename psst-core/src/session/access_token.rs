@@ -11,12 +11,6 @@ use super::SessionService;
 // Used for Shannon session, Login5, client tokens, and playback infrastructure.
 pub const CLIENT_ID: &str = "65b708073fc0480ea92a077233ca87bd";
 
-// Psst's own registered Client ID for Web API calls.
-// This avoids rate-limiting (429 errors) that Spotify applies to the official client ID
-// when used for JSON Web API requests.
-// TODO: Register your own client ID at https://developer.spotify.com/dashboard and replace this.
-pub const PSST_CLIENT_ID: &str = "TODO_REGISTER_YOUR_OWN_CLIENT_ID";
-
 // All scopes we could possibly require (used for Shannon session/Login5).
 pub const ACCESS_SCOPES: &str = "streaming,user-read-email,user-read-private,playlist-read-private,playlist-read-collaborative,playlist-modify-public,playlist-modify-private,user-follow-modify,user-follow-read,user-library-read,user-library-modify,user-top-read,user-read-recently-played";
 

@@ -5,17 +5,15 @@ use oauth2::{
 };
 use serde::{Deserialize, Serialize};
 use std::{
-    fs,
     io::{BufRead, BufReader, Write},
     net::TcpStream,
     net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener},
-    path::PathBuf,
     sync::mpsc,
     time::Duration,
 };
 use url::Url;
 
-use crate::session::access_token::{PSST_CLIENT_ID, WEBAPI_SCOPES};
+use crate::session::access_token::WEBAPI_SCOPES;
 
 // ── Callback listener (shared by all OAuth flows) ──────────────────────────
 
@@ -153,40 +151,38 @@ pub fn send_success_response(stream: &mut TcpStream) {
     let _ = stream.write_all(response.as_bytes());
 }
 
-// ── Session OAuth (official Spotify Client ID, for Shannon session) ────────
+// ── Shared OAuth helpers ───────────────────────────────────────────────────
 
-fn create_spotify_oauth_client(redirect_port: u16) -> BasicClient {
-    let redirect_address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), redirect_port);
-    let redirect_uri = format!("http://{redirect_address}/login");
+fn redirect_uri(redirect_port: u16) -> String {
+    let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), redirect_port);
+    format!("http://{addr}/login")
+}
 
+fn create_oauth_client(client_id: &str, redirect_port: u16) -> BasicClient {
     BasicClient::new(
-        ClientId::new(crate::session::access_token::CLIENT_ID.to_string()),
+        ClientId::new(client_id.to_string()),
         None,
         AuthUrl::new("https://accounts.spotify.com/authorize".to_string()).unwrap(),
         Some(TokenUrl::new("https://accounts.spotify.com/api/token".to_string()).unwrap()),
     )
-    .set_redirect_uri(RedirectUrl::new(redirect_uri).expect("Invalid redirect URL"))
+    .set_redirect_uri(RedirectUrl::new(redirect_uri(redirect_port)).expect("Invalid redirect URL"))
 }
 
-pub fn generate_auth_url(redirect_port: u16) -> (String, PkceCodeVerifier) {
-    let client = create_spotify_oauth_client(redirect_port);
-    let (pkce_challenge, pkce_verifier) = PkceCodeChallenge::new_random_sha256();
+// ── Session OAuth (official Spotify Client ID, for Shannon session) ────────
 
-    let (auth_url, _) = client
-        .authorize_url(CsrfToken::new_random)
-        .add_scopes(get_scopes())
-        .set_pkce_challenge(pkce_challenge)
-        .url();
-
-    (auth_url.to_string(), pkce_verifier)
+pub fn generate_session_auth_url(redirect_port: u16) -> (String, PkceCodeVerifier) {
+    let client_id = crate::session::access_token::CLIENT_ID;
+    let scopes = get_session_scopes();
+    generate_auth_url(client_id, redirect_port, &scopes)
 }
 
-pub fn exchange_code_for_token(
+pub fn exchange_session_code_for_token(
     redirect_port: u16,
     code: AuthorizationCode,
     pkce_verifier: PkceCodeVerifier,
 ) -> String {
-    let client = create_spotify_oauth_client(redirect_port);
+    let client_id = crate::session::access_token::CLIENT_ID;
+    let client = create_oauth_client(client_id, redirect_port);
 
     let token_response = client
         .exchange_code(code)
@@ -197,14 +193,14 @@ pub fn exchange_code_for_token(
     token_response.access_token().secret().to_string()
 }
 
-fn get_scopes() -> Vec<Scope> {
+fn get_session_scopes() -> Vec<Scope> {
     crate::session::access_token::ACCESS_SCOPES
         .split(',')
         .map(|s| Scope::new(s.trim().to_string()))
         .collect()
 }
 
-// ── Web API OAuth (Psst's own Client ID) ───────────────────────────────────
+// ── Web API OAuth (user-provided Client ID) ────────────────────────────────
 
 /// Token for Web API calls, serializable to/from disk.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -226,23 +222,6 @@ impl WebApiToken {
     }
 }
 
-fn webapi_redirect_uri(redirect_port: u16) -> String {
-    let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), redirect_port);
-    format!("http://{addr}/login")
-}
-
-fn create_webapi_oauth_client(redirect_port: u16) -> BasicClient {
-    BasicClient::new(
-        ClientId::new(PSST_CLIENT_ID.to_string()),
-        None,
-        AuthUrl::new("https://accounts.spotify.com/authorize".to_string()).unwrap(),
-        Some(TokenUrl::new("https://accounts.spotify.com/api/token".to_string()).unwrap()),
-    )
-    .set_redirect_uri(
-        RedirectUrl::new(webapi_redirect_uri(redirect_port)).expect("Invalid redirect URL"),
-    )
-}
-
 fn get_webapi_scopes() -> Vec<Scope> {
     WEBAPI_SCOPES
         .iter()
@@ -250,28 +229,40 @@ fn get_webapi_scopes() -> Vec<Scope> {
         .collect()
 }
 
-/// Generate the authorization URL for the Web API OAuth flow.
+/// Generate the authorization URL for any OAuth flow.
 /// Returns `(auth_url, pkce_verifier)`.
-pub fn generate_webapi_auth_url(redirect_port: u16) -> (String, PkceCodeVerifier) {
-    let client = create_webapi_oauth_client(redirect_port);
+pub fn generate_auth_url(
+    client_id: &str,
+    redirect_port: u16,
+    scopes: &[Scope],
+) -> (String, PkceCodeVerifier) {
+    let client = create_oauth_client(client_id, redirect_port);
     let (pkce_challenge, pkce_verifier) = PkceCodeChallenge::new_random_sha256();
 
     let (auth_url, _) = client
         .authorize_url(CsrfToken::new_random)
-        .add_scopes(get_webapi_scopes())
+        .add_scopes(scopes.iter().cloned())
         .set_pkce_challenge(pkce_challenge)
         .url();
 
     (auth_url.to_string(), pkce_verifier)
 }
 
+/// Generate the authorization URL specifically for the Web API OAuth flow.
+/// Returns `(auth_url, pkce_verifier)`.
+pub fn generate_webapi_auth_url(client_id: &str, redirect_port: u16) -> (String, PkceCodeVerifier) {
+    let scopes = get_webapi_scopes();
+    generate_auth_url(client_id, redirect_port, &scopes)
+}
+
 /// Exchange an authorization code for a full WebApiToken (including refresh token).
 pub fn exchange_webapi_code_for_token(
+    client_id: &str,
     redirect_port: u16,
     code: AuthorizationCode,
     pkce_verifier: PkceCodeVerifier,
 ) -> Result<WebApiToken, Error> {
-    let client = create_webapi_oauth_client(redirect_port);
+    let client = create_oauth_client(client_id, redirect_port);
 
     let token_response = client
         .exchange_code(code)
@@ -299,10 +290,13 @@ pub fn exchange_webapi_code_for_token(
 }
 
 /// Refresh a Web API token using a refresh token (no browser interaction needed).
-pub fn refresh_webapi_token(refresh_token_str: &str) -> Result<WebApiToken, Error> {
+pub fn refresh_webapi_token(
+    client_id: &str,
+    refresh_token_str: &str,
+) -> Result<WebApiToken, Error> {
     // For refresh, the redirect_port doesn't matter (no redirect happens),
     // but the client needs to be configured with the same redirect URI.
-    let client = create_webapi_oauth_client(8888);
+    let client = create_oauth_client(client_id, 8888);
 
     let refresh_token = RefreshToken::new(refresh_token_str.to_string());
 
@@ -333,126 +327,4 @@ pub fn refresh_webapi_token(refresh_token_str: &str) -> Result<WebApiToken, Erro
         refresh_token: Some(new_refresh_token),
         expires_at: now + expires_in,
     })
-}
-
-// ── Token persistence ──────────────────────────────────────────────────────
-
-const WEBAPI_TOKEN_FILENAME: &str = "webapi_token.json";
-
-fn webapi_token_path() -> Option<PathBuf> {
-    platform_dirs::AppDirs::new(Some("Psst"), false)
-        .map(|dirs| dirs.config_dir.join(WEBAPI_TOKEN_FILENAME))
-}
-
-/// Save a Web API token to disk.
-pub fn save_webapi_token(token: &WebApiToken) -> Result<(), Error> {
-    let path = webapi_token_path()
-        .ok_or_else(|| Error::OAuthError("Cannot determine config directory".to_string()))?;
-
-    // Ensure the directory exists
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(Error::IoError)?;
-    }
-
-    let json = serde_json::to_string_pretty(token)
-        .map_err(|e| Error::OAuthError(format!("Failed to serialize token: {e}")))?;
-
-    #[cfg(target_family = "unix")]
-    {
-        use std::os::unix::fs::OpenOptionsExt;
-        let file = fs::OpenOptions::new()
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .mode(0o600)
-            .open(&path)
-            .map_err(Error::IoError)?;
-        use std::io::Write as _;
-        let mut writer = std::io::BufWriter::new(file);
-        writer.write_all(json.as_bytes()).map_err(Error::IoError)?;
-    }
-
-    #[cfg(not(target_family = "unix"))]
-    {
-        fs::write(&path, json).map_err(Error::IoError)?;
-    }
-
-    log::info!("saved Web API token to {:?}", path);
-    Ok(())
-}
-
-/// Load a Web API token from disk.
-pub fn load_webapi_token() -> Option<WebApiToken> {
-    let path = webapi_token_path()?;
-    let json = fs::read_to_string(&path).ok()?;
-    serde_json::from_str(&json).ok()
-}
-
-/// Delete the cached Web API token from disk.
-pub fn delete_webapi_token() {
-    if let Some(path) = webapi_token_path() {
-        let _ = fs::remove_file(path);
-    }
-}
-
-/// Try to get a valid Web API access token from disk cache, refreshing if needed.
-///
-/// Returns `Ok(token)` if successful.
-/// Returns `Err(...)` if no cached token exists or refresh failed — caller should
-/// trigger a full browser-based OAuth flow.
-pub fn get_or_refresh_webapi_token() -> Result<WebApiToken, Error> {
-    if let Some(token) = load_webapi_token() {
-        if !token.is_expired() {
-            return Ok(token);
-        }
-
-        // Token is expired, try to refresh
-        if let Some(ref refresh_token) = token.refresh_token {
-            log::info!("Web API token expired, attempting refresh...");
-            match refresh_webapi_token(refresh_token) {
-                Ok(new_token) => {
-                    if let Err(e) = save_webapi_token(&new_token) {
-                        log::warn!("Failed to save refreshed Web API token: {e}");
-                    }
-                    return Ok(new_token);
-                }
-                Err(e) => {
-                    log::error!("Failed to refresh Web API token: {e}");
-                    // Fall through to error below
-                }
-            }
-        }
-    }
-
-    Err(Error::OAuthError(
-        "No valid Web API token available. Browser-based authentication required.".to_string(),
-    ))
-}
-
-/// Perform the full Web API OAuth flow: open browser, wait for callback, exchange code.
-/// This is a blocking call that waits for the user to complete the browser flow.
-///
-/// Returns the new `WebApiToken` and saves it to disk.
-pub fn perform_webapi_oauth_flow(redirect_port: u16) -> Result<WebApiToken, Error> {
-    let (auth_url, pkce_verifier) = generate_webapi_auth_url(redirect_port);
-
-    // Open the browser
-    if open::that(&auth_url).is_err() {
-        return Err(Error::OAuthError(
-            "Failed to open browser for Web API authentication".to_string(),
-        ));
-    }
-
-    // Listen for the callback
-    let socket_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), redirect_port);
-    let code = get_authcode_listener(socket_addr, Duration::from_secs(300))?;
-
-    // Exchange code for token
-    let token = exchange_webapi_code_for_token(redirect_port, code, pkce_verifier)?;
-
-    // Save to disk
-    save_webapi_token(&token)?;
-
-    log::info!("Web API OAuth flow completed successfully");
-    Ok(token)
 }

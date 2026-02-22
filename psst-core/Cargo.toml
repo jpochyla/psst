@@ -19,9 +19,7 @@ log = { version = "0.4.22" }
 num-bigint = { version = "0.4.6", features = ["rand"] }
 num-traits = { version = "0.2.19" }
 oauth2 = { version = "4.4.2" }
-open = { version = "5.3.2" }
 parking_lot = { version = "0.12.3" }
-platform-dirs = { version = "0.3.0" }
 librespot-protocol = "0.7.1"
 protobuf = "3"
 sysinfo = "0.35.0"
