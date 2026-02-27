@@ -15,14 +15,14 @@ use url::Url;
 
 use crate::session::access_token::WEBAPI_SCOPES;
 
-// ── Callback listener (shared by all OAuth flows) ──────────────────────────
-
 pub fn listen_for_callback_parameter(
     socket_address: SocketAddr,
     timeout: Duration,
     parameter_name: &'static str,
 ) -> Result<String, Error> {
-    log::info!("starting callback listener for '{parameter_name}' on {socket_address:?}",);
+    log::info!(
+        "starting callback listener for '{parameter_name}' on {socket_address:?}",
+    );
 
     // Create a simpler, linear flow
     // 1. Bind the listener
@@ -151,24 +151,18 @@ pub fn send_success_response(stream: &mut TcpStream) {
     let _ = stream.write_all(response.as_bytes());
 }
 
-// ── Shared OAuth helpers ───────────────────────────────────────────────────
-
-fn redirect_uri(redirect_port: u16) -> String {
-    let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), redirect_port);
-    format!("http://{addr}/login")
-}
-
 fn create_oauth_client(client_id: &str, redirect_port: u16) -> BasicClient {
+    let redirect_address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), redirect_port);
+    let redirect_uri = format!("http://{redirect_address}/login");
+
     BasicClient::new(
         ClientId::new(client_id.to_string()),
         None,
         AuthUrl::new("https://accounts.spotify.com/authorize".to_string()).unwrap(),
         Some(TokenUrl::new("https://accounts.spotify.com/api/token".to_string()).unwrap()),
     )
-    .set_redirect_uri(RedirectUrl::new(redirect_uri(redirect_port)).expect("Invalid redirect URL"))
+    .set_redirect_uri(RedirectUrl::new(redirect_uri).expect("Invalid redirect URL"))
 }
-
-// ── Session OAuth (official Spotify Client ID, for Shannon session) ────────
 
 pub fn generate_session_auth_url(redirect_port: u16) -> (String, PkceCodeVerifier) {
     let client_id = crate::session::access_token::CLIENT_ID;
@@ -199,8 +193,6 @@ fn get_session_scopes() -> Vec<Scope> {
         .map(|s| Scope::new(s.trim().to_string()))
         .collect()
 }
-
-// ── Web API OAuth (user-provided Client ID) ────────────────────────────────
 
 /// Token for Web API calls, serializable to/from disk.
 #[derive(Clone, Debug, Serialize, Deserialize)]

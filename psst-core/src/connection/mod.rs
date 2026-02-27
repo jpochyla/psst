@@ -436,7 +436,7 @@ fn compute_keys(
 
 fn client_response_encrypted(credentials: Credentials) -> ShannonMsg {
     use librespot_protocol::authentication::{
-        ClientResponseEncrypted, CpuFamily, LoginCredentials, Os, SystemInfo,
+        ClientResponseEncrypted, LoginCredentials, SystemInfo, Os, CpuFamily
     };
 
     let response = ClientResponseEncrypted {
