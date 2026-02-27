@@ -1,7 +1,8 @@
 // Ported from librespot
 
 use crate::error::Error;
-use crate::session::token::{Token};
+use crate::session::token::Token;
+use crate::system_info::{CLIENT_ID, DEVICE_ID, OS, SPOTIFY_SEMANTIC_VERSION};
 use crate::util::{default_ureq_agent_builder, solve_hash_cash};
 use data_encoding::HEXUPPER_PERMISSIVE;
 use librespot_protocol::clienttoken_http::{
@@ -10,8 +11,10 @@ use librespot_protocol::clienttoken_http::{
 };
 use parking_lot::Mutex;
 use protobuf::{Enum, Message};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
-use crate::system_info::{CLIENT_ID, DEVICE_ID, OS, SPOTIFY_SEMANTIC_VERSION};
+
+pub type ClientTokenProviderHandle = Arc<ClientTokenProvider>;
 
 pub struct ClientTokenProvider {
     token: Mutex<Option<Token>>,
@@ -24,6 +27,10 @@ impl ClientTokenProvider {
             token: Mutex::new(None),
             agent: default_ureq_agent_builder(proxy_url).build().into(),
         }
+    }
+
+    pub fn new_shared(proxy_url: Option<&str>) -> ClientTokenProviderHandle {
+        Arc::new(Self::new(proxy_url))
     }
 
     fn request<M: Message>(&self, message: &M) -> Result<Vec<u8>, Error> {
