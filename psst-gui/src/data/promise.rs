@@ -6,17 +6,9 @@ use crate::error::Error;
 pub enum Promise<T: Data, D: Data = (), E: Data = Error> {
     #[default]
     Empty,
-    Deferred {
-        def: D,
-    },
-    Resolved {
-        def: D,
-        val: T,
-    },
-    Rejected {
-        def: D,
-        err: E,
-    },
+    Deferred { def: D },
+    Resolved { def: D, val: T },
+    Rejected { def: D, err: E },
 }
 
 #[derive(Eq, PartialEq, Debug)]
@@ -120,3 +112,5 @@ impl<D: Data + Default, T: Data, E: Data> Promise<T, D, E> {
         *self = Self::Deferred { def: D::default() };
     }
 }
+
+
