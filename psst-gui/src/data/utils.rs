@@ -42,11 +42,22 @@ impl<T: Data> Cached<T> {
 }
 
 #[derive(Deserialize)]
+#[serde(bound(deserialize = "T: Clone + Deserialize<'de>"))]
 pub struct Page<T: Clone> {
+    #[serde(deserialize_with = "deserialize_page_items_skip_nulls")]
     pub items: Vector<T>,
     pub limit: usize,
     pub offset: usize,
     pub total: usize,
+}
+
+fn deserialize_page_items_skip_nulls<'de, D, T>(deserializer: D) -> Result<Vector<T>, D::Error>
+where
+    D: Deserializer<'de>,
+    T: Clone + Deserialize<'de>,
+{
+    let items = Vec::<Option<T>>::deserialize(deserializer)?;
+    Ok(items.into_iter().flatten().collect())
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Data, Deserialize, Serialize)]
