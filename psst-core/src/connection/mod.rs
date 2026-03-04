@@ -133,6 +133,31 @@ impl Transport {
         }
     }
 
+    /// Resolve spclient access points from Spotify's AP resolver.
+    /// These are used for storage-resolve (audio file URL resolution) instead of
+    /// the rate-limited `api.spotify.com`.
+    pub fn resolve_spclient(proxy_url: Option<&str>) -> Result<Vec<String>, Error> {
+        #[derive(Clone, Debug, Deserialize)]
+        struct SpClientResolveData {
+            spclient: Vec<String>,
+        }
+
+        let url = format!("{AP_RESOLVE_ENDPOINT}/?type=spclient");
+        let agent: ureq::Agent = default_ureq_agent_builder(proxy_url).build().into();
+        log::info!("requesting spclient list from {url}");
+        let data: SpClientResolveData = agent.get(&url).call()?.into_body().read_json()?;
+        if data.spclient.is_empty() {
+            log::warn!("received empty spclient list from server");
+            Err(Error::UnexpectedResponse)
+        } else {
+            log::info!(
+                "received {} spclient endpoints from server",
+                data.spclient.len()
+            );
+            Ok(data.spclient)
+        }
+    }
+
     pub fn connect(ap_list: &[String], proxy_url: Option<&str>) -> Result<Self, Error> {
         log::info!(
             "attempting to connect using {} access points",

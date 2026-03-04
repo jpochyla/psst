@@ -1,7 +1,7 @@
 // Ported from librespot
 
 use crate::error::Error;
-use crate::session::client_token::ClientTokenProvider;
+use crate::session::client_token::{ClientTokenProvider, ClientTokenProviderHandle};
 use crate::session::token::Token;
 use crate::session::SessionService;
 use crate::system_info::{CLIENT_ID, DEVICE_ID};
@@ -78,7 +78,7 @@ impl From<Login5Error> for Error {
 
 pub struct Login5 {
     auth_token: Mutex<Option<Token>>,
-    client_token_provider: ClientTokenProvider,
+    client_token_provider: ClientTokenProviderHandle,
     agent: ureq::Agent,
 }
 
@@ -87,18 +87,18 @@ impl Login5 {
     ///
     /// # Arguments
     ///
-    /// * `client_token_provider`: Can be optionally injected to control which client-id is
-    ///   used for it.
+    /// * `client_token_provider`: Can be optionally injected to share a `ClientTokenProvider`
+    ///   instance with other components (e.g. `Cdn`), avoiding redundant round-trips.
     ///
     /// returns: Login5
     pub fn new(
-        client_token_provider: Option<ClientTokenProvider>,
+        client_token_provider: Option<ClientTokenProviderHandle>,
         proxy_url: Option<&str>,
     ) -> Self {
         Self {
             auth_token: Mutex::new(None),
             client_token_provider: client_token_provider
-                .unwrap_or_else(|| ClientTokenProvider::new(proxy_url)),
+                .unwrap_or_else(|| ClientTokenProvider::new_shared(proxy_url)),
             agent: default_ureq_agent_builder(proxy_url).build().into(),
         }
     }

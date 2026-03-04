@@ -365,6 +365,45 @@ fn account_tab_widget(tab: AccountTab) -> impl Widget<AppState> {
             .with_spacer(theme::grid(2.0));
     }
 
+    // Web API Client ID input (shown when not logged in)
+    col = col.with_child(ViewSwitcher::new(
+        |data: &AppState, _| data.config.has_credentials(),
+        |is_logged_in, _, _| {
+            if *is_logged_in {
+                SizedBox::empty().boxed()
+            } else {
+                Flex::column()
+                    .cross_axis_alignment(CrossAxisAlignment::Start)
+                    .with_child(
+                        Label::new("Spotify Developer Client ID").with_font(theme::UI_FONT_MEDIUM),
+                    )
+                    .with_spacer(theme::grid(1.0))
+                    .with_child(
+                        Label::new(
+                            "Register at developer.spotify.com/dashboard and create an app. \
+                             Set the redirect URI to http://127.0.0.1:8888/login",
+                        )
+                        .with_text_color(theme::PLACEHOLDER_COLOR)
+                        .with_line_break_mode(LineBreaking::WordWrap),
+                    )
+                    .with_spacer(theme::grid(1.0))
+                    .with_child(
+                        TextBox::new()
+                            .with_placeholder("Paste your Client ID here")
+                            .fix_width(theme::grid(40.0))
+                            .lens(AppState::config.then(Config::webapi_client_id).map(
+                                |opt: &Option<String>| opt.clone().unwrap_or_default(),
+                                |opt: &mut Option<String>, val: String| {
+                                    *opt = if val.is_empty() { None } else { Some(val) };
+                                },
+                            )),
+                    )
+                    .with_spacer(theme::grid(2.0))
+                    .boxed()
+            }
+        },
+    ));
+
     // Spotify Login/Logout button
     col = col
         .with_child(ViewSwitcher::new(
@@ -561,19 +600,38 @@ impl Authenticate {
         Some(thread)
     }
 
-    // Helper method to simplify Spotify authentication flow
+    // Helper method to simplify Spotify authentication flow.
+    // Performs two back-to-back OAuth flows:
+    // 1. Shannon session OAuth (official Spotify Client ID) - for playback
+    // 2. Web API OAuth (user-provided Client ID) - for Web API calls
     fn start_spotify_auth(&mut self, ctx: &mut EventCtx, data: &mut AppState) {
+        // Validate that a Web API Client ID has been provided
+        let webapi_client_id = match data.config.webapi_client_id_value() {
+            Some(id) => id.to_string(),
+            None => {
+                data.preferences.auth.result.reject(
+                    (),
+                    "Please enter your Spotify Developer Client ID first.".to_string(),
+                );
+                return;
+            }
+        };
+
         // Set authentication to in-progress state
         data.preferences.auth.result.defer_default();
 
-        // Generate auth URL and store PKCE verifier
-        let (auth_url, pkce_verifier) = oauth::generate_auth_url(8888);
-        let config = data.preferences.auth.session_config(); // Keep config local
+        // Generate auth URL and store PKCE verifier for the first (session) OAuth
+        let (auth_url, pkce_verifier) = oauth::generate_session_auth_url(8888);
+        let config = data.preferences.auth.session_config();
+
+        // Clone client ID for use in the spawned thread
+        let client_id = webapi_client_id.clone();
 
         // Spawn authentication thread
         self.spotify_thread = Authenticate::spawn_auth_thread(
             ctx,
             move || {
+                // ── Step 1: Session OAuth (official Client ID) ──────────────
                 // Listen for authorization code
                 let code = oauth::get_authcode_listener(
                     SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8888),
@@ -582,16 +640,20 @@ impl Authenticate {
                 .map_err(|e| e.to_string())?;
 
                 // Exchange code for access token
-                let token = oauth::exchange_code_for_token(8888, code, pkce_verifier);
+                let token = oauth::exchange_session_code_for_token(8888, code, pkce_verifier);
 
                 // Try to authenticate with token, with retries
+                let mut credentials = None;
                 let mut retries = 3;
                 while retries > 0 {
                     match Authentication::authenticate_and_get_credentials(SessionConfig {
                         login_creds: Credentials::from_access_token(token.clone()),
                         ..config.clone()
                     }) {
-                        Ok(credentials) => return Ok(credentials),
+                        Ok(creds) => {
+                            credentials = Some(creds);
+                            break;
+                        }
                         Err(e) if retries > 1 => {
                             log::warn!("authentication failed, retrying: {e:?}");
                             retries -= 1;
@@ -599,16 +661,55 @@ impl Authenticate {
                         Err(e) => return Err(e),
                     }
                 }
-                Err("Authentication retries exceeded".to_string())
+                let credentials =
+                    credentials.ok_or_else(|| "Authentication retries exceeded".to_string())?;
+
+                // ── Step 2: Web API OAuth (user-provided Client ID) ────────
+                // This gives us a separate token for Web API calls, avoiding
+                // 429 rate-limit errors from Spotify's official Client ID.
+                log::info!("Session auth complete. Starting Web API OAuth flow...");
+                let (webapi_auth_url, webapi_pkce_verifier) =
+                    oauth::generate_webapi_auth_url(&client_id, 8888);
+
+                // Open browser for Web API OAuth
+                if open::that(&webapi_auth_url).is_err() {
+                    log::warn!("Failed to open browser for Web API OAuth (non-fatal)");
+                    return Ok((credentials, None));
+                }
+
+                // Listen for the callback
+                let socket_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8888);
+                match oauth::get_authcode_listener(socket_addr, Duration::from_secs(300)) {
+                    Ok(code) => {
+                        match oauth::exchange_webapi_code_for_token(
+                            &client_id,
+                            8888,
+                            code,
+                            webapi_pkce_verifier,
+                        ) {
+                            Ok(webapi_token) => {
+                                log::info!("Web API OAuth flow completed successfully");
+                                Ok((credentials, Some(webapi_token)))
+                            }
+                            Err(e) => {
+                                log::warn!("Web API token exchange failed (non-fatal): {e}");
+                                Ok((credentials, None))
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        log::warn!("Web API OAuth callback failed (non-fatal): {e}");
+                        Ok((credentials, None))
+                    }
+                }
             },
             Self::SPOTIFY_RESPONSE,
             self.spotify_thread.take(),
         );
 
-        // Open browser with authorization URL
+        // Open browser with authorization URL (for the first/session OAuth)
         if open::that(&auth_url).is_err() {
             data.error_alert("Failed to open browser");
-            // Resolve the promise with an error immediately
             data.preferences
                 .auth
                 .result
@@ -620,8 +721,9 @@ impl Authenticate {
 impl Authenticate {
     pub const SPOTIFY_REQUEST: Selector =
         Selector::new("app.preferences.spotify.authenticate-request");
-    pub const SPOTIFY_RESPONSE: Selector<Result<Credentials, String>> =
-        Selector::new("app.preferences.spotify.authenticate-response");
+    pub const SPOTIFY_RESPONSE: Selector<
+        Result<(Credentials, Option<psst_core::oauth::WebApiToken>), String>,
+    > = Selector::new("app.preferences.spotify.authenticate-response");
 
     // Selector for initializing fields
     pub const INITIALIZE_LASTFM_FIELDS: Selector =
@@ -657,6 +759,7 @@ impl<W: Widget<AppState>> Controller<AppState, W> for Authenticate {
             }
             Event::Command(cmd) if cmd.is(cmd::LOG_OUT) => {
                 data.config.clear_credentials();
+                data.config.clear_webapi_token();
                 data.config.save();
                 data.session.shutdown();
                 ctx.submit_command(cmd::CLOSE_ALL_WINDOWS);
@@ -714,13 +817,22 @@ impl<W: Widget<AppState>> Controller<AppState, W> for Authenticate {
             Event::Command(cmd) if cmd.is(Self::SPOTIFY_RESPONSE) => {
                 let result = cmd.get_unchecked(Self::SPOTIFY_RESPONSE);
                 match result {
-                    Ok(credentials) => {
+                    Ok((credentials, webapi_token)) => {
                         // Update session config with the new credentials
                         data.session.update_config(SessionConfig {
                             login_creds: credentials.clone(),
                             proxy_url: Config::proxy(),
                         });
                         data.config.store_credentials(credentials.clone());
+                        // Store Web API token if we got one
+                        if let Some(token) = webapi_token {
+                            data.config.store_webapi_token(token.clone());
+                            // Seed the global WebApi with the new credentials
+                            crate::webapi::WebApi::global().set_webapi_credentials(
+                                data.config.webapi_client_id_value().map(String::from),
+                                Some(token.clone()),
+                            );
+                        }
                         data.config.save();
                         data.preferences.auth.result.resolve((), ());
                         // Handle UI flow based on tab type

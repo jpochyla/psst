@@ -13,6 +13,7 @@ use platform_dirs::AppDirs;
 use psst_core::{
     cache::{mkdir_if_not_exists, CacheHandle},
     connection::Credentials,
+    oauth::{self, WebApiToken},
     player::PlaybackConfig,
     session::{SessionConfig, SessionConnection},
 };
@@ -126,6 +127,12 @@ pub struct Config {
     pub lastfm_api_key: Option<String>,
     pub lastfm_api_secret: Option<String>,
     pub lastfm_enable: bool,
+    /// User-provided Spotify Developer Client ID for Web API calls.
+    /// Register one at https://developer.spotify.com/dashboard
+    pub webapi_client_id: Option<String>,
+    /// Cached Web API OAuth token (access + refresh + expiry).
+    #[data(ignore)]
+    webapi_token: Option<WebApiToken>,
 }
 
 impl Default for Config {
@@ -148,6 +155,8 @@ impl Default for Config {
             lastfm_api_key: None,
             lastfm_api_secret: None,
             lastfm_enable: false,
+            webapi_client_id: None,
+            webapi_token: None,
         }
     }
 }
@@ -229,6 +238,50 @@ impl Config {
             login_creds: self.credentials.clone().expect("Missing credentials"),
             proxy_url: Config::proxy(),
         }
+    }
+
+    pub fn webapi_client_id_value(&self) -> Option<&str> {
+        self.webapi_client_id.as_deref().filter(|s| !s.is_empty())
+    }
+
+    pub fn store_webapi_token(&mut self, token: WebApiToken) {
+        self.webapi_token = Some(token);
+    }
+
+    pub fn clear_webapi_token(&mut self) {
+        self.webapi_token = None;
+    }
+
+    /// Try to get a valid Web API access token, refreshing if expired.
+    /// Returns `Ok(token)` if successful, `Err(...)` if no token or refresh fails.
+    pub fn get_or_refresh_webapi_token(&mut self) -> Result<WebApiToken, String> {
+        let client_id = self
+            .webapi_client_id_value()
+            .ok_or_else(|| "No Web API Client ID configured".to_string())?
+            .to_string();
+
+        if let Some(ref token) = self.webapi_token {
+            if !token.is_expired() {
+                return Ok(token.clone());
+            }
+
+            // Token is expired, try to refresh
+            if let Some(ref refresh_token) = token.refresh_token {
+                log::info!("Web API token expired, attempting refresh...");
+                match oauth::refresh_webapi_token(&client_id, refresh_token) {
+                    Ok(new_token) => {
+                        self.webapi_token = Some(new_token.clone());
+                        self.save();
+                        return Ok(new_token);
+                    }
+                    Err(e) => {
+                        log::error!("Failed to refresh Web API token: {e}");
+                    }
+                }
+            }
+        }
+
+        Err("No valid Web API token available. Browser-based authentication required.".to_string())
     }
 
     pub fn playback(&self) -> PlaybackConfig {
