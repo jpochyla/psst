@@ -111,51 +111,58 @@ impl Transport {
         }
     }
 
+    fn resolve_json_list<T, F>(
+        endpoint: &str,
+        proxy_url: Option<&str>,
+        extract: F,
+        name: &str,
+    ) -> Result<Vec<String>, Error>
+    where
+        T: serde::de::DeserializeOwned,
+        F: FnOnce(&T) -> &[String],
+    {
+        let agent: ureq::Agent = default_ureq_agent_builder(proxy_url).build().into();
+        log::info!("requesting {name} list from {endpoint}");
+        let data: T = agent.get(endpoint).call()?.into_body().read_json()?;
+        let list = extract(&data);
+        if list.is_empty() {
+            log::warn!("received empty {name} list from server");
+            Err(Error::UnexpectedResponse)
+        } else {
+            log::info!("received {} {name} entries from server", list.len());
+            Ok(list.to_vec())
+        }
+    }
+
     pub fn resolve_ap(proxy_url: Option<&str>) -> Result<Vec<String>, Error> {
-        #[derive(Clone, Debug, Deserialize)]
+        #[derive(Deserialize)]
         struct APResolveData {
             ap_list: Vec<String>,
         }
 
-        let agent: ureq::Agent = default_ureq_agent_builder(proxy_url).build().into();
-        log::info!("requesting AP list from {AP_RESOLVE_ENDPOINT}");
-        let data: APResolveData = agent
-            .get(AP_RESOLVE_ENDPOINT)
-            .call()?
-            .into_body()
-            .read_json()?;
-        if data.ap_list.is_empty() {
-            log::warn!("received empty AP list from server");
-            Err(Error::UnexpectedResponse)
-        } else {
-            log::info!("received {} APs from server", data.ap_list.len());
-            Ok(data.ap_list)
-        }
+        Self::resolve_json_list(
+            AP_RESOLVE_ENDPOINT,
+            proxy_url,
+            |data: &APResolveData| &data.ap_list,
+            "AP",
+        )
     }
 
     /// Resolve spclient access points from Spotify's AP resolver.
     /// These are used for storage-resolve (audio file URL resolution) instead of
     /// the rate-limited `api.spotify.com`.
     pub fn resolve_spclient(proxy_url: Option<&str>) -> Result<Vec<String>, Error> {
-        #[derive(Clone, Debug, Deserialize)]
+        #[derive(Deserialize)]
         struct SpClientResolveData {
             spclient: Vec<String>,
         }
 
-        let url = format!("{AP_RESOLVE_ENDPOINT}/?type=spclient");
-        let agent: ureq::Agent = default_ureq_agent_builder(proxy_url).build().into();
-        log::info!("requesting spclient list from {url}");
-        let data: SpClientResolveData = agent.get(&url).call()?.into_body().read_json()?;
-        if data.spclient.is_empty() {
-            log::warn!("received empty spclient list from server");
-            Err(Error::UnexpectedResponse)
-        } else {
-            log::info!(
-                "received {} spclient endpoints from server",
-                data.spclient.len()
-            );
-            Ok(data.spclient)
-        }
+        Self::resolve_json_list(
+            &format!("{AP_RESOLVE_ENDPOINT}/?type=spclient"),
+            proxy_url,
+            |data: &SpClientResolveData| &data.spclient,
+            "spclient",
+        )
     }
 
     pub fn connect(ap_list: &[String], proxy_url: Option<&str>) -> Result<Self, Error> {
