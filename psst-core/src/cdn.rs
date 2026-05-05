@@ -4,15 +4,21 @@ use std::{
     time::{Duration, Instant},
 };
 
-use serde::Deserialize;
+use librespot_protocol::storage_resolve::StorageResolveResponse;
+use parking_lot::Mutex;
+use protobuf::Message;
 
 use crate::{
+    connection::Transport,
     error::Error,
     item_id::FileId,
-    session::{SessionService},
+    session::{
+        client_token::{ClientTokenProvider, ClientTokenProviderHandle},
+        login5::Login5,
+        SessionService,
+    },
     util::default_ureq_agent_builder,
 };
-use crate::session::login5::Login5;
 
 pub type CdnHandle = Arc<Cdn>;
 
@@ -20,50 +26,74 @@ pub struct Cdn {
     session: SessionService,
     agent: ureq::Agent,
     login5: Login5,
+    client_token_provider: ClientTokenProviderHandle,
+    spclient_base: Mutex<Option<String>>,
+    proxy_url: Option<String>,
 }
 
 impl Cdn {
     pub fn new(session: SessionService, proxy_url: Option<&str>) -> Result<CdnHandle, Error> {
         let agent = default_ureq_agent_builder(proxy_url).build();
+        // Share a single ClientTokenProvider between Login5 and Cdn to avoid
+        // redundant round-trips to the client token API.
+        let client_token_provider = ClientTokenProvider::new_shared(proxy_url);
         Ok(Arc::new(Self {
             session,
             agent: agent.into(),
-            login5: Login5::new(None, proxy_url),
+            login5: Login5::new(Some(Arc::clone(&client_token_provider)), proxy_url),
+            client_token_provider,
+            spclient_base: Mutex::new(None),
+            proxy_url: proxy_url.map(String::from),
         }))
     }
 
+    /// Resolve and cache the spclient base URL (e.g. "https://gew1-spclient.spotify.com:443").
+    fn get_spclient_base(&self) -> Result<String, Error> {
+        let mut cached = self.spclient_base.lock();
+        if let Some(ref url) = *cached {
+            return Ok(url.clone());
+        }
+        let hosts = Transport::resolve_spclient(self.proxy_url.as_deref())?;
+        let host = hosts.first().ok_or(Error::UnexpectedResponse)?;
+        let base = format!("https://{host}");
+        log::info!("using spclient base URL: {base}");
+        *cached = Some(base.clone());
+        Ok(base)
+    }
+
     pub fn resolve_audio_file_url(&self, id: FileId) -> Result<CdnUrl, Error> {
+        let spclient_base = self.get_spclient_base()?;
+        // The spclient endpoint returns protobuf natively and does not require
+        // the query parameters that the old api.spotify.com/v1/storage-resolve
+        // JSON endpoint needed (?alt=json&version=10000000&product=9&platform=39).
+        // This matches librespot's implementation.
         let locations_uri = format!(
-            "https://api.spotify.com/v1/storage-resolve/files/audio/interactive/{}",
+            "{spclient_base}/storage-resolve/files/audio/interactive/{}",
             id.to_base16()
         );
         let access_token = self.login5.get_access_token(&self.session)?;
-        let response = self
+        let client_token = self.client_token_provider.get()?;
+        let mut response = self
             .agent
             .get(&locations_uri)
-            .query("version", "10000000")
-            .query("product", "9")
-            .query("platform", "39")
-            .query("alt", "json")
-            .header("Authorization", &format!("Bearer {}", access_token.access_token))
+            .header(
+                "Authorization",
+                &format!("Bearer {}", access_token.access_token),
+            )
+            .header("client-token", &client_token)
             .call()?;
 
-        #[derive(Deserialize)]
-        struct AudioFileLocations {
-            cdnurl: Vec<String>,
-        }
+        // Parse the protobuf StorageResolveResponse.
+        let bytes = response.body_mut().read_to_vec()?;
+        let msg = StorageResolveResponse::parse_from_bytes(&bytes)
+            .map_err(|e| Error::AudioFetchingError(Box::new(e)))?;
 
-        // Deserialize the response and pick a file URL from the returned CDN list.
-        let locations: AudioFileLocations = response.into_body().read_json()?;
-        let file_uri = locations
+        // Pick a file URL from the returned CDN list.
+        let file_uri = msg
             .cdnurl
             .into_iter()
-            // TODO:
-            //  Now, we always pick the first URL in the list, figure out a better strategy.
-            //  Choosing by random seems wrong.
             .next()
-            // TODO: Avoid panicking here.
-            .expect("No file URI found");
+            .ok_or(Error::UnexpectedResponse)?;
 
         let uri = CdnUrl::new(file_uri);
         Ok(uri)
