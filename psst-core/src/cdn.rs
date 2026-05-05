@@ -40,7 +40,7 @@ impl Cdn {
         Ok(Arc::new(Self {
             session,
             agent: agent.into(),
-            login5: Login5::new(Some(client_token_provider.clone()), proxy_url),
+            login5: Login5::new(Some(Arc::clone(&client_token_provider)), proxy_url),
             client_token_provider,
             spclient_base: Mutex::new(None),
             proxy_url: proxy_url.map(String::from),
