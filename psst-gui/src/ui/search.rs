@@ -20,7 +20,7 @@ use crate::{
 use super::{album, artist, playable, playlist, theme, track, utils};
 
 const NUMBER_OF_RESULTS_PER_TOPIC: usize = 5;
-const INDIVIDUAL_TOPIC_RESULTS_LIMIT: usize = 50;
+const INDIVIDUAL_TOPIC_RESULTS_LIMIT: usize = 10;
 
 pub const LOAD_RESULTS: Selector<(Arc<str>, Option<SearchTopic>)> =
     Selector::new("app.search.load-results");

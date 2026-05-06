@@ -9,8 +9,8 @@ use druid::{
 use crate::{
     cmd,
     data::{
-        AppState, Artist, ArtistAlbums, ArtistDetail, ArtistInfo, ArtistLink, ArtistTracks, Cached,
-        Ctx, Nav, WithCtx,
+        AppState, Artist, ArtistAlbums, ArtistDetail, ArtistInfo, ArtistLink, Cached, Ctx, Nav,
+        WithCtx,
     },
     ui::utils::{stat_row, InfoLayout},
     webapi::WebApi,
@@ -18,7 +18,7 @@ use crate::{
 };
 
 use super::{
-    album, playable, theme, track,
+    album, theme,
     utils::{self},
 };
 
@@ -27,37 +27,8 @@ pub const LOAD_DETAIL: Selector<ArtistLink> = Selector::new("app.artist.load-det
 pub fn detail_widget() -> impl Widget<AppState> {
     Flex::column()
         .with_child(async_artist_info().padding((theme::grid(1.0), 0.0)))
-        .with_child(async_top_tracks_widget())
         .with_child(async_albums_widget().padding((theme::grid(1.0), 0.0)))
         .with_child(async_related_widget().padding((theme::grid(1.0), 0.0)))
-}
-
-fn async_top_tracks_widget() -> impl Widget<AppState> {
-    Async::new(
-        utils::spinner_widget,
-        top_tracks_widget,
-        utils::error_widget,
-    )
-    .lens(
-        Ctx::make(
-            AppState::common_ctx,
-            AppState::artist_detail.then(ArtistDetail::top_tracks),
-        )
-        .then(Ctx::in_promise()),
-    )
-    .on_command_async(
-        LOAD_DETAIL,
-        |d| WebApi::global().get_artist_top_tracks(&d.id),
-        |_, data, d| data.artist_detail.top_tracks.defer(d),
-        |_, data, (d, r)| {
-            let r = r.map(|tracks| ArtistTracks {
-                id: d.id.clone(),
-                name: d.name.clone(),
-                tracks,
-            });
-            data.artist_detail.top_tracks.update((d, r))
-        },
-    )
 }
 
 fn async_albums_widget() -> impl Widget<AppState> {
@@ -215,18 +186,6 @@ fn artist_info_widget() -> impl Widget<WithCtx<ArtistInfo>> {
         )
         .context_menu(|artist| artist_info_menu(&artist.data))
         .padding((0.0, theme::grid(1.0))) // Keep overall vertical padding
-}
-
-fn top_tracks_widget() -> impl Widget<WithCtx<ArtistTracks>> {
-    playable::list_widget(playable::Display {
-        track: track::Display {
-            title: true,
-            album: true,
-            popularity: true,
-            cover: true,
-            ..track::Display::empty()
-        },
-    })
 }
 
 fn albums_widget() -> impl Widget<WithCtx<ArtistAlbums>> {

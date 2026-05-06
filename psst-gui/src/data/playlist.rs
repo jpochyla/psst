@@ -32,8 +32,10 @@ pub struct Playlist {
     pub images: Option<Vector<Image>>,
     #[serde(deserialize_with = "deserialize_description")]
     pub description: Arc<str>,
-    #[serde(rename = "tracks")]
+    #[serde(rename = "items")]
+    #[serde(alias = "tracks")]
     #[serde(deserialize_with = "deserialize_track_count")]
+    #[serde(default)]
     pub track_count: Option<usize>,
     pub owner: PublicUser,
     pub collaborative: bool,

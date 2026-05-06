@@ -6,8 +6,7 @@ use psst_core::item_id::ItemId;
 use serde::{Deserialize, Serialize};
 
 use super::{
-    AlbumLink, ArtistLink, Episode, Library, Nav, PlaylistLink, RecommendationsRequest, ShowLink,
-    Track,
+    AlbumLink, Episode, Library, Nav, PlaylistLink, RecommendationsRequest, ShowLink, Track,
 };
 
 #[derive(Clone, Data, Lens)]
@@ -145,7 +144,6 @@ pub enum PlaybackOrigin {
     Home,
     Library,
     Album(AlbumLink),
-    Artist(ArtistLink),
     Playlist(PlaylistLink),
     Show(ShowLink),
     Search(Arc<str>),
@@ -158,7 +156,6 @@ impl PlaybackOrigin {
             PlaybackOrigin::Home => Nav::Home,
             PlaybackOrigin::Library => Nav::SavedTracks,
             PlaybackOrigin::Album(link) => Nav::AlbumDetail(link.clone(), None),
-            PlaybackOrigin::Artist(link) => Nav::ArtistDetail(link.clone()),
             PlaybackOrigin::Playlist(link) => Nav::PlaylistDetail(link.clone()),
             PlaybackOrigin::Show(link) => Nav::ShowDetail(link.clone()),
             PlaybackOrigin::Search(query) => Nav::SearchResults(query.clone()),
@@ -173,7 +170,6 @@ impl fmt::Display for PlaybackOrigin {
             PlaybackOrigin::Home => f.write_str("Home"),
             PlaybackOrigin::Library => f.write_str("Saved Tracks"),
             PlaybackOrigin::Album(link) => link.name.fmt(f),
-            PlaybackOrigin::Artist(link) => link.name.fmt(f),
             PlaybackOrigin::Playlist(link) => link.name.fmt(f),
             PlaybackOrigin::Show(link) => link.name.fmt(f),
             PlaybackOrigin::Search(query) => query.fmt(f),
