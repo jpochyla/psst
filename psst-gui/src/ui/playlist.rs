@@ -3,7 +3,7 @@ use std::{cell::RefCell, cmp::Ordering, rc::Rc, sync::Arc};
 use druid::{
     im::Vector,
     widget::{Button, Either, Flex, Label, LensWrap, LineBreaking, List, TextBox},
-    Insets, Lens, LensExt, LocalizedString, Menu, MenuItem, Selector, Size, UnitPoint, Widget,
+    Lens, LensExt, LocalizedString, Menu, MenuItem, Selector, Size, UnitPoint, Widget,
     WidgetExt, WindowDesc,
 };
 use itertools::Itertools;
@@ -18,7 +18,7 @@ use crate::{
     error::Error,
     ui::menu,
     webapi::WebApi,
-    widget::{Async, Empty, MyWidgetExt, RemoteImage, ThemeScope},
+    widget::{icons, Async, Empty, MyWidgetExt, RemoteImage, ThemeScope},
 };
 
 use super::{playable, theme, track, utils};
@@ -47,21 +47,7 @@ pub fn list_widget() -> impl Widget<AppState> {
     Async::new(
         utils::spinner_widget,
         || {
-            List::new(|| {
-                Label::raw()
-                    .with_line_break_mode(LineBreaking::WordWrap)
-                    .with_text_size(theme::TEXT_SIZE_SMALL)
-                    .lens(Ctx::data().then(Playlist::name))
-                    .expand_width()
-                    .padding(Insets::uniform_xy(theme::grid(2.0), theme::grid(0.6)))
-                    .link()
-                    .on_left_click(|ctx, _, playlist, _| {
-                        ctx.submit_command(
-                            cmd::NAVIGATE.with(Nav::PlaylistDetail(playlist.data.link())),
-                        );
-                    })
-                    .context_menu(playlist_menu_ctx)
-            })
+            List::new(|| playlist_widget(false))
         },
         utils::error_widget,
     )
@@ -326,24 +312,54 @@ pub fn playlist_widget(horizontal: bool) -> impl Widget<WithCtx<Playlist>> {
         .with_line_break_mode(LineBreaking::Clip)
         .lens(Ctx::data().then(Playlist::name));
 
-    let playlist_description = Label::raw()
-        .with_line_break_mode(LineBreaking::WordWrap)
-        .with_text_color(theme::PLACEHOLDER_COLOR)
-        .with_text_size(theme::TEXT_SIZE_SMALL)
-        .lens(Ctx::data().then(Playlist::description));
-
-    let (playlist_name, playlist_description) = if horizontal {
-        (
-            playlist_name.fix_width(playlist_image_size).align_left(),
-            playlist_description
-                .fix_width(playlist_image_size)
-                .align_left(),
-        )
+    let text_content = if horizontal {
+        let name_widget = playlist_name.fix_width(playlist_image_size).align_left();
+        let description_widget = Label::raw()
+            .with_line_break_mode(LineBreaking::WordWrap)
+            .with_text_color(theme::PLACEHOLDER_COLOR)
+            .with_text_size(theme::TEXT_SIZE_SMALL)
+            .lens(Ctx::data().then(Playlist::description))
+            .fix_width(playlist_image_size)
+            .align_left();
+        
+        Either::new(
+            |ctx: &WithCtx<Playlist>, _| !ctx.data.description.is_empty(),
+            Flex::column()
+                .with_child(name_widget)
+                .with_spacer(2.0)
+                .with_child(description_widget),
+            Flex::column()
+                .with_child(
+                    Label::raw()
+                        .with_line_break_mode(LineBreaking::WordWrap)
+                        .with_text_size(theme::TEXT_SIZE_NORMAL)
+                        .lens(Ctx::data().then(Playlist::name))
+                        .fix_width(playlist_image_size)
+                        .align_left()
+                )
+        ).boxed()
     } else {
-        (
-            playlist_name.align_left(),
-            playlist_description.align_left(),
-        )
+        let name_widget = playlist_name.align_left();
+        let description_widget = Label::raw()
+            .with_text_color(theme::PLACEHOLDER_COLOR)
+            .with_text_size(theme::TEXT_SIZE_SMALL)
+            .lens(Ctx::data().then(Playlist::description))
+            .align_left();
+            
+        Either::new(
+            |ctx: &WithCtx<Playlist>, _| !ctx.data.description.is_empty(),
+            Flex::column()
+                .with_child(name_widget)
+                .with_spacer(2.0)
+                .with_child(description_widget),
+            Flex::column()
+                .with_child(
+                    Label::raw()
+                        .with_text_size(theme::TEXT_SIZE_NORMAL)
+                        .lens(Ctx::data().then(Playlist::name))
+                )
+                .align_vertical(UnitPoint::CENTER)
+        ).boxed()
     };
 
     let playlist = if horizontal {
@@ -351,10 +367,7 @@ pub fn playlist_widget(horizontal: bool) -> impl Widget<WithCtx<Playlist>> {
             .with_child(playlist_image)
             .with_default_spacer()
             .with_child(
-                Flex::column()
-                    .with_child(playlist_name)
-                    .with_spacer(2.0)
-                    .with_child(playlist_description)
+                text_content
                     .align_horizontal(UnitPoint::CENTER)
                     .align_vertical(UnitPoint::TOP)
                     .fix_size(theme::grid(16.0), theme::grid(8.0)),
@@ -364,13 +377,7 @@ pub fn playlist_widget(horizontal: bool) -> impl Widget<WithCtx<Playlist>> {
         Flex::row()
             .with_child(playlist_image)
             .with_default_spacer()
-            .with_flex_child(
-                Flex::column()
-                    .with_child(playlist_name)
-                    .with_spacer(2.0)
-                    .with_child(playlist_description),
-                1.0,
-            )
+            .with_flex_child(text_content, 1.0)
             .padding(theme::grid(1.0))
     };
 
@@ -383,9 +390,18 @@ pub fn playlist_widget(horizontal: bool) -> impl Widget<WithCtx<Playlist>> {
         .context_menu(playlist_menu_ctx)
 }
 
+fn music_note_placeholder_widget(size: f64) -> impl Widget<Playlist> {
+    icons::MUSIC_NOTE
+        .scale((size * 0.6, size * 0.6))
+        .with_color(theme::PLACEHOLDER_COLOR)
+        .center()
+        .background(theme::BACKGROUND_DARK)
+        .fix_size(size, size)
+}
+
 fn cover_widget(size: f64) -> impl Widget<Playlist> {
     RemoteImage::new(
-        utils::placeholder_widget(),
+        music_note_placeholder_widget(size),
         move |playlist: &Playlist, _| playlist.image(size, size).map(|image| image.url.clone()),
     )
     .fix_size(size, size)
