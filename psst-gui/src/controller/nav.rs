@@ -47,7 +47,7 @@ impl NavController {
                 }
             }
             Nav::ArtistDetail(link) => {
-                if !data.artist_detail.top_tracks.contains(link) {
+                if !data.artist_detail.artist.contains(link) {
                     ctx.submit_command(artist::LOAD_DETAIL.with(link.to_owned()));
                 }
             }

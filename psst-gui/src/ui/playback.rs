@@ -108,12 +108,9 @@ fn playing_item_widget() -> impl Widget<NowPlaying> {
                         ctx.submit_command(cmd::NAVIGATE.with(now_playing.origin.to_nav()));
                     })
                     .context_menu(|now_playing| match &now_playing.item {
-                        Playable::Track(track) => track::track_menu(
-                            track,
-                            &now_playing.library,
-                            &now_playing.origin,
-                            usize::MAX,
-                        ),
+                        Playable::Track(track) => {
+                            track::track_menu(track, &now_playing.library, &now_playing.origin)
+                        }
                         Playable::Episode(episode) => {
                             episode::episode_menu(episode, &now_playing.library)
                         }
@@ -178,7 +175,6 @@ fn playback_origin_icon(origin: &PlaybackOrigin) -> &'static SvgIcon {
         PlaybackOrigin::Home => &icons::HOME,
         PlaybackOrigin::Library => &icons::HEART,
         PlaybackOrigin::Album { .. } => &icons::ALBUM,
-        PlaybackOrigin::Artist { .. } => &icons::ARTIST,
         PlaybackOrigin::Playlist { .. } => &icons::PLAYLIST,
         PlaybackOrigin::Show { .. } => &icons::PODCAST,
         PlaybackOrigin::Search { .. } => &icons::SEARCH,

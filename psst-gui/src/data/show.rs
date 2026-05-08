@@ -20,6 +20,7 @@ pub struct Show {
     pub id: Arc<str>,
     pub name: Arc<str>,
     pub images: Vector<Image>,
+    #[serde(default)]
     pub publisher: Arc<str>,
     pub description: Arc<str>,
     pub total_episodes: Option<usize>,

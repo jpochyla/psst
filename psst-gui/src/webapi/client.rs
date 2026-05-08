@@ -775,19 +775,6 @@ impl WebApi {
         Ok(artist_albums)
     }
 
-    // https://developer.spotify.com/documentation/web-api/reference/get-an-artists-top-tracks
-    pub fn get_artist_top_tracks(&self, id: &str) -> Result<Vector<Arc<Track>>, Error> {
-        #[derive(Deserialize)]
-        struct Tracks {
-            tracks: Vector<Arc<Track>>,
-        }
-        let request =
-            &RequestBuilder::new(format!("v1/artists/{id}/top-tracks"), Method::Get, None)
-                .query("market", "from_token");
-        let result: Tracks = self.load(request)?;
-        Ok(result.tracks)
-    }
-
     // https://developer.spotify.com/documentation/web-api/reference/get-an-artists-related-artists
     pub fn get_related_artists(&self, id: &str) -> Result<Cached<Vector<Artist>>, Error> {
         #[derive(Clone, Data, Deserialize)]
@@ -1050,15 +1037,17 @@ impl WebApi {
             .collect())
     }
 
-    // https://developer.spotify.com/documentation/web-api/reference/save-albums-user/
+    // https://developer.spotify.com/documentation/web-api/reference/save-to-library/
     pub fn save_album(&self, id: &str) -> Result<(), Error> {
-        let request = &RequestBuilder::new("v1/me/albums", Method::Put, None).query("ids", id);
+        let request = &RequestBuilder::new("v1/me/library", Method::Put, None)
+            .set_body(Some(json!({"uris": [format!("spotify:album:{id}")]})));
         self.send_empty_json(request)
     }
 
-    // https://developer.spotify.com/documentation/web-api/reference/remove-albums-user/
+    // https://developer.spotify.com/documentation/web-api/reference/remove-from-library/
     pub fn unsave_album(&self, id: &str) -> Result<(), Error> {
-        let request = &RequestBuilder::new("v1/me/albums", Method::Delete, None).query("ids", id);
+        let request = &RequestBuilder::new("v1/me/library", Method::Delete, None)
+            .set_body(Some(json!({"uris": [format!("spotify:album:{id}")]})));
         self.send_empty_json(request)
     }
 
@@ -1094,27 +1083,31 @@ impl WebApi {
             .collect())
     }
 
-    // https://developer.spotify.com/documentation/web-api/reference/save-tracks-user/
+    // https://developer.spotify.com/documentation/web-api/reference/save-to-library/
     pub fn save_track(&self, id: &str) -> Result<(), Error> {
-        let request = &RequestBuilder::new("v1/me/tracks", Method::Put, None).query("ids", id);
+        let request = &RequestBuilder::new("v1/me/library", Method::Put, None)
+            .set_body(Some(json!({"uris": [format!("spotify:track:{id}")]})));
         self.send_empty_json(request)
     }
 
-    // https://developer.spotify.com/documentation/web-api/reference/remove-tracks-user/
+    // https://developer.spotify.com/documentation/web-api/reference/remove-from-library/
     pub fn unsave_track(&self, id: &str) -> Result<(), Error> {
-        let request = &RequestBuilder::new("v1/me/tracks", Method::Delete, None).query("ids", id);
+        let request = &RequestBuilder::new("v1/me/library", Method::Delete, None)
+            .set_body(Some(json!({"uris": [format!("spotify:track:{id}")]})));
         self.send_empty_json(request)
     }
 
-    // https://developer.spotify.com/documentation/web-api/reference/save-shows-user
+    // https://developer.spotify.com/documentation/web-api/reference/save-to-library/
     pub fn save_show(&self, id: &str) -> Result<(), Error> {
-        let request = &RequestBuilder::new("v1/me/shows", Method::Put, None).query("ids", id);
+        let request = &RequestBuilder::new("v1/me/library", Method::Put, None)
+            .set_body(Some(json!({"uris": [format!("spotify:show:{id}")]})));
         self.send_empty_json(request)
     }
 
-    // https://developer.spotify.com/documentation/web-api/reference/remove-shows-user
+    // https://developer.spotify.com/documentation/web-api/reference/remove-from-library/
     pub fn unsave_show(&self, id: &str) -> Result<(), Error> {
-        let request = &RequestBuilder::new("v1/me/shows", Method::Delete, None).query("ids", id);
+        let request = &RequestBuilder::new("v1/me/library", Method::Delete, None)
+            .set_body(Some(json!({"uris": [format!("spotify:show:{id}")]})));
         self.send_empty_json(request)
     }
 }
@@ -1224,17 +1217,16 @@ impl WebApi {
     }
 
     pub fn follow_playlist(&self, id: &str) -> Result<(), Error> {
-        let request =
-            &RequestBuilder::new(format!("v1/playlists/{id}/followers"), Method::Put, None)
-                .set_body(Some(json!({"public": false})));
-        self.request(request)?;
+        let request = &RequestBuilder::new("v1/me/library", Method::Put, None)
+            .set_body(Some(json!({"uris": [format!("spotify:playlist:{id}")]})));
+        self.send_empty_json(request)?;
         Ok(())
     }
 
     pub fn unfollow_playlist(&self, id: &str) -> Result<(), Error> {
-        let request =
-            &RequestBuilder::new(format!("v1/playlists/{id}/followers"), Method::Delete, None);
-        self.request(request)?;
+        let request = &RequestBuilder::new("v1/me/library", Method::Delete, None)
+            .set_body(Some(json!({"uris": [format!("spotify:playlist:{id}")]})));
+        self.send_empty_json(request)?;
         Ok(())
     }
 
@@ -1245,11 +1237,14 @@ impl WebApi {
         Ok(result)
     }
 
-    // https://developer.spotify.com/documentation/web-api/reference/get-playlists-tracks
+    // https://developer.spotify.com/documentation/web-api/reference/get-playlist-items
     pub fn get_playlist_tracks(&self, id: &str) -> Result<Vector<Arc<Track>>, Error> {
         #[derive(Clone, Deserialize)]
         struct PlaylistItem {
-            track: OptionalTrack,
+            #[serde(default)]
+            item: Option<OptionalTrack>,
+            #[serde(default)]
+            track: Option<OptionalTrack>,
         }
 
         // Spotify API likes to return _really_ bogus data for local tracks. Much better
@@ -1262,7 +1257,7 @@ impl WebApi {
             Json(serde_json::Value),
         }
 
-        let request = &RequestBuilder::new(format!("v1/playlists/{id}/tracks"), Method::Get, None)
+        let request = &RequestBuilder::new(format!("v1/playlists/{id}/items"), Method::Get, None)
             .query("marker", "from_token")
             .query("additional_types", "track");
 
@@ -1274,9 +1269,13 @@ impl WebApi {
             .into_iter()
             .enumerate()
             .filter_map(|(index, item)| {
-                let mut track = match item.track {
-                    OptionalTrack::Track(track) => track,
-                    OptionalTrack::Json(json) => local_track_manager.find_local_track(json)?,
+                let track_source = item.item.or(item.track);
+                let mut track = match track_source {
+                    Some(OptionalTrack::Track(track)) => track,
+                    Some(OptionalTrack::Json(json)) => {
+                        local_track_manager.find_local_track(json)?
+                    }
+                    None => return None,
                 };
                 Arc::make_mut(&mut track).track_pos = index;
                 Some(track)
@@ -1284,36 +1283,35 @@ impl WebApi {
             .collect())
     }
 
+    // https://developer.spotify.com/documentation/web-api/reference/change-playlist-details
     pub fn change_playlist_details(&self, id: &str, name: &str) -> Result<(), Error> {
-        let request = &RequestBuilder::new(format!("v1/playlists/{id}/tracks"), Method::Get, None)
+        let request = &RequestBuilder::new(format!("v1/playlists/{id}"), Method::Put, None)
             .set_body(Some(json!({ "name": name })));
-        self.request(request)?;
+        self.send_empty_json(request)?;
         Ok(())
     }
 
-    // https://developer.spotify.com/documentation/web-api/reference/add-tracks-to-playlist
+    // https://developer.spotify.com/documentation/web-api/reference/add-items-to-playlist
     pub fn add_track_to_playlist(&self, playlist_id: &str, track_uri: &str) -> Result<(), Error> {
         let request = &RequestBuilder::new(
-            format!("v1/playlists/{playlist_id}/tracks"),
+            format!("v1/playlists/{playlist_id}/items"),
             Method::Post,
-            None,
-        )
-        .query("uris", track_uri);
+            Some(json!({"uris": [track_uri]})),
+        );
         self.request(request).map(|_| ())
     }
 
-    // https://developer.spotify.com/documentation/web-api/reference/remove-tracks-playlist
+    // https://developer.spotify.com/documentation/web-api/reference/remove-playlist-items
     pub fn remove_track_from_playlist(
         &self,
         playlist_id: &str,
-        track_pos: usize,
+        track_uri: &str,
     ) -> Result<(), Error> {
         let request = &RequestBuilder::new(
-            format!("v1/playlists/{playlist_id}/tracks"),
+            format!("v1/playlists/{playlist_id}/items"),
             Method::Delete,
-            None,
-        )
-        .set_body(Some(json!({ "positions": [track_pos] })));
+            Some(json!({ "items": [{ "uri": track_uri }] })),
+        );
         self.request(request).map(|_| ())
     }
 }

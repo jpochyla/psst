@@ -35,7 +35,7 @@ use psst_core::{item_id::ItemId, session::SessionService};
 pub use crate::data::{
     album::{Album, AlbumDetail, AlbumLink, AlbumType},
     artist::{
-        Artist, ArtistAlbums, ArtistDetail, ArtistInfo, ArtistLink, ArtistStats, ArtistTracks,
+        Artist, ArtistAlbums, ArtistDetail, ArtistInfo, ArtistLink, ArtistStats,
     },
     config::{AudioQuality, Authentication, Config, Preferences, PreferencesTab, Theme},
     ctx::Ctx,
@@ -153,7 +153,6 @@ impl AppState {
             artist_detail: ArtistDetail {
                 artist: Promise::Empty,
                 albums: Promise::Empty,
-                top_tracks: Promise::Empty,
                 related_artists: Promise::Empty,
                 artist_info: Promise::Empty,
             },
@@ -209,7 +208,6 @@ impl AppState {
         self.artist_detail.albums = Promise::Empty;
         self.artist_detail.artist = Promise::Empty;
         self.artist_detail.related_artists = Promise::Empty;
-        self.artist_detail.top_tracks = Promise::Empty;
         self.playlist_detail.playlist = Promise::Empty;
         self.playlist_detail.tracks = Promise::Empty;
         self.show_detail.episodes = Promise::Empty;
