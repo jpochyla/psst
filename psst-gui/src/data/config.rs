@@ -275,6 +275,8 @@ pub enum Theme {
     #[default]
     Light,
     Dark,
+    GruvboxDark,
+    GruvboxLight,
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Data, Serialize, Deserialize, Default)]
