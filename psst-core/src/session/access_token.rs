@@ -8,10 +8,31 @@ use crate::error::Error;
 use super::SessionService;
 
 // Client ID of the official Web Spotify front-end.
+// Used for Shannon session, Login5, client tokens, and playback infrastructure.
 pub const CLIENT_ID: &str = "65b708073fc0480ea92a077233ca87bd";
 
-// All scopes we could possibly require.
+// All scopes we could possibly require (used for Shannon session/Login5).
 pub const ACCESS_SCOPES: &str = "streaming,user-read-email,user-read-private,playlist-read-private,playlist-read-collaborative,playlist-modify-public,playlist-modify-private,user-follow-modify,user-follow-read,user-library-read,user-library-modify,user-top-read,user-read-recently-played";
+
+// Scopes for Web API calls using PSST_CLIENT_ID.
+pub const WEBAPI_SCOPES: &[&str] = &[
+    "streaming",
+    "user-read-email",
+    "user-read-private",
+    "user-library-read",
+    "user-library-modify",
+    "user-read-playback-state",
+    "user-modify-playback-state",
+    "playlist-read-private",
+    "playlist-read-collaborative",
+    "playlist-modify-public",
+    "playlist-modify-private",
+    "user-follow-read",
+    "user-follow-modify",
+    "user-top-read",
+    "user-read-currently-playing",
+    "user-read-recently-played",
+];
 
 // Consider token expired even before the official expiration time.  Spotify
 // seems to be reporting excessive token TTLs so let's cut it down by 30
