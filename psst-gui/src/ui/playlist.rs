@@ -437,7 +437,10 @@ fn playlist_info_widget() -> impl Widget<WithCtx<Playlist>> {
         .clip(Size::new(size, size).to_rounded_rect(4.0))
         .context_menu(playlist_menu_ctx);
 
-    let owner_label = Label::dynamic(|p: &Playlist, _| p.owner.display_name.as_ref().to_string());
+    let owner_label = Label::dynamic(|p: &Playlist, _| p.owner.display_name.as_ref().to_string())
+        .on_click(|ctx, p: &mut Playlist, _env| {
+            ctx.submit_command(cmd::NAVIGATE.with(Nav::PublicUserDetail(p.owner.clone())));
+        });
 
     let track_count_label = Label::dynamic(|p: &Playlist, _| {
         let count = p.track_count.unwrap_or(0);
