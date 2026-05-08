@@ -1296,9 +1296,8 @@ impl WebApi {
         let request = &RequestBuilder::new(
             format!("v1/playlists/{playlist_id}/items"),
             Method::Post,
-            None,
-        )
-        .query("uris", track_uri);
+            Some(json!({"uris": [track_uri]})),
+        );
         self.request(request).map(|_| ())
     }
 
@@ -1306,14 +1305,13 @@ impl WebApi {
     pub fn remove_track_from_playlist(
         &self,
         playlist_id: &str,
-        track_pos: usize,
+        track_uri: &str,
     ) -> Result<(), Error> {
         let request = &RequestBuilder::new(
             format!("v1/playlists/{playlist_id}/items"),
             Method::Delete,
-            None,
-        )
-        .set_body(Some(json!({ "positions": [track_pos] })));
+            Some(json!({ "items": [{ "uri": track_uri }] })),
+        );
         self.request(request).map(|_| ())
     }
 }
