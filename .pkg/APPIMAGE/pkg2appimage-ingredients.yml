@@ -1,9 +1,9 @@
 ingredients:
-  dist: focal
+  dist: jammy
   sources:
-    - deb http://us.archive.ubuntu.com/ubuntu/ focal main universe
+    - deb http://us.archive.ubuntu.com/ubuntu/ jammy main universe
   debs:
     - ../*.deb
   script:
-    - mkdir -p /home/runner/work/psst/psst/.AppDir/
-    - cp /home/runner/work/psst/psst/psst-gui/assets/logo_256.png /home/runner/work/psst/psst/.AppDir/psst.png
+    - mkdir -p $GITHUB_WORKSPACE/.AppDir/
+    - cp $GITHUB_WORKSPACE/psst-gui/assets/logo_256.png $GITHUB_WORKSPACE/.AppDir/psst.png
