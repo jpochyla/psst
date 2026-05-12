@@ -21,6 +21,10 @@ use serde::{Deserialize, Serialize};
 use super::{Nav, Promise, QueueBehavior, SliderScrollScale};
 use crate::ui::theme;
 
+fn default_volume() -> f64 {
+    1.0
+}
+
 #[derive(Clone, Debug, Data, Lens)]
 pub struct Preferences {
     pub active: PreferencesTab,
@@ -112,6 +116,7 @@ pub struct Config {
     credentials: Option<Credentials>,
     pub audio_quality: AudioQuality,
     pub theme: Theme,
+    #[serde(default = "default_volume")]
     pub volume: f64,
     pub last_route: Option<Nav>,
     pub queue_behavior: QueueBehavior,
