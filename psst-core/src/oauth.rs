@@ -166,7 +166,7 @@ fn create_oauth_client(client_id: &str, redirect_port: u16) -> BasicClient {
 
 pub fn generate_session_auth_url(redirect_port: u16) -> (String, PkceCodeVerifier) {
     let client_id = crate::session::access_token::CLIENT_ID;
-    let scopes = get_session_scopes();
+    let scopes = get_scopes();
     generate_auth_url(client_id, redirect_port, &scopes)
 }
 
@@ -187,7 +187,7 @@ pub fn exchange_session_code_for_token(
     token_response.access_token().secret().to_string()
 }
 
-fn get_session_scopes() -> Vec<Scope> {
+fn get_scopes() -> Vec<Scope> {
     crate::session::access_token::ACCESS_SCOPES
         .split(',')
         .map(|s| Scope::new(s.trim().to_string()))
