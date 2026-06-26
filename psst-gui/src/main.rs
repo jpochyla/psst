@@ -51,7 +51,6 @@ fn main() {
     }
 
     WebApi::new(
-        state.session.clone(),
         Config::proxy().as_deref(),
         Config::cache_dir(),
         paginated_limit,
@@ -62,6 +61,31 @@ fn main() {
     let launcher;
     if state.config.has_credentials() {
         // Credentials are configured, open the main window.
+
+        // Check if we have a valid Web API token. If not, try to refresh.
+        // If refresh fails, the user can re-authenticate from preferences.
+        match state.config.get_or_refresh_webapi_token() {
+            Ok(token) => {
+                log::info!("Web API token is valid");
+                // Seed the global WebApi with the valid token
+                WebApi::global().set_webapi_credentials(
+                    state.config.webapi_client_id_value().map(String::from),
+                    Some(token),
+                );
+            }
+            Err(e) => {
+                log::warn!(
+                    "No valid Web API token: {e}. \
+                     Web API features may be unavailable until re-authentication."
+                );
+                // Still provide the client ID so refresh can be attempted later
+                WebApi::global().set_webapi_credentials(
+                    state.config.webapi_client_id_value().map(String::from),
+                    None,
+                );
+            }
+        }
+
         let window = ui::main_window(&state.config);
         delegate = Delegate::with_main(window.id);
         launcher = AppLauncher::with_window(window).configure_env(ui::theme::setup);

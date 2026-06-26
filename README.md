@@ -7,6 +7,8 @@ Contributions are welcome!
 
 **Note:** A Spotify Premium account is required.
 
+> **ℹ️ As of February 2026, Spotify [changed developer access](https://developer.spotify.com/blog/2026-02-06-update-on-developer-access-and-platform-security), and Psst now requires your own Spotify Developer Client ID for Web API features (search, library, playlists).** Register an app at the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard) (redirect URI: `http://127.0.0.1:8888/login`), then enter its Client ID on Psst's sign-in screen.
+
 [![Build](https://github.com/jpochyla/psst/actions/workflows/build.yml/badge.svg)](https://github.com/jpochyla/psst/actions)
 
 ![Screenshot](./psst-gui/assets/screenshot.png)

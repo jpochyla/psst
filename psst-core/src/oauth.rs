@@ -1,8 +1,9 @@
 use crate::error::Error;
 use oauth2::{
     basic::BasicClient, reqwest::http_client, AuthUrl, AuthorizationCode, ClientId, CsrfToken,
-    PkceCodeChallenge, PkceCodeVerifier, RedirectUrl, Scope, TokenResponse, TokenUrl,
+    PkceCodeChallenge, PkceCodeVerifier, RedirectUrl, RefreshToken, Scope, TokenResponse, TokenUrl,
 };
+use serde::{Deserialize, Serialize};
 use std::{
     io::{BufRead, BufReader, Write},
     net::TcpStream,
@@ -11,6 +12,8 @@ use std::{
     time::Duration,
 };
 use url::Url;
+
+use crate::session::access_token::WEBAPI_SCOPES;
 
 pub fn listen_for_callback_parameter(
     socket_address: SocketAddr,
@@ -37,15 +40,22 @@ pub fn listen_for_callback_parameter(
     // 2. Set up the channel for communication
     let (tx, rx) = mpsc::channel::<Result<String, Error>>();
 
-    // 3. Spawn the thread
+    // 3. Spawn the thread. Loop so background requests (e.g. favicon.ico)
+    //    don't consume the single accept and break the OAuth flow.
     let handle = std::thread::spawn(move || {
-        if let Ok((mut stream, _)) = listener.accept() {
-            handle_callback_connection(&mut stream, &tx, parameter_name);
-        } else {
-            log::error!("Failed to accept connection on callback listener");
-            let _ = tx.send(Err(Error::IoError(std::io::Error::other(
-                "Failed to accept connection",
-            ))));
+        for stream in listener.incoming() {
+            match stream {
+                Ok(mut stream) => {
+                    if handle_callback_connection(&mut stream, &tx, parameter_name) {
+                        break;
+                    }
+                }
+                Err(e) => {
+                    log::error!("Failed to accept callback connection: {e}");
+                    let _ = tx.send(Err(Error::IoError(e)));
+                    break;
+                }
+            }
         }
     });
 
@@ -67,36 +77,43 @@ pub fn listen_for_callback_parameter(
     result
 }
 
-/// Handles an incoming TCP connection for a generic OAuth callback.
+/// Handle one incoming TCP connection. Returns `true` if the OAuth
+/// parameter was extracted (caller should stop listening), or `false` to
+/// keep listening for the next request (e.g. favicon, malformed request).
 fn handle_callback_connection(
     stream: &mut TcpStream,
     tx: &mpsc::Sender<Result<String, Error>>,
     parameter_name: &'static str,
-) {
+) -> bool {
     let mut reader = BufReader::new(&mut *stream);
     let mut request_line = String::new();
 
-    if reader.read_line(&mut request_line).is_ok() {
-        match extract_parameter_from_request(&request_line, parameter_name) {
-            Some(value) => {
-                log::info!("received callback parameter '{parameter_name}'.");
-                send_success_response(stream);
-                let _ = tx.send(Ok(value));
-            }
-            None => {
-                let err_msg = format!(
-                    "Failed to extract parameter '{parameter_name}' from request: {request_line}",
-                );
-                log::error!("{err_msg}");
-                let _ = tx.send(Err(Error::OAuthError(err_msg)));
-            }
-        }
-    } else {
-        log::error!("Failed to read request line from callback.");
-        let _ = tx.send(Err(Error::IoError(std::io::Error::other(
-            "Failed to read request line",
-        ))));
+    if reader.read_line(&mut request_line).is_err() {
+        return false;
     }
+
+    if request_line.contains("favicon.ico") {
+        send_not_found_response(stream);
+        return false;
+    }
+
+    match extract_parameter_from_request(&request_line, parameter_name) {
+        Some(value) => {
+            log::info!("received callback parameter '{parameter_name}'.");
+            send_success_response(stream);
+            let _ = tx.send(Ok(value));
+            true
+        }
+        None => {
+            log::warn!("ignoring request without '{parameter_name}': {request_line}");
+            send_not_found_response(stream);
+            false
+        }
+    }
+}
+
+fn send_not_found_response(stream: &mut TcpStream) {
+    let _ = stream.write_all(b"HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\n\r\n");
 }
 
 /// Extracts a specified query parameter from an HTTP request line.
@@ -148,12 +165,12 @@ pub fn send_success_response(stream: &mut TcpStream) {
     let _ = stream.write_all(response.as_bytes());
 }
 
-fn create_spotify_oauth_client(redirect_port: u16) -> BasicClient {
+fn create_oauth_client(client_id: &str, redirect_port: u16) -> BasicClient {
     let redirect_address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), redirect_port);
     let redirect_uri = format!("http://{redirect_address}/login");
 
     BasicClient::new(
-        ClientId::new(crate::session::access_token::CLIENT_ID.to_string()),
+        ClientId::new(client_id.to_string()),
         None,
         AuthUrl::new("https://accounts.spotify.com/authorize".to_string()).unwrap(),
         Some(TokenUrl::new("https://accounts.spotify.com/api/token".to_string()).unwrap()),
@@ -161,25 +178,19 @@ fn create_spotify_oauth_client(redirect_port: u16) -> BasicClient {
     .set_redirect_uri(RedirectUrl::new(redirect_uri).expect("Invalid redirect URL"))
 }
 
-pub fn generate_auth_url(redirect_port: u16) -> (String, PkceCodeVerifier) {
-    let client = create_spotify_oauth_client(redirect_port);
-    let (pkce_challenge, pkce_verifier) = PkceCodeChallenge::new_random_sha256();
-
-    let (auth_url, _) = client
-        .authorize_url(CsrfToken::new_random)
-        .add_scopes(get_scopes())
-        .set_pkce_challenge(pkce_challenge)
-        .url();
-
-    (auth_url.to_string(), pkce_verifier)
+pub fn generate_session_auth_url(redirect_port: u16) -> (String, PkceCodeVerifier) {
+    let client_id = crate::session::access_token::CLIENT_ID;
+    let scopes = get_scopes();
+    generate_auth_url(client_id, redirect_port, &scopes)
 }
 
-pub fn exchange_code_for_token(
+pub fn exchange_session_code_for_token(
     redirect_port: u16,
     code: AuthorizationCode,
     pkce_verifier: PkceCodeVerifier,
 ) -> String {
-    let client = create_spotify_oauth_client(redirect_port);
+    let client_id = crate::session::access_token::CLIENT_ID;
+    let client = create_oauth_client(client_id, redirect_port);
 
     let token_response = client
         .exchange_code(code)
@@ -195,4 +206,131 @@ fn get_scopes() -> Vec<Scope> {
         .split(',')
         .map(|s| Scope::new(s.trim().to_string()))
         .collect()
+}
+
+/// Token for Web API calls, serializable to/from disk.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct WebApiToken {
+    pub access_token: String,
+    pub refresh_token: Option<String>,
+    /// Unix timestamp (seconds) when the token expires.
+    pub expires_at: u64,
+}
+
+impl WebApiToken {
+    pub fn is_expired(&self) -> bool {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+        // Consider expired 60 seconds early to avoid edge cases
+        now + 60 >= self.expires_at
+    }
+}
+
+fn get_webapi_scopes() -> Vec<Scope> {
+    WEBAPI_SCOPES
+        .iter()
+        .map(|s| Scope::new(s.to_string()))
+        .collect()
+}
+
+/// Generate the authorization URL for any OAuth flow.
+/// Returns `(auth_url, pkce_verifier)`.
+pub fn generate_auth_url(
+    client_id: &str,
+    redirect_port: u16,
+    scopes: &[Scope],
+) -> (String, PkceCodeVerifier) {
+    let client = create_oauth_client(client_id, redirect_port);
+    let (pkce_challenge, pkce_verifier) = PkceCodeChallenge::new_random_sha256();
+
+    let (auth_url, _) = client
+        .authorize_url(CsrfToken::new_random)
+        .add_scopes(scopes.iter().cloned())
+        .set_pkce_challenge(pkce_challenge)
+        .url();
+
+    (auth_url.to_string(), pkce_verifier)
+}
+
+/// Generate the authorization URL specifically for the Web API OAuth flow.
+/// Returns `(auth_url, pkce_verifier)`.
+pub fn generate_webapi_auth_url(client_id: &str, redirect_port: u16) -> (String, PkceCodeVerifier) {
+    let scopes = get_webapi_scopes();
+    generate_auth_url(client_id, redirect_port, &scopes)
+}
+
+/// Exchange an authorization code for a full WebApiToken (including refresh token).
+pub fn exchange_webapi_code_for_token(
+    client_id: &str,
+    redirect_port: u16,
+    code: AuthorizationCode,
+    pkce_verifier: PkceCodeVerifier,
+) -> Result<WebApiToken, Error> {
+    let client = create_oauth_client(client_id, redirect_port);
+
+    let token_response = client
+        .exchange_code(code)
+        .set_pkce_verifier(pkce_verifier)
+        .request(http_client)
+        .map_err(|e| Error::OAuthError(format!("Failed to exchange Web API code: {e}")))?;
+
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+
+    let expires_in = token_response
+        .expires_in()
+        .unwrap_or(Duration::from_secs(3600))
+        .as_secs();
+
+    Ok(WebApiToken {
+        access_token: token_response.access_token().secret().to_string(),
+        refresh_token: token_response
+            .refresh_token()
+            .map(|t| t.secret().to_string()),
+        expires_at: now + expires_in,
+    })
+}
+
+/// Refresh a Web API token using a refresh token (no browser interaction needed).
+pub fn refresh_webapi_token(
+    client_id: &str,
+    refresh_token_str: &str,
+) -> Result<WebApiToken, Error> {
+    // For refresh, the redirect_port doesn't matter (no redirect happens),
+    // but the client needs to be configured with the same redirect URI.
+    let client = create_oauth_client(client_id, 8888);
+
+    let refresh_token = RefreshToken::new(refresh_token_str.to_string());
+
+    let token_response = client
+        .exchange_refresh_token(&refresh_token)
+        .request(http_client)
+        .map_err(|e| Error::OAuthError(format!("Failed to refresh Web API token: {e}")))?;
+
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+
+    let expires_in = token_response
+        .expires_in()
+        .unwrap_or(Duration::from_secs(3600))
+        .as_secs();
+
+    // Spotify may or may not return a new refresh token on refresh.
+    // If it doesn't, we keep the old one.
+    let new_refresh_token = token_response
+        .refresh_token()
+        .map(|t| t.secret().to_string())
+        .unwrap_or_else(|| refresh_token_str.to_string());
+
+    Ok(WebApiToken {
+        access_token: token_response.access_token().secret().to_string(),
+        refresh_token: Some(new_refresh_token),
+        expires_at: now + expires_in,
+    })
 }

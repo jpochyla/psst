@@ -417,14 +417,14 @@ impl Widget<NowPlaying> for SeekBar {
                     ctx.set_active(true);
                 }
             }
-            Event::MouseUp(mouse) => {
-                if ctx.is_active() && mouse.button == MouseButton::Left {
-                    if ctx.is_hot() {
-                        let fraction = mouse.pos.x / ctx.size().width;
-                        ctx.submit_command(cmd::PLAY_SEEK.with(fraction));
-                    }
-                    ctx.set_active(false);
+            Event::MouseUp(mouse)
+                if ctx.is_active() && mouse.button == MouseButton::Left =>
+            {
+                if ctx.is_hot() {
+                    let fraction = mouse.pos.x / ctx.size().width;
+                    ctx.submit_command(cmd::PLAY_SEEK.with(fraction));
                 }
+                ctx.set_active(false);
             }
             _ => {}
         }
