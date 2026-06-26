@@ -109,6 +109,10 @@ impl WebApi {
                 match oauth::refresh_webapi_token(client_id, refresh_token) {
                     Ok(new_token) => {
                         let access_token = new_token.access_token.clone();
+                        // NOTE: only updates the in-memory cache. The durable
+                        // copy in config.json is refreshed by Config on the
+                        // next save; if Spotify rotates the refresh token and
+                        // the process exits before then, the user must re-login.
                         *token_guard = Some(new_token);
                         return Ok(access_token);
                     }

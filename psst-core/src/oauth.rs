@@ -40,15 +40,22 @@ pub fn listen_for_callback_parameter(
     // 2. Set up the channel for communication
     let (tx, rx) = mpsc::channel::<Result<String, Error>>();
 
-    // 3. Spawn the thread
+    // 3. Spawn the thread. Loop so background requests (e.g. favicon.ico)
+    //    don't consume the single accept and break the OAuth flow.
     let handle = std::thread::spawn(move || {
-        if let Ok((mut stream, _)) = listener.accept() {
-            handle_callback_connection(&mut stream, &tx, parameter_name);
-        } else {
-            log::error!("Failed to accept connection on callback listener");
-            let _ = tx.send(Err(Error::IoError(std::io::Error::other(
-                "Failed to accept connection",
-            ))));
+        for stream in listener.incoming() {
+            match stream {
+                Ok(mut stream) => {
+                    if handle_callback_connection(&mut stream, &tx, parameter_name) {
+                        break;
+                    }
+                }
+                Err(e) => {
+                    log::error!("Failed to accept callback connection: {e}");
+                    let _ = tx.send(Err(Error::IoError(e)));
+                    break;
+                }
+            }
         }
     });
 
@@ -70,36 +77,43 @@ pub fn listen_for_callback_parameter(
     result
 }
 
-/// Handles an incoming TCP connection for a generic OAuth callback.
+/// Handle one incoming TCP connection. Returns `true` if the OAuth
+/// parameter was extracted (caller should stop listening), or `false` to
+/// keep listening for the next request (e.g. favicon, malformed request).
 fn handle_callback_connection(
     stream: &mut TcpStream,
     tx: &mpsc::Sender<Result<String, Error>>,
     parameter_name: &'static str,
-) {
+) -> bool {
     let mut reader = BufReader::new(&mut *stream);
     let mut request_line = String::new();
 
-    if reader.read_line(&mut request_line).is_ok() {
-        match extract_parameter_from_request(&request_line, parameter_name) {
-            Some(value) => {
-                log::info!("received callback parameter '{parameter_name}'.");
-                send_success_response(stream);
-                let _ = tx.send(Ok(value));
-            }
-            None => {
-                let err_msg = format!(
-                    "Failed to extract parameter '{parameter_name}' from request: {request_line}",
-                );
-                log::error!("{err_msg}");
-                let _ = tx.send(Err(Error::OAuthError(err_msg)));
-            }
-        }
-    } else {
-        log::error!("Failed to read request line from callback.");
-        let _ = tx.send(Err(Error::IoError(std::io::Error::other(
-            "Failed to read request line",
-        ))));
+    if reader.read_line(&mut request_line).is_err() {
+        return false;
     }
+
+    if request_line.contains("favicon.ico") {
+        send_not_found_response(stream);
+        return false;
+    }
+
+    match extract_parameter_from_request(&request_line, parameter_name) {
+        Some(value) => {
+            log::info!("received callback parameter '{parameter_name}'.");
+            send_success_response(stream);
+            let _ = tx.send(Ok(value));
+            true
+        }
+        None => {
+            log::warn!("ignoring request without '{parameter_name}': {request_line}");
+            send_not_found_response(stream);
+            false
+        }
+    }
+}
+
+fn send_not_found_response(stream: &mut TcpStream) {
+    let _ = stream.write_all(b"HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\n\r\n");
 }
 
 /// Extracts a specified query parameter from an HTTP request line.
