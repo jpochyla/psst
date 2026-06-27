@@ -64,6 +64,12 @@ pub fn listen_for_callback_parameter(
         Ok(r) => r,
         Err(e) => {
             log::error!("Timed out or channel error: {e}");
+            // Drop the sender to signal the thread to exit
+            drop(tx);
+            // Wait for thread completion to ensure listener is dropped
+            if handle.join().is_err() {
+                log::warn!("thread join failed");
+            }
             return Err(Error::from(e));
         }
     };
