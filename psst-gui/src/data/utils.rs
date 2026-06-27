@@ -42,7 +42,9 @@ impl<T: Data> Cached<T> {
 }
 
 #[derive(Deserialize)]
+#[serde(bound(deserialize = "T: serde::Deserialize<'de>"))]
 pub struct Page<T: Clone> {
+    #[serde(deserialize_with = "deserialize_ignore_nulls")]
     pub items: Vector<T>,
     pub limit: usize,
     pub offset: usize,
@@ -156,6 +158,16 @@ where
     struct Wrapper(#[serde(deserialize_with = "deserialize_date")] Date);
 
     Ok(Option::deserialize(deserializer)?.map(|Wrapper(val)| val))
+}
+
+pub fn deserialize_ignore_nulls<'de, D, T>(deserializer: D) -> Result<Vector<T>, D::Error>
+where
+    T: Clone,
+    T: Deserialize<'de>,
+    D: Deserializer<'de>,
+{
+    let items: Vec<Option<T>> = Vec::deserialize(deserializer)?;
+    Ok(items.into_iter().flatten().collect())
 }
 
 pub fn deserialize_first_page<'de, D, T>(deserializer: D) -> Result<Vector<T>, D::Error>

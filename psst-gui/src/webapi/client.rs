@@ -360,8 +360,8 @@ impl WebApi {
         #[derive(Deserialize)]
         #[serde(rename_all = "camelCase")]
         pub struct Section {
-            data: SectionData,
-            section_items: SectionItems,
+            data: Option<SectionData>,
+            section_items: Option<SectionItems>,
         }
 
         #[derive(Deserialize)]
@@ -521,9 +521,12 @@ impl WebApi {
             .sections
             .iter()
             .for_each(|section| {
-                title = section.data.title.text.clone().into();
+                let (Some(data), Some(section_items)) = (&section.data, &section.section_items) else {
+                    return;
+                };
+                title = data.title.text.clone().into();
 
-                section.section_items.items.iter().for_each(|item| {
+                section_items.items.iter().for_each(|item| {
                     let Some(uri) = &item.content.data.uri else {
                         return;
                     };
@@ -1147,8 +1150,9 @@ impl WebApi {
 impl WebApi {
     pub fn get_user_info(&self) -> Result<(String, String), Error> {
         #[derive(Deserialize, Clone, Data)]
+        #[serde(rename_all = "camelCase")]
         struct User {
-            region: String,
+            country_code: String,
             timezone: String,
         }
         let token = self.access_token()?;
@@ -1156,12 +1160,12 @@ impl WebApi {
         let request = &RequestBuilder::new("json".to_string(), Method::Get, None)
             .set_protocol("http")
             .set_base_uri("ip-api.com")
-            .query("fields", "260")
+            .query("fields", "countryCode,timezone")
             .header("Authorization", format!("Bearer {token}"));
 
         let result: Cached<User> = self.load_cached(request, "user-info", "usrinfo")?;
 
-        Ok((result.data.region, result.data.timezone))
+        Ok((result.data.country_code, result.data.timezone))
     }
 
     pub fn get_section(&self, section_uri: &str) -> Result<MixedView, Error> {

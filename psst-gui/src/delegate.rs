@@ -3,7 +3,9 @@ use druid::{
     commands, AppDelegate, Application, Command, DelegateCtx, Env, Event, Handled, Target,
     WindowDesc, WindowId,
 };
+use rand::seq::IndexedRandom;
 use std::fs;
+use std::sync::Arc;
 use threadpool::ThreadPool;
 
 use crate::ui::playlist::{
@@ -13,7 +15,7 @@ use crate::ui::theme;
 use crate::ui::DOWNLOAD_ARTWORK;
 use crate::{
     cmd,
-    data::{AppState, Config},
+    data::{AppState, Config, Track},
     ui,
     webapi::WebApi,
     widget::remote_image,
@@ -139,6 +141,30 @@ impl AppDelegate<AppState> for Delegate {
         data: &mut AppState,
         _env: &Env,
     ) -> Handled {
+        if let Some(album_link) = cmd.get(cmd::PLAY_ALBUM) {
+            if let Some(album) = data.album_detail.album.resolved() {
+                play_items(
+                    ctx,
+                    album.data.tracks.iter().cloned().collect(),
+                    crate::data::PlaybackOrigin::Album(album_link.clone()),
+                    data.playback.queue_behavior,
+                    |t: Arc<Track>| crate::data::Playable::Track(t),
+                );
+            }
+            return Handled::Yes;
+        }
+        if let Some(playlist_link) = cmd.get(cmd::PLAY_PLAYLIST) {
+            if let Some(tracks) = data.playlist_detail.tracks.resolved() {
+                play_items(
+                    ctx,
+                    tracks.tracks.iter().cloned().collect(),
+                    crate::data::PlaybackOrigin::Playlist(playlist_link.clone()),
+                    data.playback.queue_behavior,
+                    |t: Arc<Track>| crate::data::Playable::Track(t),
+                );
+            }
+            return Handled::Yes;
+        }
         if cmd.is(cmd::SHOW_CREDITS_WINDOW) {
             let _window_id = self.show_credits(ctx);
             if let Some(track) = cmd.get(cmd::SHOW_CREDITS_WINDOW) {
@@ -324,4 +350,33 @@ impl Delegate {
             Handled::No
         }
     }
+}
+
+fn play_items<T, F>(
+    ctx: &mut DelegateCtx,
+    items: Vec<T>,
+    origin: crate::data::PlaybackOrigin,
+    queue_behavior: crate::data::QueueBehavior,
+    to_playable: F,
+) where
+    F: Fn(T) -> crate::data::Playable,
+{
+    if items.is_empty() {
+        return;
+    }
+    let playables: Vec<_> = items.into_iter().map(to_playable).collect();
+    let position = if queue_behavior == crate::data::QueueBehavior::Random {
+        (0..playables.len())
+            .collect::<Vec<_>>()
+            .choose(&mut rand::rng())
+            .copied()
+            .unwrap_or(0)
+    } else {
+        0
+    };
+    ctx.submit_command(crate::cmd::PLAY_TRACKS.with(crate::data::PlaybackPayload {
+        items: playables.into(),
+        origin,
+        position,
+    }));
 }
