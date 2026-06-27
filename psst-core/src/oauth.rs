@@ -87,9 +87,27 @@ fn handle_callback_connection(
 ) -> bool {
     let mut reader = BufReader::new(&mut *stream);
     let mut request_line = String::new();
+    const MAX_REQUEST_LINE_LEN: usize = 8192; // 8 KiB limit
 
-    if reader.read_line(&mut request_line).is_err() {
-        return false;
+    // Read with a size limit to prevent memory exhaustion attacks
+    let mut bytes_read = 0;
+    let mut buf = [0u8; 1];
+    loop {
+        match reader.read(&mut buf) {
+            Ok(0) => break,
+            Ok(1) => {
+                bytes_read += 1;
+                if bytes_read > MAX_REQUEST_LINE_LEN {
+                    log::error!("Request line exceeds {MAX_REQUEST_LINE_LEN} bytes limit");
+                    return false;
+                }
+                request_line.push(buf[0] as char);
+                if buf[0] == b'\n' {
+                    break;
+                }
+            }
+            _ => return false,
+        }
     }
 
     if request_line.contains("favicon.ico") {
