@@ -1361,7 +1361,8 @@ impl WebApi {
             artists: Option<Page<Artist>>,
             albums: Option<Page<Arc<Album>>>,
             tracks: Option<Page<Arc<Track>>>,
-            playlists: Option<Page<Playlist>>,
+            // Spotify returns `null` items for region-blocked/removed playlists.
+            playlists: Option<Page<Option<Playlist>>>,
             shows: Option<Page<Arc<Show>>>,
         }
 
@@ -1378,7 +1379,9 @@ impl WebApi {
         let artists = result.artists.map_or_else(Vector::new, |page| page.items);
         let albums = result.albums.map_or_else(Vector::new, |page| page.items);
         let tracks = result.tracks.map_or_else(Vector::new, |page| page.items);
-        let playlists = result.playlists.map_or_else(Vector::new, |page| page.items);
+        let playlists = result
+            .playlists
+            .map_or_else(Vector::new, |p| p.items.into_iter().flatten().collect());
         let shows = result.shows.map_or_else(Vector::new, |page| page.items);
         let topic = (topics.len() == 1).then_some(topics[0]);
 
