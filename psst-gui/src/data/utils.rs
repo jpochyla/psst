@@ -43,6 +43,7 @@ impl<T: Data> Cached<T> {
 
 #[derive(Deserialize)]
 pub struct Page<T: Clone> {
+    #[serde(deserialize_with = "deserialize_ignore_nulls", bound = "T: serde::Deserialize<'de>")]
     pub items: Vector<T>,
     pub limit: usize,
     pub offset: usize,
@@ -179,4 +180,17 @@ where
 pub fn sanitize_html_string(text: &str) -> Arc<str> {
     let sanitized = sanitize_str(&DEFAULT, text).unwrap_or_default();
     Arc::from(sanitized.replace("&amp;", "&"))
+}
+
+pub fn deserialize_ignore_nulls<'de, D, T>(deserializer: D) -> Result<Vector<T>, D::Error>
+where
+    D: Deserializer<'de>,
+    T: Deserialize<'de> + Clone,
+{
+    let opt_vec: Option<Vec<Option<T>>> = Option::deserialize(deserializer)?;
+    Ok(opt_vec
+        .unwrap_or_default()
+        .into_iter()
+        .flatten()
+        .collect())
 }
