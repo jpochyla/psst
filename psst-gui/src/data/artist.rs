@@ -10,7 +10,6 @@ pub struct ArtistDetail {
     pub artist: Promise<Artist, ArtistLink>,
     pub albums: Promise<ArtistAlbums, ArtistLink>,
     pub related_artists: Promise<Cached<Vector<Artist>>, ArtistLink>,
-    pub artist_info: Promise<ArtistInfo, ArtistLink>,
 }
 
 #[derive(Clone, Data, Lens, Deserialize)]
@@ -18,6 +17,8 @@ pub struct Artist {
     pub id: Arc<str>,
     pub name: Arc<str>,
     pub images: Vector<Image>,
+    #[serde(default)]
+    pub genres: Vector<String>,
 }
 
 impl Artist {
@@ -39,20 +40,6 @@ pub struct ArtistAlbums {
     pub singles: Vector<Arc<Album>>,
     pub compilations: Vector<Arc<Album>>,
     pub appears_on: Vector<Arc<Album>>,
-}
-#[derive(Clone, Data, Lens)]
-pub struct ArtistInfo {
-    pub main_image: Arc<str>,
-    pub stats: ArtistStats,
-    pub bio: String,
-    pub artist_links: Vector<String>,
-}
-
-#[derive(Clone, Data, Lens)]
-pub struct ArtistStats {
-    pub followers: i64,
-    pub monthly_listeners: i64,
-    pub world_rank: i64,
 }
 
 #[derive(Clone, Debug, Data, Lens, Eq, PartialEq, Hash, Deserialize, Serialize)]

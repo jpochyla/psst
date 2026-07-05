@@ -34,9 +34,7 @@ use psst_core::{item_id::ItemId, session::SessionService};
 
 pub use crate::data::{
     album::{Album, AlbumDetail, AlbumLink, AlbumType},
-    artist::{
-        Artist, ArtistAlbums, ArtistDetail, ArtistInfo, ArtistLink, ArtistStats,
-    },
+    artist::{Artist, ArtistAlbums, ArtistDetail, ArtistLink},
     config::{AudioQuality, Authentication, Config, Preferences, PreferencesTab, Theme},
     ctx::Ctx,
     find::{FindQuery, Finder, MatchFindQuery},
@@ -154,7 +152,6 @@ impl AppState {
                 artist: Promise::Empty,
                 albums: Promise::Empty,
                 related_artists: Promise::Empty,
-                artist_info: Promise::Empty,
             },
             playlist_detail: PlaylistDetail {
                 playlist: Promise::Empty,
@@ -204,7 +201,6 @@ impl AppState {
 
     pub fn refresh_all(&mut self) {
         self.album_detail.album = Promise::Empty;
-        self.artist_detail.artist_info = Promise::Empty;
         self.artist_detail.albums = Promise::Empty;
         self.artist_detail.artist = Promise::Empty;
         self.artist_detail.related_artists = Promise::Empty;

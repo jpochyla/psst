@@ -31,9 +31,9 @@ use ureq::{
 
 use crate::{
     data::{
-        self, utils::sanitize_html_string, Album, AlbumType, Artist, ArtistAlbums, ArtistInfo,
-        ArtistLink, ArtistStats, AudioAnalysis, Cached, Episode, EpisodeId, EpisodeLink, Image,
-        MixedView, Nav, Page, Playlist, PublicUser, Range, Recommendations, RecommendationsRequest,
+        self, utils::sanitize_html_string, Album, AlbumType, Artist, ArtistAlbums, ArtistLink,
+        AudioAnalysis, Cached, Episode, EpisodeId, EpisodeLink, MixedView, Nav, Page, Playlist,
+        PublicUser, Range, Recommendations, RecommendationsRequest,
         SearchResults, SearchTopic, Show, SpotifyUrl, Track, TrackLines, UserProfile,
     },
     error::Error,
@@ -41,7 +41,6 @@ use crate::{
 };
 
 use super::{cache::WebApiCache, local::LocalTrackManager};
-use sanitize_html::{rules::predefined::DEFAULT, sanitize_str};
 
 pub struct WebApi {
     agent: Agent,
@@ -227,11 +226,12 @@ impl WebApi {
     fn for_all_pages<T: DeserializeOwned + Clone>(
         &self,
         request: &RequestBuilder,
+        initial_limit: usize,
         mut func: impl FnMut(Page<T>) -> Result<(), Error>,
     ) -> Result<(), Error> {
         // TODO: Some result sets, like very long playlists and saved tracks/albums can
         // be very big.  Implement virtualized scrolling and lazy-loading of results.
-        let mut limit = 50;
+        let mut limit = initial_limit;
         let mut offset = 0;
         loop {
             let req = request
@@ -303,9 +303,20 @@ impl WebApi {
         &self,
         request: &RequestBuilder,
     ) -> Result<Vector<T>, Error> {
+        self.load_all_pages_with_limit(request, 50)
+    }
+
+    /// Like `load_all_pages`, but with an explicit initial page size. Needed
+    /// for endpoints that cap `limit` below 50, like the "Get Artist's Albums"
+    /// endpoint where the default 50 returns HTTP 400.
+    fn load_all_pages_with_limit<T: DeserializeOwned + Clone>(
+        &self,
+        request: &RequestBuilder,
+        page_limit: usize,
+    ) -> Result<Vector<T>, Error> {
         let mut results = Vector::new();
 
-        self.for_all_pages(request, |page| {
+        self.for_all_pages(request, page_limit, |page| {
             results.append(page.items);
             Ok(())
         })?;
@@ -612,6 +623,7 @@ impl WebApi {
                                         .collect()
                                 },
                             ),
+                            genres: Vector::new(),
                         }),
                         DataTypename::Album => album.push_back(Arc::new(Album {
                             id: id.into(),
@@ -763,10 +775,10 @@ impl WebApi {
 
     // https://developer.spotify.com/documentation/web-api/reference/get-an-artists-albums/
     pub fn get_artist_albums(&self, id: &str) -> Result<ArtistAlbums, Error> {
-        let request = &RequestBuilder::new(format!("v1/artists/{id}/albums"), Method::Get, None)
-            .query("market", "from_token");
-        let result: Vector<Arc<Album>> = self.load_all_pages(request)?;
-
+        // Split the groups with `include_groups` and let the API categorize
+        // them, instead of guessing from `album_type`. The main discography
+        // is bucketed by type and the separate `appears_on` request is taken
+        // wholesale. `limit` is capped at 10. The default 50 returns HTTP 400.
         let mut artist_albums = ArtistAlbums {
             albums: Vector::new(),
             singles: Vector::new(),
@@ -774,35 +786,21 @@ impl WebApi {
             appears_on: Vector::new(),
         };
 
-        let mut last_album_release_year = usize::MAX;
-        let mut last_single_release_year = usize::MAX;
-
-        for album in result {
+        let main = &RequestBuilder::new(format!("v1/artists/{id}/albums"), Method::Get, None)
+            .query("include_groups", "album,single,compilation");
+        let main_albums: Vector<Arc<Album>> = self.load_all_pages_with_limit(main, 10)?;
+        for album in main_albums {
             match album.album_type {
-                // Spotify is labeling albums and singles that should be labeled `appears_on` as `album` or `single`.
-                // They are still ordered properly though, with the most recent first, then 'appears_on'.
-                // So we just wait until they are no longer descending, then start putting them in the 'appears_on' Vec.
-                // NOTE: This will break if an artist has released 'appears_on' albums/singles before their first actual album/single.
-                AlbumType::Album => {
-                    if album.release_year_int() > last_album_release_year {
-                        artist_albums.appears_on.push_back(album)
-                    } else {
-                        last_album_release_year = album.release_year_int();
-                        artist_albums.albums.push_back(album)
-                    }
-                }
-                AlbumType::Single => {
-                    if album.release_year_int() > last_single_release_year {
-                        artist_albums.appears_on.push_back(album);
-                    } else {
-                        last_single_release_year = album.release_year_int();
-                        artist_albums.singles.push_back(album);
-                    }
-                }
+                AlbumType::Single => artist_albums.singles.push_back(album),
                 AlbumType::Compilation => artist_albums.compilations.push_back(album),
-                AlbumType::AppearsOn => artist_albums.appears_on.push_back(album),
+                AlbumType::Album | AlbumType::AppearsOn => artist_albums.albums.push_back(album),
             }
         }
+
+        let appears = &RequestBuilder::new(format!("v1/artists/{id}/albums"), Method::Get, None)
+            .query("include_groups", "appears_on");
+        artist_albums.appears_on = self.load_all_pages_with_limit(appears, 10)?;
+
         Ok(artist_albums)
     }
 
@@ -819,120 +817,6 @@ impl WebApi {
         );
         let result: Cached<Artists> = self.load_cached(request, "related-artists", id)?;
         Ok(result.map(|result| result.artists))
-    }
-
-    pub fn get_artist_info(&self, id: &str) -> Result<ArtistInfo, Error> {
-        #[derive(Clone, Data, Deserialize)]
-        pub struct Welcome {
-            data: Data1,
-        }
-
-        #[derive(Clone, Data, Deserialize)]
-        #[serde(rename_all = "camelCase")]
-        pub struct Data1 {
-            artist_union: ArtistUnion,
-        }
-
-        #[derive(Clone, Data, Deserialize)]
-        pub struct ArtistUnion {
-            profile: Profile,
-            stats: Stats,
-            visuals: Visuals,
-        }
-
-        #[derive(Clone, Data, Deserialize)]
-        #[serde(rename_all = "camelCase")]
-        pub struct Profile {
-            biography: Biography,
-            external_links: ExternalLinks,
-        }
-
-        #[derive(Clone, Data, Deserialize)]
-        pub struct Biography {
-            text: String,
-        }
-
-        #[derive(Clone, Data, Deserialize)]
-        pub struct ExternalLinks {
-            items: Vector<ExternalLinksItem>,
-        }
-
-        #[derive(Clone, Data, Deserialize)]
-        #[serde(rename_all = "camelCase")]
-        pub struct Visuals {
-            avatar_image: AvatarImage,
-        }
-        #[derive(Clone, Data, Deserialize)]
-        pub struct AvatarImage {
-            sources: Vector<Image>,
-        }
-        #[derive(Clone, Data, Deserialize)]
-        pub struct ExternalLinksItem {
-            url: String,
-        }
-
-        #[derive(Clone, Data, Deserialize)]
-        #[serde(rename_all = "camelCase")]
-        pub struct Stats {
-            followers: i64,
-            monthly_listeners: i64,
-            world_rank: i64,
-        }
-
-        let variables = json!( {
-            "locale": "",
-            "uri": format!("spotify:artist:{}", id),
-        });
-        let json = json!({
-            "extensions": {
-                "persistedQuery": {
-                    "version": 1,
-                    "sha256Hash": "1ac33ddab5d39a3a9c27802774e6d78b9405cc188c6f75aed007df2a32737c72"
-                }
-            },
-            "operationName": "queryArtistOverview",
-            "variables": variables,
-        });
-
-        let request =
-            &RequestBuilder::new("pathfinder/v2/query".to_string(), Method::Post, Some(json))
-                .set_base_uri("api-partner.spotify.com")
-                .header("User-Agent", Self::user_agent());
-        let result: Cached<Welcome> = self.load_cached(request, "artist-info", id)?;
-
-        let hrefs: Vector<String> = result
-            .data
-            .data
-            .artist_union
-            .profile
-            .external_links
-            .items
-            .into_iter()
-            .map(|link| link.url)
-            .collect();
-
-        Ok(ArtistInfo {
-            main_image: Arc::from(
-                result.data.data.artist_union.visuals.avatar_image.sources[0]
-                    .url
-                    .to_string(),
-            ),
-            stats: ArtistStats {
-                followers: result.data.data.artist_union.stats.followers,
-                monthly_listeners: result.data.data.artist_union.stats.monthly_listeners,
-                world_rank: result.data.data.artist_union.stats.world_rank,
-            },
-            bio: {
-                let sanitized_bio = sanitize_str(
-                    &DEFAULT,
-                    &result.data.data.artist_union.profile.biography.text,
-                )
-                .unwrap_or_default();
-                sanitized_bio.replace("&amp;", "&")
-            },
-
-            artist_links: hrefs,
-        })
     }
 }
 
@@ -982,7 +866,7 @@ impl WebApi {
             .query("market", "from_token");
 
         let mut results = Vector::new();
-        self.for_all_pages(request, |page: Page<Option<EpisodeLink>>| {
+        self.for_all_pages(request, 50, |page: Page<Option<EpisodeLink>>| {
             if !page.items.is_empty() {
                 let ids = page
                     .items
