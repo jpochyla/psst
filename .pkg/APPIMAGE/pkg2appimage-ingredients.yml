@@ -1,9 +1,13 @@
+app: Psst
+lowerapp: psst
 ingredients:
   dist: jammy
   sources:
     - deb http://us.archive.ubuntu.com/ubuntu/ jammy main universe
+  package: psst-gui
   debs:
     - ../*.deb
   script:
-    - mkdir -p $GITHUB_WORKSPACE/.AppDir/
-    - cp $GITHUB_WORKSPACE/psst-gui/assets/logo_256.png $GITHUB_WORKSPACE/.AppDir/psst.png
+    - mkdir -p Psst.AppDir
+    - cp ../psst-gui/assets/logo_256.png Psst.AppDir/psst.png
+    - dpkg-deb -f ../*.deb Version > VERSION
