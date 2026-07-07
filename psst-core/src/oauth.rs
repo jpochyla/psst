@@ -1,7 +1,8 @@
 use crate::error::Error;
 use oauth2::{
-    basic::BasicClient, reqwest::http_client, AuthUrl, AuthorizationCode, ClientId, CsrfToken,
-    PkceCodeChallenge, PkceCodeVerifier, RedirectUrl, RefreshToken, Scope, TokenResponse, TokenUrl,
+    basic::BasicClient, reqwest::http_client, AuthType, AuthUrl, AuthorizationCode, ClientId,
+    CsrfToken, PkceCodeChallenge, PkceCodeVerifier, RedirectUrl, RefreshToken, Scope, TokenResponse,
+    TokenUrl,
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -176,6 +177,9 @@ fn create_oauth_client(client_id: &str, redirect_port: u16) -> BasicClient {
         Some(TokenUrl::new("https://accounts.spotify.com/api/token".to_string()).unwrap()),
     )
     .set_redirect_uri(RedirectUrl::new(redirect_uri).expect("Invalid redirect URL"))
+    // Spotify's PKCE public-client token endpoint expects `client_id` in the
+    // request body, not as an HTTP Basic auth header (the oauth2 crate default).
+    .set_auth_type(AuthType::RequestBody)
 }
 
 pub fn generate_session_auth_url(redirect_port: u16) -> (String, PkceCodeVerifier) {
@@ -274,7 +278,7 @@ pub fn exchange_webapi_code_for_token(
         .exchange_code(code)
         .set_pkce_verifier(pkce_verifier)
         .request(http_client)
-        .map_err(|e| Error::OAuthError(format!("Failed to exchange Web API code: {e}")))?;
+        .map_err(|e| Error::OAuthError(format!("Failed to exchange Web API code: {e:?}")))?;
 
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
