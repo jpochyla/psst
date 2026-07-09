@@ -123,7 +123,7 @@ impl WebApi {
             }
         }
         Err(Error::WebApiError(
-            "No valid Web API token available".to_string(),
+            "No valid Web API token available. Did you enable Web API for the Spotify Developer Client?".to_string(),
         ))
     }
 
