@@ -32,8 +32,7 @@ pub struct Playlist {
     pub images: Option<Vector<Image>>,
     #[serde(deserialize_with = "deserialize_description")]
     pub description: Arc<str>,
-    #[serde(rename = "items")]
-    #[serde(alias = "tracks")]
+    #[serde(rename = "tracks")]
     #[serde(deserialize_with = "deserialize_track_count")]
     #[serde(default)]
     pub track_count: Option<usize>,
@@ -93,7 +92,8 @@ where
         total: Option<usize>,
     }
 
-    Ok(PlaylistTracksRef::deserialize(deserializer)?.total)
+    let opt: Option<PlaylistTracksRef> = Option::deserialize(deserializer)?;
+    Ok(opt.and_then(|r| r.total))
 }
 
 fn deserialize_description<'de, D>(deserializer: D) -> Result<Arc<str>, D::Error>
