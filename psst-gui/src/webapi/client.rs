@@ -1117,7 +1117,7 @@ impl WebApi {
     // https://developer.spotify.com/documentation/web-api/reference/save-to-library/
     pub fn save_track(&self, id: &str) -> Result<(), Error> {
         // Spotify's /v1/me/tracks takes the base62 ids as a query param, not a
-        // uris body. The old /v1/me/library + {"uris":[...]} form returns 400.
+        // uris body.
         let request = &RequestBuilder::new("v1/me/tracks", Method::Put, None).query("ids", id);
         self.send_empty_json(request)
     }
