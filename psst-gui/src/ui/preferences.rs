@@ -760,6 +760,9 @@ impl<W: Widget<AppState>> Controller<AppState, W> for Authenticate {
             Event::Command(cmd) if cmd.is(cmd::LOG_OUT) => {
                 data.config.clear_credentials();
                 data.config.clear_webapi_token();
+                // `WebApi` keeps its own copy and would save it right back into
+                // the config we just cleared.
+                crate::webapi::WebApi::global().set_webapi_credentials(None, None);
                 data.config.save();
                 data.session.shutdown();
                 ctx.submit_command(cmd::CLOSE_ALL_WINDOWS);

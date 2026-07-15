@@ -11,7 +11,7 @@ use std::{
 use druid::{
     im::Vector,
     image::{self, ImageFormat},
-    Data, ImageBuf,
+    Data, ExtEventSink, ImageBuf, Target,
 };
 
 use itertools::Itertools;
@@ -30,6 +30,7 @@ use ureq::{
 };
 
 use crate::{
+    cmd,
     data::{
         self, utils::sanitize_html_string, Album, AlbumType, Artist, ArtistAlbums, ArtistInfo,
         ArtistLink, ArtistStats, AudioAnalysis, Cached, Episode, EpisodeId, EpisodeLink, Image,
@@ -50,6 +51,7 @@ pub struct WebApi {
     paginated_limit: usize,
     webapi_token: Mutex<Option<WebApiToken>>,
     webapi_client_id: Mutex<Option<String>>,
+    event_sink: OnceLock<ExtEventSink>,
 }
 
 impl WebApi {
@@ -70,6 +72,7 @@ impl WebApi {
             paginated_limit,
             webapi_token: Mutex::new(None),
             webapi_client_id: Mutex::new(None),
+            event_sink: OnceLock::new(),
         }
     }
 
@@ -94,6 +97,27 @@ impl WebApi {
         *self.webapi_token.lock() = token;
     }
 
+    /// Install the handle used to send refreshed tokens back to the GUI thread.
+    pub fn set_event_sink(&self, sink: ExtEventSink) {
+        if self.event_sink.set(sink).is_err() {
+            log::warn!("event sink is already installed");
+        }
+    }
+
+    /// Send a refreshed token to the GUI thread, which owns the config.
+    fn persist_webapi_token(&self, token: WebApiToken) {
+        if let Some(sink) = self.event_sink.get() {
+            if sink
+                .submit_command(cmd::STORE_WEBAPI_TOKEN, token, Target::Global)
+                .is_err()
+            {
+                log::warn!("failed to submit the refreshed Web API token");
+            }
+        } else {
+            log::warn!("no event sink, the refreshed Web API token will not be saved");
+        }
+    }
+
     fn access_token(&self) -> Result<String, Error> {
         let mut token_guard = self.webapi_token.lock();
         if let Some(ref token) = *token_guard {
@@ -109,10 +133,9 @@ impl WebApi {
                 match oauth::refresh_webapi_token(client_id, refresh_token) {
                     Ok(new_token) => {
                         let access_token = new_token.access_token.clone();
-                        // NOTE: only updates the in-memory cache. The durable
-                        // copy in config.json is refreshed by Config on the
-                        // next save; if Spotify rotates the refresh token and
-                        // the process exits before then, the user must re-login.
+                        // Spotify revokes the previous refresh token on every
+                        // refresh, so the copy in the config is now dead.
+                        self.persist_webapi_token(new_token.clone());
                         *token_guard = Some(new_token);
                         return Ok(access_token);
                     }
