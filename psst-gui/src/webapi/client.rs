@@ -122,7 +122,7 @@ impl WebApi {
             }
         }
         Err(Error::WebApiError(
-            "No valid Web API token available".to_string(),
+            "No valid Web API token available. Did you enable Web API for the Spotify Developer Client?".to_string(),
         ))
     }
 
@@ -1000,15 +1000,15 @@ impl WebApi {
 
     // https://developer.spotify.com/documentation/web-api/reference/save-to-library/
     pub fn save_track(&self, id: &str) -> Result<(), Error> {
-        let request = &RequestBuilder::new("v1/me/library", Method::Put, None)
-            .set_body(Some(json!({"uris": [format!("spotify:track:{id}")]})));
+        // Spotify's /v1/me/tracks takes the base62 ids as a query param, not a
+        // uris body.
+        let request = &RequestBuilder::new("v1/me/tracks", Method::Put, None).query("ids", id);
         self.send_empty_json(request)
     }
 
     // https://developer.spotify.com/documentation/web-api/reference/remove-from-library/
     pub fn unsave_track(&self, id: &str) -> Result<(), Error> {
-        let request = &RequestBuilder::new("v1/me/library", Method::Delete, None)
-            .set_body(Some(json!({"uris": [format!("spotify:track:{id}")]})));
+        let request = &RequestBuilder::new("v1/me/tracks", Method::Delete, None).query("ids", id);
         self.send_empty_json(request)
     }
 

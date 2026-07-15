@@ -32,8 +32,10 @@ pub struct Playlist {
     pub images: Option<Vector<Image>>,
     #[serde(deserialize_with = "deserialize_description")]
     pub description: Arc<str>,
-    #[serde(rename = "items")]
-    #[serde(alias = "tracks")]
+    // Spotify returns both a `tracks` object (with `total`) and, more recently,
+    // a separate `items` key on playlist objects. Matching both (rename + alias)
+    // makes serde error with "duplicate field `items`", so read only `tracks`.
+    #[serde(rename = "tracks")]
     #[serde(deserialize_with = "deserialize_track_count")]
     #[serde(default)]
     pub track_count: Option<usize>,
