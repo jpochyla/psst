@@ -151,7 +151,6 @@ impl AppState {
             artist_detail: ArtistDetail {
                 artist: Promise::Empty,
                 albums: Promise::Empty,
-                related_artists: Promise::Empty,
             },
             playlist_detail: PlaylistDetail {
                 playlist: Promise::Empty,
@@ -203,7 +202,6 @@ impl AppState {
         self.album_detail.album = Promise::Empty;
         self.artist_detail.albums = Promise::Empty;
         self.artist_detail.artist = Promise::Empty;
-        self.artist_detail.related_artists = Promise::Empty;
         self.playlist_detail.playlist = Promise::Empty;
         self.playlist_detail.tracks = Promise::Empty;
         self.show_detail.episodes = Promise::Empty;

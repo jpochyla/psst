@@ -306,9 +306,7 @@ impl WebApi {
         self.load_all_pages_with_limit(request, 50)
     }
 
-    /// Like `load_all_pages`, but with an explicit initial page size. Needed
-    /// for endpoints that cap `limit` below 50, like the "Get Artist's Albums"
-    /// endpoint where the default 50 returns HTTP 400.
+    /// Like `load_all_pages`, but for endpoints that cap `limit` below 50.
     fn load_all_pages_with_limit<T: DeserializeOwned + Clone>(
         &self,
         request: &RequestBuilder,
@@ -623,7 +621,6 @@ impl WebApi {
                                         .collect()
                                 },
                             ),
-                            genres: Vector::new(),
                         }),
                         DataTypename::Album => album.push_back(Arc::new(Album {
                             id: id.into(),
@@ -775,10 +772,9 @@ impl WebApi {
 
     // https://developer.spotify.com/documentation/web-api/reference/get-an-artists-albums/
     pub fn get_artist_albums(&self, id: &str) -> Result<ArtistAlbums, Error> {
-        // Split the groups with `include_groups` and let the API categorize
-        // them, instead of guessing from `album_type`. The main discography
-        // is bucketed by type and the separate `appears_on` request is taken
-        // wholesale. `limit` is capped at 10. The default 50 returns HTTP 400.
+        // `album_group` is gone since February 2026 and `album_type` never says
+        // `appears_on`, so only `include_groups` still separates the discography
+        // from guest appearances, hence two sweeps. `limit` over 10 gives a 400.
         let mut artist_albums = ArtistAlbums {
             albums: Vector::new(),
             singles: Vector::new(),
@@ -787,36 +783,23 @@ impl WebApi {
         };
 
         let main = &RequestBuilder::new(format!("v1/artists/{id}/albums"), Method::Get, None)
+            .query("market", "from_token")
             .query("include_groups", "album,single,compilation");
         let main_albums: Vector<Arc<Album>> = self.load_all_pages_with_limit(main, 10)?;
         for album in main_albums {
             match album.album_type {
                 AlbumType::Single => artist_albums.singles.push_back(album),
                 AlbumType::Compilation => artist_albums.compilations.push_back(album),
-                AlbumType::Album | AlbumType::AppearsOn => artist_albums.albums.push_back(album),
+                AlbumType::Album => artist_albums.albums.push_back(album),
             }
         }
 
         let appears = &RequestBuilder::new(format!("v1/artists/{id}/albums"), Method::Get, None)
+            .query("market", "from_token")
             .query("include_groups", "appears_on");
         artist_albums.appears_on = self.load_all_pages_with_limit(appears, 10)?;
 
         Ok(artist_albums)
-    }
-
-    // https://developer.spotify.com/documentation/web-api/reference/get-an-artists-related-artists
-    pub fn get_related_artists(&self, id: &str) -> Result<Cached<Vector<Artist>>, Error> {
-        #[derive(Clone, Data, Deserialize)]
-        struct Artists {
-            artists: Vector<Artist>,
-        }
-        let request = &RequestBuilder::new(
-            format!("v1/artists/{id}/related-artists"),
-            Method::Get,
-            None,
-        );
-        let result: Cached<Artists> = self.load_cached(request, "related-artists", id)?;
-        Ok(result.map(|result| result.artists))
     }
 }
 

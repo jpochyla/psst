@@ -1,16 +1,13 @@
 use druid::{
-    im::Vector,
     kurbo::Circle,
-    widget::{CrossAxisAlignment, Either, Flex, Label, LabelText, LineBreaking, List},
+    widget::{CrossAxisAlignment, Flex, Label, LabelText, LineBreaking, List},
     Data, Insets, LensExt, LocalizedString, Menu, MenuItem, Selector, Size, UnitPoint, Widget,
     WidgetExt,
 };
 
 use crate::{
     cmd,
-    data::{
-        AppState, Artist, ArtistAlbums, ArtistDetail, ArtistLink, Cached, Ctx, Nav, WithCtx,
-    },
+    data::{AppState, Artist, ArtistAlbums, ArtistDetail, ArtistLink, Ctx, Nav, WithCtx},
     webapi::WebApi,
     widget::{Async, Empty, MyWidgetExt, RemoteImage},
 };
@@ -26,7 +23,6 @@ pub fn detail_widget() -> impl Widget<AppState> {
     Flex::column()
         .with_child(async_artist_header().padding((theme::grid(1.0), 0.0)))
         .with_child(async_albums_widget().padding((theme::grid(1.0), 0.0)))
-        .with_child(async_related_widget().padding((theme::grid(1.0), 0.0)))
 }
 
 fn async_artist_header() -> impl Widget<AppState> {
@@ -55,28 +51,11 @@ fn artist_header_widget() -> impl Widget<Artist> {
         .with_line_break_mode(LineBreaking::WordWrap)
         .lens(Artist::name);
 
-    let genres = Either::new(
-        |artist: &Artist, _| !artist.genres.is_empty(),
-        Label::new(|artist: &Artist, _env: &_| {
-            artist.genres.iter().map(String::as_str).collect::<Vec<_>>().join(", ")
-        })
-        .with_line_break_mode(LineBreaking::WordWrap)
-        .with_text_color(theme::PLACEHOLDER_COLOR),
-        Empty,
-    );
-
     Flex::row()
         .cross_axis_alignment(CrossAxisAlignment::Center)
         .with_child(artist_image)
         .with_spacer(theme::grid(1.0))
-        .with_flex_child(
-            Flex::column()
-                .cross_axis_alignment(CrossAxisAlignment::Start)
-                .with_child(name)
-                .with_spacer(theme::grid(0.5))
-                .with_child(genres),
-            1.0,
-        )
+        .with_flex_child(name, 1.0)
         .padding((0.0, theme::grid(1.0)))
 }
 
@@ -94,18 +73,6 @@ fn async_albums_widget() -> impl Widget<AppState> {
             |d| WebApi::global().get_artist_albums(&d.id),
             |_, data, d| data.artist_detail.albums.defer(d),
             |_, data, r| data.artist_detail.albums.update(r),
-        )
-}
-
-fn async_related_widget() -> impl Widget<AppState> {
-    // related-artist is deprecated. Hide the section on failure instead of showing an error box.
-    Async::new(utils::spinner_widget, related_widget, || Empty)
-        .lens(AppState::artist_detail.then(ArtistDetail::related_artists))
-        .on_command_async(
-            LOAD_DETAIL,
-            |d| WebApi::global().get_related_artists(&d.id),
-            |_, data, d| data.artist_detail.related_artists.defer(d),
-            |_, data, r| data.artist_detail.related_artists.update(r),
         )
 }
 
@@ -186,14 +153,6 @@ fn albums_widget() -> impl Widget<WithCtx<ArtistAlbums>> {
         .with_child(
             List::new(|| album::album_widget(false)).lens(Ctx::map(ArtistAlbums::appears_on)),
         )
-}
-
-fn related_widget() -> impl Widget<Cached<Vector<Artist>>> {
-    Flex::column()
-        .cross_axis_alignment(CrossAxisAlignment::Start)
-        .with_child(header_widget("Related Artists"))
-        .with_child(List::new(|| artist_widget(false)))
-        .lens(Cached::data)
 }
 
 fn header_widget<T: Data>(text: impl Into<LabelText<T>>) -> impl Widget<T> {

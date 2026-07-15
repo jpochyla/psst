@@ -14,6 +14,9 @@ use time::{Date, Month};
 #[derive(Clone, Data, Lens)]
 pub struct Cached<T: Data> {
     pub data: T,
+    /// Unread: `map` is the only reader, and nothing calls `map`. Kept for
+    /// whoever adds cache expiry.
+    #[allow(dead_code)]
     #[data(ignore)]
     pub cached_at: Option<SystemTime>,
 }
@@ -33,6 +36,8 @@ impl<T: Data> Cached<T> {
         }
     }
 
+    /// Unused; see `cached_at`.
+    #[allow(dead_code)]
     pub fn map<U: Data>(self, f: impl Fn(T) -> U) -> Cached<U> {
         Cached {
             data: f(self.data),

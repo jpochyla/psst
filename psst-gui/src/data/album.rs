@@ -109,7 +109,6 @@ pub enum AlbumType {
     Album,
     Single,
     Compilation,
-    AppearsOn,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Data, Deserialize)]
