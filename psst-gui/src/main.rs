@@ -99,6 +99,10 @@ fn main() {
         launcher = AppLauncher::with_window(window).configure_env(ui::theme::setup);
     };
 
+    // `WebApi` refreshes tokens on worker threads, but only the GUI thread can
+    // save them into the config.
+    WebApi::global().set_event_sink(launcher.get_external_handle());
+
     launcher
         .delegate(delegate)
         .launch(state)
