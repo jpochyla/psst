@@ -196,45 +196,21 @@ impl WebApi {
         }
 
         let ct = client_token.as_deref();
-        // ureq 3 surfaces 429/503 as `Err(StatusCode(..))` rather than an `Ok`
-        // response, so `with_retry` never sees them — retry with backoff here.
-        const MAX_RETRIES: u32 = 4;
-        let mut attempt: u32 = 0;
-        loop {
-            let headers = request.get_headers();
-            let result = match request.get_method() {
-                Method::Get => configure_request(self.agent.get(&url), &token, ct, headers).call(),
-                Method::Post => configure_request(self.agent.post(&url), &token, ct, headers)
-                    .send_json(request.get_body()),
-                Method::Put => configure_request(self.agent.put(&url), &token, ct, headers)
-                    .send_json(request.get_body()),
-                Method::Delete => configure_request(self.agent.delete(&url), &token, ct, headers)
-                    .force_send_body()
-                    .send_json(request.get_body()),
-            };
-            match result {
-                Ok(response) => return Ok(response),
-                Err(err) => {
-                    let status = match &err {
-                        ureq::Error::StatusCode(code) => Some(*code),
-                        _ => None,
-                    };
-                    if matches!(status, Some(429) | Some(503)) && attempt < MAX_RETRIES {
-                        let backoff = Duration::from_secs(1u64 << attempt);
-                        log::warn!(
-                            "web api request to {url} got HTTP {}, retrying in {}s ({}/{})",
-                            status.unwrap(),
-                            backoff.as_secs(),
-                            attempt + 1,
-                            MAX_RETRIES
-                        );
-                        thread::sleep(backoff);
-                        attempt += 1;
-                        continue;
-                    }
-                    return Err(Error::WebApiError(err.to_string()));
-                }
-            }
+        let headers = request.get_headers();
+        match request.get_method() {
+            Method::Get => configure_request(self.agent.get(&url), &token, ct, headers)
+                .call()
+                .map_err(|err| Error::WebApiError(err.to_string())),
+            Method::Post => configure_request(self.agent.post(&url), &token, ct, headers)
+                .send_json(request.get_body())
+                .map_err(|err| Error::WebApiError(err.to_string())),
+            Method::Put => configure_request(self.agent.put(&url), &token, ct, headers)
+                .send_json(request.get_body())
+                .map_err(|err| Error::WebApiError(err.to_string())),
+            Method::Delete => configure_request(self.agent.delete(&url), &token, ct, headers)
+                .force_send_body()
+                .send_json(request.get_body())
+                .map_err(|err| Error::WebApiError(err.to_string())),
         }
     }
 
