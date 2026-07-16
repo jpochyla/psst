@@ -57,6 +57,10 @@ fn main() {
     )
     .install_as_global();
 
+    // Share the core session so the WebApi can authenticate `api-partner`
+    // (pathfinder GraphQL) calls with first-party tokens.
+    WebApi::global().set_session(state.session.clone());
+
     let delegate;
     let launcher;
     if state.config.has_credentials() {

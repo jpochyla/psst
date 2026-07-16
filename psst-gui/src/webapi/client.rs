@@ -19,6 +19,11 @@ use log::info;
 use parking_lot::Mutex;
 use psst_core::{
     oauth::{self, WebApiToken},
+    session::{
+        client_token::{ClientTokenProvider, ClientTokenProviderHandle},
+        login5::Login5,
+        SessionService,
+    },
     system_info::{OS, SPOTIFY_SEMANTIC_VERSION},
 };
 use serde::{de::DeserializeOwned, Deserialize};
@@ -31,16 +36,18 @@ use ureq::{
 
 use crate::{
     data::{
-        self, utils::sanitize_html_string, Album, AlbumType, Artist, ArtistAlbums, ArtistLink,
-        AudioAnalysis, Cached, Episode, EpisodeId, EpisodeLink, MixedView, Nav, Page, Playlist,
-        PublicUser, Range, Recommendations, RecommendationsRequest,
-        SearchResults, SearchTopic, Show, SpotifyUrl, Track, TrackLines, UserProfile,
+        self, utils::sanitize_html_string, Album, AlbumType, Artist, ArtistAlbums, ArtistInfo,
+        ArtistLink, ArtistStats, AudioAnalysis, Cached, Episode, EpisodeId, EpisodeLink, Image,
+        MixedView, Nav, Page, Playlist, PublicUser, Range, Recommendations,
+        RecommendationsRequest, SearchResults, SearchTopic, Show, SpotifyUrl, Track, TrackLines,
+        UserProfile,
     },
     error::Error,
     ui::credits::TrackCredits,
 };
 
 use super::{cache::WebApiCache, local::LocalTrackManager};
+use sanitize_html::{rules::predefined::DEFAULT, sanitize_str};
 
 pub struct WebApi {
     agent: Agent,
@@ -49,6 +56,11 @@ pub struct WebApi {
     paginated_limit: usize,
     webapi_token: Mutex<Option<WebApiToken>>,
     webapi_client_id: Mutex<Option<String>>,
+    // First-party session credentials, used for `api-partner.spotify.com`
+    // (pathfinder GraphQL) calls, which reject the Web API OAuth token.
+    session: Mutex<Option<SessionService>>,
+    login5: Login5,
+    client_token_provider: ClientTokenProviderHandle,
 }
 
 impl WebApi {
@@ -62,6 +74,7 @@ impl WebApi {
             let proxy = ureq::Proxy::new(proxy_url).ok();
             agent = agent.proxy(proxy);
         }
+        let client_token_provider = ClientTokenProvider::new_shared(proxy_url);
         Self {
             agent: agent.build().into(),
             cache: WebApiCache::new(cache_base),
@@ -69,6 +82,9 @@ impl WebApi {
             paginated_limit,
             webapi_token: Mutex::new(None),
             webapi_client_id: Mutex::new(None),
+            session: Mutex::new(None),
+            login5: Login5::new(Some(Arc::clone(&client_token_provider)), proxy_url),
+            client_token_provider,
         }
     }
 
@@ -91,6 +107,32 @@ impl WebApi {
     pub fn set_webapi_credentials(&self, client_id: Option<String>, token: Option<WebApiToken>) {
         *self.webapi_client_id.lock() = client_id;
         *self.webapi_token.lock() = token;
+    }
+
+    /// Install the authenticated core session, used to mint the first-party
+    /// tokens that `api-partner.spotify.com` requires.
+    pub fn set_session(&self, session: SessionService) {
+        *self.session.lock() = Some(session);
+    }
+
+    /// Mint the `(bearer, client-token)` pair accepted by `api-partner`.  Uses
+    /// the Login5 access token from the core session plus a protobuf client
+    /// token — the same credentials the web player and `Cdn` use.
+    fn partner_token(&self) -> Result<(String, String), Error> {
+        let session = self
+            .session
+            .lock()
+            .clone()
+            .ok_or_else(|| Error::WebApiError("No active session for api-partner".to_string()))?;
+        let access_token = self
+            .login5
+            .get_access_token(&session)
+            .map_err(|err| Error::WebApiError(err.to_string()))?;
+        let client_token = self
+            .client_token_provider
+            .get()
+            .map_err(|err| Error::WebApiError(err.to_string()))?;
+        Ok((access_token.access_token, client_token))
     }
 
     fn access_token(&self) -> Result<String, Error> {
@@ -127,32 +169,48 @@ impl WebApi {
     }
 
     fn request(&self, request: &RequestBuilder) -> Result<Response<Body>, Error> {
-        let token = self.access_token()?;
+        // `api-partner.spotify.com` rejects the Web API OAuth token, so those
+        // requests carry the first-party Login5 bearer + client-token instead.
+        let (token, client_token) = if request.partner_auth {
+            let (bearer, client_token) = self.partner_token()?;
+            (bearer, Some(client_token))
+        } else {
+            (self.access_token()?, None)
+        };
         let url = request.build();
 
         fn configure_request<B>(
             req_builder: ureq::RequestBuilder<B>,
             token: &str,
+            client_token: Option<&str>,
             headers: &HashMap<String, String>,
         ) -> ureq::RequestBuilder<B> {
-            headers.iter().fold(
-                req_builder.header("Authorization", &format!("Bearer {token}")),
-                |current_req, (k, v)| current_req.header(k, v),
-            )
+            let mut req = req_builder.header("Authorization", &format!("Bearer {token}"));
+            if let Some(client_token) = client_token {
+                req = req.header("client-token", client_token);
+            }
+            headers
+                .iter()
+                .fold(req, |current_req, (k, v)| current_req.header(k, v))
         }
 
+        let ct = client_token.as_deref();
         match request.get_method() {
-            Method::Get => configure_request(self.agent.get(&url), &token, request.get_headers())
+            Method::Get => configure_request(self.agent.get(&url), &token, ct, request.get_headers())
                 .call()
                 .map_err(|err| Error::WebApiError(err.to_string())),
-            Method::Post => configure_request(self.agent.post(&url), &token, request.get_headers())
-                .send_json(request.get_body())
-                .map_err(|err| Error::WebApiError(err.to_string())),
-            Method::Put => configure_request(self.agent.put(&url), &token, request.get_headers())
-                .send_json(request.get_body())
-                .map_err(|err| Error::WebApiError(err.to_string())),
+            Method::Post => {
+                configure_request(self.agent.post(&url), &token, ct, request.get_headers())
+                    .send_json(request.get_body())
+                    .map_err(|err| Error::WebApiError(err.to_string()))
+            }
+            Method::Put => {
+                configure_request(self.agent.put(&url), &token, ct, request.get_headers())
+                    .send_json(request.get_body())
+                    .map_err(|err| Error::WebApiError(err.to_string()))
+            }
             Method::Delete => {
-                configure_request(self.agent.delete(&url), &token, request.get_headers())
+                configure_request(self.agent.delete(&url), &token, ct, request.get_headers())
                     .force_send_body()
                     .send_json(request.get_body())
                     .map_err(|err| Error::WebApiError(err.to_string()))
@@ -800,6 +858,215 @@ impl WebApi {
         artist_albums.appears_on = self.load_all_pages_with_limit(appears, 10)?;
 
         Ok(artist_albums)
+    }
+
+    /// Build the `queryArtistOverview` pathfinder request against
+    /// `api-partner.spotify.com`.  Shared by artist info and related artists,
+    /// which are both fields of the returned `artistUnion`.
+    fn artist_overview_request(&self, id: &str) -> RequestBuilder {
+        let json = json!({
+            "extensions": {
+                "persistedQuery": {
+                    "version": 1,
+                    "sha256Hash": "1ac33ddab5d39a3a9c27802774e6d78b9405cc188c6f75aed007df2a32737c72"
+                }
+            },
+            "operationName": "queryArtistOverview",
+            "variables": {
+                "locale": "",
+                "uri": format!("spotify:artist:{id}"),
+            },
+        });
+        RequestBuilder::new("pathfinder/v2/query".to_string(), Method::Post, Some(json))
+            .set_base_uri("api-partner.spotify.com")
+            .header("User-Agent", Self::user_agent())
+            .partner_auth()
+    }
+
+    // Artist bio, stats, image and external links from the pathfinder GraphQL
+    // `queryArtistOverview` operation (there is no REST equivalent).
+    pub fn get_artist_info(&self, id: &str) -> Result<ArtistInfo, Error> {
+        #[derive(Clone, Data, Deserialize)]
+        struct Welcome {
+            data: WelcomeData,
+        }
+        #[derive(Clone, Data, Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct WelcomeData {
+            artist_union: ArtistUnion,
+        }
+        // Sparse artists (no monthly listeners yet) omit `profile`, `stats` and
+        // `visuals` entirely, so every branch must tolerate their absence.
+        #[derive(Clone, Data, Deserialize)]
+        struct ArtistUnion {
+            #[serde(default)]
+            profile: Option<Profile>,
+            #[serde(default)]
+            stats: Option<Stats>,
+            #[serde(default)]
+            visuals: Option<Visuals>,
+        }
+        #[derive(Clone, Data, Default, Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct Profile {
+            #[serde(default)]
+            biography: Option<Biography>,
+            #[serde(default)]
+            external_links: ExternalLinks,
+        }
+        #[derive(Clone, Data, Deserialize)]
+        struct Biography {
+            #[serde(default)]
+            text: Option<String>,
+        }
+        #[derive(Clone, Data, Default, Deserialize)]
+        struct ExternalLinks {
+            #[serde(default)]
+            items: Vector<ExternalLinksItem>,
+        }
+        #[derive(Clone, Data, Deserialize)]
+        struct ExternalLinksItem {
+            url: String,
+        }
+        #[derive(Clone, Data, Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct Visuals {
+            #[serde(default)]
+            avatar_image: Option<AvatarImage>,
+        }
+        #[derive(Clone, Data, Deserialize)]
+        struct AvatarImage {
+            #[serde(default)]
+            sources: Vector<Image>,
+        }
+        // Individual counters can also be null even when `stats` is present.
+        #[derive(Clone, Data, Default, Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct Stats {
+            #[serde(default)]
+            followers: Option<i64>,
+            #[serde(default)]
+            monthly_listeners: Option<i64>,
+            #[serde(default)]
+            world_rank: Option<i64>,
+        }
+
+        let request = &self.artist_overview_request(id);
+        let result: Cached<Welcome> = self.load_cached(request, "artist-info", id)?;
+        let union = result.data.data.artist_union;
+
+        let main_image = union
+            .visuals
+            .and_then(|visuals| visuals.avatar_image)
+            .and_then(|image| image.sources.into_iter().next())
+            .map(|source| source.url.clone())
+            .unwrap_or_else(|| Arc::from(""));
+
+        let profile = union.profile.unwrap_or_default();
+        let stats = union.stats.unwrap_or_default();
+
+        let bio = profile
+            .biography
+            .and_then(|biography| biography.text)
+            .map(|text| {
+                let sanitized = sanitize_str(&DEFAULT, &text).unwrap_or_default();
+                sanitized.replace("&amp;", "&")
+            })
+            .unwrap_or_default();
+
+        let artist_links = profile
+            .external_links
+            .items
+            .into_iter()
+            .map(|link| link.url)
+            .collect();
+
+        Ok(ArtistInfo {
+            main_image,
+            stats: ArtistStats {
+                followers: stats.followers.unwrap_or(0),
+                monthly_listeners: stats.monthly_listeners.unwrap_or(0),
+                world_rank: stats.world_rank.unwrap_or(0),
+            },
+            bio,
+            artist_links,
+        })
+    }
+
+    // Related artists, now sourced from `artistUnion.relatedContent` in the same
+    // `queryArtistOverview` response (the old REST `related-artists` endpoint is
+    // gone).
+    pub fn get_related_artists(&self, id: &str) -> Result<Cached<Vector<Artist>>, Error> {
+        #[derive(Clone, Data, Deserialize)]
+        struct Welcome {
+            data: WelcomeData,
+        }
+        #[derive(Clone, Data, Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct WelcomeData {
+            artist_union: ArtistUnion,
+        }
+        #[derive(Clone, Data, Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct ArtistUnion {
+            #[serde(default)]
+            related_content: Option<RelatedContent>,
+        }
+        #[derive(Clone, Data, Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct RelatedContent {
+            #[serde(default)]
+            related_artists: RelatedArtists,
+        }
+        #[derive(Clone, Data, Default, Deserialize)]
+        struct RelatedArtists {
+            #[serde(default)]
+            items: Vector<RelatedArtist>,
+        }
+        #[derive(Clone, Data, Deserialize)]
+        struct RelatedArtist {
+            id: Arc<str>,
+            profile: RelatedProfile,
+            #[serde(default)]
+            visuals: Option<RelatedVisuals>,
+        }
+        #[derive(Clone, Data, Deserialize)]
+        struct RelatedProfile {
+            name: Arc<str>,
+        }
+        #[derive(Clone, Data, Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct RelatedVisuals {
+            #[serde(default)]
+            avatar_image: Option<RelatedAvatar>,
+        }
+        #[derive(Clone, Data, Deserialize)]
+        struct RelatedAvatar {
+            #[serde(default)]
+            sources: Vector<Image>,
+        }
+
+        let request = &self.artist_overview_request(id);
+        let result: Cached<Welcome> = self.load_cached(request, "related-artists", id)?;
+        Ok(result.map(|welcome| {
+            welcome
+                .data
+                .artist_union
+                .related_content
+                .map(|content| content.related_artists.items)
+                .unwrap_or_default()
+                .into_iter()
+                .map(|artist| Artist {
+                    id: artist.id,
+                    name: artist.profile.name,
+                    images: artist
+                        .visuals
+                        .and_then(|visuals| visuals.avatar_image)
+                        .map(|image| image.sources)
+                        .unwrap_or_default(),
+                })
+                .collect()
+        }))
     }
 }
 
@@ -1451,6 +1718,9 @@ struct RequestBuilder {
     headers: HashMap<String, String>,
     method: Method,
     body: Option<serde_json::Value>,
+    // When set, authenticate with the first-party Login5 bearer + client-token
+    // (for `api-partner.spotify.com`) instead of the Web API OAuth token.
+    partner_auth: bool,
 }
 
 impl RequestBuilder {
@@ -1464,11 +1734,19 @@ impl RequestBuilder {
             headers: HashMap::new(),
             method,
             body,
+            partner_auth: false,
         }
     }
 
     fn query(mut self, key: impl Display, value: impl Display) -> Self {
         self.queries.insert(key.to_string(), value.to_string());
+        self
+    }
+
+    /// Authenticate this request with the first-party Login5 bearer +
+    /// client-token, as required by `api-partner.spotify.com`.
+    fn partner_auth(mut self) -> Self {
+        self.partner_auth = true;
         self
     }
 
