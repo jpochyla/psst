@@ -29,6 +29,7 @@ use psst_core::{
 use serde::{de::DeserializeOwned, Deserialize};
 use serde_json::json;
 use std::sync::OnceLock;
+use time::{Date, Month};
 use ureq::{
     http::{Response, StatusCode},
     Agent, Body,
@@ -37,9 +38,10 @@ use ureq::{
 use crate::{
     data::{
         self, utils::sanitize_html_string, Album, AlbumType, Artist, ArtistAlbums, ArtistInfo,
-        ArtistLink, ArtistStats, AudioAnalysis, Cached, Episode, EpisodeId, EpisodeLink, Image,
-        MixedView, Nav, Page, Playlist, PublicUser, Range, Recommendations, RecommendationsRequest,
-        SearchResults, SearchTopic, Show, SpotifyUrl, Track, TrackLines, UserProfile,
+        ArtistLink, ArtistStats, AudioAnalysis, Cached, DatePrecision, Episode, EpisodeId,
+        EpisodeLink, Image, MixedView, Nav, Page, Playlist, PublicUser, Range, Recommendations,
+        RecommendationsRequest, SearchResults, SearchTopic, Show, SpotifyUrl, Track, TrackLines,
+        UserProfile,
     },
     error::Error,
     ui::credits::TrackCredits,
@@ -194,10 +196,8 @@ impl WebApi {
         }
 
         let ct = client_token.as_deref();
-        // ureq 3 surfaces non-2xx statuses as `Err(StatusCode(..))`, not as an
-        // `Ok` response, so rate limits (429) and transient upstream failures
-        // (503) must be retried here with exponential backoff — `with_retry`'s
-        // status check never sees them.
+        // ureq 3 surfaces 429/503 as `Err(StatusCode(..))` rather than an `Ok`
+        // response, so `with_retry` never sees them — retry with backoff here.
         const MAX_RETRIES: u32 = 4;
         let mut attempt: u32 = 0;
         loop {
@@ -839,6 +839,181 @@ impl WebApi {
     }
 }
 
+/// Persisted-query hashes for the pathfinder discography operations, extracted
+/// from the web player bundle.  Albums, singles and compilations all share one
+/// document (selected by `operationName`); appears-on is a separate one.
+const DISCOGRAPHY_HASH: &str = "5e07d323febb57b4a56a42abbf781490e58764aa45feb6e3dc0591564fc56599";
+const APPEARS_ON_HASH: &str = "9a4bb7a20d6720fe52d7b47bc001cfa91940ddf5e7113761460b4a288d18a4c1";
+
+// Shape of the `queryArtistDiscography*` / `queryArtistAppearsOn` responses.
+// Each operation populates a different field, so all are optional and the
+// caller selects the one it wants.
+#[derive(Deserialize)]
+struct DiscographyResponse {
+    data: DiscographyData,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DiscographyData {
+    artist_union: DiscographyUnion,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DiscographyUnion {
+    #[serde(default)]
+    discography: Discography,
+    #[serde(default)]
+    related_content: RelatedContent,
+}
+
+#[derive(Default, Deserialize)]
+struct Discography {
+    #[serde(default)]
+    albums: Option<DiscographySection>,
+    #[serde(default)]
+    singles: Option<DiscographySection>,
+    #[serde(default)]
+    compilations: Option<DiscographySection>,
+}
+
+#[derive(Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RelatedContent {
+    #[serde(default)]
+    appears_on: Option<DiscographySection>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DiscographySection {
+    #[serde(default)]
+    total_count: i64,
+    #[serde(default)]
+    items: Vec<ReleaseHolder>,
+}
+
+#[derive(Deserialize)]
+struct ReleaseHolder {
+    releases: Releases,
+}
+
+#[derive(Deserialize)]
+struct Releases {
+    #[serde(default)]
+    items: Vec<Release>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct Release {
+    id: Arc<str>,
+    name: Arc<str>,
+    #[serde(default)]
+    cover_art: CoverArt,
+    #[serde(default)]
+    date: Option<ReleaseDate>,
+    #[serde(rename = "type", default)]
+    release_type: Option<String>,
+    #[serde(default)]
+    artists: ReleaseArtists,
+}
+
+#[derive(Default, Deserialize)]
+struct CoverArt {
+    #[serde(default)]
+    sources: Vector<Image>,
+}
+
+#[derive(Deserialize)]
+struct ReleaseDate {
+    #[serde(default)]
+    year: Option<i32>,
+    #[serde(default)]
+    month: Option<u8>,
+    #[serde(default)]
+    day: Option<u8>,
+    #[serde(default)]
+    precision: Option<String>,
+}
+
+#[derive(Default, Deserialize)]
+struct ReleaseArtists {
+    #[serde(default)]
+    items: Vec<ReleaseArtist>,
+}
+
+#[derive(Deserialize)]
+struct ReleaseArtist {
+    uri: String,
+    profile: ReleaseArtistProfile,
+}
+
+#[derive(Deserialize)]
+struct ReleaseArtistProfile {
+    name: Arc<str>,
+}
+
+impl Release {
+    fn to_album(&self, default_type: AlbumType) -> Album {
+        let album_type = match self.release_type.as_deref() {
+            Some("ALBUM") => AlbumType::Album,
+            Some("SINGLE") => AlbumType::Single,
+            Some("COMPILATION") => AlbumType::Compilation,
+            _ => default_type,
+        };
+        let (release_date, release_date_precision) = self
+            .date
+            .as_ref()
+            .map(ReleaseDate::to_date)
+            .unwrap_or((None, None));
+
+        Album {
+            id: self.id.clone(),
+            name: self.name.clone(),
+            album_type,
+            images: self.cover_art.sources.clone(),
+            artists: self
+                .artists
+                .items
+                .iter()
+                .map(|artist| ArtistLink {
+                    id: artist.uri.rsplit(':').next().unwrap_or_default().into(),
+                    name: artist.profile.name.clone(),
+                })
+                .collect(),
+            copyrights: Vector::new(),
+            label: "".into(),
+            tracks: Vector::new(),
+            release_date,
+            release_date_precision,
+        }
+    }
+}
+
+impl ReleaseDate {
+    fn to_date(&self) -> (Option<Date>, Option<DatePrecision>) {
+        let precision = match self.precision.as_deref() {
+            Some("DAY") => Some(DatePrecision::Day),
+            Some("MONTH") => Some(DatePrecision::Month),
+            Some("YEAR") => Some(DatePrecision::Year),
+            _ => None,
+        };
+        // Only the year is required; month/day default to 1 so we can still form
+        // a valid `Date` even when precision is coarser than a full day.
+        let date = self.year.and_then(|year| {
+            let month = self
+                .month
+                .and_then(|month| Month::try_from(month).ok())
+                .unwrap_or(Month::January);
+            let day = self.day.filter(|day| *day >= 1).unwrap_or(1);
+            Date::from_calendar_date(year, month, day).ok()
+        });
+        (date, precision)
+    }
+}
+
 /// Artist endpoints.
 impl WebApi {
     // https://developer.spotify.com/documentation/web-api/reference/get-artist/
@@ -848,36 +1023,103 @@ impl WebApi {
         Ok(result.data)
     }
 
-    // https://developer.spotify.com/documentation/web-api/reference/get-an-artists-albums/
+    // Fetched via the pathfinder discography operations rather than the REST
+    // `v1/artists/{id}/albums` endpoint, whose OAuth quota rate-limits (429)
+    // aggressively; the partner quota does not and still paginates fully.
     pub fn get_artist_albums(&self, id: &str) -> Result<ArtistAlbums, Error> {
-        // `album_group` is gone since February 2026 and `album_type` never says
-        // `appears_on`, so only `include_groups` still separates the discography
-        // from guest appearances, hence two sweeps. `limit` over 10 gives a 400.
-        let mut artist_albums = ArtistAlbums {
-            albums: Vector::new(),
-            singles: Vector::new(),
-            compilations: Vector::new(),
-            appears_on: Vector::new(),
-        };
+        Ok(ArtistAlbums {
+            albums: self.artist_releases(
+                id,
+                "queryArtistDiscographyAlbums",
+                DISCOGRAPHY_HASH,
+                true,
+                AlbumType::Album,
+                |union| union.discography.albums.as_ref(),
+            )?,
+            singles: self.artist_releases(
+                id,
+                "queryArtistDiscographySingles",
+                DISCOGRAPHY_HASH,
+                true,
+                AlbumType::Single,
+                |union| union.discography.singles.as_ref(),
+            )?,
+            compilations: self.artist_releases(
+                id,
+                "queryArtistDiscographyCompilations",
+                DISCOGRAPHY_HASH,
+                true,
+                AlbumType::Compilation,
+                |union| union.discography.compilations.as_ref(),
+            )?,
+            appears_on: self.artist_releases(
+                id,
+                "queryArtistAppearsOn",
+                APPEARS_ON_HASH,
+                false,
+                AlbumType::Album,
+                |union| union.related_content.appears_on.as_ref(),
+            )?,
+        })
+    }
 
-        let main = &RequestBuilder::new(format!("v1/artists/{id}/albums"), Method::Get, None)
-            .query("market", "from_token")
-            .query("include_groups", "album,single,compilation");
-        let main_albums: Vector<Arc<Album>> = self.load_all_pages_with_limit(main, 10)?;
-        for album in main_albums {
-            match album.album_type {
-                AlbumType::Single => artist_albums.singles.push_back(album),
-                AlbumType::Compilation => artist_albums.compilations.push_back(album),
-                AlbumType::Album => artist_albums.albums.push_back(album),
+    /// Fetch one discography section, paging until `totalCount` is exhausted.
+    /// `select` picks the section out of the response, `default_type` fills in
+    /// releases that omit their `type`, and `order` sends `DATE_DESC` (which the
+    /// appears-on operation rejects).
+    fn artist_releases(
+        &self,
+        id: &str,
+        operation: &str,
+        hash: &str,
+        order: bool,
+        default_type: AlbumType,
+        select: impl Fn(&DiscographyUnion) -> Option<&DiscographySection>,
+    ) -> Result<Vector<Arc<Album>>, Error> {
+        const PAGE: usize = 50;
+
+        let mut releases = Vector::new();
+        let mut offset = 0;
+        loop {
+            let mut variables = json!({
+                "uri": format!("spotify:artist:{id}"),
+                "offset": offset,
+                "limit": PAGE,
+            });
+            if order {
+                variables["order"] = json!("DATE_DESC");
+            }
+            let json = json!({
+                "operationName": operation,
+                "variables": variables,
+                "extensions": {
+                    "persistedQuery": { "version": 1, "sha256Hash": hash }
+                },
+            });
+            let request =
+                &RequestBuilder::new("pathfinder/v2/query".to_string(), Method::Post, Some(json))
+                    .set_base_uri("api-partner.spotify.com")
+                    .header("User-Agent", Self::user_agent())
+                    .partner_auth();
+
+            let response: DiscographyResponse = self.load(request)?;
+            let union = response.data.artist_union;
+            let Some(section) = select(&union) else {
+                break;
+            };
+
+            for holder in &section.items {
+                if let Some(release) = holder.releases.items.first() {
+                    releases.push_back(Arc::new(release.to_album(default_type.clone())));
+                }
+            }
+
+            offset += PAGE;
+            if section.items.is_empty() || offset >= section.total_count.max(0) as usize {
+                break;
             }
         }
-
-        let appears = &RequestBuilder::new(format!("v1/artists/{id}/albums"), Method::Get, None)
-            .query("market", "from_token")
-            .query("include_groups", "appears_on");
-        artist_albums.appears_on = self.load_all_pages_with_limit(appears, 10)?;
-
-        Ok(artist_albums)
+        Ok(releases)
     }
 
     /// Build the `queryArtistOverview` pathfinder request against
@@ -901,6 +1143,81 @@ impl WebApi {
             .set_base_uri("api-partner.spotify.com")
             .header("User-Agent", Self::user_agent())
             .partner_auth()
+    }
+
+    // Related artists, sourced from `artistUnion.relatedContent` in the same
+    // `queryArtistOverview` response
+    pub fn get_related_artists(&self, id: &str) -> Result<Cached<Vector<Artist>>, Error> {
+        #[derive(Clone, Data, Deserialize)]
+        struct Welcome {
+            data: WelcomeData,
+        }
+        #[derive(Clone, Data, Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct WelcomeData {
+            artist_union: ArtistUnion,
+        }
+        #[derive(Clone, Data, Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct ArtistUnion {
+            #[serde(default)]
+            related_content: Option<RelatedContent>,
+        }
+        #[derive(Clone, Data, Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct RelatedContent {
+            #[serde(default)]
+            related_artists: RelatedArtists,
+        }
+        #[derive(Clone, Data, Default, Deserialize)]
+        struct RelatedArtists {
+            #[serde(default)]
+            items: Vector<RelatedArtist>,
+        }
+        #[derive(Clone, Data, Deserialize)]
+        struct RelatedArtist {
+            id: Arc<str>,
+            profile: RelatedProfile,
+            #[serde(default)]
+            visuals: Option<RelatedVisuals>,
+        }
+        #[derive(Clone, Data, Deserialize)]
+        struct RelatedProfile {
+            name: Arc<str>,
+        }
+        #[derive(Clone, Data, Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct RelatedVisuals {
+            #[serde(default)]
+            avatar_image: Option<RelatedAvatar>,
+        }
+        #[derive(Clone, Data, Deserialize)]
+        struct RelatedAvatar {
+            #[serde(default)]
+            sources: Vector<Image>,
+        }
+
+        let request = &self.artist_overview_request(id);
+        let result: Cached<Welcome> = self.load_cached(request, "related-artists", id)?;
+        Ok(result.map(|welcome| {
+            welcome
+                .data
+                .artist_union
+                .related_content
+                .map(|content| content.related_artists.items)
+                .unwrap_or_default()
+                .into_iter()
+                .map(|artist| Artist {
+                    id: artist.id,
+                    name: artist.profile.name,
+                    images: artist
+                        .visuals
+                        .and_then(|visuals| visuals.avatar_image)
+                        .map(|image| image.sources)
+                        .unwrap_or_default(),
+                })
+                .collect()
+        }))
     }
 
     // Artist bio, stats, image and external links from the pathfinder GraphQL
@@ -1011,82 +1328,6 @@ impl WebApi {
             bio,
             artist_links,
         })
-    }
-
-    // Related artists, now sourced from `artistUnion.relatedContent` in the same
-    // `queryArtistOverview` response (the old REST `related-artists` endpoint is
-    // gone).
-    pub fn get_related_artists(&self, id: &str) -> Result<Cached<Vector<Artist>>, Error> {
-        #[derive(Clone, Data, Deserialize)]
-        struct Welcome {
-            data: WelcomeData,
-        }
-        #[derive(Clone, Data, Deserialize)]
-        #[serde(rename_all = "camelCase")]
-        struct WelcomeData {
-            artist_union: ArtistUnion,
-        }
-        #[derive(Clone, Data, Deserialize)]
-        #[serde(rename_all = "camelCase")]
-        struct ArtistUnion {
-            #[serde(default)]
-            related_content: Option<RelatedContent>,
-        }
-        #[derive(Clone, Data, Deserialize)]
-        #[serde(rename_all = "camelCase")]
-        struct RelatedContent {
-            #[serde(default)]
-            related_artists: RelatedArtists,
-        }
-        #[derive(Clone, Data, Default, Deserialize)]
-        struct RelatedArtists {
-            #[serde(default)]
-            items: Vector<RelatedArtist>,
-        }
-        #[derive(Clone, Data, Deserialize)]
-        struct RelatedArtist {
-            id: Arc<str>,
-            profile: RelatedProfile,
-            #[serde(default)]
-            visuals: Option<RelatedVisuals>,
-        }
-        #[derive(Clone, Data, Deserialize)]
-        struct RelatedProfile {
-            name: Arc<str>,
-        }
-        #[derive(Clone, Data, Deserialize)]
-        #[serde(rename_all = "camelCase")]
-        struct RelatedVisuals {
-            #[serde(default)]
-            avatar_image: Option<RelatedAvatar>,
-        }
-        #[derive(Clone, Data, Deserialize)]
-        struct RelatedAvatar {
-            #[serde(default)]
-            sources: Vector<Image>,
-        }
-
-        let request = &self.artist_overview_request(id);
-        let result: Cached<Welcome> = self.load_cached(request, "related-artists", id)?;
-        Ok(result.map(|welcome| {
-            welcome
-                .data
-                .artist_union
-                .related_content
-                .map(|content| content.related_artists.items)
-                .unwrap_or_default()
-                .into_iter()
-                .map(|artist| Artist {
-                    id: artist.id,
-                    name: artist.profile.name,
-                    images: artist
-                        .visuals
-                        .and_then(|visuals| visuals.avatar_image)
-                        .map(|image| image.sources)
-                        .unwrap_or_default(),
-                })
-                .collect()
-        }))
     }
 }
 
