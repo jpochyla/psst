@@ -76,35 +76,17 @@ pub fn stat_row<T: Data>(
     value_func: impl Fn(&T) -> String + 'static,
 ) -> impl Widget<WithCtx<T>> {
     Flex::row()
-        .with_child(
-            Label::new(label)
-                .with_text_size(theme::TEXT_SIZE_SMALL)
-                .with_text_color(theme::PLACEHOLDER_COLOR),
-        )
-        .with_spacer(theme::grid(0.5))
-        .with_child(
-            Label::new(move |ctx: &WithCtx<T>, _env: &_| value_func(&ctx.data))
-                .with_text_size(theme::TEXT_SIZE_SMALL),
-        )
-        .align_left()
-}
-
-pub fn format_number_with_commas(n: i64) -> String {
-    let s = n.to_string();
-    if s.len() <= 3 {
-        return s;
-    }
-    // Reverse the string, chunk it, then reverse the chunks to process from left to right.
-    s.chars()
-        .rev()
-        .collect::<Vec<_>>()
-        .chunks(3)
-        .rev()
-        // Reverse the characters in each chunk back to their original order and collect into a string.
-        .map(|chunk| chunk.iter().rev().collect::<String>())
-        .collect::<Vec<_>>()
-        // Join the chunks with commas.
-        .join(",")
+    .with_child(
+        Label::new(label)
+        .with_text_size(theme::TEXT_SIZE_SMALL)
+        .with_text_color(theme::PLACEHOLDER_COLOR),
+    )
+    .with_spacer(theme::grid(0.5))
+    .with_child(
+        Label::new(move |ctx: &WithCtx<T>, _env: &_| value_func(&ctx.data))
+        .with_text_size(theme::TEXT_SIZE_SMALL),
+    )
+    .align_left()
 }
 
 pub fn placeholder_widget<T: Data>() -> impl Widget<T> {
@@ -117,26 +99,26 @@ pub fn spinner_widget<T: Data>() -> impl Widget<T> {
 
 pub fn error_widget() -> impl Widget<Error> {
     let icon = icons::ERROR
-        .scale((theme::grid(3.0), theme::grid(3.0)))
-        .with_color(theme::PLACEHOLDER_COLOR);
+    .scale((theme::grid(3.0), theme::grid(3.0)))
+    .with_color(theme::PLACEHOLDER_COLOR);
     let error = Flex::column()
-        .cross_axis_alignment(CrossAxisAlignment::Start)
-        .with_child(
-            Label::new("Error:")
-                .with_font(theme::UI_FONT_MEDIUM)
-                .with_text_color(theme::PLACEHOLDER_COLOR),
-        )
-        .with_child(
-            Label::dynamic(|err: &Error, _| err.to_string())
-                .with_text_size(theme::TEXT_SIZE_SMALL)
-                .with_text_color(theme::PLACEHOLDER_COLOR),
-        );
+    .cross_axis_alignment(CrossAxisAlignment::Start)
+    .with_child(
+        Label::new("Error:")
+        .with_font(theme::UI_FONT_MEDIUM)
+        .with_text_color(theme::PLACEHOLDER_COLOR),
+    )
+    .with_child(
+        Label::dynamic(|err: &Error, _| err.to_string())
+        .with_text_size(theme::TEXT_SIZE_SMALL)
+        .with_text_color(theme::PLACEHOLDER_COLOR),
+    );
     Flex::row()
-        .with_child(icon)
-        .with_default_spacer()
-        .with_child(error)
-        .padding((0.0, theme::grid(6.0)))
-        .center()
+    .with_child(icon)
+    .with_default_spacer()
+    .with_child(error)
+    .padding((0.0, theme::grid(6.0)))
+    .center()
 }
 
 pub fn as_minutes_and_seconds(dur: Duration) -> String {
@@ -152,6 +134,24 @@ pub fn as_human(dur: Duration) -> String {
     )
 }
 
+pub fn format_number_with_commas(n: i64) -> String {
+    let s = n.to_string();
+    if s.len() <= 3 {
+        return s;
+    }
+    // Reverse the string, chunk it, then reverse the chunks to process from left to right.
+    s.chars()
+    .rev()
+    .collect::<Vec<_>>()
+    .chunks(3)
+    .rev()
+    // Reverse the characters in each chunk back to their original order and collect into a string.
+    .map(|chunk| chunk.iter().rev().collect::<String>())
+    .collect::<Vec<_>>()
+    // Join the chunks with commas.
+    .join(",")
+}
+
 pub struct InfoLayout<T, B, S> {
     biography: WidgetPod<T, B>,
     stats: WidgetPod<T, S>,
@@ -159,9 +159,9 @@ pub struct InfoLayout<T, B, S> {
 
 impl<T, B, S> InfoLayout<T, B, S>
 where
-    T: Data,
-    B: Widget<T>,
-    S: Widget<T>,
+T: Data,
+B: Widget<T>,
+S: Widget<T>,
 {
     pub fn new(biography: B, stats: S) -> Self {
         Self {
@@ -200,7 +200,7 @@ impl<T: Data, B: Widget<T>, S: Widget<T>> Widget<T> for InfoLayout<T, B, S> {
             let stats_width = max.width * 0.33 - padding / 2.0;
 
             let biography_bc =
-                BoxConstraints::new(Size::ZERO, Size::new(biography_width, image_height));
+            BoxConstraints::new(Size::ZERO, Size::new(biography_width, image_height));
             let stats_bc = BoxConstraints::new(Size::ZERO, Size::new(stats_width, max.height));
 
             let biography_size = self.biography.layout(ctx, &biography_bc, data, env);
@@ -208,7 +208,7 @@ impl<T: Data, B: Widget<T>, S: Widget<T>> Widget<T> for InfoLayout<T, B, S> {
 
             self.biography.set_origin(ctx, Point::ORIGIN);
             self.stats
-                .set_origin(ctx, Point::new(biography_width + padding, 0.0));
+            .set_origin(ctx, Point::new(biography_width + padding, 0.0));
 
             Size::new(max.width, biography_size.height.max(stats_size.height))
         } else {
@@ -223,7 +223,7 @@ impl<T: Data, B: Widget<T>, S: Widget<T>> Widget<T> for InfoLayout<T, B, S> {
 
             self.biography.set_origin(ctx, Point::ORIGIN);
             self.stats
-                .set_origin(ctx, Point::new(0.0, biography_size.height + padding));
+            .set_origin(ctx, Point::new(0.0, biography_size.height + padding));
 
             Size::new(max.width, image_height)
         }

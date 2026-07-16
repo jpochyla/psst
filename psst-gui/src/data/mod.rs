@@ -34,7 +34,9 @@ use psst_core::{item_id::ItemId, session::SessionService};
 
 pub use crate::data::{
     album::{Album, AlbumDetail, AlbumLink, AlbumType},
-    artist::{Artist, ArtistAlbums, ArtistDetail, ArtistInfo, ArtistLink, ArtistStats},
+    artist::{
+        Artist, ArtistAlbums, ArtistDetail, ArtistInfo, ArtistLink, ArtistStats,
+    },
     config::{AudioQuality, Authentication, Config, Preferences, PreferencesTab, Theme},
     ctx::Ctx,
     find::{FindQuery, Finder, MatchFindQuery},

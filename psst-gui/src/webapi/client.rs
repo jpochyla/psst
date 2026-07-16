@@ -38,9 +38,8 @@ use crate::{
     data::{
         self, utils::sanitize_html_string, Album, AlbumType, Artist, ArtistAlbums, ArtistInfo,
         ArtistLink, ArtistStats, AudioAnalysis, Cached, Episode, EpisodeId, EpisodeLink, Image,
-        MixedView, Nav, Page, Playlist, PublicUser, Range, Recommendations,
-        RecommendationsRequest, SearchResults, SearchTopic, Show, SpotifyUrl, Track, TrackLines,
-        UserProfile,
+        MixedView, Nav, Page, Playlist, PublicUser, Range, Recommendations, RecommendationsRequest,
+        SearchResults, SearchTopic, Show, SpotifyUrl, Track, TrackLines, UserProfile,
     },
     error::Error,
     ui::credits::TrackCredits,
@@ -189,31 +188,52 @@ impl WebApi {
             if let Some(client_token) = client_token {
                 req = req.header("client-token", client_token);
             }
-            headers
-                .iter()
-                .fold(req, |current_req, (k, v)| current_req.header(k, v))
+            headers.iter().fold(
+                req, |current_req, (k, v)| current_req.header(k, v)
+            )
         }
 
         let ct = client_token.as_deref();
-        match request.get_method() {
-            Method::Get => configure_request(self.agent.get(&url), &token, ct, request.get_headers())
-                .call()
-                .map_err(|err| Error::WebApiError(err.to_string())),
-            Method::Post => {
-                configure_request(self.agent.post(&url), &token, ct, request.get_headers())
-                    .send_json(request.get_body())
-                    .map_err(|err| Error::WebApiError(err.to_string()))
-            }
-            Method::Put => {
-                configure_request(self.agent.put(&url), &token, ct, request.get_headers())
-                    .send_json(request.get_body())
-                    .map_err(|err| Error::WebApiError(err.to_string()))
-            }
-            Method::Delete => {
-                configure_request(self.agent.delete(&url), &token, ct, request.get_headers())
+        // ureq 3 surfaces non-2xx statuses as `Err(StatusCode(..))`, not as an
+        // `Ok` response, so rate limits (429) and transient upstream failures
+        // (503) must be retried here with exponential backoff — `with_retry`'s
+        // status check never sees them.
+        const MAX_RETRIES: u32 = 4;
+        let mut attempt: u32 = 0;
+        loop {
+            let headers = request.get_headers();
+            let result = match request.get_method() {
+                Method::Get => configure_request(self.agent.get(&url), &token, ct, headers).call(),
+                Method::Post => configure_request(self.agent.post(&url), &token, ct, headers)
+                    .send_json(request.get_body()),
+                Method::Put => configure_request(self.agent.put(&url), &token, ct, headers)
+                    .send_json(request.get_body()),
+                Method::Delete => configure_request(self.agent.delete(&url), &token, ct, headers)
                     .force_send_body()
-                    .send_json(request.get_body())
-                    .map_err(|err| Error::WebApiError(err.to_string()))
+                    .send_json(request.get_body()),
+            };
+            match result {
+                Ok(response) => return Ok(response),
+                Err(err) => {
+                    let status = match &err {
+                        ureq::Error::StatusCode(code) => Some(*code),
+                        _ => None,
+                    };
+                    if matches!(status, Some(429) | Some(503)) && attempt < MAX_RETRIES {
+                        let backoff = Duration::from_secs(1u64 << attempt);
+                        log::warn!(
+                            "web api request to {url} got HTTP {}, retrying in {}s ({}/{})",
+                            status.unwrap(),
+                            backoff.as_secs(),
+                            attempt + 1,
+                            MAX_RETRIES
+                        );
+                        thread::sleep(backoff);
+                        attempt += 1;
+                        continue;
+                    }
+                    return Err(Error::WebApiError(err.to_string()));
+                }
             }
         }
     }
