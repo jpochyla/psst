@@ -33,7 +33,7 @@ use druid::{
 use psst_core::{item_id::ItemId, session::SessionService};
 
 pub use crate::data::{
-    album::{Album, AlbumDetail, AlbumLink, AlbumType},
+    album::{Album, AlbumDetail, AlbumLink, AlbumType, DatePrecision},
     artist::{
         Artist, ArtistAlbums, ArtistDetail, ArtistInfo, ArtistLink, ArtistStats,
     },
