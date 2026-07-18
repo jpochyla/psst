@@ -13,6 +13,10 @@ impl SessionController {
         // Update the session configuration, any active session will get shut down.
         data.session.update_config(data.config.session());
 
+        // Hand the authenticated session to the WebApi so it can mint the
+        // first-party tokens that `api-partner.spotify.com` requires.
+        crate::webapi::WebApi::global().set_session(data.session.clone());
+
         // Reload the global, usually visible data.
         ctx.submit_command(playlist::LOAD_LIST);
         ctx.submit_command(home::LOAD_MADE_FOR_YOU);

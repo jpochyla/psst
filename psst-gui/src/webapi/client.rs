@@ -19,6 +19,11 @@ use log::info;
 use parking_lot::Mutex;
 use psst_core::{
     oauth::{self, WebApiToken},
+    session::{
+        client_token::{ClientTokenProvider, ClientTokenProviderHandle},
+        login5::Login5,
+        SessionService,
+    },
     system_info::{OS, SPOTIFY_SEMANTIC_VERSION},
 };
 use serde::{de::DeserializeOwned, Deserialize};
@@ -50,6 +55,11 @@ pub struct WebApi {
     paginated_limit: usize,
     webapi_token: Mutex<Option<WebApiToken>>,
     webapi_client_id: Mutex<Option<String>>,
+    // First-party session credentials, used for `api-partner.spotify.com`
+    // (pathfinder GraphQL) calls, which reject the Web API OAuth token.
+    session: Mutex<Option<SessionService>>,
+    login5: Login5,
+    client_token_provider: ClientTokenProviderHandle,
 }
 
 impl WebApi {
@@ -63,6 +73,7 @@ impl WebApi {
             let proxy = ureq::Proxy::new(proxy_url).ok();
             agent = agent.proxy(proxy);
         }
+        let client_token_provider = ClientTokenProvider::new_shared(proxy_url);
         Self {
             agent: agent.build().into(),
             cache: WebApiCache::new(cache_base),
@@ -70,6 +81,9 @@ impl WebApi {
             paginated_limit,
             webapi_token: Mutex::new(None),
             webapi_client_id: Mutex::new(None),
+            session: Mutex::new(None),
+            login5: Login5::new(Some(Arc::clone(&client_token_provider)), proxy_url),
+            client_token_provider,
         }
     }
 
@@ -92,6 +106,32 @@ impl WebApi {
     pub fn set_webapi_credentials(&self, client_id: Option<String>, token: Option<WebApiToken>) {
         *self.webapi_client_id.lock() = client_id;
         *self.webapi_token.lock() = token;
+    }
+
+    /// Install the authenticated core session, used to mint the first-party
+    /// tokens that `api-partner.spotify.com` requires.
+    pub fn set_session(&self, session: SessionService) {
+        *self.session.lock() = Some(session);
+    }
+
+    /// Mint the `(bearer, client-token)` pair accepted by `api-partner`.  Uses
+    /// the Login5 access token from the core session plus a protobuf client
+    /// token — the same credentials the web player and `Cdn` use.
+    fn partner_token(&self) -> Result<(String, String), Error> {
+        let session = self
+            .session
+            .lock()
+            .clone()
+            .ok_or_else(|| Error::WebApiError("No active session for api-partner".to_string()))?;
+        let access_token = self
+            .login5
+            .get_access_token(&session)
+            .map_err(|err| Error::WebApiError(err.to_string()))?;
+        let client_token = self
+            .client_token_provider
+            .get()
+            .map_err(|err| Error::WebApiError(err.to_string()))?;
+        Ok((access_token.access_token, client_token))
     }
 
     fn access_token(&self) -> Result<String, Error> {
@@ -128,36 +168,47 @@ impl WebApi {
     }
 
     fn request(&self, request: &RequestBuilder) -> Result<Response<Body>, Error> {
-        let token = self.access_token()?;
+        // `api-partner.spotify.com` rejects the Web API OAuth token, so those
+        // requests carry the first-party Login5 bearer + client-token instead.
+        let (token, client_token) = if request.partner_auth {
+            let (bearer, client_token) = self.partner_token()?;
+            (bearer, Some(client_token))
+        } else {
+            (self.access_token()?, None)
+        };
         let url = request.build();
 
         fn configure_request<B>(
             req_builder: ureq::RequestBuilder<B>,
             token: &str,
+            client_token: Option<&str>,
             headers: &HashMap<String, String>,
         ) -> ureq::RequestBuilder<B> {
+            let mut req = req_builder.header("Authorization", &format!("Bearer {token}"));
+            if let Some(client_token) = client_token {
+                req = req.header("client-token", client_token);
+            }
             headers.iter().fold(
-                req_builder.header("Authorization", &format!("Bearer {token}")),
-                |current_req, (k, v)| current_req.header(k, v),
+                req, |current_req, (k, v)| current_req.header(k, v)
             )
         }
 
+        let ct = client_token.as_deref();
+        let headers = request.get_headers();
         match request.get_method() {
-            Method::Get => configure_request(self.agent.get(&url), &token, request.get_headers())
+            Method::Get => configure_request(self.agent.get(&url), &token, ct, headers)
                 .call()
                 .map_err(|err| Error::WebApiError(err.to_string())),
-            Method::Post => configure_request(self.agent.post(&url), &token, request.get_headers())
+            Method::Post => configure_request(self.agent.post(&url), &token, ct, headers)
                 .send_json(request.get_body())
                 .map_err(|err| Error::WebApiError(err.to_string())),
-            Method::Put => configure_request(self.agent.put(&url), &token, request.get_headers())
+            Method::Put => configure_request(self.agent.put(&url), &token, ct, headers)
                 .send_json(request.get_body())
                 .map_err(|err| Error::WebApiError(err.to_string())),
-            Method::Delete => {
-                configure_request(self.agent.delete(&url), &token, request.get_headers())
-                    .force_send_body()
-                    .send_json(request.get_body())
-                    .map_err(|err| Error::WebApiError(err.to_string()))
-            }
+            Method::Delete => configure_request(self.agent.delete(&url), &token, ct, headers)
+                .force_send_body()
+                .send_json(request.get_body())
+                .map_err(|err| Error::WebApiError(err.to_string())),
         }
     }
 
@@ -1189,7 +1240,8 @@ impl WebApi {
         let request =
             &RequestBuilder::new("pathfinder/v2/query".to_string(), Method::Post, Some(json))
                 .set_base_uri("api-partner.spotify.com")
-                .header("User-Agent", Self::user_agent());
+                .header("User-Agent", Self::user_agent())
+                .partner_auth();
 
         // Extract the playlists
         self.load_and_return_home_section(request)
@@ -1584,6 +1636,9 @@ struct RequestBuilder {
     headers: HashMap<String, String>,
     method: Method,
     body: Option<serde_json::Value>,
+    // When set, authenticate with the first-party Login5 bearer + client-token
+    // (for `api-partner.spotify.com`) instead of the Web API OAuth token.
+    partner_auth: bool,
 }
 
 impl RequestBuilder {
@@ -1597,7 +1652,15 @@ impl RequestBuilder {
             headers: HashMap::new(),
             method,
             body,
+            partner_auth: false,
         }
+    }
+
+    /// Authenticate this request with the first-party Login5 bearer +
+    /// client-token, as required by `api-partner.spotify.com`.
+    fn partner_auth(mut self) -> Self {
+        self.partner_auth = true;
+        self
     }
 
     fn query(mut self, key: impl Display, value: impl Display) -> Self {
