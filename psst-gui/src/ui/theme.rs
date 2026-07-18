@@ -1,6 +1,9 @@
+use std::fs;
+
 use druid::{Color, Env, FontDescriptor, FontFamily, FontWeight, Insets, Key, Size};
 
 pub use druid::theme::*;
+use serde::Deserialize;
 
 use crate::data::{AppState, Theme};
 
@@ -46,6 +49,8 @@ pub fn setup(env: &mut Env, state: &AppState) {
     match state.config.theme {
         Theme::Light => setup_light_theme(env),
         Theme::Dark => setup_dark_theme(env),
+        Theme::GruvboxDark => setup_gruvbox_dark_theme(env),
+        Theme::GruvboxLight => setup_gruvbox_light_theme(env),
     };
 
     env.set(WINDOW_BACKGROUND_COLOR, env.get(GREY_700));
@@ -66,6 +71,14 @@ pub fn setup(env: &mut Env, state: &AppState) {
             env.set(BUTTON_DARK, env.get(GREY_600));
         }
         Theme::Dark => {
+            env.set(BUTTON_LIGHT, env.get(GREY_600));
+            env.set(BUTTON_DARK, env.get(GREY_700));
+        }
+        Theme::GruvboxDark => {
+            env.set(BUTTON_LIGHT, env.get(GREY_700));
+            env.set(BUTTON_DARK, env.get(GREY_600));
+        }
+        Theme::GruvboxLight => {
             env.set(BUTTON_LIGHT, env.get(GREY_600));
             env.set(BUTTON_DARK, env.get(GREY_700));
         }
@@ -164,4 +177,103 @@ fn setup_dark_theme(env: &mut Env) {
     env.set(LINK_HOT_COLOR, Color::rgba(1.0, 1.0, 1.0, 0.05));
     env.set(LINK_ACTIVE_COLOR, Color::rgba(1.0, 1.0, 1.0, 0.025));
     env.set(LINK_COLD_COLOR, Color::rgba(1.0, 1.0, 1.0, 0.0));
+}
+
+fn setup_gruvbox_light_theme(env: &mut Env) {
+    // Gruvbox Light palette
+    // https://github.com/morhetz/gruvbox
+    env.set(GREY_000, Color::rgb8(0x3c, 0x38, 0x36)); // fg0
+    env.set(GREY_100, Color::rgb8(0x50, 0x49, 0x45)); // fg1
+    env.set(GREY_200, Color::rgb8(0x66, 0x5c, 0x54)); // fg2
+    env.set(GREY_300, Color::rgb8(0xa8, 0x99, 0x84)); // gray
+    env.set(GREY_400, Color::rgb8(0xd5, 0xc4, 0xa1)); // bg3
+    env.set(GREY_500, Color::rgb8(0xeb, 0xdb, 0xb2)); // bg2
+    env.set(GREY_600, Color::rgb8(0xf2, 0xe5, 0xbc)); // bg1
+    env.set(GREY_700, Color::rgb8(0xfb, 0xf1, 0xc7)); // bg0
+
+    env.set(BLUE_100, Color::rgb8(0x45, 0x85, 0x88)); // blue
+    env.set(BLUE_200, Color::rgb8(0x07, 0x66, 0x78)); // dark blue
+
+    env.set(RED, Color::rgb8(0xcc, 0x24, 0x1d)); // red
+
+    env.set(LINK_HOT_COLOR, Color::rgba8(0x45, 0x85, 0x88, 0x80)); // blue, 50% alpha
+    env.set(LINK_ACTIVE_COLOR, Color::rgba8(0x45, 0x85, 0x88, 0x40)); // blue, 25% alpha
+    env.set(LINK_COLD_COLOR, Color::rgba8(0x45, 0x85, 0x88, 0x00)); // blue, 0% alpha
+}
+
+fn setup_gruvbox_dark_theme(env: &mut Env) {
+    // Gruvbox Dark palette
+    // https://github.com/morhetz/gruvbox
+    env.set(GREY_000, Color::rgb8(0xeb, 0xdb, 0xb2)); // fg0
+    env.set(GREY_100, Color::rgb8(0xd5, 0xc4, 0xa1)); // fg1
+    env.set(GREY_200, Color::rgb8(0xbd, 0xae, 0x93)); // fg2
+    env.set(GREY_300, Color::rgb8(0xa8, 0x99, 0x84)); // gray
+    env.set(GREY_400, Color::rgb8(0x66, 0x5c, 0x54)); // bg4
+    env.set(GREY_500, Color::rgb8(0x3c, 0x38, 0x36)); // bg2
+    env.set(GREY_600, Color::rgb8(0x28, 0x28, 0x28)); // bg1
+    env.set(GREY_700, Color::rgb8(0x1d, 0x20, 0x21)); // bg0_h
+
+    env.set(BLUE_100, Color::rgb8(0x45, 0x85, 0x88)); // blue
+    env.set(BLUE_200, Color::rgb8(0x07, 0x66, 0x78)); // dark blue
+
+    env.set(RED, Color::rgb8(0xcc, 0x24, 0x1d)); // red
+
+    env.set(LINK_HOT_COLOR, Color::rgba8(0x45, 0x85, 0x88, 0x80)); // blue, 50% alpha
+    env.set(LINK_ACTIVE_COLOR, Color::rgba8(0x45, 0x85, 0x88, 0x40)); // blue, 25% alpha
+    env.set(LINK_COLD_COLOR, Color::rgba8(0x45, 0x85, 0x88, 0x00)); // blue, 0% alpha
+}
+
+fn load_colorscheme(path: &str) -> Option<ColorScheme> {
+    let content = fs::read_to_string(path).ok()?;
+    toml::from_str(&content).ok()
+}
+
+fn setup_custom_theme(env: &mut Env, scheme: &ColorScheme) {
+    env.set(GREY_000, Color::from_hex_str(&scheme.grey_000).unwrap());
+    env.set(GREY_100, Color::from_hex_str(&scheme.grey_100).unwrap());
+    env.set(GREY_200, Color::from_hex_str(&scheme.grey_200).unwrap());
+    env.set(GREY_300, Color::from_hex_str(&scheme.grey_300).unwrap());
+    env.set(GREY_400, Color::from_hex_str(&scheme.grey_400).unwrap());
+    env.set(GREY_500, Color::from_hex_str(&scheme.grey_500).unwrap());
+    env.set(GREY_600, Color::from_hex_str(&scheme.grey_600).unwrap());
+    env.set(GREY_700, Color::from_hex_str(&scheme.grey_700).unwrap());
+
+    env.set(BLUE_100, Color::from_hex_str(&scheme.blue_100).unwrap());
+    env.set(BLUE_200, Color::from_hex_str(&scheme.blue_200).unwrap());
+
+    env.set(RED, Color::from_hex_str(&scheme.red).unwrap());
+
+    env.set(
+        LINK_HOT_COLOR,
+        Color::from_hex_str(&scheme.link_hot_color).unwrap(),
+    );
+    env.set(
+        LINK_ACTIVE_COLOR,
+        Color::from_hex_str(&scheme.link_active_color).unwrap(),
+    );
+    env.set(
+        LINK_COLD_COLOR,
+        Color::from_hex_str(&scheme.link_cold_color).unwrap(),
+    );
+}
+
+#[derive(Deserialize, Debug)]
+pub struct ColorScheme {
+    pub grey_000: String,
+    pub grey_100: String,
+    pub grey_200: String,
+    pub grey_300: String,
+    pub grey_400: String,
+    pub grey_500: String,
+    pub grey_600: String,
+    pub grey_700: String,
+
+    pub blue_100: String,
+    pub blue_200: String,
+
+    pub red: String,
+
+    pub link_hot_color: String,
+    pub link_active_color: String,
+    pub link_cold_color: String,
 }
