@@ -68,7 +68,7 @@ jobs:
 
       - name: Install Cross
         if: runner.os == 'Linux'
-        run: cargo install cross
+        run: cargo install cross --version 0.2.5
 
       - name: Build (Linux)
         if: runner.os == 'Linux'
