@@ -70,10 +70,6 @@ jobs:
         if: runner.os == 'Linux'
         run: cargo install cross
 
-      - name: Set up QEMU
-        if: runner.os == 'Linux'
-        run: docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
-
       - name: Build (Linux)
         if: runner.os == 'Linux'
         run: cross build --release --target ${{ matrix.target }}
