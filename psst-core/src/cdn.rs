@@ -131,7 +131,7 @@ impl CdnUrl {
 
     fn new(url: String) -> Self {
         let expires_in = parse_expiration(&url).unwrap_or_else(|| {
-            log::warn!("failed to parse expiration time from URL {:?}", &url);
+            log::warn!("failed to parse expiration time from URL {:?}", url);
             Self::DEFAULT_EXPIRATION
         });
         let expires = Instant::now() + expires_in;
