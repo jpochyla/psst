@@ -29,6 +29,7 @@ use psst_core::{
 use serde::{de::DeserializeOwned, Deserialize};
 use serde_json::json;
 use std::sync::OnceLock;
+use time::{Date, Month};
 use ureq::{
     http::{Response, StatusCode},
     Agent, Body,
@@ -37,9 +38,10 @@ use ureq::{
 use crate::{
     data::{
         self, utils::sanitize_html_string, Album, AlbumType, Artist, ArtistAlbums, ArtistInfo,
-        ArtistLink, ArtistStats, AudioAnalysis, Cached, Episode, EpisodeId, EpisodeLink, Image,
-        MixedView, Nav, Page, Playlist, PublicUser, Range, Recommendations, RecommendationsRequest,
-        SearchResults, SearchTopic, Show, SpotifyUrl, Track, TrackLines, UserProfile,
+        ArtistLink, ArtistStats, AudioAnalysis, Cached, DatePrecision, Episode, EpisodeId,
+        EpisodeLink, Image, MixedView, Nav, Page, Playlist, PublicUser, Range, Recommendations,
+        RecommendationsRequest, SearchResults, SearchTopic, Show, SpotifyUrl, Track, TrackLines,
+        UserProfile,
     },
     error::Error,
     ui::credits::TrackCredits,
@@ -803,6 +805,181 @@ impl WebApi {
     }
 }
 
+/// Persisted-query hashes for the pathfinder discography operations, extracted
+/// from the web player bundle.  Albums, singles and compilations all share one
+/// document (selected by `operationName`); appears-on is a separate one.
+const DISCOGRAPHY_HASH: &str = "5e07d323febb57b4a56a42abbf781490e58764aa45feb6e3dc0591564fc56599";
+const APPEARS_ON_HASH: &str = "9a4bb7a20d6720fe52d7b47bc001cfa91940ddf5e7113761460b4a288d18a4c1";
+
+// Shape of the `queryArtistDiscography*` / `queryArtistAppearsOn` responses.
+// Each operation populates a different field, so all are optional and the
+// caller selects the one it wants.
+#[derive(Deserialize)]
+struct DiscographyResponse {
+    data: DiscographyData,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DiscographyData {
+    artist_union: DiscographyUnion,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DiscographyUnion {
+    #[serde(default)]
+    discography: Discography,
+    #[serde(default)]
+    related_content: RelatedContent,
+}
+
+#[derive(Default, Deserialize)]
+struct Discography {
+    #[serde(default)]
+    albums: Option<DiscographySection>,
+    #[serde(default)]
+    singles: Option<DiscographySection>,
+    #[serde(default)]
+    compilations: Option<DiscographySection>,
+}
+
+#[derive(Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RelatedContent {
+    #[serde(default)]
+    appears_on: Option<DiscographySection>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DiscographySection {
+    #[serde(default)]
+    total_count: i64,
+    #[serde(default)]
+    items: Vec<ReleaseHolder>,
+}
+
+#[derive(Deserialize)]
+struct ReleaseHolder {
+    releases: Releases,
+}
+
+#[derive(Deserialize)]
+struct Releases {
+    #[serde(default)]
+    items: Vec<Release>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct Release {
+    id: Arc<str>,
+    name: Arc<str>,
+    #[serde(default)]
+    cover_art: CoverArt,
+    #[serde(default)]
+    date: Option<ReleaseDate>,
+    #[serde(rename = "type", default)]
+    release_type: Option<String>,
+    #[serde(default)]
+    artists: ReleaseArtists,
+}
+
+#[derive(Default, Deserialize)]
+struct CoverArt {
+    #[serde(default)]
+    sources: Vector<Image>,
+}
+
+#[derive(Deserialize)]
+struct ReleaseDate {
+    #[serde(default)]
+    year: Option<i32>,
+    #[serde(default)]
+    month: Option<u8>,
+    #[serde(default)]
+    day: Option<u8>,
+    #[serde(default)]
+    precision: Option<String>,
+}
+
+#[derive(Default, Deserialize)]
+struct ReleaseArtists {
+    #[serde(default)]
+    items: Vec<ReleaseArtist>,
+}
+
+#[derive(Deserialize)]
+struct ReleaseArtist {
+    uri: String,
+    profile: ReleaseArtistProfile,
+}
+
+#[derive(Deserialize)]
+struct ReleaseArtistProfile {
+    name: Arc<str>,
+}
+
+impl Release {
+    fn to_album(&self, default_type: AlbumType) -> Album {
+        let album_type = match self.release_type.as_deref() {
+            Some("ALBUM") => AlbumType::Album,
+            Some("SINGLE") => AlbumType::Single,
+            Some("COMPILATION") => AlbumType::Compilation,
+            _ => default_type,
+        };
+        let (release_date, release_date_precision) = self
+            .date
+            .as_ref()
+            .map(ReleaseDate::to_date)
+            .unwrap_or((None, None));
+
+        Album {
+            id: self.id.clone(),
+            name: self.name.clone(),
+            album_type,
+            images: self.cover_art.sources.clone(),
+            artists: self
+                .artists
+                .items
+                .iter()
+                .map(|artist| ArtistLink {
+                    id: artist.uri.rsplit(':').next().unwrap_or_default().into(),
+                    name: artist.profile.name.clone(),
+                })
+                .collect(),
+            copyrights: Vector::new(),
+            label: "".into(),
+            tracks: Vector::new(),
+            release_date,
+            release_date_precision,
+        }
+    }
+}
+
+impl ReleaseDate {
+    fn to_date(&self) -> (Option<Date>, Option<DatePrecision>) {
+        let precision = match self.precision.as_deref() {
+            Some("DAY") => Some(DatePrecision::Day),
+            Some("MONTH") => Some(DatePrecision::Month),
+            Some("YEAR") => Some(DatePrecision::Year),
+            _ => None,
+        };
+        // Only the year is required; month/day default to 1 so we can still form
+        // a valid `Date` even when precision is coarser than a full day.
+        let date = self.year.and_then(|year| {
+            let month = self
+                .month
+                .and_then(|month| Month::try_from(month).ok())
+                .unwrap_or(Month::January);
+            let day = self.day.filter(|day| *day >= 1).unwrap_or(1);
+            Date::from_calendar_date(year, month, day).ok()
+        });
+        (date, precision)
+    }
+}
+
 /// Artist endpoints.
 impl WebApi {
     // https://developer.spotify.com/documentation/web-api/reference/get-artist/
@@ -812,128 +989,106 @@ impl WebApi {
         Ok(result.data)
     }
 
-    // https://developer.spotify.com/documentation/web-api/reference/get-an-artists-albums/
+    // Albums, singles, compilations and appears-on each come from a separate
+    // pathfinder discography operation on `api-partner.spotify.com`, paginated
+    // independently.
     pub fn get_artist_albums(&self, id: &str) -> Result<ArtistAlbums, Error> {
-        let request = &RequestBuilder::new(format!("v1/artists/{id}/albums"), Method::Get, None)
-            .query("market", "from_token");
-        let result: Vector<Arc<Album>> = self.load_all_pages(request)?;
+        Ok(ArtistAlbums {
+            albums: self.artist_releases(
+                id,
+                "queryArtistDiscographyAlbums",
+                DISCOGRAPHY_HASH,
+                true,
+                AlbumType::Album,
+                |union| union.discography.albums.as_ref(),
+            )?,
+            singles: self.artist_releases(
+                id,
+                "queryArtistDiscographySingles",
+                DISCOGRAPHY_HASH,
+                true,
+                AlbumType::Single,
+                |union| union.discography.singles.as_ref(),
+            )?,
+            compilations: self.artist_releases(
+                id,
+                "queryArtistDiscographyCompilations",
+                DISCOGRAPHY_HASH,
+                true,
+                AlbumType::Compilation,
+                |union| union.discography.compilations.as_ref(),
+            )?,
+            appears_on: self.artist_releases(
+                id,
+                "queryArtistAppearsOn",
+                APPEARS_ON_HASH,
+                false,
+                AlbumType::Album,
+                |union| union.related_content.appears_on.as_ref(),
+            )?,
+        })
+    }
 
-        let mut artist_albums = ArtistAlbums {
-            albums: Vector::new(),
-            singles: Vector::new(),
-            compilations: Vector::new(),
-            appears_on: Vector::new(),
-        };
+    /// Fetch one discography section, paging until `totalCount` is exhausted.
+    /// `select` picks the section out of the response, `default_type` fills in
+    /// releases that omit their `type`, and `order` sends `DATE_DESC` (which the
+    /// appears-on operation rejects).
+    fn artist_releases(
+        &self,
+        id: &str,
+        operation: &str,
+        hash: &str,
+        order: bool,
+        default_type: AlbumType,
+        select: impl Fn(&DiscographyUnion) -> Option<&DiscographySection>,
+    ) -> Result<Vector<Arc<Album>>, Error> {
+        const PAGE: usize = 50;
 
-        let mut last_album_release_year = usize::MAX;
-        let mut last_single_release_year = usize::MAX;
+        let mut releases = Vector::new();
+        let mut offset = 0;
+        loop {
+            let mut variables = json!({
+                "uri": format!("spotify:artist:{id}"),
+                "offset": offset,
+                "limit": PAGE,
+            });
+            if order {
+                variables["order"] = json!("DATE_DESC");
+            }
+            let json = json!({
+                "operationName": operation,
+                "variables": variables,
+                "extensions": {
+                    "persistedQuery": { "version": 1, "sha256Hash": hash }
+                },
+            });
+            let request =
+                &RequestBuilder::new("pathfinder/v2/query".to_string(), Method::Post, Some(json))
+                    .set_base_uri("api-partner.spotify.com")
+                    .header("User-Agent", Self::user_agent())
+                    .partner_auth();
 
-        for album in result {
-            match album.album_type {
-                // Spotify is labeling albums and singles that should be labeled `appears_on` as `album` or `single`.
-                // They are still ordered properly though, with the most recent first, then 'appears_on'.
-                // So we just wait until they are no longer descending, then start putting them in the 'appears_on' Vec.
-                // NOTE: This will break if an artist has released 'appears_on' albums/singles before their first actual album/single.
-                AlbumType::Album => {
-                    if album.release_year_int() > last_album_release_year {
-                        artist_albums.appears_on.push_back(album)
-                    } else {
-                        last_album_release_year = album.release_year_int();
-                        artist_albums.albums.push_back(album)
-                    }
+            let response: DiscographyResponse = self.load(request)?;
+            let union = response.data.artist_union;
+            let Some(section) = select(&union) else {
+                break;
+            };
+
+            for holder in &section.items {
+                if let Some(release) = holder.releases.items.first() {
+                    releases.push_back(Arc::new(release.to_album(default_type.clone())));
                 }
-                AlbumType::Single => {
-                    if album.release_year_int() > last_single_release_year {
-                        artist_albums.appears_on.push_back(album);
-                    } else {
-                        last_single_release_year = album.release_year_int();
-                        artist_albums.singles.push_back(album);
-                    }
-                }
-                AlbumType::Compilation => artist_albums.compilations.push_back(album),
-                AlbumType::AppearsOn => artist_albums.appears_on.push_back(album),
+            }
+
+            offset += PAGE;
+            if section.items.is_empty() || offset >= section.total_count.max(0) as usize {
+                break;
             }
         }
-        Ok(artist_albums)
+        Ok(releases)
     }
 
-    // https://developer.spotify.com/documentation/web-api/reference/get-an-artists-related-artists
-    pub fn get_related_artists(&self, id: &str) -> Result<Cached<Vector<Artist>>, Error> {
-        #[derive(Clone, Data, Deserialize)]
-        struct Artists {
-            artists: Vector<Artist>,
-        }
-        let request = &RequestBuilder::new(
-            format!("v1/artists/{id}/related-artists"),
-            Method::Get,
-            None,
-        );
-        let result: Cached<Artists> = self.load_cached(request, "related-artists", id)?;
-        Ok(result.map(|result| result.artists))
-    }
-
-    pub fn get_artist_info(&self, id: &str) -> Result<ArtistInfo, Error> {
-        #[derive(Clone, Data, Deserialize)]
-        pub struct Welcome {
-            data: Data1,
-        }
-
-        #[derive(Clone, Data, Deserialize)]
-        #[serde(rename_all = "camelCase")]
-        pub struct Data1 {
-            artist_union: ArtistUnion,
-        }
-
-        #[derive(Clone, Data, Deserialize)]
-        pub struct ArtistUnion {
-            profile: Profile,
-            stats: Stats,
-            visuals: Visuals,
-        }
-
-        #[derive(Clone, Data, Deserialize)]
-        #[serde(rename_all = "camelCase")]
-        pub struct Profile {
-            biography: Biography,
-            external_links: ExternalLinks,
-        }
-
-        #[derive(Clone, Data, Deserialize)]
-        pub struct Biography {
-            text: String,
-        }
-
-        #[derive(Clone, Data, Deserialize)]
-        pub struct ExternalLinks {
-            items: Vector<ExternalLinksItem>,
-        }
-
-        #[derive(Clone, Data, Deserialize)]
-        #[serde(rename_all = "camelCase")]
-        pub struct Visuals {
-            avatar_image: AvatarImage,
-        }
-        #[derive(Clone, Data, Deserialize)]
-        pub struct AvatarImage {
-            sources: Vector<Image>,
-        }
-        #[derive(Clone, Data, Deserialize)]
-        pub struct ExternalLinksItem {
-            url: String,
-        }
-
-        #[derive(Clone, Data, Deserialize)]
-        #[serde(rename_all = "camelCase")]
-        pub struct Stats {
-            followers: i64,
-            monthly_listeners: i64,
-            world_rank: i64,
-        }
-
-        let variables = json!( {
-            "locale": "",
-            "uri": format!("spotify:artist:{}", id),
-        });
+    fn artist_overview_request(&self, id: &str) -> RequestBuilder {
         let json = json!({
             "extensions": {
                 "persistedQuery": {
@@ -942,20 +1097,184 @@ impl WebApi {
                 }
             },
             "operationName": "queryArtistOverview",
-            "variables": variables,
+            "variables": {
+                "locale": "",
+                "uri": format!("spotify:artist:{id}"),
+            },
         });
+        RequestBuilder::new("pathfinder/v2/query".to_string(), Method::Post, Some(json))
+            .set_base_uri("api-partner.spotify.com")
+            .header("User-Agent", Self::user_agent())
+            .partner_auth()
+    }
 
-        let request =
-            &RequestBuilder::new("pathfinder/v2/query".to_string(), Method::Post, Some(json))
-                .set_base_uri("api-partner.spotify.com")
-                .header("User-Agent", Self::user_agent());
+    // Related artists, sourced from `artistUnion.relatedContent` in the same
+    // `queryArtistOverview` response
+    pub fn get_related_artists(&self, id: &str) -> Result<Cached<Vector<Artist>>, Error> {
+        #[derive(Clone, Data, Deserialize)]
+        struct Welcome {
+            data: WelcomeData,
+        }
+        #[derive(Clone, Data, Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct WelcomeData {
+            artist_union: ArtistUnion,
+        }
+        #[derive(Clone, Data, Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct ArtistUnion {
+            #[serde(default)]
+            related_content: Option<RelatedContent>,
+        }
+        #[derive(Clone, Data, Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct RelatedContent {
+            #[serde(default)]
+            related_artists: RelatedArtists,
+        }
+        #[derive(Clone, Data, Default, Deserialize)]
+        struct RelatedArtists {
+            #[serde(default)]
+            items: Vector<RelatedArtist>,
+        }
+        #[derive(Clone, Data, Deserialize)]
+        struct RelatedArtist {
+            id: Arc<str>,
+            profile: RelatedProfile,
+            #[serde(default)]
+            visuals: Option<RelatedVisuals>,
+        }
+        #[derive(Clone, Data, Deserialize)]
+        struct RelatedProfile {
+            name: Arc<str>,
+        }
+        #[derive(Clone, Data, Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct RelatedVisuals {
+            #[serde(default)]
+            avatar_image: Option<RelatedAvatar>,
+        }
+        #[derive(Clone, Data, Deserialize)]
+        struct RelatedAvatar {
+            #[serde(default)]
+            sources: Vector<Image>,
+        }
+
+        let request = &self.artist_overview_request(id);
+        let result: Cached<Welcome> = self.load_cached(request, "related-artists", id)?;
+        Ok(result.map(|welcome| {
+            welcome
+                .data
+                .artist_union
+                .related_content
+                .map(|content| content.related_artists.items)
+                .unwrap_or_default()
+                .into_iter()
+                .map(|artist| Artist {
+                    id: artist.id,
+                    name: artist.profile.name,
+                    images: artist
+                        .visuals
+                        .and_then(|visuals| visuals.avatar_image)
+                        .map(|image| image.sources)
+                        .unwrap_or_default(),
+                })
+                .collect()
+        }))
+    }
+
+    // Artist bio, stats, image and external links from the pathfinder GraphQL
+    // `queryArtistOverview` operation (there is no REST equivalent).
+    pub fn get_artist_info(&self, id: &str) -> Result<ArtistInfo, Error> {
+        #[derive(Clone, Data, Deserialize)]
+        struct Welcome {
+            data: WelcomeData,
+        }
+        #[derive(Clone, Data, Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct WelcomeData {
+            artist_union: ArtistUnion,
+        }
+        // Sparse artists (no monthly listeners yet) omit `profile`, `stats` and
+        // `visuals` entirely, so every branch must tolerate their absence.
+        #[derive(Clone, Data, Deserialize)]
+        struct ArtistUnion {
+            #[serde(default)]
+            profile: Option<Profile>,
+            #[serde(default)]
+            stats: Option<Stats>,
+            #[serde(default)]
+            visuals: Option<Visuals>,
+        }
+        #[derive(Clone, Data, Default, Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct Profile {
+            #[serde(default)]
+            biography: Option<Biography>,
+            #[serde(default)]
+            external_links: ExternalLinks,
+        }
+        #[derive(Clone, Data, Deserialize)]
+        struct Biography {
+            #[serde(default)]
+            text: Option<String>,
+        }
+        #[derive(Clone, Data, Default, Deserialize)]
+        struct ExternalLinks {
+            #[serde(default)]
+            items: Vector<ExternalLinksItem>,
+        }
+        #[derive(Clone, Data, Deserialize)]
+        struct ExternalLinksItem {
+            url: String,
+        }
+        #[derive(Clone, Data, Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct Visuals {
+            #[serde(default)]
+            avatar_image: Option<AvatarImage>,
+        }
+        #[derive(Clone, Data, Deserialize)]
+        struct AvatarImage {
+            #[serde(default)]
+            sources: Vector<Image>,
+        }
+        // Individual counters can also be null even when `stats` is present.
+        #[derive(Clone, Data, Default, Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct Stats {
+            #[serde(default)]
+            followers: Option<i64>,
+            #[serde(default)]
+            monthly_listeners: Option<i64>,
+            #[serde(default)]
+            world_rank: Option<i64>,
+        }
+
+        let request = &self.artist_overview_request(id);
         let result: Cached<Welcome> = self.load_cached(request, "artist-info", id)?;
+        let union = result.data.data.artist_union;
 
-        let hrefs: Vector<String> = result
-            .data
-            .data
-            .artist_union
-            .profile
+        let main_image = union
+            .visuals
+            .and_then(|visuals| visuals.avatar_image)
+            .and_then(|image| image.sources.into_iter().next())
+            .map(|source| source.url.clone())
+            .unwrap_or_else(|| Arc::from(""));
+
+        let profile = union.profile.unwrap_or_default();
+        let stats = union.stats.unwrap_or_default();
+
+        let bio = profile
+            .biography
+            .and_then(|biography| biography.text)
+            .map(|text| {
+                let sanitized = sanitize_str(&DEFAULT, &text).unwrap_or_default();
+                sanitized.replace("&amp;", "&")
+            })
+            .unwrap_or_default();
+
+        let artist_links = profile
             .external_links
             .items
             .into_iter()
@@ -963,26 +1282,14 @@ impl WebApi {
             .collect();
 
         Ok(ArtistInfo {
-            main_image: Arc::from(
-                result.data.data.artist_union.visuals.avatar_image.sources[0]
-                    .url
-                    .to_string(),
-            ),
+            main_image,
             stats: ArtistStats {
-                followers: result.data.data.artist_union.stats.followers,
-                monthly_listeners: result.data.data.artist_union.stats.monthly_listeners,
-                world_rank: result.data.data.artist_union.stats.world_rank,
+                followers: stats.followers.unwrap_or(0),
+                monthly_listeners: stats.monthly_listeners.unwrap_or(0),
+                world_rank: stats.world_rank.unwrap_or(0),
             },
-            bio: {
-                let sanitized_bio = sanitize_str(
-                    &DEFAULT,
-                    &result.data.data.artist_union.profile.biography.text,
-                )
-                .unwrap_or_default();
-                sanitized_bio.replace("&amp;", "&")
-            },
-
-            artist_links: hrefs,
+            bio,
+            artist_links,
         })
     }
 }
