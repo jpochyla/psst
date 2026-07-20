@@ -29,6 +29,7 @@ use psst_core::{
 use serde::{de::DeserializeOwned, Deserialize};
 use serde_json::json;
 use std::sync::OnceLock;
+use time::{Date, Month};
 use ureq::{
     http::{Response, StatusCode},
     Agent, Body,
@@ -37,9 +38,10 @@ use ureq::{
 use crate::{
     data::{
         self, utils::sanitize_html_string, Album, AlbumType, Artist, ArtistAlbums, ArtistInfo,
-        ArtistLink, ArtistStats, AudioAnalysis, Cached, Episode, EpisodeId, EpisodeLink, Image,
-        MixedView, Nav, Page, Playlist, PublicUser, Range, Recommendations, RecommendationsRequest,
-        SearchResults, SearchTopic, Show, SpotifyUrl, Track, TrackLines, UserProfile,
+        ArtistLink, ArtistStats, AudioAnalysis, Cached, DatePrecision, Episode, EpisodeId,
+        EpisodeLink, Image, MixedView, Nav, Page, Playlist, PublicUser, Range, Recommendations,
+        RecommendationsRequest, SearchResults, SearchTopic, Show, SpotifyUrl, Track, TrackLines,
+        UserProfile,
     },
     error::Error,
     ui::credits::TrackCredits,
@@ -803,6 +805,181 @@ impl WebApi {
     }
 }
 
+/// Persisted-query hashes for the pathfinder discography operations, extracted
+/// from the web player bundle.  Albums, singles and compilations all share one
+/// document (selected by `operationName`); appears-on is a separate one.
+const DISCOGRAPHY_HASH: &str = "5e07d323febb57b4a56a42abbf781490e58764aa45feb6e3dc0591564fc56599";
+const APPEARS_ON_HASH: &str = "9a4bb7a20d6720fe52d7b47bc001cfa91940ddf5e7113761460b4a288d18a4c1";
+
+// Shape of the `queryArtistDiscography*` / `queryArtistAppearsOn` responses.
+// Each operation populates a different field, so all are optional and the
+// caller selects the one it wants.
+#[derive(Deserialize)]
+struct DiscographyResponse {
+    data: DiscographyData,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DiscographyData {
+    artist_union: DiscographyUnion,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DiscographyUnion {
+    #[serde(default)]
+    discography: Discography,
+    #[serde(default)]
+    related_content: RelatedContent,
+}
+
+#[derive(Default, Deserialize)]
+struct Discography {
+    #[serde(default)]
+    albums: Option<DiscographySection>,
+    #[serde(default)]
+    singles: Option<DiscographySection>,
+    #[serde(default)]
+    compilations: Option<DiscographySection>,
+}
+
+#[derive(Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RelatedContent {
+    #[serde(default)]
+    appears_on: Option<DiscographySection>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DiscographySection {
+    #[serde(default)]
+    total_count: i64,
+    #[serde(default)]
+    items: Vec<ReleaseHolder>,
+}
+
+#[derive(Deserialize)]
+struct ReleaseHolder {
+    releases: Releases,
+}
+
+#[derive(Deserialize)]
+struct Releases {
+    #[serde(default)]
+    items: Vec<Release>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct Release {
+    id: Arc<str>,
+    name: Arc<str>,
+    #[serde(default)]
+    cover_art: CoverArt,
+    #[serde(default)]
+    date: Option<ReleaseDate>,
+    #[serde(rename = "type", default)]
+    release_type: Option<String>,
+    #[serde(default)]
+    artists: ReleaseArtists,
+}
+
+#[derive(Default, Deserialize)]
+struct CoverArt {
+    #[serde(default)]
+    sources: Vector<Image>,
+}
+
+#[derive(Deserialize)]
+struct ReleaseDate {
+    #[serde(default)]
+    year: Option<i32>,
+    #[serde(default)]
+    month: Option<u8>,
+    #[serde(default)]
+    day: Option<u8>,
+    #[serde(default)]
+    precision: Option<String>,
+}
+
+#[derive(Default, Deserialize)]
+struct ReleaseArtists {
+    #[serde(default)]
+    items: Vec<ReleaseArtist>,
+}
+
+#[derive(Deserialize)]
+struct ReleaseArtist {
+    uri: String,
+    profile: ReleaseArtistProfile,
+}
+
+#[derive(Deserialize)]
+struct ReleaseArtistProfile {
+    name: Arc<str>,
+}
+
+impl Release {
+    fn to_album(&self, default_type: AlbumType) -> Album {
+        let album_type = match self.release_type.as_deref() {
+            Some("ALBUM") => AlbumType::Album,
+            Some("SINGLE") => AlbumType::Single,
+            Some("COMPILATION") => AlbumType::Compilation,
+            _ => default_type,
+        };
+        let (release_date, release_date_precision) = self
+            .date
+            .as_ref()
+            .map(ReleaseDate::to_date)
+            .unwrap_or((None, None));
+
+        Album {
+            id: self.id.clone(),
+            name: self.name.clone(),
+            album_type,
+            images: self.cover_art.sources.clone(),
+            artists: self
+                .artists
+                .items
+                .iter()
+                .map(|artist| ArtistLink {
+                    id: artist.uri.rsplit(':').next().unwrap_or_default().into(),
+                    name: artist.profile.name.clone(),
+                })
+                .collect(),
+            copyrights: Vector::new(),
+            label: "".into(),
+            tracks: Vector::new(),
+            release_date,
+            release_date_precision,
+        }
+    }
+}
+
+impl ReleaseDate {
+    fn to_date(&self) -> (Option<Date>, Option<DatePrecision>) {
+        let precision = match self.precision.as_deref() {
+            Some("DAY") => Some(DatePrecision::Day),
+            Some("MONTH") => Some(DatePrecision::Month),
+            Some("YEAR") => Some(DatePrecision::Year),
+            _ => None,
+        };
+        // Only the year is required; month/day default to 1 so we can still form
+        // a valid `Date` even when precision is coarser than a full day.
+        let date = self.year.and_then(|year| {
+            let month = self
+                .month
+                .and_then(|month| Month::try_from(month).ok())
+                .unwrap_or(Month::January);
+            let day = self.day.filter(|day| *day >= 1).unwrap_or(1);
+            Date::from_calendar_date(year, month, day).ok()
+        });
+        (date, precision)
+    }
+}
+
 /// Artist endpoints.
 impl WebApi {
     // https://developer.spotify.com/documentation/web-api/reference/get-artist/
@@ -812,49 +989,103 @@ impl WebApi {
         Ok(result.data)
     }
 
-    // https://developer.spotify.com/documentation/web-api/reference/get-an-artists-albums/
+    // Albums, singles, compilations and appears-on each come from a separate
+    // pathfinder discography operation on `api-partner.spotify.com`, paginated
+    // independently.
     pub fn get_artist_albums(&self, id: &str) -> Result<ArtistAlbums, Error> {
-        let request = &RequestBuilder::new(format!("v1/artists/{id}/albums"), Method::Get, None)
-            .query("market", "from_token");
-        let result: Vector<Arc<Album>> = self.load_all_pages(request)?;
+        Ok(ArtistAlbums {
+            albums: self.artist_releases(
+                id,
+                "queryArtistDiscographyAlbums",
+                DISCOGRAPHY_HASH,
+                true,
+                AlbumType::Album,
+                |union| union.discography.albums.as_ref(),
+            )?,
+            singles: self.artist_releases(
+                id,
+                "queryArtistDiscographySingles",
+                DISCOGRAPHY_HASH,
+                true,
+                AlbumType::Single,
+                |union| union.discography.singles.as_ref(),
+            )?,
+            compilations: self.artist_releases(
+                id,
+                "queryArtistDiscographyCompilations",
+                DISCOGRAPHY_HASH,
+                true,
+                AlbumType::Compilation,
+                |union| union.discography.compilations.as_ref(),
+            )?,
+            appears_on: self.artist_releases(
+                id,
+                "queryArtistAppearsOn",
+                APPEARS_ON_HASH,
+                false,
+                AlbumType::Album,
+                |union| union.related_content.appears_on.as_ref(),
+            )?,
+        })
+    }
 
-        let mut artist_albums = ArtistAlbums {
-            albums: Vector::new(),
-            singles: Vector::new(),
-            compilations: Vector::new(),
-            appears_on: Vector::new(),
-        };
+    /// Fetch one discography section, paging until `totalCount` is exhausted.
+    /// `select` picks the section out of the response, `default_type` fills in
+    /// releases that omit their `type`, and `order` sends `DATE_DESC` (which the
+    /// appears-on operation rejects).
+    fn artist_releases(
+        &self,
+        id: &str,
+        operation: &str,
+        hash: &str,
+        order: bool,
+        default_type: AlbumType,
+        select: impl Fn(&DiscographyUnion) -> Option<&DiscographySection>,
+    ) -> Result<Vector<Arc<Album>>, Error> {
+        const PAGE: usize = 50;
 
-        let mut last_album_release_year = usize::MAX;
-        let mut last_single_release_year = usize::MAX;
+        let mut releases = Vector::new();
+        let mut offset = 0;
+        loop {
+            let mut variables = json!({
+                "uri": format!("spotify:artist:{id}"),
+                "offset": offset,
+                "limit": PAGE,
+            });
+            if order {
+                variables["order"] = json!("DATE_DESC");
+            }
+            let json = json!({
+                "operationName": operation,
+                "variables": variables,
+                "extensions": {
+                    "persistedQuery": { "version": 1, "sha256Hash": hash }
+                },
+            });
+            let request =
+                &RequestBuilder::new("pathfinder/v2/query".to_string(), Method::Post, Some(json))
+                    .set_base_uri("api-partner.spotify.com")
+                    .header("User-Agent", Self::user_agent())
+                    .partner_auth();
 
-        for album in result {
-            match album.album_type {
-                // Spotify is labeling albums and singles that should be labeled `appears_on` as `album` or `single`.
-                // They are still ordered properly though, with the most recent first, then 'appears_on'.
-                // So we just wait until they are no longer descending, then start putting them in the 'appears_on' Vec.
-                // NOTE: This will break if an artist has released 'appears_on' albums/singles before their first actual album/single.
-                AlbumType::Album => {
-                    if album.release_year_int() > last_album_release_year {
-                        artist_albums.appears_on.push_back(album)
-                    } else {
-                        last_album_release_year = album.release_year_int();
-                        artist_albums.albums.push_back(album)
-                    }
+            let response: DiscographyResponse = self.load(request)?;
+            let union = response.data.artist_union;
+            let Some(section) = select(&union) else {
+                break;
+            };
+
+            for holder in &section.items {
+                if let Some(release) = holder.releases.items.first() {
+                    releases.push_back(Arc::new(release.to_album(default_type.clone())));
                 }
-                AlbumType::Single => {
-                    if album.release_year_int() > last_single_release_year {
-                        artist_albums.appears_on.push_back(album);
-                    } else {
-                        last_single_release_year = album.release_year_int();
-                        artist_albums.singles.push_back(album);
-                    }
-                }
-                AlbumType::Compilation => artist_albums.compilations.push_back(album),
-                AlbumType::AppearsOn => artist_albums.appears_on.push_back(album),
+            }
+
+            offset += PAGE;
+            if section.items.is_empty() || offset >= section.total_count.max(0) as usize {
+                break;
             }
         }
-        Ok(artist_albums)
+        Ok(releases)
     }
 
     // https://developer.spotify.com/documentation/web-api/reference/get-an-artists-related-artists
