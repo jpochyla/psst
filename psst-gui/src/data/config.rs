@@ -190,7 +190,7 @@ impl Config {
     pub fn load() -> Option<Config> {
         let path = Self::config_path().expect("Failed to get config path");
         if let Ok(file) = File::open(&path) {
-            log::info!("loading config: {:?}", &path);
+            log::info!("loading config: {:?}", path);
             let reader = BufReader::new(file);
             Some(serde_json::from_reader(reader).expect("Failed to read config"))
         } else {
@@ -212,7 +212,7 @@ impl Config {
         let writer = BufWriter::new(file);
 
         serde_json::to_writer_pretty(writer, self).expect("Failed to write config");
-        log::info!("saved config: {:?}", &path);
+        log::info!("saved config: {:?}", path);
     }
 
     pub fn has_credentials(&self) -> bool {

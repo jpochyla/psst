@@ -37,7 +37,7 @@ impl<T: Data, U: Data + Eq + Hash> ViewDispatcher<T, U> {
 impl<T: Data, U: Data + Eq + Hash> Widget<T> for ViewDispatcher<T, U> {
     fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut T, env: &Env) {
         if event.should_propagate_to_hidden() {
-            for (_, child) in self.children.iter_mut() {
+            for child in self.children.values_mut() {
                 child.event(ctx, event, data, env);
             }
         } else if let Some(child) = self.active_child() {
@@ -57,7 +57,7 @@ impl<T: Data, U: Data + Eq + Hash> Widget<T> for ViewDispatcher<T, U> {
         }
 
         if event.should_propagate_to_hidden() {
-            for (_, child) in self.children.iter_mut() {
+            for child in self.children.values_mut() {
                 child.lifecycle(ctx, event, data, env);
             }
         } else if let Some(child) = self.active_child() {
