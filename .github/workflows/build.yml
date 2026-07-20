@@ -231,7 +231,6 @@ jobs:
           path: "*.deb"
 
   appimage:
-    if: false # Disable temporarily: https://github.com/jpochyla/psst/actions/runs/3897410142/jobs/6655282029
     runs-on: ubuntu-latest
     needs: deb
     steps:
@@ -241,19 +240,18 @@ jobs:
       - name: Download Debian Package
         uses: actions/download-artifact@v4
         with:
-          name: psst-deb
-          # Downloads to the root of the workspace by default if path is omitted or '.',
-          # so removing explicit path to ${{github.workspace}}
+          name: psst-deb-amd64
+          path: .
 
       - name: Install Dependencies
-        run: sudo apt-get update && sudo apt-get install -y libfuse2
+        run: sudo apt-get update && sudo apt-get install -y libfuse2 xvfb
 
       - name: Create Workspace
         run: mkdir -p appimage
 
       - name: Download the Latest pkg2appimage
         run: |
-          latest_release_appimage_url=$(wget -q https://api.github.com/repos/AppImageCommunity/pkg2appimage/releases/latest -O - | jq -r '.assets[0].browser_download_url')
+          latest_release_appimage_url=$(wget -q https://api.github.com/repos/AppImageCommunity/pkg2appimage/releases/latest -O - | jq -r '.assets[] | select(.name | endswith("x86_64.AppImage")) | .browser_download_url' | head -n 1)
           wget --directory-prefix=appimage -c $latest_release_appimage_url
 
       - name: Create Path to pkg2appimage
@@ -265,12 +263,26 @@ jobs:
 
       - name: Create Path to pkg2appimage's Recipe File
         run: |
-          recipe_path=psst/.pkg/APPIMAGE/pkg2appimage-ingredients.yml
+          recipe_path=.pkg/APPIMAGE/pkg2appimage-ingredients.yml
           echo "recipe_path=${recipe_path}" >> $GITHUB_ENV
 
       - name: Run pkg2appimage
         run: |
           ${{env.app_path}} ${{env.recipe_path}}
+
+      - name: Smoke Test AppImage
+        run: |
+          appimage=$(find out -maxdepth 1 -name '*.AppImage' -print -quit)
+          chmod +x "$appimage"
+
+          set +e
+          xvfb-run -a timeout 20s "$appimage"
+          status=$?
+          set -e
+
+          if [ "$status" -ne 0 ] && [ "$status" -ne 124 ]; then
+            exit "$status"
+          fi
 
       - name: Upload AppImage
         uses: actions/upload-artifact@v4
@@ -279,7 +291,7 @@ jobs:
           path: out/*.AppImage
 
   release:
-    needs: [build, deb]
+    needs: [build, deb, appimage]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -315,6 +327,7 @@ jobs:
           find artifacts -type f -name 'psst-gui.exe' -exec mv {} artifacts_final/Psst.exe \;
           find artifacts -type f -name 'psst-amd64.deb' -exec mv {} artifacts_final/psst-amd64.deb \;
           find artifacts -type f -name 'psst-arm64.deb' -exec mv {} artifacts_final/psst-arm64.deb \;
+          find artifacts -type f -name '*.AppImage' -exec mv {} artifacts_final/psst.AppImage \;
 
           find artifacts -type f -name 'psst' -path '*/psst-x86_64-unknown-linux-gnu/*' -exec mv {} artifacts_final/psst-linux-x86_64 \;
           find artifacts -type f -name 'psst' -path '*/psst-aarch64-unknown-linux-gnu/*' -exec mv {} artifacts_final/psst-linux-aarch64 \;
