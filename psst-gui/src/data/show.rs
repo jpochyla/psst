@@ -57,7 +57,8 @@ impl ShowLink {
     }
 }
 
-#[derive(Clone, Debug, Data, Lens, Deserialize)]
+/// A resolved episode, built from the wire shape in [`ShowEpisode`].
+#[derive(Clone, Debug, Data, Lens)]
 pub struct Episode {
     pub id: EpisodeId,
     pub name: Arc<str>,
@@ -65,10 +66,7 @@ pub struct Episode {
     pub images: Vector<Image>,
     pub description: Arc<str>,
     pub languages: Vector<Arc<str>>,
-    #[serde(rename = "duration_ms")]
-    #[serde(deserialize_with = "super::utils::deserialize_millis")]
     pub duration: Duration,
-    #[serde(deserialize_with = "super::utils::deserialize_date_option")]
     #[data(same_fn = "PartialEq::eq")]
     pub release_date: Option<Date>,
     #[data(same_fn = "PartialEq::eq")]
@@ -97,10 +95,47 @@ impl Episode {
     }
 }
 
-#[derive(Clone, Debug, Data, Lens, Deserialize)]
-pub struct EpisodeLink {
+/// An episode as it appears inside a show's episode list.  Identical to
+/// `Episode` except that it carries no `show` — the caller already knows which
+/// show it asked for, and the endpoint that returns the full shape is 403 for
+/// third-party clients.
+///
+/// One unparseable field fails the whole page, so anything the UI can live
+/// without is defaulted.
+#[derive(Clone, Debug, Deserialize)]
+pub struct ShowEpisode {
     pub id: EpisodeId,
     pub name: Arc<str>,
+    #[serde(default)]
+    pub images: Vector<Image>,
+    #[serde(default)]
+    pub description: Arc<str>,
+    #[serde(default)]
+    pub languages: Vector<Arc<str>>,
+    #[serde(rename = "duration_ms")]
+    #[serde(deserialize_with = "super::utils::deserialize_millis")]
+    pub duration: Duration,
+    #[serde(deserialize_with = "super::utils::deserialize_date_option")]
+    pub release_date: Option<Date>,
+    pub release_date_precision: Option<DatePrecision>,
+    pub resume_point: Option<ResumePoint>,
+}
+
+impl ShowEpisode {
+    pub fn into_episode(self, show: ShowLink) -> Episode {
+        Episode {
+            id: self.id,
+            name: self.name,
+            show,
+            images: self.images,
+            description: self.description,
+            languages: self.languages,
+            duration: self.duration,
+            release_date: self.release_date,
+            release_date_precision: self.release_date_precision,
+            resume_point: self.resume_point,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Data, Lens, Deserialize)]

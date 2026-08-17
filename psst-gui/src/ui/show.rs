@@ -107,7 +107,7 @@ fn async_episodes_widget() -> impl Widget<AppState> {
     )
     .on_command_async(
         LOAD_DETAIL,
-        |d| WebApi::global().get_show_episodes(&d.id),
+        |d| WebApi::global().get_show_episodes(&d),
         |_, data, d| data.show_detail.episodes.defer(d),
         |_, data, (d, r)| {
             let r = r.map(|episodes| ShowEpisodes {
