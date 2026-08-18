@@ -116,8 +116,8 @@ jobs:
         if: runner.os == 'macOS'
         env:
           CARGO_BUNDLE_SKIP_BUILD: "true"
-        run: |
-          cargo bundle --release -p psst-gui
+        run: cargo bundle --release
+        working-directory: psst-gui
 
       - name: Create DMG
         if: runner.os == 'macOS'
