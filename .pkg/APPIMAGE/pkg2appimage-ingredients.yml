@@ -1,9 +1,13 @@
+app: Psst
+lowerapp: psst
 ingredients:
-  dist: focal
+  dist: jammy
   sources:
-    - deb http://us.archive.ubuntu.com/ubuntu/ focal main universe
+    - deb http://us.archive.ubuntu.com/ubuntu/ jammy main universe
+  package: psst-gui
   debs:
     - ../*.deb
   script:
-    - mkdir -p /home/runner/work/psst/psst/.AppDir/
-    - cp /home/runner/work/psst/psst/psst-gui/assets/logo_256.png /home/runner/work/psst/psst/.AppDir/psst.png
+    - mkdir -p Psst.AppDir
+    - cp ../psst-gui/assets/logo_256.png Psst.AppDir/psst.png
+    - dpkg-deb -f ../*.deb Version > VERSION
