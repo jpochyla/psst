@@ -18,10 +18,12 @@ A clear and concise description of what you expected to happen.
 **Screenshots**
 If applicable, add screenshots to help explain your problem.
 
-**Environment**
+**Platform (please complete the following)**
 
-- OS:
-- Version:
+- OS: [e.g. macOS 14.0, Ubuntu 22.04, Windows 11]
+- Architecture: [e.g. x86_64, aarch64]
+- App Version: [e.g. 0.1.0]
+- Installation method: [e.g. built from source, AUR, Homebrew]
 
 **Additional context**
 Add any other context about the problem here.
