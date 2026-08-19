@@ -82,7 +82,7 @@ pub fn preferences_window() -> WindowDesc<AppState> {
     let win = WindowDesc::new(preferences_widget())
         .title("Preferences")
         .window_size(win_size)
-        .resizable(false)
+        .resizable(true)
         .show_title(false)
         .transparent_titlebar(true);
     if cfg!(target_os = "macos") {
@@ -96,7 +96,7 @@ pub fn account_setup_window() -> WindowDesc<AppState> {
     let win = WindowDesc::new(account_setup_widget())
         .title("Login")
         .window_size((theme::grid(50.0), theme::grid(45.0)))
-        .resizable(false)
+        .resizable(true)
         .show_title(false)
         .transparent_titlebar(true);
     if cfg!(target_os = "macos") {

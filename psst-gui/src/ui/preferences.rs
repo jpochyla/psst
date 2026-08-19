@@ -14,7 +14,7 @@ use druid::{
     text::ParseFormatter,
     widget::{
         Button, Controller, CrossAxisAlignment, Flex, Label, LineBreaking, MainAxisAlignment,
-        RadioGroup, SizedBox, Slider, TextBox, ViewSwitcher,
+        RadioGroup, SizedBox, Slider, TextBox, ViewSwitcher, Scroll,
     },
     Color, Data, Env, Event, EventCtx, Insets, Lens, LensExt, LifeCycle, LifeCycleCtx, Selector,
     Widget, WidgetExt,
@@ -51,8 +51,8 @@ where
 }
 
 pub fn account_setup_widget() -> impl Widget<AppState> {
+    Scroll::new(
     Flex::column()
-        .must_fill_main_axis(true)
         .cross_axis_alignment(CrossAxisAlignment::Start)
         .with_spacer(theme::grid(2.0))
         .with_child(
@@ -71,8 +71,9 @@ pub fn account_setup_widget() -> impl Widget<AppState> {
         .with_spacer(theme::grid(6.0))
         .with_child(account_tab_widget(AccountTab::FirstSetup).expand_width())
         .padding(theme::grid(4.0))
-}
-
+    )
+    .vertical()
+}     
 pub fn preferences_widget() -> impl Widget<AppState> {
     const PROPAGATE_FLAGS: Selector = Selector::new("app.preferences.propagate-flags");
 
@@ -390,7 +391,7 @@ fn account_tab_widget(tab: AccountTab) -> impl Widget<AppState> {
                     .with_child(
                         TextBox::new()
                             .with_placeholder("Paste your Client ID here")
-                            .fix_width(theme::grid(40.0))
+                            .fix_width(theme::grid(24.0))
                             .lens(AppState::config.then(Config::webapi_client_id).map(
                                 |opt: &Option<String>| opt.clone().unwrap_or_default(),
                                 |opt: &mut Option<String>, val: String| {
