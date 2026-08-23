@@ -180,6 +180,12 @@ impl AppDelegate<AppState> for Delegate {
         } else if let Some(text) = cmd.get(cmd::GO_TO_URL) {
             let _ = open::that(text);
             Handled::Yes
+        } else if let Some(token) = cmd.get(cmd::STORE_WEBAPI_TOKEN) {
+            // Do not call back into `WebApi` here, it holds the token lock
+            // across the refresh and we would block the GUI until it finishes.
+            data.config.store_webapi_token(token.clone());
+            data.config.save();
+            Handled::Yes
         } else if let Handled::Yes = self.command_image(ctx, target, cmd, data) {
             Handled::Yes
         } else if let Some(link) = cmd.get(UNFOLLOW_PLAYLIST_CONFIRM) {
