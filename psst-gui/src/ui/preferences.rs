@@ -4,6 +4,7 @@ use std::time::Duration;
 
 use crate::{
     cmd,
+    controller::InputController,
     data::{
         AppState, AudioQuality, Authentication, Config, Preferences, PreferencesTab, Promise,
         SliderScrollScale, Theme,
@@ -24,6 +25,9 @@ use psst_core::{connection::Credentials, lastfm, oauth, session::SessionConfig};
 use super::{icons::SvgIcon, theme};
 
 const CLEAR_CACHE: Selector = Selector::new("app.preferences.clear-cache");
+
+#[cfg(test)]
+mod tests;
 
 // Helper function for creating a labeled input row
 fn make_input_row<L>(
@@ -51,16 +55,19 @@ where
 }
 
 pub fn account_setup_widget() -> impl Widget<AppState> {
+    // Windows decorations reduce the available content area. Keep the existing
+    // spacing elsewhere, including clearance for the macOS window controls.
+    let compact = cfg!(target_os = "windows");
     Flex::column()
         .must_fill_main_axis(true)
         .cross_axis_alignment(CrossAxisAlignment::Start)
-        .with_spacer(theme::grid(2.0))
+        .with_spacer(theme::grid(if compact { 0.0 } else { 2.0 }))
         .with_child(
             Label::new("Please insert your Spotify Premium credentials.")
                 .with_font(theme::UI_FONT_MEDIUM)
                 .with_line_break_mode(LineBreaking::WordWrap),
         )
-        .with_spacer(theme::grid(2.0))
+        .with_spacer(theme::grid(if compact { 1.0 } else { 2.0 }))
         .with_child(
             Label::new(
                 "Psst connects only to the official servers, and does not store your password.",
@@ -68,9 +75,12 @@ pub fn account_setup_widget() -> impl Widget<AppState> {
             .with_text_color(theme::PLACEHOLDER_COLOR)
             .with_line_break_mode(LineBreaking::WordWrap),
         )
-        .with_spacer(theme::grid(6.0))
+        .with_spacer(theme::grid(if compact { 2.0 } else { 6.0 }))
         .with_child(account_tab_widget(AccountTab::FirstSetup).expand_width())
-        .padding(theme::grid(4.0))
+        .padding((
+            theme::grid(4.0),
+            theme::grid(if compact { 2.0 } else { 4.0 }),
+        ))
 }
 
 pub fn preferences_widget() -> impl Widget<AppState> {
@@ -354,6 +364,7 @@ enum AccountTab {
 }
 
 fn account_tab_widget(tab: AccountTab) -> impl Widget<AppState> {
+    let compact = cfg!(target_os = "windows") && matches!(tab, AccountTab::FirstSetup);
     let mut col = Flex::column().cross_axis_alignment(match tab {
         AccountTab::FirstSetup => CrossAxisAlignment::Center,
         AccountTab::InPreferences => CrossAxisAlignment::Start,
@@ -368,7 +379,7 @@ fn account_tab_widget(tab: AccountTab) -> impl Widget<AppState> {
     // Web API Client ID input (shown when not logged in)
     col = col.with_child(ViewSwitcher::new(
         |data: &AppState, _| data.config.has_credentials(),
-        |is_logged_in, _, _| {
+        move |is_logged_in, _, _| {
             if *is_logged_in {
                 SizedBox::empty().boxed()
             } else {
@@ -390,6 +401,9 @@ fn account_tab_widget(tab: AccountTab) -> impl Widget<AppState> {
                     .with_child(
                         TextBox::new()
                             .with_placeholder("Paste your Client ID here")
+                            .controller(InputController::new().on_submit(|ctx, _, _| {
+                                ctx.submit_command(Authenticate::SPOTIFY_REQUEST);
+                            }))
                             .fix_width(theme::grid(40.0))
                             .lens(AppState::config.then(Config::webapi_client_id).map(
                                 |opt: &Option<String>| opt.clone().unwrap_or_default(),
@@ -398,7 +412,7 @@ fn account_tab_widget(tab: AccountTab) -> impl Widget<AppState> {
                                 },
                             )),
                     )
-                    .with_spacer(theme::grid(2.0))
+                    .with_spacer(theme::grid(if compact { 1.0 } else { 2.0 }))
                     .boxed()
             }
         },
@@ -435,6 +449,7 @@ fn account_tab_widget(tab: AccountTab) -> impl Widget<AppState> {
                     Label::dynamic(|err: &String, _| err.to_owned())
                         .with_text_size(theme::TEXT_SIZE_SMALL)
                         .with_text_color(druid::Color::RED)
+                        .with_line_break_mode(LineBreaking::WordWrap)
                 },
             )
             .lens(
