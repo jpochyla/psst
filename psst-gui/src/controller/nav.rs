@@ -100,6 +100,13 @@ where
         match event {
             Event::Command(cmd) if cmd.is(cmd::NAVIGATE) => {
                 let nav = cmd.get_unchecked(cmd::NAVIGATE);
+                if matches!(nav, Nav::Queue) {
+                    data.queue_panel_open =
+                        !(data.queue_panel_open && data.config.show_now_playing);
+                    data.config.show_now_playing = data.queue_panel_open;
+                    ctx.set_handled();
+                    return;
+                }
                 data.navigate(nav);
                 ctx.set_handled();
                 self.load_route_data(ctx, data);

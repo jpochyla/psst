@@ -100,7 +100,9 @@ pub fn run_if_requested() -> bool {
             crate::splitify::window()
         }
         "queue" | "queue-empty" | "lyrics" => {
-            state.nav = crate::data::Nav::Queue;
+            state.nav = crate::data::Nav::Home;
+            state.queue_panel_open = view != "lyrics";
+            state.config.show_now_playing = true;
             if view != "queue-empty" {
                 for (index, (name, artist)) in [
                     ("Instant Crush", "Daft Punk"),

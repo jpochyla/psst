@@ -287,11 +287,15 @@ fn root_widget() -> impl Widget<AppState> {
                 |state: &AppState, _| state.config.show_now_playing,
                 Split::columns(
                     Overlay::bottom(route_widget(), alert_widget()),
-                    now_playing::widget(),
+                    druid::widget::Either::new(
+                        |state: &AppState, _| state.queue_panel_open,
+                        queue::widget(),
+                        now_playing::widget(),
+                    ),
                 )
-                .split_point(0.67)
+                .split_point(0.62)
                 .bar_size(8.0)
-                .min_size(340.0, 220.0)
+                .min_size(300.0, 260.0)
                 .solid_bar(true),
                 Overlay::bottom(route_widget(), alert_widget()),
             ),
@@ -588,10 +592,15 @@ fn sidebar_link_widget(
         .link()
         .env_scope({
             let link_nav = link_nav.clone();
-            move |env, nav: &Nav| {
+            move |env, state: &AppState| {
+                let active = if matches!(link_nav, Nav::Queue) {
+                    state.queue_panel_open && state.config.show_now_playing
+                } else {
+                    link_nav == state.nav
+                };
                 env.set(
                     theme::LINK_COLD_COLOR,
-                    if &link_nav == nav {
+                    if active {
                         env.get(theme::MENU_BUTTON_BG_ACTIVE)
                     } else {
                         env.get(theme::MENU_BUTTON_BG_INACTIVE)
@@ -599,7 +608,7 @@ fn sidebar_link_widget(
                 );
                 env.set(
                     theme::TEXT_COLOR,
-                    if &link_nav == nav {
+                    if active {
                         env.get(theme::MENU_BUTTON_FG_ACTIVE)
                     } else {
                         env.get(theme::MENU_BUTTON_FG_INACTIVE)
@@ -610,7 +619,6 @@ fn sidebar_link_widget(
         .on_left_click(move |ctx, _, _, _| {
             ctx.submit_command(cmd::NAVIGATE.with(link_nav.clone()));
         })
-        .lens(AppState::nav)
 }
 
 fn volume_slider() -> impl Widget<AppState> {

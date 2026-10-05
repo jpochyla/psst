@@ -90,6 +90,8 @@ pub struct AppState {
     pub alerts: Vector<Alert>,
     pub cache_notice: String,
     pub selected_folder: Option<String>,
+    pub queue_panel_open: bool,
+    pub queue_visible_count: usize,
     pub folder_name: String,
     pub editing_folder: Option<String>,
     pub finder: Finder,
@@ -141,6 +143,8 @@ impl AppState {
             },
             playback,
             added_queue: Vector::new(),
+            queue_panel_open: false,
+            queue_visible_count: 100,
             engine_queue: None,
             search: Search {
                 input: "".into(),

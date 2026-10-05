@@ -13,6 +13,8 @@
 
 ## Earlier integration checks
 
+- Spotify-style queue update: compact right sidebar with current track in green, 48px artwork, artist subtitles, source heading, independent scroll and close control. Visual review passed in dark at 1120 x 800 and light at 900 x 620. Actual account artwork and 549 upcoming tracks were displayed while the existing playlist remained open; closing and reopening from the footer preserved the route and paused playback. Rows load visually in blocks of 100 without modifying the engine queue. GUI tests: 25 pass, one live test excluded; Clippy with warnings denied and the native Windows build pass.
+
 Integration: existing xpotify repository, branch `splitify-integration`; original Splitify `main` remains the web app.
 
 - Rust stable / Windows C++ Build Tools and SDK installed. Locked native build produces `dist/Xpotify.exe`.

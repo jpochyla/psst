@@ -90,24 +90,6 @@ fn toolbar<T: Data>() -> impl Widget<GridPage<T>> {
         .padding((8.0, 10.0))
 }
 
-pub fn list<T: Data>(factory: impl Fn() -> Box<dyn Widget<T>> + 'static) -> impl Widget<Vector<T>> {
-    Grid {
-        child: WidgetPod::new(
-            Flex::column()
-                .with_child(toolbar())
-                .with_child(List::new(factory).lens(GridPage::<T>::values))
-                .boxed(),
-        ),
-        data: GridPage {
-            rows: Vector::new(),
-            values: Vector::new(),
-            page_size: 100,
-            page: 0,
-            total: 0,
-        },
-    }
-}
-
 struct Grid<T: Data> {
     child: WidgetPod<GridPage<T>, Box<dyn Widget<GridPage<T>>>>,
     data: GridPage<T>,
