@@ -1,7 +1,7 @@
 use std::{
     env::{self, VarError},
     fs::{self, File, OpenOptions},
-    io::{BufReader, BufWriter},
+    io::{BufReader, BufWriter, Write},
     path::{Path, PathBuf},
 };
 
@@ -114,6 +114,8 @@ pub struct Config {
     pub theme: Theme,
     pub volume: f64,
     pub last_route: Option<Nav>,
+    pub last_playback: Option<super::resume::ResumeSnapshot>,
+    pub seen_releases: druid::im::Vector<String>,
     pub queue_behavior: QueueBehavior,
     pub show_track_cover: bool,
     pub window_size: Size,
@@ -142,6 +144,8 @@ impl Default for Config {
             theme: Default::default(),
             volume: 1.0,
             last_route: Default::default(),
+            last_playback: None,
+            seen_releases: druid::im::Vector::new(),
             queue_behavior: Default::default(),
             show_track_cover: Default::default(),
             window_size: Size::new(1120.0, 800.0),
@@ -198,6 +202,8 @@ impl Config {
     }
 
     pub fn save(&self) {
+        static LOCK: parking_lot::Mutex<()> = parking_lot::Mutex::new(());
+        let _lock = LOCK.lock();
         let dir = Self::config_dir().expect("Failed to get config dir");
         let path = Self::config_path().expect("Failed to get config path");
         mkdir_if_not_exists(&dir).expect("Failed to create config dir");
@@ -207,10 +213,14 @@ impl Config {
         #[cfg(target_family = "unix")]
         options.mode(0o600);
 
-        let file = options.open(&path).expect("Failed to create config");
-        let writer = BufWriter::new(file);
-
-        serde_json::to_writer_pretty(writer, self).expect("Failed to write config");
+        let temporary = dir.join("config.json.tmp");
+        let file = options.open(&temporary).expect("Failed to create config");
+        let mut writer = BufWriter::new(file);
+        serde_json::to_writer_pretty(&mut writer, self).expect("Failed to write config");
+        writer.flush().expect("Failed to flush config");
+        writer.get_ref().sync_all().expect("Failed to sync config");
+        drop(writer);
+        fs::rename(temporary, &path).expect("Failed to replace config");
         log::info!("saved config: {:?}", path);
     }
 

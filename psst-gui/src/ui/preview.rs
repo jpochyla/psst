@@ -146,6 +146,19 @@ pub fn run_if_requested() -> bool {
             }
             super::main_window(&state.config)
         }
+        "news" => {
+            state.nav = crate::data::Nav::Notifications;
+            state.common_ctx_mut().nav = state.nav.clone();
+            let releases = ["Nuevo sencillo", "Nuevo álbum", "Una canción con un título largo para comprobar el espacio"].into_iter().enumerate().map(|(index, name)| {
+                let album: crate::data::Album = serde_json::from_value(serde_json::json!({
+                    "id":format!("preview{index}"),"name":name,"album_type":"single","images":[],"artists":[{"id":"preview","name":"Artista seguido"}],
+                    "release_date":"2026-10-01","release_date_precision":"day"
+                })).expect("news preview");
+                crate::data::news::Release { album:Arc::new(album),artist:"Artista seguido".into(),date:"2026-10-01".into(),unread:true }
+            }).collect();
+            state.news.feed.resolve((),crate::data::news::NewsFeed { releases, followed_count:199,failed_count:0,notice:String::new() });
+            super::main_window(&state.config)
+        }
         "player" => super::main_window(&state.config),
         "login" => super::account_setup_window(),
         _ => WindowDesc::new(druid::widget::Label::new("Unknown UI preview")),

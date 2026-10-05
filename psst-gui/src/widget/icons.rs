@@ -14,6 +14,17 @@ pub static VIDEO: SvgIcon = SvgIcon {
     op: PaintOp::Fill,
 };
 
+pub static BELL: SvgIcon = SvgIcon {
+    svg_path: "M14 2C9 2 6 6 6 11V18L3 21H25L22 18V11C22 6 19 2 14 2ZM14 4C18 4 20 7 20 11V19H8V11C8 7 10 4 14 4ZM11 23H17C17 27 11 27 11 23Z",
+    svg_size: Size::new(28.0, 28.0), op: PaintOp::Fill,
+};
+pub static DEVICES: SvgIcon = SvgIcon {
+    svg_path:
+        "M2 3H20V15H2ZM4 5V13H18V5ZM7 17H15V19H7ZM19 9H27V25H19ZM21 11V22H25V11ZM22 23H24V24H22Z",
+    svg_size: Size::new(28.0, 28.0),
+    op: PaintOp::Fill,
+};
+
 pub static QUEUE: SvgIcon = SvgIcon {
     svg_path: "M3 5H25V7H3Z M3 11H25V13H3Z M3 17H15V19H3Z M19 16L27 21L19 26Z",
     svg_size: Size::new(28.0, 28.0),

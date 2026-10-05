@@ -262,7 +262,8 @@ impl AppDelegate<AppState> for Delegate {
             data.preferences.auth.clear();
         }
         if self.main_window == Some(id) {
-            data.config.volume = data.playback.volume;
+            data.capture_resume();
+            data.config.volume = data.connect.local_volume.unwrap_or(data.playback.volume);
             data.config.save();
             ctx.submit_command(commands::CLOSE_ALL_WINDOWS);
             ctx.submit_command(commands::QUIT_APP);

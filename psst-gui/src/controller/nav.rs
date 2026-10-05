@@ -11,6 +11,12 @@ pub struct NavController;
 impl NavController {
     fn load_route_data(&self, ctx: &mut EventCtx, data: &mut AppState) {
         match &data.nav {
+            Nav::Devices => ctx.submit_command(crate::ui::connect::LOAD),
+            Nav::Notifications => {
+                if !data.news.feed.is_resolved() && !data.news.feed.is_deferred(&()) {
+                    ctx.submit_command(crate::ui::news::LOAD);
+                }
+            }
             Nav::Home | Nav::Queue => {}
             Nav::Lyrics => {
                 if let Some(np) = &data.playback.now_playing {
@@ -150,7 +156,7 @@ where
             ctx.submit_command(cmd::NAVIGATE.with(Nav::SavedTracks));
             // Load the last route, or the default.
             ctx.submit_command(
-                cmd::NAVIGATE.with(data.config.last_route.to_owned().unwrap_or_default()),
+                cmd::NAVIGATE.with(if data.playback.now_playing.is_some() { data.nav.clone() } else { data.config.last_route.to_owned().unwrap_or_default() }),
             );
         }
         child.lifecycle(ctx, event, data, env)

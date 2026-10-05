@@ -3,8 +3,8 @@ use std::{cell::RefCell, cmp::Ordering, rc::Rc, sync::Arc};
 use druid::{
     im::Vector,
     widget::{Button, Either, Flex, Label, LensWrap, LineBreaking, List, TextBox},
-    Insets, Lens, LensExt, LocalizedString, Menu, MenuItem, Selector, Size, UnitPoint, Widget,
-    WidgetExt, WindowDesc,
+    Lens, LensExt, LocalizedString, Menu, MenuItem, Selector, Size, UnitPoint, Widget, WidgetExt,
+    WindowDesc,
 };
 use itertools::Itertools;
 
@@ -22,6 +22,45 @@ use crate::{
 };
 
 use super::{playable, theme, track, utils};
+
+fn library_row_widget() -> impl Widget<WithCtx<Playlist>> {
+    let cover = RemoteImage::new(utils::placeholder_widget(), |row: &WithCtx<Playlist>, _| {
+        row.data.image(48.0, 48.0).map(|image| image.url.clone())
+    })
+    .fix_size(48.0, 48.0)
+    .clip(Size::new(48.0, 48.0).to_rounded_rect(5.0));
+    let labels = Flex::column()
+        .cross_axis_alignment(druid::widget::CrossAxisAlignment::Start)
+        .with_child(
+            Label::raw()
+                .with_font(theme::UI_FONT_MEDIUM)
+                .with_line_break_mode(LineBreaking::Clip)
+                .lens(Ctx::data().then(Playlist::name))
+                .expand_width(),
+        )
+        .with_spacer(5.0)
+        .with_child(
+            Label::dynamic(|row: &WithCtx<Playlist>, _| {
+                format!(
+                    "Playlist · {}",
+                    if row.data.owner.display_name.is_empty() {
+                        &row.data.owner.id
+                    } else {
+                        &row.data.owner.display_name
+                    }
+                )
+            })
+            .with_text_size(theme::TEXT_SIZE_SMALL)
+            .with_text_color(theme::PLACEHOLDER_COLOR)
+            .with_line_break_mode(LineBreaking::Clip)
+            .expand_width(),
+        );
+    Flex::row().with_child(cover).with_spacer(12.0).with_flex_child(labels, 1.0)
+        .padding((10.0, 8.0)).expand_width().link().rounded(6.0)
+        .active(|row: &WithCtx<Playlist>, _| matches!(&row.ctx.nav, Nav::PlaylistDetail(link) if link.id == row.data.id))
+        .on_left_click(|ctx, _, row, _| ctx.submit_command(cmd::NAVIGATE.with(Nav::PlaylistDetail(row.data.link()))))
+        .context_menu(playlist_menu_ctx)
+}
 
 pub const LOAD_LIST: Selector = Selector::new("app.playlist.load-list");
 pub const LOAD_DETAIL: Selector<(PlaylistLink, AppState)> =
@@ -46,23 +85,7 @@ const SHOW_UNFOLLOW_PLAYLIST_CONFIRM: Selector<UnfollowPlaylist> =
 pub fn list_widget() -> impl Widget<AppState> {
     Async::new(
         utils::spinner_widget,
-        || {
-            List::new(|| {
-                Label::raw()
-                    .with_line_break_mode(LineBreaking::WordWrap)
-                    .with_text_size(theme::TEXT_SIZE_SMALL)
-                    .lens(Ctx::data().then(Playlist::name))
-                    .expand_width()
-                    .padding(Insets::uniform_xy(theme::grid(2.0), theme::grid(0.6)))
-                    .link()
-                    .on_left_click(|ctx, _, playlist, _| {
-                        ctx.submit_command(
-                            cmd::NAVIGATE.with(Nav::PlaylistDetail(playlist.data.link())),
-                        );
-                    })
-                    .context_menu(playlist_menu_ctx)
-            })
-        },
+        || List::new(library_row_widget),
         utils::error_widget,
     )
     .lens(

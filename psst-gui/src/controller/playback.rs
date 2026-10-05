@@ -1,6 +1,6 @@
 use std::{
     thread::{self, JoinHandle},
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use crossbeam_channel::Sender;
@@ -41,6 +41,7 @@ pub struct PlaybackController {
     has_scrobbled: bool,
     scrobbler: Option<Scrobbler>,
     startup: bool,
+    last_resume_save: Instant,
 }
 fn init_scrobbler_instance(data: &AppState) -> Option<Scrobbler> {
     if data.config.lastfm_enable {
@@ -78,6 +79,7 @@ impl PlaybackController {
             has_scrobbled: false,
             scrobbler: None,
             startup: true,
+            last_resume_save: Instant::now(),
         }
     }
 
@@ -100,7 +102,7 @@ impl PlaybackController {
             &output,
         );
 
-        self.media_controls = Self::create_media_controls(player.sender(), window)
+        self.media_controls = Self::create_media_controls(event_sink.clone(), window)
             .map_err(|err| log::error!("failed to connect to media control interface: {err:?}"))
             .ok();
 
@@ -165,7 +167,7 @@ impl PlaybackController {
     }
 
     fn create_media_controls(
-        sender: Sender<PlayerEvent>,
+        sink: ExtEventSink,
         #[allow(unused_variables)] window: &WindowHandle,
     ) -> Result<MediaControls, souvlaki::Error> {
         let hwnd = {
@@ -189,27 +191,30 @@ impl PlaybackController {
         })?;
 
         media_controls.attach(move |event| {
-            Self::handle_media_control_event(event, &sender);
+            Self::handle_media_control_event(event, &sink);
         })?;
 
         Ok(media_controls)
     }
 
-    fn handle_media_control_event(event: MediaControlEvent, sender: &Sender<PlayerEvent>) {
-        let cmd = match event {
-            MediaControlEvent::Play => PlayerEvent::Command(PlayerCommand::Resume),
-            MediaControlEvent::Pause => PlayerEvent::Command(PlayerCommand::Pause),
-            MediaControlEvent::Toggle => PlayerEvent::Command(PlayerCommand::PauseOrResume),
-            MediaControlEvent::Next => PlayerEvent::Command(PlayerCommand::Next),
-            MediaControlEvent::Previous => PlayerEvent::Command(PlayerCommand::Previous),
+    fn handle_media_control_event(event: MediaControlEvent, sink: &ExtEventSink) {
+        let selector = match event {
+            MediaControlEvent::Play => cmd::PLAY_RESUME,
+            MediaControlEvent::Pause => cmd::PLAY_PAUSE,
+            MediaControlEvent::Toggle => cmd::PLAY_TOGGLE,
+            MediaControlEvent::Next => cmd::PLAY_NEXT,
+            MediaControlEvent::Previous => cmd::PLAY_PREVIOUS,
             MediaControlEvent::SetPosition(MediaPosition(duration)) => {
-                PlayerEvent::Command(PlayerCommand::Seek { position: duration })
-            }
-            _ => {
+                let _ = sink.submit_command(
+                    cmd::SKIP_TO_POSITION,
+                    duration.as_millis() as u64,
+                    druid::Target::Global,
+                );
                 return;
             }
+            _ => return,
         };
-        sender.send(cmd).unwrap();
+        let _ = sink.submit_command(selector, (), druid::Target::Global);
     }
 
     fn update_media_control_playback(&mut self, playback: &Playback) {
@@ -426,7 +431,45 @@ where
         data: &mut AppState,
         env: &Env,
     ) {
+        if data.connect.selected.is_some() {
+            if let Event::Command(command) = event {
+                if command.is(cmd::PLAYBACK_LOADING) || command.is(cmd::PLAYBACK_PLAYING)
+                    || command.is(cmd::PLAYBACK_PROGRESS) || command.is(cmd::PLAYBACK_PAUSING)
+                    || command.is(cmd::PLAYBACK_RESUMING) || command.is(cmd::PLAYBACK_STOPPED)
+                    || command.is(cmd::QUEUE_CHANGED) || command.is(cmd::PLAYBACK_BLOCKED) {
+                    ctx.set_handled();
+                    return;
+                }
+            }
+        }
         match event {
+            Event::Command(command) if command.is(cmd::SUSPEND_LOCAL_PLAYBACK) => {
+                self.stop();
+                ctx.set_handled();
+            }
+            Event::Command(command) if command.is(cmd::RESTORE_LOCAL_PLAYBACK) => {
+                data.capture_resume();
+                let nav = data.nav.clone();
+                data.restore_resume();
+                data.navigate(&nav);
+                if let Some(snapshot) = &data.config.last_playback {
+                    self.send(PlayerEvent::Command(PlayerCommand::RestoreQueue {
+                        items: data
+                            .playback
+                            .queue
+                            .iter()
+                            .map(|entry| PlaybackItem {
+                                item_id: entry.item.id(),
+                                norm_level: NormalizationLevel::Track,
+                            })
+                            .collect(),
+                        position: snapshot.position,
+                        progress: Duration::from_millis(snapshot.progress_ms),
+                    }));
+                }
+                data.playback.state = PlaybackState::Paused;
+                ctx.set_handled();
+            }
             Event::Command(cmd) if cmd.is(cmd::SET_FOCUS) => {
                 ctx.request_focus();
             }
@@ -459,6 +502,8 @@ where
 
                 if let Some(queued) = data.queued_entry(*item) {
                     data.start_playback(queued.item, queued.origin, progress.to_owned());
+                    data.capture_resume();
+                    data.config.save();
                     self.update_media_control_playback(&data.playback);
                     self.update_media_control_metadata(&data.playback);
                     if let Some(now_playing) = &data.playback.now_playing {
@@ -472,6 +517,11 @@ where
             Event::Command(cmd) if cmd.is(cmd::PLAYBACK_PROGRESS) => {
                 let progress = cmd.get_unchecked(cmd::PLAYBACK_PROGRESS);
                 data.progress_playback(progress.to_owned());
+                if self.last_resume_save.elapsed() >= Duration::from_secs(15) {
+                    data.capture_resume();
+                    data.config.save();
+                    self.last_resume_save = Instant::now();
+                }
 
                 self.report_scrobble(&data.playback);
                 self.update_media_control_playback(&data.playback);
@@ -479,6 +529,8 @@ where
             }
             Event::Command(cmd) if cmd.is(cmd::PLAYBACK_PAUSING) => {
                 data.pause_playback();
+                data.capture_resume();
+                data.config.save();
                 self.update_media_control_playback(&data.playback);
                 ctx.set_handled();
             }
@@ -520,6 +572,10 @@ where
                 self.resume();
                 ctx.set_handled();
             }
+            Event::Command(command) if command.is(cmd::PLAY_TOGGLE) => {
+                self.pause_or_resume();
+                ctx.set_handled();
+            }
             Event::Command(cmd) if cmd.is(cmd::PLAY_PREVIOUS) => {
                 self.previous();
                 ctx.set_handled();
@@ -553,6 +609,7 @@ where
                         now_playing.item.duration().as_secs_f64() * fraction,
                     );
                     self.seek(position);
+                    if data.playback.state == PlaybackState::Paused { data.progress_playback(position); }
                 }
                 ctx.set_handled();
             }
@@ -564,22 +621,43 @@ where
                             self.pause();
                         }
                     }
-                    Err(_) => data.error_alert("No se pudo abrir el navegador para buscar el videoclip."),
+                    Err(_) => {
+                        data.error_alert("No se pudo abrir el navegador para buscar el videoclip.")
+                    }
                 }
                 ctx.set_handled();
             }
             Event::Command(cmd) if cmd.is(cmd::SKIP_TO_POSITION) => {
                 let location = cmd.get_unchecked(cmd::SKIP_TO_POSITION);
-                self.seek(Duration::from_millis(*location));
+                let position = Duration::from_millis(*location);
+                self.seek(position);
+                if data.playback.state == PlaybackState::Paused { data.progress_playback(position); }
                 ctx.set_handled();
             }
             // Keyboard shortcuts.
             Event::KeyDown(key) if key.code == Code::Space => {
-                self.pause_or_resume();
+                if data.connect.selected.is_some() {
+                    ctx.submit_command(cmd::PLAY_TOGGLE);
+                } else {
+                    self.pause_or_resume();
+                }
                 ctx.set_handled();
             }
             Event::KeyDown(key) if key.code == Code::ArrowRight => {
-                if key.mods.shift() {
+                if data.connect.selected.is_some() {
+                    if key.mods.shift() {
+                        ctx.submit_command(cmd::PLAY_NEXT);
+                    } else if let Some(np) = &data.playback.now_playing {
+                        ctx.submit_command(
+                            cmd::SKIP_TO_POSITION.with(
+                                (np.progress
+                                    + Duration::from_secs(data.config.seek_duration as u64))
+                                .min(np.item.duration())
+                                .as_millis() as u64,
+                            ),
+                        );
+                    }
+                } else if key.mods.shift() {
                     self.next();
                 } else {
                     self.seek_relative(data, true);
@@ -587,7 +665,21 @@ where
                 ctx.set_handled();
             }
             Event::KeyDown(key) if key.code == Code::ArrowLeft => {
-                if key.mods.shift() {
+                if data.connect.selected.is_some() {
+                    if key.mods.shift() {
+                        ctx.submit_command(cmd::PLAY_PREVIOUS);
+                    } else if let Some(np) = &data.playback.now_playing {
+                        ctx.submit_command(
+                            cmd::SKIP_TO_POSITION.with(
+                                np.progress
+                                    .saturating_sub(Duration::from_secs(
+                                        data.config.seek_duration as u64,
+                                    ))
+                                    .as_millis() as u64,
+                            ),
+                        );
+                    }
+                } else if key.mods.shift() {
                     self.previous();
                 } else {
                     self.seek_relative(data, false);
@@ -628,6 +720,25 @@ where
                 self.set_volume(data.playback.volume);
                 self.set_queue_behavior(data.playback.queue_behavior);
 
+                if let Some(snapshot) = &data.config.last_playback {
+                    if let Some(now_playing) = &data.playback.now_playing {
+                        let items = data
+                            .playback
+                            .queue
+                            .iter()
+                            .map(|entry| PlaybackItem {
+                                item_id: entry.item.id(),
+                                norm_level: NormalizationLevel::Track,
+                            })
+                            .collect();
+                        self.send(PlayerEvent::Command(PlayerCommand::RestoreQueue {
+                            items,
+                            position: snapshot.position,
+                            progress: now_playing.progress,
+                        }));
+                    }
+                }
+
                 // Request focus so we can receive keyboard events.
                 ctx.submit_command(cmd::SET_FOCUS.to(ctx.widget_id()));
             }
@@ -655,6 +766,11 @@ where
     ) {
         if !old_data.playback.volume.same(&data.playback.volume) {
             self.set_volume(data.playback.volume);
+        }
+
+        if data.connect.selected.is_some() && !old_data.playback.same(&data.playback) {
+            self.update_media_control_playback(&data.playback);
+            self.update_media_control_metadata(&data.playback);
         }
 
         let lastfm_changed = old_data.config.lastfm_api_key != data.config.lastfm_api_key

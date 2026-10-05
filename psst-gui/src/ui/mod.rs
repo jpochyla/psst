@@ -33,6 +33,7 @@ use std::time::Duration;
 
 pub mod album;
 pub mod artist;
+pub mod connect;
 pub mod credits;
 pub mod design;
 pub mod episode;
@@ -41,6 +42,7 @@ pub mod home;
 pub mod library;
 pub mod lyrics;
 pub mod menu;
+pub mod news;
 pub mod playable;
 pub mod playback;
 pub mod playlist;
@@ -57,8 +59,8 @@ pub mod system_theme;
 pub mod theme;
 pub mod track;
 pub mod user;
-pub mod video;
 pub mod utils;
+pub mod video;
 
 pub const DOWNLOAD_ARTWORK: Selector<(String, String)> = Selector::new("app.artwork.download");
 
@@ -239,12 +241,9 @@ fn root_widget() -> impl Widget<AppState> {
         });
 
     let controls = Flex::column()
-        .with_default_spacer()
-        .with_child(volume_slider())
-        .with_default_spacer()
         .with_child(user::user_widget())
         .center()
-        .fix_height(88.0)
+        .fix_height(56.0)
         .background(Border::Top.with_color(theme::GREY_500));
 
     let sidebar = Flex::column()
@@ -254,7 +253,6 @@ fn root_widget() -> impl Widget<AppState> {
 
     let topbar = Flex::row()
         .must_fill_main_axis(true)
-        .with_child(topbar_back_button_widget())
         .with_flex_child(topbar_title_widget(), 1.0)
         .with_child(topbar_sort_widget())
         .background(Border::Bottom.with_color(theme::BACKGROUND_DARK));
@@ -263,39 +261,52 @@ fn root_widget() -> impl Widget<AppState> {
         .cross_axis_alignment(CrossAxisAlignment::Start)
         .with_child(topbar)
         .with_flex_child(Overlay::bottom(route_widget(), alert_widget()), 1.0)
-        .with_child(playback::panel_widget())
         .background(theme::BACKGROUND_LIGHT);
 
     let split = Split::columns(sidebar, main)
-        .split_point(0.22)
-        .bar_size(1.0)
-        .min_size(200.0, 500.0)
+        .split_point(0.27)
+        .bar_size(8.0)
+        .min_size(235.0, 500.0)
         .min_bar_area(1.0)
         .solid_bar(true);
 
-    ThemeScope::new(split)
-        .controller(SessionController)
-        .controller(NavController)
-        .controller(SortController)
-        .on_command_async(
-            cmd::LOAD_TRACK_CREDITS,
-            |track: Arc<Track>| {
-                log::debug!("fetching credits for track: {}", track.name);
-                WebApi::global().get_track_credits(&track.id.0.to_base62())
-            },
-            |_, data: &mut AppState, _| {
-                data.credits = None;
-            },
-            |_ctx, data, (_track, result): (Arc<Track>, Result<TrackCredits, Error>)| match result {
-                Ok(credits) => {
-                    data.credits = Some(credits);
-                }
-                Err(err) => {
-                    log::error!("Failed to fetch credits for {}: {:?}", _track.name, err);
-                    data.error_alert(format!("Failed to fetch track credits: {err}"));
-                }
-            },
-        )
+    let shell = Flex::column()
+        .with_child(global_navigation_widget())
+        .with_flex_child(split, 1.0)
+        .with_child(
+            Flex::row()
+                .with_flex_child(playback::panel_widget(), 1.0)
+                .with_child(volume_slider().fix_width(180.0).center().fix_height(88.0))
+                .background(theme::BACKGROUND_DARK),
+        );
+
+    connect::controller(news::controller(
+        ThemeScope::new(shell)
+            .controller(SessionController)
+            .controller(NavController)
+            .controller(SortController)
+            .on_command_async(
+                cmd::LOAD_TRACK_CREDITS,
+                |track: Arc<Track>| {
+                    log::debug!("fetching credits for track: {}", track.name);
+                    WebApi::global().get_track_credits(&track.id.0.to_base62())
+                },
+                |_, data: &mut AppState, _| {
+                    data.credits = None;
+                },
+                |_ctx, data, (_track, result): (Arc<Track>, Result<TrackCredits, Error>)| {
+                    match result {
+                        Ok(credits) => {
+                            data.credits = Some(credits);
+                        }
+                        Err(err) => {
+                            log::error!("Failed to fetch credits for {}: {:?}", _track.name, err);
+                            data.error_alert(format!("Failed to fetch track credits: {err}"));
+                        }
+                    }
+                },
+            ),
+    ))
     // .debug_invalidation()
     // .debug_widget_id()
     // .debug_paint_layout()
@@ -345,6 +356,8 @@ fn route_widget() -> impl Widget<AppState> {
     ViewDispatcher::new(
         |state: &AppState, _| state.nav.route(),
         |route: &Route, _, _| match route {
+            Route::Devices => connect::widget().boxed(),
+            Route::Notifications => news::widget().boxed(),
             Route::Queue => queue::widget().boxed(),
             Route::Home => Scroll::new(home::home_widget().padding(theme::grid(1.0)))
                 .vertical()
@@ -405,9 +418,9 @@ fn sidebar_menu_widget() -> impl Widget<AppState> {
     Flex::column()
         .with_default_spacer()
         .with_child(
-            Label::new("Xpotify")
+            Label::new("Tu biblioteca")
                 .with_font(theme::UI_FONT_MEDIUM)
-                .with_text_size(24.0)
+                .with_text_size(18.0)
                 .align_left()
                 .padding((16.0, 8.0)),
         )
@@ -422,7 +435,6 @@ fn sidebar_menu_widget() -> impl Widget<AppState> {
             )
             .padding((12.0, 10.0)),
         )
-        .with_child(sidebar_link_widget("Inicio", Some(&icons::HOME), Nav::Home))
         .with_child(sidebar_link_widget(
             "Canciones",
             Some(&icons::MUSIC_NOTE),
@@ -439,7 +451,77 @@ fn sidebar_menu_widget() -> impl Widget<AppState> {
             Nav::Shows,
         ))
         .with_child(sidebar_link_widget("Cola", Some(&icons::QUEUE), Nav::Queue))
-        .with_child(search::input_widget().padding((theme::grid(1.0), theme::grid(1.0))))
+}
+
+fn global_navigation_widget() -> impl Widget<AppState> {
+    let home = icons::HOME
+        .scale((24.0, 24.0))
+        .padding(12.0)
+        .link()
+        .circle()
+        .tooltip("Inicio")
+        .on_left_click(|ctx, _, _: &mut AppState, _| {
+            ctx.submit_command(cmd::NAVIGATE.with(Nav::Home))
+        });
+    let bell = Flex::row()
+        .with_child(icons::BELL.scale((22.0, 22.0)))
+        .with_child(
+            Label::dynamic(|state: &AppState, _| {
+                state
+                    .news
+                    .feed
+                    .resolved()
+                    .map(|feed| {
+                        feed.releases
+                            .iter()
+                            .filter(|release| release.unread)
+                            .count()
+                    })
+                    .filter(|count| *count > 0)
+                    .map(|count| format!(" {count}"))
+                    .unwrap_or_default()
+            })
+            .with_text_size(11.0),
+        )
+        .padding(12.0)
+        .link()
+        .rounded(24.0)
+        .tooltip("Novedades de artistas seguidos")
+        .on_left_click(|ctx, _, _, _| ctx.submit_command(cmd::NAVIGATE.with(Nav::Notifications)));
+    let devices = icons::DEVICES
+        .scale((24.0, 24.0))
+        .padding(12.0)
+        .link()
+        .circle()
+        .tooltip("Conectar a un teléfono, altavoz u otro dispositivo")
+        .on_left_click(|ctx, _, _: &mut AppState, _| {
+            ctx.submit_command(cmd::NAVIGATE.with(Nav::Devices))
+        });
+    Flex::row()
+        .with_child(
+            Label::new("Xpotify")
+                .with_font(theme::UI_FONT_MEDIUM)
+                .with_text_size(20.0)
+                .fix_width(126.0),
+        )
+        .with_child(topbar_back_button_widget())
+        .with_child(home)
+        .with_spacer(12.0)
+        .with_flex_child(
+            Flex::row()
+                .with_child(icons::SEARCH.scale((22.0, 22.0)))
+                .with_spacer(10.0)
+                .with_flex_child(search::input_widget(), 1.0)
+                .padding((16.0, 8.0))
+                .background(theme::BACKGROUND_LIGHT)
+                .rounded(24.0),
+            1.0,
+        )
+        .with_spacer(12.0)
+        .with_child(devices)
+        .with_child(bell)
+        .padding((16.0, 8.0))
+        .background(theme::BACKGROUND_DARK)
 }
 
 fn sidebar_link_widget(
@@ -651,6 +733,8 @@ fn route_icon_widget() -> impl Widget<Nav> {
         |nav: &Nav, _, _| {
             let icon = |icon: &SvgIcon| icon.scale(theme::ICON_SIZE_MEDIUM);
             match &nav {
+                Nav::Devices => icon(&icons::DEVICES).boxed(),
+                Nav::Notifications => icon(&icons::BELL).boxed(),
                 Nav::Home | Nav::Lyrics | Nav::SavedTracks | Nav::SavedAlbums | Nav::Shows => {
                     Empty.boxed()
                 }

@@ -160,9 +160,9 @@ fn setup_dark_theme(env: &mut Env) {
     env.set(GREY_200, Color::grey8(0xe0));
     env.set(GREY_300, Color::grey8(0xbd));
     env.set(GREY_400, Color::grey8(0x82));
-    env.set(GREY_500, Color::rgb8(52, 65, 58));
-    env.set(GREY_600, Color::rgb8(19, 26, 23));
-    env.set(GREY_700, Color::rgb8(26, 35, 30));
+    env.set(GREY_500, Color::grey8(0x33));
+    env.set(GREY_600, Color::grey8(0x08));
+    env.set(GREY_700, Color::grey8(0x12));
     env.set(BLUE_100, Color::rgb8(36, 180, 105));
     env.set(BLUE_200, Color::rgb8(90, 225, 150));
 

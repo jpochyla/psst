@@ -21,6 +21,9 @@ impl SessionController {
         ctx.submit_command(playlist::LOAD_LIST);
         ctx.submit_command(home::LOAD_MADE_FOR_YOU);
         ctx.submit_command(user::LOAD_PROFILE);
+        if data.playback.now_playing.is_some() {
+            ctx.submit_command(cmd::NAVIGATE.with(data.nav.clone()));
+        }
     }
 }
 

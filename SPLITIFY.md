@@ -50,3 +50,15 @@ The music-note button opens lyrics for the current song and refreshes them as th
 The video icon and each song's context menu offer **Buscar videoclip en YouTube**. This opens a browser search for the artist and title and pauses native music to avoid overlapping audio. It does not select an unverified video automatically or embed video in the native window. Spotify's track API does not provide a music-video playback URL.
 
 Development UI review: `--preview-ui=lyrics --dark` or `--light` uses synthetic lyrics and blocks remote actions.
+
+## Library, startup and Spotify Connect
+
+The main window now has a global search field and Home button at the top, playlist cover thumbnails in the library, and a full-width player with volume at the bottom. Device and news icons remain available across routes. System remains the default theme.
+
+Closing the app saves the current track, source playlist/album, base queue and position in the local profile. Startup restores them paused and loads the source view. Audio is loaded only after pressing Play. Snapshots contain up to 5,000 tracks; manual queue additions and the previous shuffle order are not persisted.
+
+Open the device icon to select a Spotify Connect device or **Este equipo · Xpotify**. Remote controls use Spotify's official playback API, including play/pause, previous/next, seek, queue additions, shuffle/repeat and volume. Remote queue entries come from Spotify. Open Spotify on the other device with the same account so it can be discovered. Returning to this computer keeps the song paused, ready to continue. Device support and account permissions can limit available controls.
+
+The bell opens releases from followed artists: recent albums/singles from the last 90 days, cover images, unread indicators and a local **Marcar como leídas** action. It scans each artist's latest 20 releases and displays up to 300 unique releases. Spotify announcements and its complete official notifications inbox are not available in this view. Responses are cached for six hours; a Spotify release quota response preserves the cooldown across restarts and displays a clear notice instead of waiting indefinitely. Cached releases remain usable when available.
+
+For local visual review, `--preview-ui=news --dark` or `--light` uses synthetic releases and blocks remote actions.

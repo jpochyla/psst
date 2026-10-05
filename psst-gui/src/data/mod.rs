@@ -1,14 +1,17 @@
 mod album;
 mod artist;
 pub mod config;
+pub mod connect;
 mod ctx;
 mod find;
 mod id;
 mod nav;
+pub mod news;
 mod playback;
 mod playlist;
 mod promise;
 mod recommend;
+pub mod resume;
 mod search;
 mod show;
 mod slider_scroll_scale;
@@ -88,6 +91,8 @@ pub struct AppState {
     pub finder: Finder,
     pub added_queue: Vector<QueueEntry>,
     pub lyrics: Promise<Lyrics, String>,
+    pub connect: connect::ConnectState,
+    pub news: news::NewsState,
     pub credits: Option<TrackCredits>,
 }
 
@@ -114,7 +119,7 @@ impl AppState {
             up_next: Vector::new(),
             volume: config.volume,
         };
-        Self {
+        let mut state = Self {
             splitify: crate::splitify::SplitState::default(),
             session: SessionService::empty(),
             nav: Nav::Home,
@@ -171,8 +176,12 @@ impl AppState {
             alerts: Vector::new(),
             finder: Finder::new(),
             lyrics: Promise::Empty,
+            connect: connect::ConnectState::default(),
+            news: news::NewsState::default(),
             credits: None,
-        }
+        };
+        state.restore_resume();
+        state
     }
 }
 

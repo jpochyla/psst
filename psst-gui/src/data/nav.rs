@@ -11,6 +11,8 @@ use super::RecommendationsRequest;
 
 #[derive(Copy, Clone, Debug, Data, PartialEq, Eq, Hash)]
 pub enum Route {
+    Devices,
+    Notifications,
     Home,
     Lyrics,
     Queue,
@@ -29,6 +31,8 @@ pub enum Route {
 pub enum Nav {
     #[default]
     Home,
+    Devices,
+    Notifications,
     Lyrics,
     Queue,
     SavedTracks,
@@ -45,6 +49,8 @@ pub enum Nav {
 impl Nav {
     pub fn route(&self) -> Route {
         match self {
+            Nav::Devices => Route::Devices,
+            Nav::Notifications => Route::Notifications,
             Nav::Home => Route::Home,
             Nav::Lyrics => Route::Lyrics,
             Nav::Queue => Route::Queue,
@@ -62,6 +68,8 @@ impl Nav {
 
     pub fn title(&self) -> String {
         match self {
+            Nav::Devices => "Conectar a un dispositivo".into(),
+            Nav::Notifications => "Novedades".into(),
             Nav::Home => "Inicio".to_string(),
             Nav::Lyrics => "Letra".to_string(),
             Nav::Queue => "Cola de reproducci\u{00f3}n".to_string(),
@@ -79,6 +87,8 @@ impl Nav {
 
     pub fn full_title(&self) -> String {
         match self {
+            Nav::Devices => "Dispositivos Spotify Connect".into(),
+            Nav::Notifications => "Novedades de artistas seguidos".into(),
             Nav::Home => "Inicio".to_string(),
             Nav::Lyrics => "Letra".to_string(),
             Nav::Queue => "Cola de reproducci\u{00f3}n".to_string(),

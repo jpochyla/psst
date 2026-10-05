@@ -5,7 +5,7 @@ use std::{
     path::PathBuf,
     sync::Arc,
     thread,
-    time::Duration,
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
 use druid::{
@@ -61,9 +61,278 @@ fn trusted_api_destination(url: &url::Url) -> bool {
         )
 }
 
+impl WebApi {
+    pub fn get_devices(&self) -> Result<Vector<data::connect::Device>, Error> {
+        #[derive(Deserialize)]
+        struct Devices {
+            devices: Vector<data::connect::Device>,
+        }
+        let result: Devices = self.load(&RequestBuilder::new(
+            "v1/me/player/devices",
+            Method::Get,
+            None,
+        ))?;
+        Ok(result.devices)
+    }
+
+    pub fn followed_artist_news(&self) -> Result<data::news::NewsFeed, Error> {
+        log::info!("Loading followed artist releases");
+        #[derive(Deserialize)]
+        struct Cursor {
+            after: Option<String>,
+        }
+        #[derive(Deserialize)]
+        struct Artists {
+            items: Vec<Artist>,
+            cursors: Cursor,
+            next: Option<String>,
+        }
+        #[derive(Deserialize)]
+        struct Following {
+            artists: Artists,
+        }
+        let mut followed = Vec::new();
+        let mut after = None;
+        let mut cursors = std::collections::HashSet::new();
+        loop {
+            let mut request = RequestBuilder::new("v1/me/following", Method::Get, None)
+                .query("type", "artist")
+                .query("limit", "50");
+            if let Some(after) = &after {
+                request = request.query("after", after);
+            }
+            let page: Following = self.load(&request)?;
+            followed.extend(page.artists.items);
+            if page.artists.next.is_none() {
+                break;
+            }
+            after = page.artists.cursors.after;
+            if after
+                .as_ref()
+                .is_none_or(|after| !cursors.insert(after.clone()))
+            {
+                break;
+            }
+        }
+        #[derive(Deserialize)]
+        struct Albums {
+            items: Vec<Arc<Album>>,
+        }
+        let cutoff = time::OffsetDateTime::now_utc().date() - time::Duration::days(90);
+        let mut releases = Vec::new();
+        let mut seen = std::collections::HashSet::new();
+        let mut failed = 0;
+        // Four bounded readers; Spotify credentials never leave the official API host.
+        log::info!("Loading releases from {} followed artists", followed.len());
+        for (batch_index, batch) in followed.chunks(4).enumerate() {
+            let results = thread::scope(|scope| {
+                let workers: Vec<_> = batch
+                    .iter()
+                    .map(|artist| {
+                        scope.spawn(move || {
+                            let request = RequestBuilder::new(
+                                format!("v1/artists/{}/albums", artist.id),
+                                Method::Get,
+                                None,
+                            )
+                            .query("include_groups", "album,single")
+                            .query("limit", "20")
+                            .query("market", "from_token");
+                            (artist, self.news_albums::<Albums>(&artist.id, &request))
+                        })
+                    })
+                    .collect();
+                workers
+                    .into_iter()
+                    .filter_map(|worker| worker.join().ok())
+                    .collect::<Vec<_>>()
+            });
+            for (artist, result) in results {
+                match result {
+                    Ok(albums) => {
+                        for album in albums.items {
+                            if album.release_date.is_some_and(|date| {
+                                date >= cutoff && date <= time::OffsetDateTime::now_utc().date()
+                            }) && seen.insert(album.id.clone())
+                            {
+                                releases.push(data::news::Release {
+                                    date: album.release_date.unwrap().to_string(),
+                                    album,
+                                    artist: artist.name.to_string(),
+                                    unread: true,
+                                });
+                            }
+                        }
+                    }
+                    Err(_) => failed += 1,
+                }
+            }
+            log::info!("Release lookup: {} of {} artists, {} recent releases, {} failures", ((batch_index + 1) * 4).min(followed.len()), followed.len(), releases.len(), failed);
+        }
+        releases.sort_by(|a, b| b.date.cmp(&a.date).then(a.album.name.cmp(&b.album.name)));
+        Ok(data::news::NewsFeed {
+            releases: releases.into_iter().take(300).collect(),
+            followed_count: followed.len(),
+            failed_count: failed,
+            notice: self.news_quota_until.lock().and_then(|until| until.duration_since(SystemTime::now()).ok()).map(|delay| format!("Spotify ha limitado las consultas de lanzamientos. Vuelve a actualizar dentro de aproximadamente {} horas. Se muestran los datos disponibles en cach\u{00e9}.", delay.as_secs().div_ceil(3600))).unwrap_or_default(),
+        })
+    }
+
+    fn news_albums<T: DeserializeOwned>(&self, id: &str, request: &RequestBuilder) -> Result<T, Error> {
+        if id.len() != 22 || !id.chars().all(|c| c.is_ascii_alphanumeric()) {
+            return Err(Error::WebApiError("Invalid artist ID".into()));
+        }
+        let cached = || self.cache.get("artist-releases", id).and_then(|file| serde_json::from_reader(file).ok());
+        let quota_active = self.news_quota_until.lock().is_some_and(|until| until > SystemTime::now());
+        let fresh = self.cache.get("artist-releases", id).and_then(|file| file.metadata().ok())
+            .and_then(|metadata| metadata.modified().ok()).and_then(|modified| modified.elapsed().ok())
+            .is_some_and(|age| age < Duration::from_secs(6 * 3600));
+        if quota_active || fresh {
+            if let Some(value) = cached() { return Ok(value); }
+            if quota_active { return Err(Error::WebApiError("Spotify HTTP 429: release quota exhausted".into())); }
+        }
+        let mut response = self.request(request)?;
+        if response.status() == StatusCode::TOO_MANY_REQUESTS {
+            let seconds = response.headers().get("Retry-After").and_then(|header| header.to_str().ok())
+                .and_then(|value| value.parse::<u64>().ok()).unwrap_or(60).clamp(1, 604800);
+            let until = SystemTime::now() + Duration::from_secs(seconds);
+            let mut quota = self.news_quota_until.lock();
+            *quota = Some(until);
+            self.cache.set("artist-releases", "quota-until", until.duration_since(UNIX_EPOCH).unwrap().as_secs().to_string().as_bytes());
+            return cached().ok_or_else(|| Error::WebApiError("Spotify HTTP 429: release quota exhausted".into()));
+        }
+        let value: serde_json::Value = response.body_mut().with_config().limit(2 * 1024 * 1024).read_json()?;
+        let parsed = serde_json::from_value(value.clone())?;
+        self.cache.set("artist-releases", id, &serde_json::to_vec(&value)?);
+        Ok(parsed)
+    }
+
+    pub fn remote_playback(&self) -> Result<Option<data::connect::RemotePlayback>, Error> {
+        let mut response = Self::with_retry(|| {
+            self.request(
+                &RequestBuilder::new("v1/me/player", Method::Get, None)
+                    .query("additional_types", "track"),
+            )
+        })?;
+        if response.status().as_u16() == 204 {
+            return Ok(None);
+        }
+        response
+            .body_mut()
+            .with_config()
+            .limit(2 * 1024 * 1024)
+            .read_json()
+            .map(Some)
+            .map_err(|_| Error::WebApiError("No se pudo leer el estado del dispositivo.".into()))
+    }
+
+    pub fn remote_queue(&self) -> Result<druid::im::Vector<data::Playable>, Error> {
+        let value: serde_json::Value = self.load(&RequestBuilder::new(
+            "v1/me/player/queue",
+            Method::Get,
+            None,
+        ))?;
+        Ok(value["queue"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(|value| {
+                serde_json::from_value::<data::Track>(value.clone())
+                    .ok()
+                    .map(|track| data::Playable::Track(Arc::new(track)))
+            })
+            .collect())
+    }
+
+    pub fn remote_action(&self, action: &data::connect::RemoteRequest) -> Result<(), Error> {
+        let json_body = || {
+            serde_json::from_str::<serde_json::Value>(&action.body)
+                .map_err(|_| Error::WebApiError("Solicitud de reproducción inválida.".into()))
+        };
+        let send = |path: &str, method: Method, body| {
+            self.send_empty_json(
+                &RequestBuilder::new(path, method, body).query("device_id", &action.device_id),
+            )
+        };
+        match action.kind.as_str() {
+            "transfer" | "switch-play" => {
+                let already_active = self.get_devices()?.iter().any(|device| device.id.as_ref() == Some(&action.device_id) && device.is_active);
+                if !already_active { self.send_empty_json(&RequestBuilder::new(
+                    "v1/me/player",
+                    Method::Put,
+                    Some(json!({"device_ids":[action.device_id],"play":false})),
+                ))?; }
+                if already_active && action.kind == "transfer" && self.remote_playback()?.is_some_and(|playback| playback.is_playing && playback.device.id.as_ref() == Some(&action.device_id)) {
+                    send("v1/me/player/pause", Method::Put, None)?;
+                }
+                if action.kind == "switch-play" {
+                    send("v1/me/player/play", Method::Put, Some(json_body()?))?;
+                }
+                Ok(())
+            }
+            "play" => send("v1/me/player/play", Method::Put, Some(json_body()?)),
+            "resume" => send("v1/me/player/play", Method::Put, None),
+            "pause" => send("v1/me/player/pause", Method::Put, None),
+            "next" => send("v1/me/player/next", Method::Post, None),
+            "previous" => send("v1/me/player/previous", Method::Post, None),
+            "seek" => self.send_empty_json(
+                &RequestBuilder::new("v1/me/player/seek", Method::Put, None)
+                    .query("device_id", &action.device_id)
+                    .query("position_ms", &action.value),
+            ),
+            "volume" => self.send_empty_json(
+                &RequestBuilder::new("v1/me/player/volume", Method::Put, None)
+                    .query("device_id", &action.device_id)
+                    .query("volume_percent", &action.value),
+            ),
+            "behavior" => {
+                self.send_empty_json(
+                    &RequestBuilder::new("v1/me/player/shuffle", Method::Put, None)
+                        .query("device_id", &action.device_id)
+                        .query("state", &action.body),
+                )?;
+                self.send_empty_json(
+                    &RequestBuilder::new("v1/me/player/repeat", Method::Put, None)
+                        .query("device_id", &action.device_id)
+                        .query("state", &action.value),
+                )
+            }
+            "shuffle" => self.send_empty_json(
+                &RequestBuilder::new("v1/me/player/shuffle", Method::Put, None)
+                    .query("device_id", &action.device_id)
+                    .query("state", &action.value),
+            ),
+            "repeat" => self.send_empty_json(
+                &RequestBuilder::new("v1/me/player/repeat", Method::Put, None)
+                    .query("device_id", &action.device_id)
+                    .query("state", &action.value),
+            ),
+            "queue" => self.send_empty_json(
+                &RequestBuilder::new("v1/me/player/queue", Method::Post, None)
+                    .query("device_id", &action.device_id)
+                    .query("uri", &action.value),
+            ),
+            _ => Err(Error::WebApiError(
+                "Acción de dispositivo desconocida.".into(),
+            )),
+        }
+    }
+}
+
 #[cfg(test)]
 mod credential_destination_tests {
     use super::*;
+    #[test]
+    fn exhausted_release_quota_returns_without_network_or_sleep() {
+        let api = WebApi::new(None, None, 5000);
+        *api.news_quota_until.lock() = Some(SystemTime::now() + Duration::from_secs(86400));
+        let request = RequestBuilder::new("v1/artists/example/albums", Method::Get, None);
+        let start = std::time::Instant::now();
+        let result = api.news_albums::<serde_json::Value>("5lfWrciYtohtIMVDVZd0Rf", &request);
+        assert!(result.unwrap_err().to_string().contains("429"));
+        assert!(start.elapsed() < Duration::from_secs(1));
+        assert!(api.news_albums::<serde_json::Value>("../escape", &request).is_err());
+    }
     #[test]
     fn library_mutations_use_current_endpoint_and_encoded_spotify_uri() {
         for kind in ["track", "album", "show", "playlist"] {
@@ -113,6 +382,7 @@ pub struct WebApi {
     local_track_manager: Mutex<LocalTrackManager>,
     paginated_limit: usize,
     webapi_token: Mutex<Option<WebApiToken>>,
+    news_quota_until: Mutex<Option<SystemTime>>,
     webapi_client_id: Mutex<Option<String>>,
     // First-party session credentials, used for `api-partner.spotify.com`
     // (pathfinder GraphQL) calls, which reject the Web API OAuth token.
@@ -135,10 +405,15 @@ impl WebApi {
             let proxy = ureq::Proxy::new(proxy_url).ok();
             agent = agent.proxy(proxy);
         }
+        let cache = WebApiCache::new(cache_base);
+        let news_quota_until = cache.get("artist-releases", "quota-until")
+            .and_then(|file| serde_json::from_reader::<_, u64>(file).ok())
+            .and_then(|seconds| UNIX_EPOCH.checked_add(Duration::from_secs(seconds)));
         let client_token_provider = ClientTokenProvider::new_shared(proxy_url);
         Self {
             agent: agent.build().into(),
-            cache: WebApiCache::new(cache_base),
+            cache,
+            news_quota_until: Mutex::new(news_quota_until),
             local_track_manager: Mutex::new(LocalTrackManager::new()),
             paginated_limit,
             webapi_token: Mutex::new(None),
@@ -1475,7 +1750,9 @@ impl WebApi {
             }
         }
         if lines.is_empty() {
-            return Err(Error::WebApiError("Spotify no tiene letra para esta canción.".into()));
+            return Err(Error::WebApiError(
+                "Spotify no tiene letra para esta canción.".into(),
+            ));
         }
         Ok(lines)
     }
