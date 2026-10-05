@@ -1,5 +1,11 @@
 # Psst
 
+## Integración local con Splitify
+
+Esta versión añade un editor nativo de playlists con `gemini-3.5-flash-lite`. Abre **View → Splitify · Organizar con IA** o haz clic derecho en una playlist y elige **Dividir con Splitify IA**. Configura `AI_AGENT_API_KEY` y `SPOTIFY_CLIENT_ID` en `.env.local`; añade `http://127.0.0.1:8888/login` como redirect URI en Spotify Developer Dashboard. La IA propone una vista previa editable y el botón de creación genera playlists privadas. La reproducción sigue usando el cliente nativo.
+
+Consulta [la revisión de seguridad](SECURITY-REVIEW.md): se corrigieron fugas de tokens en el código heredado y se actualizaron dependencias. La rama `main` del repositorio Splitify conserva la aplicación web; su rama `native` incorpora este cliente Rust.
+
 A fast Spotify client with a native GUI written in Rust, without Electron.
 Psst is still very early in development, lacking in features, stability, and general user experience.
 It's fully cross-platform, supporting Windows, Linux, and macOS.
@@ -169,7 +175,7 @@ Here's the basic project structure:
 
 ## Privacy Policy
 
-Psst connects only to the official Spotify servers and does not call home.
+Spotify credentials are sent only to the official Spotify API hosts. Cover images are fetched without credentials from approved HTTPS CDNs. The optional Last.fm feature connects to Last.fm; Splitify sends compact song metadata to Google Gemini only when generating a preview. No Spotify tokens are sent to Gemini. See SECURITY-REVIEW.md for the corrected inherited token leaks and remaining limitations.
 Caches of various things are stored locally and can be deleted anytime.
 User credentials are not stored at all; instead, a re-usable authentication token from Spotify is used.
 

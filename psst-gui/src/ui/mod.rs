@@ -94,7 +94,7 @@ pub fn preferences_window() -> WindowDesc<AppState> {
 
 pub fn account_setup_window() -> WindowDesc<AppState> {
     let win = WindowDesc::new(account_setup_widget())
-        .title("Login")
+        .title(if std::env::var_os("SPLITIFY_NATIVE").is_some() { "Splitify Native · Login" } else { "Login" })
         .window_size((theme::grid(50.0), theme::grid(45.0)))
         .resizable(false)
         .show_title(false)
@@ -647,6 +647,10 @@ fn compute_main_window_title(data: &AppState, _env: &Env) -> String {
             Playable::Episode(episode) => episode.name.to_string(),
         }
     } else {
-        "Psst".to_owned()
+        if std::env::var_os("SPLITIFY_NATIVE").is_some() {
+            "Splitify Native".to_owned()
+        } else {
+            "Psst".to_owned()
+        }
     }
 }

@@ -1,15 +1,16 @@
 use crate::error::Error;
 use oauth2::{
-    basic::BasicClient, reqwest::http_client, AuthUrl, AuthorizationCode, ClientId, CsrfToken,
-    PkceCodeChallenge, PkceCodeVerifier, RedirectUrl, RefreshToken, Scope, TokenResponse, TokenUrl,
+    basic::BasicClient, AuthUrl, AuthorizationCode, ClientId, CsrfToken, EndpointNotSet,
+    EndpointSet, PkceCodeChallenge, PkceCodeVerifier, RedirectUrl, RefreshToken, Scope,
+    TokenResponse, TokenUrl,
 };
 use serde::{Deserialize, Serialize};
 use std::{
-    io::{BufRead, BufReader, Write},
+    io::{BufRead, BufReader, Read, Write},
     net::TcpStream,
     net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener},
     sync::mpsc,
-    time::Duration,
+    time::{Duration, Instant},
 };
 use url::Url;
 
@@ -20,9 +21,21 @@ pub fn listen_for_callback_parameter(
     timeout: Duration,
     parameter_name: &'static str,
 ) -> Result<String, Error> {
-    log::info!(
-        "starting callback listener for '{parameter_name}' on {socket_address:?}",
-    );
+    listen_for_callback(socket_address, timeout, parameter_name, None)
+}
+
+fn listen_for_callback(
+    socket_address: SocketAddr,
+    timeout: Duration,
+    parameter_name: &'static str,
+    expected_state: Option<String>,
+) -> Result<String, Error> {
+    if !socket_address.ip().is_loopback() {
+        return Err(Error::OAuthError(
+            "OAuth callback must bind to loopback".into(),
+        ));
+    }
+    log::info!("starting callback listener for '{parameter_name}' on {socket_address:?}",);
 
     // Create a simpler, linear flow
     // 1. Bind the listener
@@ -37,18 +50,30 @@ pub fn listen_for_callback_parameter(
         }
     };
 
+    listener.set_nonblocking(true)?;
+    let deadline = Instant::now() + timeout;
     // 2. Set up the channel for communication
     let (tx, rx) = mpsc::channel::<Result<String, Error>>();
 
     // 3. Spawn the thread. Loop so background requests (e.g. favicon.ico)
     //    don't consume the single accept and break the OAuth flow.
     let handle = std::thread::spawn(move || {
-        for stream in listener.incoming() {
-            match stream {
-                Ok(mut stream) => {
-                    if handle_callback_connection(&mut stream, &tx, parameter_name) {
+        while Instant::now() < deadline {
+            match listener.accept() {
+                Ok((mut stream, _)) => {
+                    let _ = stream.set_read_timeout(Some(Duration::from_secs(2)));
+                    let _ = stream.set_write_timeout(Some(Duration::from_secs(2)));
+                    if handle_callback_connection(
+                        &mut stream,
+                        &tx,
+                        parameter_name,
+                        expected_state.as_deref(),
+                    ) {
                         break;
                     }
+                }
+                Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                    std::thread::sleep(Duration::from_millis(25));
                 }
                 Err(e) => {
                     log::error!("Failed to accept callback connection: {e}");
@@ -84,12 +109,20 @@ fn handle_callback_connection(
     stream: &mut TcpStream,
     tx: &mpsc::Sender<Result<String, Error>>,
     parameter_name: &'static str,
+    expected_state: Option<&str>,
 ) -> bool {
-    let mut reader = BufReader::new(&mut *stream);
+    let mut reader = BufReader::new((&mut *stream).take(8193));
     let mut request_line = String::new();
 
-    if reader.read_line(&mut request_line).is_err() {
+    if reader.read_line(&mut request_line).is_err() || request_line.len() > 8192 {
         return false;
+    }
+
+    if let Some(expected) = expected_state {
+        if !valid_oauth_callback(&request_line, expected) {
+            send_not_found_response(stream);
+            return false;
+        }
     }
 
     if request_line.contains("favicon.ico") {
@@ -105,11 +138,50 @@ fn handle_callback_connection(
             true
         }
         None => {
-            log::warn!("ignoring request without '{parameter_name}': {request_line}");
+            log::warn!("ignoring invalid callback request");
             send_not_found_response(stream);
             false
         }
     }
+}
+
+fn valid_oauth_callback(line: &str, expected: &str) -> bool {
+    let mut words = line.split_whitespace();
+    if words.next() != Some("GET") {
+        return false;
+    }
+    let Some(path) = words.next() else {
+        return false;
+    };
+    if !path.starts_with("/login?") {
+        return false;
+    }
+    let Ok(url) = Url::parse(&format!("http://localhost{path}")) else {
+        return false;
+    };
+    let states: Vec<_> = url
+        .query_pairs()
+        .filter(|(key, _)| key == "state")
+        .collect();
+    states.len() == 1
+        && ring::digest::digest(&ring::digest::SHA256, states[0].1.as_bytes()).as_ref()
+            == ring::digest::digest(&ring::digest::SHA256, expected.as_bytes()).as_ref()
+}
+
+pub fn get_authcode_listener_with_state(
+    socket_address: SocketAddr,
+    timeout: Duration,
+    authorization_url: &str,
+) -> Result<AuthorizationCode, Error> {
+    let state = Url::parse(authorization_url)
+        .ok()
+        .and_then(|url| {
+            url.query_pairs()
+                .find(|(k, _)| k == "state")
+                .map(|(_, v)| v.into_owned())
+        })
+        .ok_or_else(|| Error::OAuthError("Missing OAuth state".into()))?;
+    listen_for_callback(socket_address, timeout, "code", Some(state)).map(AuthorizationCode::new)
 }
 
 fn send_not_found_response(stream: &mut TcpStream) {
@@ -165,17 +237,30 @@ pub fn send_success_response(stream: &mut TcpStream) {
     let _ = stream.write_all(response.as_bytes());
 }
 
-fn create_oauth_client(client_id: &str, redirect_port: u16) -> BasicClient {
+type SpotifyOAuthClient =
+    BasicClient<EndpointSet, EndpointNotSet, EndpointNotSet, EndpointNotSet, EndpointSet>;
+
+fn http_client(request: oauth2::HttpRequest) -> Result<oauth2::HttpResponse, ureq::Error> {
+    let agent: ureq::Agent = ureq::Agent::config_builder()
+        .timeout_global(Some(Duration::from_secs(30)))
+        .max_redirects(0)
+        .http_status_as_error(false)
+        .build()
+        .into();
+    let response = agent.run(request)?;
+    let (parts, mut body) = response.into_parts();
+    let bytes = body.read_to_vec()?;
+    Ok(ureq::http::Response::from_parts(parts, bytes))
+}
+
+fn create_oauth_client(client_id: &str, redirect_port: u16) -> SpotifyOAuthClient {
     let redirect_address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), redirect_port);
     let redirect_uri = format!("http://{redirect_address}/login");
 
-    BasicClient::new(
-        ClientId::new(client_id.to_string()),
-        None,
-        AuthUrl::new("https://accounts.spotify.com/authorize".to_string()).unwrap(),
-        Some(TokenUrl::new("https://accounts.spotify.com/api/token".to_string()).unwrap()),
-    )
-    .set_redirect_uri(RedirectUrl::new(redirect_uri).expect("Invalid redirect URL"))
+    BasicClient::new(ClientId::new(client_id.to_string()))
+        .set_auth_uri(AuthUrl::new("https://accounts.spotify.com/authorize".to_string()).unwrap())
+        .set_token_uri(TokenUrl::new("https://accounts.spotify.com/api/token".to_string()).unwrap())
+        .set_redirect_uri(RedirectUrl::new(redirect_uri).expect("Invalid redirect URL"))
 }
 
 pub fn generate_session_auth_url(redirect_port: u16) -> (String, PkceCodeVerifier) {
@@ -188,17 +273,21 @@ pub fn exchange_session_code_for_token(
     redirect_port: u16,
     code: AuthorizationCode,
     pkce_verifier: PkceCodeVerifier,
-) -> String {
+) -> Result<String, Error> {
     let client_id = crate::session::access_token::CLIENT_ID;
     let client = create_oauth_client(client_id, redirect_port);
 
     let token_response = client
         .exchange_code(code)
         .set_pkce_verifier(pkce_verifier)
-        .request(http_client)
-        .expect("Failed to exchange code for token");
+        .request(&http_client)
+        .map_err(|_| {
+            Error::OAuthError(
+                "Spotify token exchange failed. Check authentication and network.".into(),
+            )
+        })?;
 
-    token_response.access_token().secret().to_string()
+    Ok(token_response.access_token().secret().to_string())
 }
 
 fn get_scopes() -> Vec<Scope> {
@@ -273,7 +362,7 @@ pub fn exchange_webapi_code_for_token(
     let token_response = client
         .exchange_code(code)
         .set_pkce_verifier(pkce_verifier)
-        .request(http_client)
+        .request(&http_client)
         .map_err(|e| Error::OAuthError(format!("Failed to exchange Web API code: {e}")))?;
 
     let now = std::time::SystemTime::now()
@@ -308,7 +397,7 @@ pub fn refresh_webapi_token(
 
     let token_response = client
         .exchange_refresh_token(&refresh_token)
-        .request(http_client)
+        .request(&http_client)
         .map_err(|e| Error::OAuthError(format!("Failed to refresh Web API token: {e}")))?;
 
     let now = std::time::SystemTime::now()
@@ -333,4 +422,51 @@ pub fn refresh_webapi_token(
         refresh_token: Some(new_refresh_token),
         expires_at: now + expires_in,
     })
+}
+
+#[cfg(test)]
+mod callback_tests {
+    use super::*;
+    #[test]
+    fn validates_state_method_path_and_duplicates() {
+        assert!(valid_oauth_callback(
+            "GET /login?code=abc&state=expected HTTP/1.1",
+            "expected"
+        ));
+        assert!(!valid_oauth_callback(
+            "GET /login?code=abc&state=attacker HTTP/1.1",
+            "expected"
+        ));
+        assert!(!valid_oauth_callback(
+            "GET /login?code=abc HTTP/1.1",
+            "expected"
+        ));
+        assert!(!valid_oauth_callback(
+            "POST /login?state=expected HTTP/1.1",
+            "expected"
+        ));
+        assert!(!valid_oauth_callback(
+            "GET /other?state=expected HTTP/1.1",
+            "expected"
+        ));
+        assert!(!valid_oauth_callback(
+            "GET /login?state=expected&state=expected HTTP/1.1",
+            "expected"
+        ));
+    }
+    #[test]
+    fn callback_timeout_releases_port() {
+        let reserve = TcpListener::bind("127.0.0.1:0").unwrap();
+        let address = reserve.local_addr().unwrap();
+        drop(reserve);
+        assert!(listen_for_callback(
+            address,
+            Duration::from_millis(100),
+            "code",
+            Some("expected".into())
+        )
+        .is_err());
+        std::thread::sleep(Duration::from_millis(50));
+        assert!(TcpListener::bind(address).is_ok());
+    }
 }

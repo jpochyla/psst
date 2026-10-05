@@ -578,6 +578,11 @@ fn playlist_menu_ctx(playlist: &WithCtx<Playlist>) -> Menu<AppState> {
     let mut menu = Menu::empty();
 
     menu = menu.entry(
+        MenuItem::new("Dividir con Splitify IA")
+            .command(crate::splitify::OPEN.with(playlist.id.to_string())),
+    );
+
+    menu = menu.entry(
         MenuItem::new(
             LocalizedString::new("menu-item-copy-link").with_placeholder("Copy Link to Playlist"),
         )

@@ -67,6 +67,7 @@ pub const ALERT_DURATION: Duration = Duration::from_secs(5);
 
 #[derive(Clone, Data, Lens)]
 pub struct AppState {
+    pub splitify: crate::splitify::SplitState,
     #[data(ignore)]
     pub session: SessionService,
     pub nav: Nav,
@@ -113,6 +114,7 @@ impl AppState {
             volume: config.volume,
         };
         Self {
+            splitify: crate::splitify::SplitState::default(),
             session: SessionService::empty(),
             nav: Nav::Home,
             history: Vector::new(),

@@ -1,4 +1,4 @@
-#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+#![cfg_attr(target_os = "windows", windows_subsystem = "windows")]
 #![allow(clippy::new_without_default, clippy::type_complexity)]
 
 mod cmd;
@@ -6,6 +6,7 @@ mod controller;
 mod data;
 mod delegate;
 mod error;
+mod splitify;
 mod ui;
 mod webapi;
 mod widget;
@@ -25,6 +26,7 @@ const ENV_LOG: &str = "PSST_LOG";
 const ENV_LOG_STYLE: &str = "PSST_LOG_STYLE";
 
 fn main() {
+    let _ = dotenvy::from_filename(".env.local");
     // Setup logging from the env variables, with defaults.
     Builder::from_env(
         Env::new()
@@ -34,7 +36,10 @@ fn main() {
     .init();
 
     // Load configuration
-    let config = Config::load().unwrap_or_default();
+    let mut config = Config::load().unwrap_or_default();
+    if config.webapi_client_id_value().is_none() {
+        config.webapi_client_id = std::env::var("SPOTIFY_CLIENT_ID").ok();
+    }
 
     let paginated_limit = config.paginated_limit;
     let mut state = AppState::default_with_config(config.clone());
@@ -102,6 +107,14 @@ fn main() {
         delegate = Delegate::with_preferences(window.id);
         launcher = AppLauncher::with_window(window).configure_env(ui::theme::setup);
     };
+
+    if state.config.has_credentials() && std::env::var_os("SPLITIFY_NATIVE").is_some() {
+        let _ = launcher.get_external_handle().submit_command(
+            splitify::OPEN,
+            String::new(),
+            druid::Target::Global,
+        );
+    }
 
     launcher
         .delegate(delegate)

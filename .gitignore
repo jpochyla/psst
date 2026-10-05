@@ -5,6 +5,8 @@ cache
 .idea
 .DS_Store
 .env
+.env.local
+.tools/
 *.iml
 rust-toolchain
 *.ico

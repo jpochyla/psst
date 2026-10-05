@@ -56,14 +56,14 @@ pub fn account_setup_widget() -> impl Widget<AppState> {
         .cross_axis_alignment(CrossAxisAlignment::Start)
         .with_spacer(theme::grid(2.0))
         .with_child(
-            Label::new("Please insert your Spotify Premium credentials.")
+            Label::new("Sign in with Spotify. Premium is required for playback.")
                 .with_font(theme::UI_FONT_MEDIUM)
                 .with_line_break_mode(LineBreaking::WordWrap),
         )
         .with_spacer(theme::grid(2.0))
         .with_child(
             Label::new(
-                "Psst connects only to the official servers, and does not store your password.",
+                "Spotify handles login in your browser. AI classification sends track metadata to Google Gemini.",
             )
             .with_text_color(theme::PLACEHOLDER_COLOR)
             .with_line_break_mode(LineBreaking::WordWrap),
@@ -622,6 +622,7 @@ impl Authenticate {
 
         // Generate auth URL and store PKCE verifier for the first (session) OAuth
         let (auth_url, pkce_verifier) = oauth::generate_session_auth_url(8888);
+        let session_auth_url = auth_url.clone();
         let config = data.preferences.auth.session_config();
 
         // Clone client ID for use in the spawned thread
@@ -633,14 +634,16 @@ impl Authenticate {
             move || {
                 // ── Step 1: Session OAuth (official Client ID) ──────────────
                 // Listen for authorization code
-                let code = oauth::get_authcode_listener(
+                let code = oauth::get_authcode_listener_with_state(
                     SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8888),
                     Duration::from_secs(300),
+                    &session_auth_url,
                 )
                 .map_err(|e| e.to_string())?;
 
                 // Exchange code for access token
-                let token = oauth::exchange_session_code_for_token(8888, code, pkce_verifier);
+                let token = oauth::exchange_session_code_for_token(8888, code, pkce_verifier)
+                    .map_err(|e| e.to_string())?;
 
                 // Try to authenticate with token, with retries
                 let mut credentials = None;
@@ -679,7 +682,11 @@ impl Authenticate {
 
                 // Listen for the callback
                 let socket_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8888);
-                match oauth::get_authcode_listener(socket_addr, Duration::from_secs(300)) {
+                match oauth::get_authcode_listener_with_state(
+                    socket_addr,
+                    Duration::from_secs(300),
+                    &webapi_auth_url,
+                ) {
                     Ok(code) => {
                         match oauth::exchange_webapi_code_for_token(
                             &client_id,

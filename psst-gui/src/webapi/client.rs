@@ -50,6 +50,26 @@ use crate::{
 use super::{cache::WebApiCache, local::LocalTrackManager};
 use sanitize_html::{rules::predefined::DEFAULT, sanitize_str};
 
+fn trusted_api_destination(url: &url::Url) -> bool {
+    url.scheme() == "https" && url.username().is_empty() && url.password().is_none()
+        && url.port_or_known_default() == Some(443)
+        && matches!(url.host_str(), Some("api.spotify.com" | "api-partner.spotify.com" | "spclient.wg.spotify.com"))
+}
+
+#[cfg(test)]
+mod credential_destination_tests {
+    use super::*;
+    #[test]
+    fn only_official_https_api_hosts_receive_credentials() {
+        for trusted in ["https://api.spotify.com/v1/me", "https://api-partner.spotify.com/pathfinder/v1/query", "https://spclient.wg.spotify.com/track-credits-view/"] {
+            assert!(trusted_api_destination(&url::Url::parse(trusted).unwrap()));
+        }
+        for rejected in ["http://ip-api.com/json", "https://i.scdn.co/image/cover", "http://api.spotify.com/v1/me", "https://api.spotify.com.evil.example/v1/me", "https://api.spotify.com@evil.example/v1/me", "https://api.spotify.com:8888/v1/me"] {
+            assert!(!trusted_api_destination(&url::Url::parse(rejected).unwrap()));
+        }
+    }
+}
+
 pub struct WebApi {
     agent: Agent,
     cache: WebApiCache,
@@ -70,7 +90,7 @@ impl WebApi {
         cache_base: Option<PathBuf>,
         paginated_limit: usize,
     ) -> Self {
-        let mut agent = Agent::config_builder().timeout_global(Some(Duration::from_secs(5)));
+        let mut agent = Agent::config_builder().timeout_global(Some(Duration::from_secs(30))).max_redirects(0);
         if let Some(proxy_url) = proxy_url {
             let proxy = ureq::Proxy::new(proxy_url).ok();
             agent = agent.proxy(proxy);
@@ -120,11 +140,10 @@ impl WebApi {
     /// the Login5 access token from the core session plus a protobuf client
     /// token — the same credentials the web player and `Cdn` use.
     fn partner_token(&self) -> Result<(String, String), Error> {
-        let session = self
-            .session
-            .lock()
-            .clone()
-            .ok_or_else(|| Error::WebApiError("No active session for api-partner".to_string()))?;
+        let session =
+            self.session.lock().clone().ok_or_else(|| {
+                Error::WebApiError("No active session for api-partner".to_string())
+            })?;
         let access_token = self
             .login5
             .get_access_token(&session)
@@ -170,6 +189,13 @@ impl WebApi {
     }
 
     fn request(&self, request: &RequestBuilder) -> Result<Response<Body>, Error> {
+        let destination = url::Url::parse(&request.build())
+            .map_err(|_| Error::WebApiError("Invalid API URL".into()))?;
+        if !trusted_api_destination(&destination) {
+            return Err(Error::WebApiError(
+                "Refusing to send Spotify credentials to an untrusted destination".into(),
+            ));
+        }
         // `api-partner.spotify.com` rejects the Web API OAuth token, so those
         // requests carry the first-party Login5 bearer + client-token instead.
         let (token, client_token) = if request.partner_auth {
@@ -190,9 +216,9 @@ impl WebApi {
             if let Some(client_token) = client_token {
                 req = req.header("client-token", client_token);
             }
-            headers.iter().fold(
-                req, |current_req, (k, v)| current_req.header(k, v)
-            )
+            headers
+                .iter()
+                .fold(req, |current_req, (k, v)| current_req.header(k, v))
         }
 
         let ct = client_token.as_deref();
@@ -1470,20 +1496,12 @@ impl WebApi {
     pub fn get_user_info(&self) -> Result<(String, String), Error> {
         #[derive(Deserialize, Clone, Data)]
         struct User {
-            region: String,
-            timezone: String,
+            country: Option<String>,
         }
-        let token = self.access_token()?;
-
-        let request = &RequestBuilder::new("json".to_string(), Method::Get, None)
-            .set_protocol("http")
-            .set_base_uri("ip-api.com")
-            .query("fields", "260")
-            .header("Authorization", format!("Bearer {token}"));
-
-        let result: Cached<User> = self.load_cached(request, "user-info", "usrinfo")?;
-
-        Ok((result.data.region, result.data.timezone))
+        let request = &RequestBuilder::new("v1/me", Method::Get, None);
+        let user: User = self.load(request)?;
+        let timezone = std::env::var("TZ").unwrap_or_else(|_| "UTC".into());
+        Ok((user.country.unwrap_or_else(|| "US".into()), timezone))
     }
 
     pub fn get_section(&self, section_uri: &str) -> Result<MixedView, Error> {
@@ -1638,6 +1656,36 @@ impl WebApi {
     }
 
     // https://developer.spotify.com/documentation/web-api/reference/change-playlist-details
+    pub fn create_private_playlist(&self, name: &str) -> Result<String, Error> {
+        #[derive(Deserialize)]
+        struct Created {
+            id: String,
+        }
+        let request = &RequestBuilder::new(
+            "v1/me/playlists",
+            Method::Post,
+            Some(
+                json!({"name": name, "public": false, "description": "Created by Splitify Native."}),
+            ),
+        );
+        let created: Created = self.load(request)?;
+        Ok(created.id)
+    }
+
+    pub fn add_tracks_to_playlist(&self, id: &str, uris: &[String]) -> Result<(), Error> {
+        if uris.len() > 100 {
+            return Err(Error::WebApiError(
+                "Spotify accepts at most 100 tracks per request".into(),
+            ));
+        }
+        let request = &RequestBuilder::new(
+            format!("v1/playlists/{id}/items"),
+            Method::Post,
+            Some(json!({"uris": uris})),
+        );
+        self.request(request).map(|_| ())
+    }
+
     pub fn change_playlist_details(&self, id: &str, name: &str) -> Result<(), Error> {
         let request = &RequestBuilder::new(format!("v1/playlists/{id}"), Method::Put, None)
             .set_body(Some(json!({ "name": name })));
@@ -1823,26 +1871,36 @@ impl WebApi {
             return Ok(disk_cached_image);
         }
 
-        // Split the URI into its components
-        let uri_clone = uri.clone();
-        let parsed = url::Url::parse(&uri_clone).unwrap();
-
-        let protocol = parsed.scheme();
-        let base_uri = parsed.host_str().unwrap();
-        let path = parsed.path().trim_start_matches('/');
-
-        let mut queries = std::collections::HashMap::new();
-        for (k, v) in parsed.query_pairs() {
-            queries.insert(k.to_string(), v.to_string());
+        let parsed =
+            url::Url::parse(&uri).map_err(|_| Error::WebApiError("Invalid image URL".into()))?;
+        let host = parsed.host_str().unwrap_or("");
+        let allowed = [
+            "scdn.co",
+            "spotifycdn.com",
+            "spotify.com",
+            "lastfm.freetls.fastly.net",
+            "lastfm-img2.akamaized.net",
+        ]
+        .iter()
+        .any(|domain| host == *domain || host.ends_with(&format!(".{domain}")));
+        if parsed.scheme() != "https" || !allowed {
+            return Err(Error::WebApiError("Untrusted image source".into()));
         }
-
-        let request = RequestBuilder::new(path, Method::Get, None)
-            .set_protocol(protocol)
-            .set_base_uri(base_uri);
-
-        let response = self.request(&request)?;
+        // Image CDNs never receive Spotify authorization or client-token headers.
+        let response = self
+            .agent
+            .get(parsed.as_str())
+            .call()
+            .map_err(|e| Error::WebApiError(e.to_string()))?;
         let mut body = Vec::new();
-        response.into_body().into_reader().read_to_end(&mut body)?;
+        response
+            .into_body()
+            .into_reader()
+            .take(16 * 1024 * 1024 + 1)
+            .read_to_end(&mut body)?;
+        if body.len() > 16 * 1024 * 1024 {
+            return Err(Error::WebApiError("Image exceeds size limit".into()));
+        }
 
         let format = match infer::get(body.as_slice()) {
             Some(kind) if kind.mime_type() == "image/jpeg" => Some(ImageFormat::Jpeg),
@@ -1944,10 +2002,6 @@ impl RequestBuilder {
         self
     }
 
-    fn set_protocol(mut self, protocol: impl Display) -> Self {
-        self.protocol = protocol.to_string();
-        self
-    }
     fn get_headers(&self) -> &HashMap<String, String> {
         &self.headers
     }

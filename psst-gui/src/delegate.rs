@@ -20,6 +20,7 @@ use crate::{
 };
 
 pub struct Delegate {
+    splitify_window: Option<WindowId>,
     main_window: Option<WindowId>,
     preferences_window: Option<WindowId>,
     credits_window: Option<WindowId>,
@@ -33,6 +34,7 @@ impl Delegate {
         const MAX_IMAGE_THREADS: usize = 32;
 
         Self {
+            splitify_window: None,
             main_window: None,
             preferences_window: None,
             credits_window: None,
@@ -139,7 +141,24 @@ impl AppDelegate<AppState> for Delegate {
         data: &mut AppState,
         _env: &Env,
     ) -> Handled {
-        if cmd.is(cmd::SHOW_CREDITS_WINDOW) {
+        if let Some(id) = cmd.get(crate::splitify::OPEN) {
+            if let Some(window_id) = self.splitify_window {
+                ctx.submit_command(commands::SHOW_WINDOW.to(window_id));
+                if !data.splitify.busy && !id.is_empty() {
+                    data.splitify.source = id.clone();
+                }
+            } else {
+                if !id.is_empty() {
+                    data.splitify.source = id.clone();
+                }
+                let window = WindowDesc::new(crate::splitify::widget())
+                    .title("Splitify · Spotify + Gemini")
+                    .window_size((1050.0, 760.0));
+                self.splitify_window = Some(window.id);
+                ctx.new_window(window);
+            }
+            Handled::Yes
+        } else if cmd.is(cmd::SHOW_CREDITS_WINDOW) {
             let _window_id = self.show_credits(ctx);
             if let Some(track) = cmd.get(cmd::SHOW_CREDITS_WINDOW) {
                 ctx.submit_command(
@@ -151,6 +170,9 @@ impl AppDelegate<AppState> for Delegate {
             Handled::Yes
         } else if cmd.is(cmd::SHOW_MAIN) {
             self.show_main(&data.config, ctx);
+            if std::env::var_os("SPLITIFY_NATIVE").is_some() {
+                ctx.submit_command(crate::splitify::OPEN.with(String::new()));
+            }
             Handled::Yes
         } else if cmd.is(cmd::SHOW_ACCOUNT_SETUP) {
             self.show_account_setup(ctx);
@@ -178,7 +200,12 @@ impl AppDelegate<AppState> for Delegate {
             Application::global().clipboard().put_string(text);
             Handled::Yes
         } else if let Some(text) = cmd.get(cmd::GO_TO_URL) {
-            let _ = open::that(text);
+            match url::Url::parse(text) {
+                Ok(url) if url.scheme() == "https" => {
+                    let _ = open::that(url.as_str());
+                }
+                _ => data.error_alert("Only HTTPS links can be opened"),
+            }
             Handled::Yes
         } else if let Handled::Yes = self.command_image(ctx, target, cmd, data) {
             Handled::Yes
@@ -248,6 +275,9 @@ impl AppDelegate<AppState> for Delegate {
         if self.artwork_window == Some(id) {
             self.artwork_window = None;
         }
+        if self.splitify_window == Some(id) {
+            self.splitify_window = None;
+        }
     }
 
     fn event(
@@ -258,6 +288,15 @@ impl AppDelegate<AppState> for Delegate {
         data: &mut AppState,
         _env: &Env,
     ) -> Option<Event> {
+        if self.splitify_window == Some(window_id)
+            && data.splitify.busy
+            && matches!(event, Event::WindowCloseRequested)
+        {
+            data.splitify
+                .status
+                .push_str(" · Espera a que termine antes de cerrar esta ventana.");
+            return None;
+        }
         if self.main_window == Some(window_id) {
             if let Event::WindowSize(size) = event {
                 if !self.size_updated {
