@@ -84,9 +84,9 @@ pub fn run_if_requested() -> bool {
             }
             crate::splitify::window()
         }
-        "queue" | "queue-empty" => {
+        "queue" | "queue-empty" | "lyrics" => {
             state.nav = crate::data::Nav::Queue;
-            if view == "queue" {
+            if view != "queue-empty" {
                 for (index, (name, artist)) in [
                     ("Instant Crush", "Daft Punk"),
                     ("Midnight City", "M83"),
@@ -115,6 +115,34 @@ pub fn run_if_requested() -> bool {
                         state.playback.up_next.push_back(entry);
                     }
                 }
+            }
+            if view == "lyrics" {
+                state.nav = crate::data::Nav::Lyrics;
+                state.lyrics.resolve(
+                    state
+                        .playback
+                        .now_playing
+                        .as_ref()
+                        .unwrap()
+                        .item
+                        .id()
+                        .to_base62(),
+                    crate::data::Lyrics {
+                        notice: "Vista previa local · Letra sincronizada de ejemplo".into(),
+                        lines: [
+                            (0, 30_000, "Primera línea de ejemplo"),
+                            (30_000, 50_000, "Esta línea coincide con la posición actual"),
+                            (50_000, 240_000, "Pulsa una línea para cambiar la posición"),
+                        ]
+                        .into_iter()
+                        .map(|(start, end, words)| crate::data::TrackLines {
+                            start_time_ms: start.to_string(),
+                            end_time_ms: end.to_string(),
+                            words: words.into(),
+                        })
+                        .collect(),
+                    },
+                );
             }
             super::main_window(&state.config)
         }

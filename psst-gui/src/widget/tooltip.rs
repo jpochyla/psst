@@ -65,6 +65,10 @@ impl<T: Data, W: Widget<T>> Widget<T> for Tooltip<W> {
 
     fn update(&mut self, ctx: &mut UpdateCtx, old: &T, data: &T, env: &Env) {
         self.inner.update(ctx, old, data, env);
+        if self.visible {
+            // Playback updates can repaint underneath a hint outside the control's bounds.
+            ctx.window().invalidate();
+        }
     }
 
     fn layout(&mut self, ctx: &mut LayoutCtx, bc: &BoxConstraints, data: &T, env: &Env) -> Size {

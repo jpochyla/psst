@@ -12,7 +12,14 @@ impl NavController {
     fn load_route_data(&self, ctx: &mut EventCtx, data: &mut AppState) {
         match &data.nav {
             Nav::Home | Nav::Queue => {}
-            Nav::Lyrics => {}
+            Nav::Lyrics => {
+                if let Some(np) = &data.playback.now_playing {
+                    let key = np.item.id().to_base62();
+                    if !data.lyrics.contains(&key) && !data.lyrics.is_deferred(&key) {
+                        ctx.submit_command(lyrics::SHOW_LYRICS.with(np.clone()));
+                    }
+                }
+            }
             Nav::SavedTracks => {
                 if !data.library.saved_tracks.is_resolved() {
                     ctx.submit_command(library::LOAD_TRACKS);
@@ -109,9 +116,6 @@ where
                     Nav::Lyrics => data.navigate_back(),
                     _ => {
                         data.navigate(&Nav::Lyrics);
-                        if let Some(np) = data.playback.now_playing.as_ref() {
-                            ctx.submit_command(lyrics::SHOW_LYRICS.with(np.clone()));
-                        }
                     }
                 }
                 ctx.set_handled();

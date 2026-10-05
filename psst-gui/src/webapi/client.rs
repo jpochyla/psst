@@ -1450,6 +1450,8 @@ impl WebApi {
         #[serde(rename_all = "camelCase")]
         pub struct Lyrics {
             pub lines: Vector<TrackLines>,
+            #[serde(default)]
+            pub sync_type: String,
             pub provider: String,
             pub provider_lyrics_id: String,
         }
@@ -1466,7 +1468,16 @@ impl WebApi {
         .header("app-platform", "WebPlayer");
 
         let lyrics: Cached<Root> = self.load_cached(request, "lyrics", &track_id)?;
-        Ok(lyrics.data.lyrics.lines)
+        let mut lines = lyrics.data.lyrics.lines;
+        if lyrics.data.lyrics.sync_type != "LINE_SYNCED" {
+            for line in lines.iter_mut() {
+                line.start_time_ms = "-1".into();
+            }
+        }
+        if lines.is_empty() {
+            return Err(Error::WebApiError("Spotify no tiene letra para esta canción.".into()));
+        }
+        Ok(lines)
     }
 }
 

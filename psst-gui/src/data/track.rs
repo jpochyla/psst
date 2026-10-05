@@ -84,6 +84,12 @@ pub struct TrackLines {
     pub end_time_ms: String,
 }
 
+#[derive(Clone, Debug, Data, Lens)]
+pub struct Lyrics {
+    pub lines: druid::im::Vector<TrackLines>,
+    pub notice: String,
+}
+
 #[derive(Clone, Copy, Default, PartialEq, Eq, Debug, Hash, Deserialize, Serialize)]
 #[serde(try_from = "String")]
 #[serde(into = "String")]

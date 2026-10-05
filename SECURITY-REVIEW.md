@@ -38,3 +38,5 @@ cargo run -p psst-core --features cpal --example verify_connection
 ```
 
 La comprobación `verify_connection` autentica el servidor Spotify sin enviar credenciales de usuario. Las comprobaciones de Gemini con la clave local devolvieron HTTP 200 tanto al consultar el modelo como al generar una clasificación estructurada mínima.
+
+Lyrics update: an independent unauthenticated HTTP client sends only song title, artist, album and duration to https://lrclib.net. It rejects redirects, limits response bodies to 2 MiB and times out in 12 seconds per request. Spotify tokens never reach LRCLIB or YouTube. Video search constructs an encoded query on a fixed https://www.youtube.com/results URL and opens the system browser; song metadata cannot change its destination.

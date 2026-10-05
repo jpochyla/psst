@@ -227,6 +227,24 @@ fn player_widget() -> impl Widget<Playback> {
                     ctx.submit_command(TOGGLE_LYRICS);
                 }),
         )
+        .with_child(
+            small_button_widget(&icons::VIDEO)
+                .tooltip("Buscar videoclip en YouTube (abre el navegador)")
+                .on_left_click(|ctx, _, playback: &mut Playback, _| {
+                    if let Some(track) =
+                        playback.now_playing.as_ref().and_then(|np| np.item.track())
+                    {
+                        ctx.submit_command(cmd::OPEN_MUSIC_VIDEO.with(track.clone()));
+                    }
+                })
+                .disabled_if(|playback: &Playback, _| {
+                    playback
+                        .now_playing
+                        .as_ref()
+                        .and_then(|np| np.item.track())
+                        .is_none()
+                }),
+        )
         .padding(theme::grid(2.0))
 }
 

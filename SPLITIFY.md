@@ -42,3 +42,11 @@ Debug builds include local UI previews: `dist/Xpotify.exe --preview-ui=login`, `
 See `SECURITY-REVIEW.md` for the security review and remaining dependency risks; `VALIDATION.md` records actual checks. Upstream MIT licensing is preserved in `LICENSE.md`.
 
 Icon controls show Spanish tooltips after 500 ms of hover. Playback hints describe the current shuffle/repeat mode and the next action; save hints distinguish adding from removing. Hints appear above controls when possible and disappear on exit or click.
+
+## Lyrics and music videos
+
+The music-note button opens lyrics for the current song and refreshes them as the song changes. LRCLIB is queried by title, primary artist, album and duration using HTTPS without Spotify credentials; Spotify is a fallback. Available timed lyrics highlight the current line and support click-to-seek, including the first line at zero seconds. Plain lyrics and instrumental tracks have distinct messages; unavailable lyrics can be retried. Successful results are kept in a bounded in-memory cache. Availability depends on provider coverage.
+
+The video icon and each song's context menu offer **Buscar videoclip en YouTube**. This opens a browser search for the artist and title and pauses native music to avoid overlapping audio. It does not select an unverified video automatically or embed video in the native window. Spotify's track API does not provide a music-video playback URL.
+
+Development UI review: `--preview-ui=lyrics --dark` or `--light` uses synthetic lyrics and blocks remote actions.

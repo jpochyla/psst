@@ -57,6 +57,7 @@ pub mod system_theme;
 pub mod theme;
 pub mod track;
 pub mod user;
+pub mod video;
 pub mod utils;
 
 pub const DOWNLOAD_ARTWORK: Selector<(String, String)> = Selector::new("app.artwork.download");

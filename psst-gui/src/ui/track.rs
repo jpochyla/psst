@@ -248,6 +248,9 @@ pub fn track_menu(
 ) -> Menu<AppState> {
     let mut menu = Menu::empty();
 
+    menu = menu.entry(MenuItem::new("Buscar videoclip en YouTube")
+        .command(cmd::OPEN_MUSIC_VIDEO.with(track.clone())));
+
     for artist_link in &track.artists {
         let more_than_one_artist = track.artists.len() > 1;
         let title = if more_than_one_artist {

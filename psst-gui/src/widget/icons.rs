@@ -8,6 +8,12 @@ pub static LOGO: SvgIcon = SvgIcon {
     op: PaintOp::Fill,
 };
 
+pub static VIDEO: SvgIcon = SvgIcon {
+    svg_path: "M3 5H25V23H3ZM5 7V21H23V7ZM11 9V19L19 14Z",
+    svg_size: Size::new(28.0, 28.0),
+    op: PaintOp::Fill,
+};
+
 pub static QUEUE: SvgIcon = SvgIcon {
     svg_path: "M3 5H25V7H3Z M3 11H25V13H3Z M3 17H15V19H3Z M19 16L27 21L19 26Z",
     svg_size: Size::new(28.0, 28.0),

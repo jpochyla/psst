@@ -556,6 +556,18 @@ where
                 }
                 ctx.set_handled();
             }
+            Event::Command(command) if command.is(cmd::OPEN_MUSIC_VIDEO) => {
+                let track = command.get_unchecked(cmd::OPEN_MUSIC_VIDEO);
+                match open::that_detached(crate::ui::video::search_url(track)) {
+                    Ok(()) => {
+                        if data.playback.state == PlaybackState::Playing {
+                            self.pause();
+                        }
+                    }
+                    Err(_) => data.error_alert("No se pudo abrir el navegador para buscar el videoclip."),
+                }
+                ctx.set_handled();
+            }
             Event::Command(cmd) if cmd.is(cmd::SKIP_TO_POSITION) => {
                 let location = cmd.get_unchecked(cmd::SKIP_TO_POSITION);
                 self.seek(Duration::from_millis(*location));
