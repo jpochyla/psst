@@ -325,6 +325,9 @@ fn root_widget() -> impl Widget<AppState> {
     #[cfg(target_os = "windows")]
     let shell = shell.controller(crate::controller::taskbar::TaskbarController::default());
 
+    let shell =
+        shell.controller(crate::controller::native_connect::NativeConnectController::default());
+
     folders::controller(crate::controller::cache_hint::widget(connect::controller(
         news::controller(
             ThemeScope::new(download::controller(library::mutation_controller(shell)))

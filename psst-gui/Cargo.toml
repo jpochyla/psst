@@ -1,6 +1,6 @@
 [package]
 name = "psst-gui"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["Jan Pochyla <jpochyla@gmail.com>"]
 edition = "2021"
 build = "build.rs"
@@ -14,6 +14,14 @@ cubeb = ["psst-core/cubeb"]
 
 [dependencies]
 psst-core = { path = "../psst-core" }
+librespot-core = { version = "=0.8.0", default-features = false, features = ["native-tls"] }
+librespot-connect = { version = "=0.8.0", default-features = false }
+librespot-playback = { version = "=0.8.0", default-features = false }
+librespot-metadata = { version = "=0.8.0", default-features = false }
+librespot-protocol = "=0.8.0"
+futures-util = "0.3"
+rb = "0.4.1"
+tokio = { version = "1", features = ["rt-multi-thread", "sync", "time", "macros"] }
 
 # Common
 crossbeam-channel = { version = "0.5.15" }

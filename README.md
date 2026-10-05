@@ -2,7 +2,7 @@
 
 [Descargar Xpotify para Windows x64](https://github.com/angelopol/xpotify/releases/latest) · [Uso y configuración](SPLITIFY.md) · [Estado de funciones](ROADMAP.md)
 
-Cliente nativo basado en Psst, con organización de playlists mediante Gemini, letras sincronizadas, cola interactiva y controles de reproducción en la vista previa de la barra de tareas de Windows. La versión 0.2.0 incorpora un selector de playlists y reduce consultas mediante caché, carga bajo demanda y reutilización de playlists por `snapshot_id`.
+Cliente nativo basado en Psst, con organización de playlists mediante Gemini, letras sincronizadas, cola interactiva y controles de reproducción en la vista previa de la barra de tareas de Windows. La versión 0.3.0 incorpora un receptor Spotify Connect nativo para controlar la PC desde otros dispositivos, conservando caché, carga bajo demanda y reutilización de playlists por `snapshot_id`. El motor nativo no reporta escuchas al historial de Spotify; esta limitación se mantiene por elección del usuario.
 
 ## Integración local con Splitify
 
@@ -41,7 +41,7 @@ Unofficial builds of Psst are also available through the [AUR](https://aur.archl
 
 ## Building
 
-On all platforms, the **latest [Rust](https://rustup.rs/) stable** (at least 1.65.0) is required.
+On all platforms, the **latest [Rust](https://rustup.rs/) stable** (at least 1.89.0 for the current lockfile) is required.
 For platform-specific requirements, see the dropdowns below.
 
 <details>
@@ -190,7 +190,7 @@ User credentials are not stored at all; instead, a re-usable authentication toke
 This project would not exist without the following:
 
 - Big thank you to [`librespot`](https://github.com/librespot-org/librespot), the Open Source Spotify client library for Rust. Most of `psst-core` is directly inspired by the ideas and code of `librespot`, although with a few differences:
-  - Spotify Connect (remote control) is not supported yet.
+  - This fork integrates native Spotify Connect using librespot 0.8.0 and the native audio output. The original engine remains available with Connect disabled. Native listen reporting is not implemented.
   - Psst is completely synchronous, without `tokio` or other `async` runtime, although it will probably change in the future.
   - Psst is using HTTPS-based CDN audio file retrieval, similar to the official Web client or [`librespot-java`](https://github.com/librespot-org/librespot-java), instead of the channel-based approach in `librespot`.
 - [`druid`](https://github.com/linebender/druid) native GUI library for Rust.

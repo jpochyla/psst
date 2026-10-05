@@ -5,6 +5,7 @@ mod ex_click;
 mod ex_cursor;
 mod ex_scroll;
 mod input;
+pub mod native_connect;
 mod nav;
 mod on_command;
 mod on_command_async;

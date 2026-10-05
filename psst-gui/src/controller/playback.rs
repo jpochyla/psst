@@ -185,6 +185,10 @@ impl PlaybackController {
 
     #[cfg(feature = "cpal")]
     fn check_audio_device(&mut self, ctx: &mut EventCtx, data: &mut AppState) {
+        if data.config.native_connect {
+            self.audio_timer = ctx.request_timer(Duration::from_secs(2));
+            return;
+        }
         use psst_core::audio::output::AudioOutput;
         let (current, available) = DefaultAudioOutput::devices();
         let failed = self
@@ -600,7 +604,10 @@ where
         if matches!(event, Event::Timer(token) if *token == self.audio_timer) {
             self.check_audio_device(ctx, data);
         }
-        if data.connect.selected.is_some() {
+        if data.connect.selected.is_some()
+            || (data.config.native_connect
+                && matches!(event, Event::Command(command) if command.target() == druid::Target::Widget(ctx.widget_id())))
+        {
             if let Event::Command(command) = event {
                 if command.is(cmd::PLAYBACK_LOADING)
                     || command.is(cmd::PLAYBACK_PLAYING)
@@ -618,6 +625,7 @@ where
         }
         #[cfg(feature = "cpal")]
         if data.connect.selected.is_none()
+            && !data.config.native_connect
             && (self.audio_device.is_none()
                 || self
                     .output

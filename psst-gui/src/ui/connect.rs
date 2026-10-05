@@ -53,7 +53,14 @@ pub fn widget() -> impl Widget<AppState> {
         .with_child(Label::new("Abre Spotify en tu teléfono, altavoz u otro equipo y conéctalo a tu cuenta para que aparezca aquí.")
             .with_line_break_mode(LineBreaking::WordWrap).expand_width())
         .with_spacer(16.0)
-        .with_child(Label::new("El reproductor nativo de Xpotify todavía no se anuncia como receptor de Spotify Connect. Para controlar esta PC desde el teléfono, abre Spotify oficial aquí y selecciona ese equipo en la lista.")
+        .with_child(Button::dynamic(|state: &AppState, _| if state.config.native_connect { "Desactivar Connect nativo" } else { "Activar Connect nativo" }.to_string())
+            .on_click(|ctx, _: &mut AppState, _| ctx.submit_command(crate::controller::native_connect::TOGGLE)))
+        .with_spacer(8.0)
+        .with_child(Label::dynamic(|state: &AppState, _| state.connect.native_status.clone()).with_line_break_mode(LineBreaking::WordWrap).expand_width())
+        .with_spacer(8.0)
+        .with_child(Button::new("Reintentar Connect nativo").on_click(|ctx, _: &mut AppState, _| ctx.submit_command(crate::controller::native_connect::RETRY)))
+        .with_spacer(16.0)
+        .with_child(Label::new("Con Connect nativo activo, selecciona Xpotify en la lista de dispositivos de Spotify del teléfono para controlar esta PC. El cliente oficial sigue disponible como alternativa para registrar escuchas.")
             .with_line_break_mode(LineBreaking::WordWrap).with_text_color(theme::PLACEHOLDER_COLOR).expand_width())
         .with_spacer(12.0)
         .with_child(Button::new("Abrir Spotify en esta PC").on_click(|_, state: &mut AppState, _| {
@@ -301,6 +308,14 @@ impl<W: Widget<AppState>> Controller<AppState, W> for ConnectController {
         }
         if let Event::Command(command) = event {
             if let Some(selected) = command.get(SELECT) {
+                if state.config.native_connect
+                    && selected.as_ref().and_then(|d| d.id.as_deref())
+                        == Some(state.config.connect_device_id.as_str())
+                {
+                    ctx.submit_command(SELECT.with(None));
+                    ctx.set_handled();
+                    return;
+                }
                 if state.connect.busy {
                     ctx.set_handled();
                     return;

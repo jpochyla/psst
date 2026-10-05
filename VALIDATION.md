@@ -1,5 +1,15 @@
 # Local validation - Windows - 2026-10-05
 
+## Native Spotify Connect, Windows 0.3.0
+
+- The native receiver authenticated with the existing account and registered `Xpotify · DESKTOP-51LRVL0`. Its device ID survives configuration reload. Startup preserves Bad News in pause and does not activate the receiver automatically.
+- Native audio loaded Bad News and fed decoded samples into the fork's CPAL output. Playback advanced from the restored position without audio buffer errors. Regression tests verify ordered draining of full buffers and cancellation during shutdown.
+- A separate temporary authenticated Connect client sent commands through Spotify's Connect service to the running GUI receiver. Resume, seek to 26 seconds, pause, skip next and pause were acknowledged. The application persisted Broke Boys at position zero after the final commands, and its Windows title changed to Drake - Broke Boys. This exercises server-to-receiver commands. No physical iPhone test is claimed.
+- The peer was an ignored local test project, excluded from packaging. It reads existing credentials without displaying or rewriting them and does not read browser cookies. A preliminary malformed request returned HTTP 400 before correcting its JSON content type.
+- The public Web API cooldown remained active. PC transport and state updates use the authenticated Connect session without `/me/player` polling. Native session requests use at most three attempts, initial connection has a 35-second deadline, and application reconnection uses exponential delay. Existing public API cooldown checks continue to pass.
+- The user chose native playback and accepted limited listen reporting. Spotify history, Wrapped and stream-count reporting are not claimed. Last.fm remains separate; the official desktop client is an optional alternative.
+- Validation: 58 passing unit tests across core and GUI, one ignored live LRCLIB test, and Clippy with warnings denied. The optimized Windows package keeps both licenses and excludes credentials, logs and local environment files.
+
 ## Windows 0.2.0 publication checks
 
 - 52 unit tests pass (17 core, 35 GUI), with one live LRCLIB test intentionally excluded; Clippy passes with warnings denied. New coverage verifies library fallback after invalidation without cross-account leakage, playlist snapshot reuse with duplicates/original positions, rejection of stale page data after a changed revision, suppression of repeated transient reads, URL validation and route refresh isolation.

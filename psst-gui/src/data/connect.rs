@@ -24,6 +24,8 @@ pub struct ConnectState {
     pub pending_start: bool,
     pub local_volume: Option<f64>,
     pub status: String,
+    pub native_status: String,
+    pub native_ready: bool,
 }
 
 #[derive(Clone, Data)]

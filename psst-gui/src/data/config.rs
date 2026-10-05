@@ -113,6 +113,8 @@ pub struct Config {
     pub audio_quality: AudioQuality,
     #[serde(default)]
     pub audio_quality_version: u32,
+    pub native_connect: bool,
+    pub connect_device_id: String,
     pub theme: Theme,
     pub volume: f64,
     pub last_route: Option<Nav>,
@@ -147,6 +149,8 @@ impl Default for Config {
             credentials: Default::default(),
             audio_quality: Default::default(),
             audio_quality_version: 1,
+            native_connect: true,
+            connect_device_id: format!("xpotify-{:032x}", rand::random::<u128>()),
             theme: Default::default(),
             volume: 1.0,
             last_route: Default::default(),
