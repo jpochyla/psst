@@ -525,6 +525,7 @@ pub struct WebApi {
     response_origins: Mutex<HashMap<String, SystemTime>>,
     request_gate: Mutex<Instant>,
     response_load: Mutex<()>,
+    read_failures: Mutex<HashMap<String, (Instant, Error)>>,
     webapi_client_id: Mutex<Option<String>>,
     // First-party session credentials, used for `api-partner.spotify.com`
     // (pathfinder GraphQL) calls, which reject the Web API OAuth token.
@@ -560,6 +561,7 @@ impl WebApi {
             response_origins: Mutex::new(HashMap::new()),
             request_gate: Mutex::new(Instant::now()),
             response_load: Mutex::new(()),
+            read_failures: Mutex::new(HashMap::new()),
             local_track_manager: Mutex::new(LocalTrackManager::new()),
             paginated_limit,
             webapi_token: Mutex::new(None),
@@ -832,14 +834,47 @@ impl WebApi {
                 }
             }
         }
-        let result = self.request_json(request);
+        if old.is_none() && (request.path == "v1/me" || request.path == "v1/me/playlists") {
+            if let Some(file) = key
+                .as_ref()
+                .and_then(|key| self.cache.get("library-snapshots", key))
+            {
+                let modified = file.metadata().ok().and_then(|meta| meta.modified().ok());
+                if modified
+                    .and_then(|time| time.elapsed().ok())
+                    .is_some_and(|age| age < Duration::from_secs(14 * 86400))
+                {
+                    if let Ok(value) = serde_json::from_reader(file) {
+                        old = Some((value, modified));
+                    }
+                }
+            }
+        }
+        // Never launch another failing GET immediately when navigating back to a view.
+        let result = if let Some((_, error)) = self
+            .read_failures
+            .lock()
+            .get(&request.build())
+            .filter(|(at, _)| {
+                matches!(request.method, Method::Get) && at.elapsed() < Duration::from_secs(30)
+            }) {
+            Err(error.clone())
+        } else {
+            self.request_json(request)
+        };
         match result {
             Ok(value) => {
                 let parsed = serde_json::from_value(value.clone())?;
                 if let Some(key) = key {
                     self.cache
                         .set("responses", &key, &serde_json::to_vec(&value)?);
+                    // Keep the last known library even after an explicit metadata refresh.
+                    if request.path == "v1/me" || request.path == "v1/me/playlists" {
+                        self.cache
+                            .set("library-snapshots", &key, &serde_json::to_vec(&value)?);
+                    }
                 }
+                self.read_failures.lock().remove(&request.build());
                 self.response_origins.lock().remove(&request.build());
                 Ok(parsed)
             }
@@ -850,7 +885,19 @@ impl WebApi {
                 }
                 Ok(value)
             }
-            Err(error) => Err(error),
+            Err(error) => {
+                if matches!(request.method, Method::Get)
+                    && Self::temporary_api_error(&error)
+                    && !matches!(error, Error::RateLimited { .. })
+                {
+                    let mut failures = self.read_failures.lock();
+                    failures.retain(|_, (at, _)| at.elapsed() < Duration::from_secs(30));
+                    if failures.len() < 128 {
+                        failures.insert(request.build(), (Instant::now(), error.clone()));
+                    }
+                }
+                Err(error)
+            }
         }
     }
 
@@ -918,7 +965,62 @@ impl WebApi {
         self.check_rate_limit(&RequestBuilder::new("v1/me", Method::Get, None))?;
         self.cache.invalidate_metadata()?;
         self.response_origins.lock().clear();
+        self.read_failures.lock().clear();
         Ok(())
+    }
+
+    fn invalidate_pages(&self, request: &RequestBuilder) -> Result<(), Error> {
+        for offset in (0..self.paginated_limit).step_by(50) {
+            let request = request
+                .clone()
+                .query("limit", 50.min(self.paginated_limit - offset))
+                .query("offset", offset);
+            if let Some(key) = self.response_key(&request) {
+                self.cache.remove("responses", &key)?;
+            }
+            self.read_failures.lock().remove(&request.build());
+            self.response_origins.lock().remove(&request.build());
+        }
+        Ok(())
+    }
+
+    pub fn invalidate_playlist(&self, id: &str) -> Result<(), Error> {
+        let request = RequestBuilder::new(format!("v1/playlists/{id}"), Method::Get, None);
+        self.check_rate_limit(&request)?;
+        if let Some(key) = self.response_key(&request) {
+            self.cache.remove("responses", &key)?;
+        }
+        self.read_failures.lock().remove(&request.build());
+        self.response_origins.lock().remove(&request.build());
+        self.invalidate_pages(
+            &RequestBuilder::new(format!("v1/playlists/{id}/items"), Method::Get, None)
+                .query("marker", "from_token")
+                .query("additional_types", "track"),
+        )
+    }
+
+    pub fn invalidate_route(&self, nav: &Nav) -> Result<(), Error> {
+        if let Nav::PlaylistDetail(link) = nav {
+            return self.invalidate_playlist(&link.id);
+        }
+        let request = match nav {
+            Nav::SavedTracks => Some(
+                RequestBuilder::new("v1/me/tracks", Method::Get, None)
+                    .query("market", "from_token"),
+            ),
+            Nav::SavedAlbums => Some(
+                RequestBuilder::new("v1/me/albums", Method::Get, None)
+                    .query("market", "from_token"),
+            ),
+            Nav::Shows => Some(RequestBuilder::new("v1/me/shows", Method::Get, None)),
+            _ => None,
+        };
+        if let Some(request) = request {
+            self.check_rate_limit(&request)?;
+            self.invalidate_pages(&request)
+        } else {
+            self.invalidate_metadata()
+        }
     }
 
     fn rate_limit_key(&self, request: &RequestBuilder) -> String {
@@ -1313,6 +1415,7 @@ impl WebApi {
                     match item.content.data.typename {
                         DataTypename::Playlist => {
                             playlist.push_back(Playlist {
+                                snapshot_id: None,
                                 id: id.into(),
                                 name: Arc::from(item.content.data.name.clone().unwrap()),
                                 images: Some(item.content.data.images.as_ref().map_or_else(
@@ -2312,6 +2415,36 @@ impl WebApi {
 
     // https://developer.spotify.com/documentation/web-api/reference/get-playlist-items
     pub fn get_playlist_tracks(&self, id: &str) -> Result<Vector<Arc<Track>>, Error> {
+        // One metadata lookup can avoid fetching every page of an unchanged playlist.
+        let playlist = self.get_playlist(id)?;
+        let snapshot_key = self.response_key(&RequestBuilder::new(
+            format!("v1/playlists/{id}"),
+            Method::Get,
+            None,
+        ));
+        if let (Some(key), Some(snapshot)) = (&snapshot_key, &playlist.snapshot_id) {
+            if let Some(file) = self.cache.get("playlist-snapshots", key) {
+                if let Ok((saved, items)) =
+                    serde_json::from_reader::<_, (String, Vec<(usize, Arc<Track>)>)>(file)
+                {
+                    if saved == snapshot.as_ref() {
+                        return Ok(items
+                            .into_iter()
+                            .map(|(position, mut track)| {
+                                Arc::make_mut(&mut track).track_pos = position;
+                                track
+                            })
+                            .collect());
+                    }
+                    // A new revision must never inherit still-fresh pages of the old revision.
+                    self.invalidate_pages(
+                        &RequestBuilder::new(format!("v1/playlists/{id}/items"), Method::Get, None)
+                            .query("marker", "from_token")
+                            .query("additional_types", "track"),
+                    )?;
+                }
+            }
+        }
         #[derive(Clone, Deserialize)]
         struct PlaylistItem {
             #[serde(default)]
@@ -2338,7 +2471,7 @@ impl WebApi {
 
         let local_track_manager = self.local_track_manager.lock();
 
-        Ok(result
+        let tracks: Vector<Arc<Track>> = result
             .into_iter()
             .enumerate()
             .filter_map(|(index, item)| {
@@ -2353,7 +2486,21 @@ impl WebApi {
                 Arc::make_mut(&mut track).track_pos = index;
                 Some(track)
             })
-            .collect())
+            .collect();
+        if !tracks.iter().any(|track| track.is_local) {
+            if let (Some(key), Some(snapshot)) = (snapshot_key, playlist.snapshot_id) {
+                let items: Vec<_> = tracks
+                    .iter()
+                    .map(|track| (track.track_pos, track))
+                    .collect();
+                self.cache.set(
+                    "playlist-snapshots",
+                    &key,
+                    &serde_json::to_vec(&(snapshot, items))?,
+                );
+            }
+        }
+        Ok(tracks)
     }
 
     // https://developer.spotify.com/documentation/web-api/reference/change-playlist-details
@@ -2811,5 +2958,125 @@ mod reorder_tests {
         assert!(reorder_destination(7, 8, true).is_err());
         assert!(reorder_destination(8, 8, false).is_err());
         assert!(reorder_destination(0, 0, true).is_err());
+    }
+}
+
+#[cfg(test)]
+mod efficiency_tests {
+    use super::*;
+    fn api() -> WebApi {
+        let path = std::env::temp_dir().join(format!(
+            "xpotify-efficiency-{}-{}",
+            std::process::id(),
+            rand::random::<u64>()
+        ));
+        let api = WebApi::new(Some("http://127.0.0.1:9"), Some(path), 5000);
+        api.set_webapi_credentials(
+            Some("fixture-client".into()),
+            Some(WebApiToken {
+                access_token: "fixture-access".into(),
+                refresh_token: Some("fixture-refresh".into()),
+                expires_at: u64::MAX,
+            }),
+        );
+        let request = RequestBuilder::new("v1/me", Method::Get, None);
+        let until = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs()
+            + 3600;
+        api.cache.set(
+            "request-limits",
+            &api.rate_limit_key(&request),
+            &serde_json::to_vec(&until).unwrap(),
+        );
+        api
+    }
+    #[test]
+    fn library_backup_survives_refresh_and_never_crosses_accounts() {
+        let api = api();
+        let request = RequestBuilder::new("v1/me", Method::Get, None);
+        let key = api.response_key(&request).unwrap();
+        api.cache.set(
+            "library-snapshots",
+            &key,
+            br#"{"display_name":"Fixture","id":"fixture-user"}"#,
+        );
+        api.cache.invalidate_metadata().unwrap();
+        assert_eq!(api.get_user_profile().unwrap().id.as_ref(), "fixture-user");
+        api.set_webapi_credentials(
+            Some("fixture-client".into()),
+            Some(WebApiToken {
+                access_token: "another-access".into(),
+                refresh_token: Some("another-refresh".into()),
+                expires_at: u64::MAX,
+            }),
+        );
+        assert!(matches!(
+            api.get_user_profile(),
+            Err(Error::RateLimited { .. })
+        ));
+    }
+    #[test]
+    fn unchanged_playlist_reuses_snapshot_and_changed_revision_rejects_old_pages() {
+        let api = api();
+        let id = "37i9dQZF1DX4WYpdgoIcn6";
+        let request = RequestBuilder::new(format!("v1/playlists/{id}"), Method::Get, None);
+        let key = api.response_key(&request).unwrap();
+        let mut metadata = json!({"id":id,"name":"Fixture","description":"", "owner":{"id":"fixture-user","display_name":"Fixture"},"collaborative":false,"public":false,"snapshot_id":"revision-a"});
+        api.cache
+            .set("responses", &key, &serde_json::to_vec(&metadata).unwrap());
+        let track: Track = serde_json::from_value(json!({
+            "id":"7omij53d6AvXefx13NNyfn", "name":"Fixture song", "artists":[], "duration_ms":180000,
+            "disc_number":1,"track_number":1,"explicit":false,"is_local":false
+        })).unwrap();
+        let items = vec![(0usize, &track), (3usize, &track)];
+        api.cache.set(
+            "playlist-snapshots",
+            &key,
+            &serde_json::to_vec(&("revision-a", items)).unwrap(),
+        );
+        let tracks = api.get_playlist_tracks(id).unwrap();
+        assert_eq!(tracks.len(), 2);
+        assert_eq!(tracks[1].track_pos, 3);
+        assert_eq!(tracks[0].id, tracks[1].id);
+        let page = RequestBuilder::new(format!("v1/playlists/{id}/items"), Method::Get, None)
+            .query("marker", "from_token")
+            .query("additional_types", "track")
+            .query("limit", 50)
+            .query("offset", 0);
+        let page_key = api.response_key(&page).unwrap();
+        api.cache.set(
+            "responses",
+            &page_key,
+            br#"{"offset":0,"limit":50,"total":0,"items":[]}"#,
+        );
+        metadata["snapshot_id"] = json!("revision-b");
+        api.cache
+            .set("responses", &key, &serde_json::to_vec(&metadata).unwrap());
+        assert!(matches!(
+            api.get_playlist_tracks(id),
+            Err(Error::RateLimited { .. })
+        ));
+        assert!(api.cache.get("responses", &page_key).is_none());
+    }
+    #[test]
+    fn repeated_transient_read_returns_same_error_without_network() {
+        let api = api();
+        let request = RequestBuilder::new("v1/me/tracks", Method::Get, None);
+        api.read_failures.lock().insert(
+            request.build(),
+            (Instant::now(), Error::WebApiError("fixture timeout".into())),
+        );
+        let first = api
+            .load::<serde_json::Value>(&request)
+            .unwrap_err()
+            .to_string();
+        let second = api
+            .load::<serde_json::Value>(&request)
+            .unwrap_err()
+            .to_string();
+        assert_eq!(first, second);
+        assert!(first.contains("fixture timeout"));
     }
 }

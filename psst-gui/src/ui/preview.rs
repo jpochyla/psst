@@ -10,12 +10,17 @@ struct PreviewDelegate;
 impl AppDelegate<AppState> for PreviewDelegate {
     fn command(
         &mut self,
-        _: &mut DelegateCtx,
+        ctx: &mut DelegateCtx,
         _: druid::Target,
         command: &Command,
-        _: &mut AppState,
+        data: &mut AppState,
         _: &Env,
     ) -> Handled {
+        if let Some(track) = command.get(super::playlist_picker::OPEN) {
+            data.playlist_picker_track = Some(*track);
+            ctx.new_window(super::playlist_picker::window());
+            return Handled::Yes;
+        }
         // Prevent remote requests and writes while reviewing fixture screens.
         let local_ui_command = [
             "app.playable.reveal-playing",
@@ -56,6 +61,23 @@ pub fn run_if_requested() -> bool {
     config.window_size = druid::Size::new(1120.0, 800.0);
     let mut state = AppState::default_with_config(config);
     let window = match view.as_str() {
+        "playlist-picker" | "playlist-picker-error" => {
+            if view == "playlist-picker" {
+                fixture_library(&mut state);
+            } else {
+                let until = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs()
+                    + 3600;
+                state.with_library_mut(|library| {
+                    library
+                        .playlists
+                        .reject((), crate::error::Error::rate_limited(until))
+                });
+            }
+            super::playlist_picker::window()
+        }
         "editor" | "editor-empty" => {
             if view == "editor" {
                 state.splitify.source =
@@ -99,7 +121,10 @@ pub fn run_if_requested() -> bool {
             }
             crate::splitify::window()
         }
-        "queue" | "queue-empty" | "lyrics" | "lyrics-follow" => {
+        "queue" | "queue-empty" | "lyrics" | "lyrics-follow" | "menus" => {
+            if view == "menus" {
+                fixture_library(&mut state);
+            }
             state.nav = crate::data::Nav::Home;
             state.queue_panel_open = !matches!(view.as_str(), "lyrics" | "lyrics-follow");
             state.config.show_now_playing = true;
@@ -284,4 +309,17 @@ pub fn run_if_requested() -> bool {
         .launch(state)
         .expect("UI preview");
     true
+}
+
+fn fixture_library(state: &mut AppState) {
+    state.with_library_mut(|library| {
+        library.user_profile.resolve((), crate::data::UserProfile { id: "fixture".into(), display_name: "Angel".into(), email: "".into() });
+        let playlists = [("Us", "fixture", false), ("La", "fixture", false), ("Compartida", "friend", true), ("Solo lectura", "friend", false)].into_iter().map(|(name, owner, collaborative)| {
+            serde_json::from_value(serde_json::json!({
+                "id":"37i9dQZF1DX4WYpdgoIcn6", "name":name,"description":"", "images":[],
+                "owner":{"id":owner,"display_name":"Angel"},"collaborative":collaborative,"public":false
+            })).unwrap()
+        }).collect();
+        library.playlists.resolve((), playlists);
+    });
 }

@@ -971,6 +971,7 @@ fn about_tab_widget() -> impl Widget<AppState> {
         .cross_axis_alignment(CrossAxisAlignment::Start)
         .must_fill_main_axis(true)
         .with_child(Label::new("Build Info").with_font(theme::UI_FONT_MEDIUM))
+        .with_child(Label::new(concat!("Xpotify ", env!("CARGO_PKG_VERSION"))))
         .with_spacer(theme::grid(2.0))
         .with_child(commit_hash)
         .with_child(build_time)

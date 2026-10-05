@@ -1,7 +1,7 @@
 param([switch]$SkipBuild)
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
-if (-not $SkipBuild) { & (Join-Path $PSScriptRoot 'Build-Native.ps1') }
+if (-not $SkipBuild) { & (Join-Path $PSScriptRoot 'Build-Native.ps1') -Release }
 $outputRoot = [IO.Path]::GetFullPath((Join-Path $projectRoot 'dist'))
 $executable = Join-Path $outputRoot 'Xpotify.exe'
 if (-not (Test-Path -LiteralPath $executable)) { throw 'Compila Xpotify antes de empaquetarlo.' }
@@ -26,6 +26,7 @@ try {
     $archive = Join-Path $outputRoot 'Xpotify-Windows-x64.zip'
     Compress-Archive -LiteralPath (Get-ChildItem -LiteralPath $stageRoot -Force -File).FullName -DestinationPath $archive -Force
     (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash | Set-Content -LiteralPath ($archive + '.sha256') -Encoding ascii
+    (Get-FileHash -LiteralPath $executable -Algorithm SHA256).Hash | Set-Content -LiteralPath ($executable + '.sha256') -Encoding ascii
     Write-Host "Paquete: $archive"
 } finally {
     # The absolute staging path was checked above and is unique to this invocation.

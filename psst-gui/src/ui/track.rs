@@ -430,7 +430,19 @@ pub fn track_menu_with_play(
     let mut playlist_menu = Menu::new(
         LocalizedString::new("menu-item-add-to-playlist").with_placeholder("Add to Playlist"),
     );
-    for playlist in library.writable_playlists() {
+    let targets = library.writable_playlists();
+    if targets.is_empty() {
+        let message = if library.playlists.is_deferred(&()) || library.user_profile.is_deferred(&())
+        {
+            "La biblioteca se está cargando..."
+        } else if !library.playlists.is_resolved() || !library.user_profile.is_resolved() {
+            "Biblioteca no disponible: abre el selector"
+        } else {
+            "No hay playlists editables"
+        };
+        playlist_menu = playlist_menu.entry(MenuItem::new(message).enabled(false));
+    }
+    for playlist in targets {
         playlist_menu = playlist_menu.entry(
             MenuItem::new(
                 LocalizedString::new("menu-item-save-to-playlist")
@@ -442,6 +454,10 @@ pub fn track_menu_with_play(
             })),
         );
     }
+    playlist_menu = playlist_menu.separator().entry(
+        MenuItem::new("Buscar playlist o pegar enlace...")
+            .command(super::playlist_picker::OPEN.with(track.id)),
+    );
     menu = menu.entry(playlist_menu);
 
     menu

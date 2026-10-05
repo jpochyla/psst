@@ -1,5 +1,17 @@
 # Xpotify with Splitify
 
+## Windows 0.2.0
+
+Download the optimized Windows x64 executable or portable ZIP from [GitHub Releases](https://github.com/angelopol/xpotify/releases/latest). The package includes the launcher, documentation, both licenses and SHA-256 verification. Build locally with `powershell -File scripts/Build-Native.ps1 -Release`; `Package-Native.ps1` now uses the release build by default. The release executable excludes development preview modes.
+
+Windows taskbar thumbnails include **Anterior**, **Reproducir/Pausar** and **Siguiente**, including while the main window is minimized. The middle icon follows playback state. Controls are disabled when playback is unavailable, and reinstalled when Explorer recreates the taskbar.
+
+Right-click **Add to Playlist** lists your own and collaborative playlists. When the library or profile is unavailable it displays an explanation, plus **Buscar playlist o pegar enlace...**. The selector filters locally, shows available covers, explains quota/loading errors and accepts an editable playlist's Spotify URL/URI. Hovering does not make network requests. Spotify permissions and quotas still apply when adding a song.
+
+Startup loads the requested view and the sidebar/profile rather than eagerly downloading saved tracks and home sections. Navigation deduplicates pending loads. Unchanged playlist snapshots reuse cached complete tracks, including duplicate occurrences and original positions; a changed snapshot invalidates old page data before reading it. Refreshing a playlist or saved collection invalidates only its corresponding response pages, and route refresh preserves other views in memory. Transient failed reads are held for 30 seconds to prevent immediate repeated failures. Last successful profile/playlist-list responses can survive metadata refresh for temporary-error fallback for up to 14 days, scoped to the OAuth session. Image requests share one download per URL with at most eight workers.
+
+Remaining limitations are recorded in [ROADMAP.md](ROADMAP.md): native Spotify Connect reception and native listen reporting remain unsupported. The release does not claim these features, 24 kb/s HE-AAC Low, or validation on macOS/Linux. The executable is not Authenticode signed.
+
 The native integration lives in the existing xpotify repository, branch `splitify-integration`. The original Splitify repository stays on `main` with its Next.js web application. No nested Rust copy or separate native repository is required.
 
 The fork roadmap and its remaining limits are tracked in [ROADMAP.md](ROADMAP.md). The native app now includes paged track lists, album/artist grids, local playlist folders, safe playlist reordering, a resizable current-playback pane, network retries and metadata cache dates/refresh. Playback state preserves the engine's actual shuffle order and manually queued tracks and restores in pause. Windows distribution: `powershell -File scripts/Package-Native.ps1`; the ZIP contains no account credentials or Gemini key. macOS/Linux packaging scripts and a manual workflow are provided but have not been tested on this Windows machine.

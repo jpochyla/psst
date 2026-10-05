@@ -94,6 +94,10 @@ pub struct AppState {
     pub queue_visible_count: usize,
     pub folder_name: String,
     pub editing_folder: Option<String>,
+    pub playlist_picker_track: Option<TrackId>,
+    pub playlist_picker_filter: String,
+    pub playlist_picker_url: String,
+    pub playlist_picker_status: String,
     pub finder: Finder,
     pub added_queue: Vector<QueueEntry>,
     #[data(ignore)]
@@ -191,6 +195,10 @@ impl AppState {
             selected_folder: None,
             folder_name: String::new(),
             editing_folder: None,
+            playlist_picker_track: None,
+            playlist_picker_filter: String::new(),
+            playlist_picker_url: String::new(),
+            playlist_picker_status: String::new(),
             finder: Finder::new(),
             lyrics: Promise::Empty,
             connect: connect::ConnectState::default(),
@@ -230,15 +238,43 @@ impl AppState {
         }
     }
 
-    pub fn refresh_all(&mut self) {
-        self.album_detail.album = Promise::Empty;
-        self.artist_detail.overview = Promise::Empty;
-        self.artist_detail.albums = Promise::Empty;
-        self.artist_detail.artist = Promise::Empty;
-        self.playlist_detail.playlist = Promise::Empty;
-        self.playlist_detail.tracks = Promise::Empty;
-        self.show_detail.episodes = Promise::Empty;
-        self.show_detail.show = Promise::Empty;
+    pub fn refresh_current_route(&mut self) {
+        match self.nav.clone() {
+            Nav::SavedTracks => self.with_library_mut(|library| library.saved_tracks.clear()),
+            Nav::SavedAlbums => self.with_library_mut(|library| library.saved_albums.clear()),
+            Nav::Shows => self.with_library_mut(|library| library.saved_shows.clear()),
+            Nav::AlbumDetail(_, _) => self.album_detail.album.clear(),
+            Nav::ArtistDetail(_) => {
+                self.artist_detail.artist.clear();
+                self.artist_detail.albums.clear();
+                self.artist_detail.overview.clear();
+            }
+            Nav::PlaylistDetail(_) => {
+                self.playlist_detail.playlist.clear();
+                self.playlist_detail.tracks.clear();
+            }
+            Nav::ShowDetail(_) => {
+                self.show_detail.show.clear();
+                self.show_detail.episodes.clear();
+            }
+            Nav::SearchResults(_) => self.search.results.clear(),
+            Nav::Recommendations(_) => self.recommend.results.clear(),
+            Nav::Notifications => self.news.feed.clear(),
+            Nav::Lyrics => self.lyrics.clear(),
+            Nav::Home => {
+                self.home_detail.made_for_you.clear();
+                self.home_detail.user_top_mixes.clear();
+                self.home_detail.best_of_artists.clear();
+                self.home_detail.recommended_stations.clear();
+                self.home_detail.your_shows.clear();
+                self.home_detail.shows_that_you_might_like.clear();
+                self.home_detail.uniquely_yours.clear();
+                self.home_detail.jump_back_in.clear();
+                self.home_detail.user_top_tracks.clear();
+                self.home_detail.user_top_artists.clear();
+            }
+            Nav::Queue | Nav::Devices => {}
+        }
     }
 }
 
@@ -636,4 +672,25 @@ impl Alert {
 pub enum AlertStyle {
     Error,
     Info,
+}
+
+#[cfg(test)]
+mod refresh_tests {
+    use super::*;
+    #[test]
+    fn refreshing_saved_tracks_preserves_other_views() {
+        let mut state = AppState::default_with_config(Config::default());
+        state.with_library_mut(|library| {
+            library
+                .saved_tracks
+                .resolve((), SavedTracks::new(Vector::new()));
+            library
+                .saved_albums
+                .resolve((), SavedAlbums::new(Vector::new()));
+        });
+        state.nav = Nav::SavedTracks;
+        state.refresh_current_route();
+        assert!(!state.library.saved_tracks.is_resolved());
+        assert!(state.library.saved_albums.is_resolved());
+    }
 }

@@ -42,6 +42,7 @@ pub struct Playlist {
     pub owner: PublicUser,
     pub collaborative: bool,
     pub public: Option<bool>,
+    pub snapshot_id: Option<Arc<str>>,
 }
 
 impl<'de> Deserialize<'de> for Playlist {
@@ -62,6 +63,7 @@ impl<'de> Deserialize<'de> for Playlist {
             owner: PublicUser,
             collaborative: bool,
             public: Option<bool>,
+            snapshot_id: Option<Arc<str>>,
         }
         let p = Payload::deserialize(deserializer)?;
         Ok(Self {
@@ -76,6 +78,7 @@ impl<'de> Deserialize<'de> for Playlist {
             owner: p.owner,
             collaborative: p.collaborative,
             public: p.public,
+            snapshot_id: p.snapshot_id,
         })
     }
 }

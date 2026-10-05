@@ -422,7 +422,9 @@ impl PlaybackController {
                     duration,
                     cover_url,
                 })
-                .unwrap();
+                .unwrap_or_else(|error| {
+                    log::warn!("Could not update OS playback metadata: {error}")
+                });
         }
     }
 

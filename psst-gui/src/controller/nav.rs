@@ -17,7 +17,14 @@ impl NavController {
                     ctx.submit_command(crate::ui::news::LOAD);
                 }
             }
-            Nav::Home | Nav::Queue => {}
+            Nav::Home => {
+                if !data.home_detail.made_for_you.is_resolved()
+                    && !data.home_detail.made_for_you.is_deferred(&())
+                {
+                    ctx.submit_command(crate::ui::home::LOAD_MADE_FOR_YOU);
+                }
+            }
+            Nav::Queue => {}
             Nav::Lyrics => {
                 if let Some(np) = &data.playback.now_playing {
                     let key = np.item.id().to_base62();
@@ -27,17 +34,23 @@ impl NavController {
                 }
             }
             Nav::SavedTracks => {
-                if !data.library.saved_tracks.is_resolved() {
+                if !data.library.saved_tracks.is_resolved()
+                    && !data.library.saved_tracks.is_deferred(&())
+                {
                     ctx.submit_command(library::LOAD_TRACKS);
                 }
             }
             Nav::SavedAlbums => {
-                if !data.library.saved_albums.is_resolved() {
+                if !data.library.saved_albums.is_resolved()
+                    && !data.library.saved_albums.is_deferred(&())
+                {
                     ctx.submit_command(library::LOAD_ALBUMS);
                 }
             }
             Nav::Shows => {
-                if !data.library.saved_shows.is_resolved() {
+                if !data.library.saved_shows.is_resolved()
+                    && !data.library.saved_shows.is_deferred(&())
+                {
                     ctx.submit_command(library::LOAD_SHOWS);
                 }
             }
@@ -48,6 +61,10 @@ impl NavController {
                     .search
                     .results
                     .contains(&(query.clone(), data.search.topic))
+                    && !data
+                        .search
+                        .results
+                        .is_deferred(&(query.clone(), data.search.topic))
                 {
                     ctx.submit_command(
                         search::LOAD_RESULTS.with((query.to_owned(), data.search.topic)),
@@ -55,29 +72,38 @@ impl NavController {
                 }
             }
             Nav::AlbumDetail(link, _) => {
-                if !data.album_detail.album.contains(link) {
+                if !data.album_detail.album.contains(link)
+                    && !data.album_detail.album.is_deferred(link)
+                {
                     ctx.submit_command(album::LOAD_DETAIL.with(link.to_owned()));
                 }
             }
             Nav::ArtistDetail(link) => {
-                if !data.artist_detail.artist.contains(link) {
+                if !data.artist_detail.artist.contains(link)
+                    && !data.artist_detail.artist.is_deferred(link)
+                {
                     ctx.submit_command(artist::LOAD_DETAIL.with(link.to_owned()));
                 }
             }
             Nav::PlaylistDetail(link) => {
-                if !data.playlist_detail.playlist.contains(link) {
+                if !data.playlist_detail.playlist.contains(link)
+                    && !data.playlist_detail.playlist.is_deferred(link)
+                {
                     ctx.submit_command(
                         playlist::LOAD_DETAIL.with((link.to_owned(), data.to_owned())),
                     );
                 }
             }
             Nav::ShowDetail(link) => {
-                if !data.show_detail.show.contains(link) {
+                if !data.show_detail.show.contains(link) && !data.show_detail.show.is_deferred(link)
+                {
                     ctx.submit_command(show::LOAD_DETAIL.with(link.to_owned()));
                 }
             }
             Nav::Recommendations(request) => {
-                if !data.recommend.results.contains(request) {
+                if !data.recommend.results.contains(request)
+                    && !data.recommend.results.is_deferred(request)
+                {
                     ctx.submit_command(recommend::LOAD_RESULTS.with(request.clone()));
                 }
             }
@@ -120,14 +146,14 @@ where
                 self.load_route_data(ctx, data);
             }
             Event::Command(cmd) if cmd.is(cmd::NAVIGATE_REFRESH) => {
-                if let Err(error) = crate::webapi::WebApi::global().invalidate_metadata() {
+                let api = crate::webapi::WebApi::global();
+                let result = api.invalidate_route(&data.nav);
+                if let Err(error) = result {
                     data.error_alert(error);
                     ctx.set_handled();
                     return;
                 }
-                data.refresh_all();
-                data.search.results.clear();
-                data.news.feed.clear();
+                data.refresh_current_route();
                 ctx.set_handled();
                 self.load_route_data(ctx, data);
             }
@@ -147,14 +173,14 @@ where
                 self.load_route_data(ctx, data);
             }
             Event::KeyDown(key) if key.mods.ctrl() && key.code == Code::KeyR => {
-                if let Err(error) = crate::webapi::WebApi::global().invalidate_metadata() {
+                let api = crate::webapi::WebApi::global();
+                let result = api.invalidate_route(&data.nav);
+                if let Err(error) = result {
                     data.error_alert(error);
                     ctx.set_handled();
                     return;
                 }
-                data.refresh_all();
-                data.search.results.clear();
-                data.news.feed.clear();
+                data.refresh_current_route();
                 ctx.set_handled();
                 self.load_route_data(ctx, data);
             }
@@ -173,8 +199,6 @@ where
         env: &Env,
     ) {
         if let LifeCycle::WidgetAdded = event {
-            // Loads the library's saved tracks without the user needing to click on the tab.
-            ctx.submit_command(cmd::NAVIGATE.with(Nav::SavedTracks));
             // Load the last route, or the default.
             ctx.submit_command(cmd::NAVIGATE.with(if data.playback.now_playing.is_some() {
                 data.nav.clone()

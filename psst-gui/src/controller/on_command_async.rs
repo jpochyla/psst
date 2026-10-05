@@ -67,12 +67,11 @@ where
 
                     move || {
                         let res = req_fn(req.clone());
-                        sink.submit_command(
+                        let _ = sink.submit_command(
                             Self::RESPONSE,
                             SingleUse::new((req, res)),
                             Target::Widget(self_id),
-                        )
-                        .unwrap();
+                        );
                     }
                 }));
                 if old_thread.is_some() {

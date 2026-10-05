@@ -29,6 +29,12 @@ Trabajo en el repositorio original `xpotify`, rama `splitify-integration`. El re
 
 ## Comprobaciones
 
+Windows 0.2.0 añade los controles Anterior/Reproducir-Pausar/Siguiente a las miniaturas de la barra de tareas. Se deshabilitan cuando no hay reproducción disponible y se reinstalan si Explorer recrea la barra. El selector de playlists ofrece portadas o icono alternativo, filtro local y enlace directo, con mensajes cuando la biblioteca/perfil no están disponibles. El hover no consulta Spotify.
+
+La carga inicial y la navegación esperan a que se abra cada vista. Las solicitudes pendientes no se repiten al volver a una ruta. La caché por `snapshot_id` evita descargar otra vez todas las páginas de una playlist sin cambios; conserva duplicados y posiciones originales. Un snapshot nuevo invalida sus páginas anteriores. Actualizar una playlist o colección guardada solo invalida sus páginas y conserva otras vistas en memoria. Se agrupan descargas de portadas repetidas y se limita su paralelismo a ocho trabajadores.
+
+La última copia correcta de perfil y lista de playlists se conserva durante actualizaciones de metadatos, aislada por sesión OAuth, para respaldo temporal de hasta 14 días. Los fallos temporales de lectura se conservan 30 segundos para evitar repetir inmediatamente una solicitud que ya falló. `Package-Native.ps1` genera por defecto la compilación optimizada `release`, con SHA-256 para ZIP y EXE.
+
 ```powershell
 cargo test --locked -p psst-core --lib -p psst-gui --bin psst-gui
 cargo clippy --locked -p psst-core --lib -p psst-gui --bin psst-gui -- -D warnings

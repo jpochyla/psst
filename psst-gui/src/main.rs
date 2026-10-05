@@ -26,6 +26,12 @@ const ENV_LOG: &str = "PSST_LOG";
 const ENV_LOG_STYLE: &str = "PSST_LOG_STYLE";
 
 fn main() {
+    #[cfg(target_os = "windows")]
+    unsafe {
+        let _ = windows::Win32::UI::Shell::SetCurrentProcessExplicitAppUserModelID(
+            windows::core::w!("com.angelopol.xpotify"),
+        );
+    }
     let _ = dotenvy::from_filename(".env.local");
     // Setup logging from the env variables, with defaults.
     Builder::from_env(

@@ -4,6 +4,7 @@ use druid::{
     WindowDesc, WindowId,
 };
 use std::fs;
+use std::{collections::HashMap, sync::Arc};
 use threadpool::ThreadPool;
 
 use crate::ui::playlist::{
@@ -20,26 +21,30 @@ use crate::{
 };
 
 pub struct Delegate {
+    playlist_picker_window: Option<WindowId>,
     splitify_window: Option<WindowId>,
     main_window: Option<WindowId>,
     preferences_window: Option<WindowId>,
     credits_window: Option<WindowId>,
     artwork_window: Option<WindowId>,
     image_pool: ThreadPool,
+    image_waiters: HashMap<Arc<str>, Vec<Target>>,
     size_updated: bool,
 }
 
 impl Delegate {
     pub fn new() -> Self {
-        const MAX_IMAGE_THREADS: usize = 32;
+        const MAX_IMAGE_THREADS: usize = 8;
 
         Self {
+            playlist_picker_window: None,
             splitify_window: None,
             main_window: None,
             preferences_window: None,
             credits_window: None,
             artwork_window: None,
             image_pool: ThreadPool::with_name("image_loading".into(), MAX_IMAGE_THREADS),
+            image_waiters: HashMap::new(),
             size_updated: false,
         }
     }
@@ -141,7 +146,32 @@ impl AppDelegate<AppState> for Delegate {
         data: &mut AppState,
         _env: &Env,
     ) -> Handled {
-        if let Some(id) = cmd.get(crate::splitify::OPEN) {
+        if let Some(track) = cmd.get(ui::playlist_picker::OPEN) {
+            data.playlist_picker_track = Some(*track);
+            data.playlist_picker_filter.clear();
+            data.playlist_picker_url.clear();
+            data.playlist_picker_status.clear();
+            Self::show_or_create_window(
+                &mut self.playlist_picker_window,
+                ui::playlist_picker::window,
+                ctx,
+            );
+            Handled::Yes
+        } else if let Some(link) = cmd.get(ui::playlist_picker::SELECT) {
+            if let Some(error) = WebApi::global().rate_limit_error() {
+                data.playlist_picker_status = error.to_string();
+                data.error_alert(error);
+            } else if let Some(track_id) = data.playlist_picker_track {
+                ctx.submit_command(ui::playlist::ADD_TRACK.with(crate::data::PlaylistAddTrack {
+                    link: link.clone(),
+                    track_id,
+                }));
+                if let Some(id) = self.playlist_picker_window {
+                    ctx.submit_command(commands::CLOSE_WINDOW.to(id));
+                }
+            }
+            Handled::Yes
+        } else if let Some(id) = cmd.get(crate::splitify::OPEN) {
             if let Some(window_id) = self.splitify_window {
                 ctx.submit_command(commands::SHOW_WINDOW.to(window_id));
                 if !data.splitify.busy && !id.is_empty() {
@@ -252,6 +282,10 @@ impl AppDelegate<AppState> for Delegate {
         _env: &Env,
         ctx: &mut DelegateCtx,
     ) {
+        if self.playlist_picker_window == Some(id) {
+            self.playlist_picker_window = None;
+            data.playlist_picker_track = None;
+        }
         if self.credits_window == Some(id) {
             self.credits_window = None;
             data.credits = None;
@@ -302,6 +336,7 @@ impl AppDelegate<AppState> for Delegate {
                 }
             }
         } else if [
+            self.playlist_picker_window,
             self.preferences_window,
             self.artwork_window,
             self.credits_window,
@@ -327,6 +362,27 @@ impl Delegate {
         cmd: &Command,
         _data: &mut AppState,
     ) -> Handled {
+        const COMPLETE: druid::Selector<(Arc<str>, Result<druid::ImageBuf, crate::error::Error>)> =
+            druid::Selector::new("app.image.complete");
+        if let Some((location, result)) = cmd.get(COMPLETE) {
+            let waiters = self.image_waiters.remove(location).unwrap_or_default();
+            match result {
+                Ok(image) => {
+                    for target in waiters {
+                        ctx.submit_command(
+                            remote_image::PROVIDE_DATA
+                                .with(remote_image::ImagePayload {
+                                    location: location.clone(),
+                                    image_buf: image.clone(),
+                                })
+                                .to(target),
+                        );
+                    }
+                }
+                Err(error) => log::warn!("failed to fetch image: {error}"),
+            }
+            return Handled::Yes;
+        }
         if let Some(location) = cmd.get(remote_image::REQUEST_DATA).cloned() {
             let sink = ctx.get_external_handle();
             if let Some(image_buf) = WebApi::global().get_cached_image(&location) {
@@ -334,24 +390,18 @@ impl Delegate {
                     location,
                     image_buf,
                 };
-                sink.submit_command(remote_image::PROVIDE_DATA, payload, target)
-                    .unwrap();
+                let _ = sink.submit_command(remote_image::PROVIDE_DATA, payload, target);
             } else {
+                if let Some(waiters) = self.image_waiters.get_mut(&location) {
+                    if !waiters.contains(&target) {
+                        waiters.push(target);
+                    }
+                    return Handled::Yes;
+                }
+                self.image_waiters.insert(location.clone(), vec![target]);
                 self.image_pool.execute(move || {
                     let result = WebApi::global().get_image(location.clone());
-                    match result {
-                        Ok(image_buf) => {
-                            let payload = remote_image::ImagePayload {
-                                location,
-                                image_buf,
-                            };
-                            sink.submit_command(remote_image::PROVIDE_DATA, payload, target)
-                                .unwrap();
-                        }
-                        Err(err) => {
-                            log::warn!("failed to fetch image: {err}")
-                        }
-                    }
+                    let _ = sink.submit_command(COMPLETE, (location, result), Target::Global);
                 });
             }
             Handled::Yes

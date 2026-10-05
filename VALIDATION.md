@@ -1,5 +1,13 @@
 # Local validation - Windows - 2026-10-05
 
+## Windows 0.2.0 publication checks
+
+- 51 unit tests pass (17 core, 34 GUI), with one live LRCLIB test intentionally excluded; Clippy passes with warnings denied. New coverage verifies library fallback after invalidation without cross-account leakage, playlist snapshot reuse with duplicates/original positions, rejection of stale page data after a changed revision, suppression of repeated transient reads, URL validation and route refresh isolation.
+- Windows registered all three native taskbar thumbnail buttons. Using the actual `WM_COMMAND` / `THBN_CLICKED` notifications while minimized resumed and paused native audio at low volume; Next selected The Blacker The Berry and the player was paused at approximately five seconds. Previous reset the paused song to its beginning. These checks exercise the notification path; they do not claim a screenshot of the taskbar flyout.
+- Local selector fixtures display own and collaborative playlists, exclude read-only destinations and keep the text input/actions visible at the minimum dialog size. Available cover images use the shared image pipeline, with a playlist icon when absent. Quota failures are explained instead of showing an empty submenu. No remote playlist write was attempted while the actual Spotify quota remained blocked.
+- The user's saved Bad News playback, queue and original volume are restored after playback validation. The original Splitify web main remains untouched. Release notes retain the outstanding native Connect/listen-reporting limits rather than claiming the roadmap fully complete.
+- Distribution uses an optimized Windows x64 release build with a fixed package allowlist, both licenses and separate EXE/ZIP SHA-256 sidecars. Development preview entry points are excluded from this build; local credentials, Gemini keys and logs are not packaged.
+
 ## Quota, queue, lyrics and quality update
 
 - 45 unit tests pass (17 core, 28 GUI); the explicitly live LRCLIB test remains excluded. Clippy for the core library and GUI passes with warnings denied, and the locked Windows build succeeds.

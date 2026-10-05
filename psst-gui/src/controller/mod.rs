@@ -13,6 +13,8 @@ mod on_update;
 mod playback;
 mod session;
 mod sort;
+#[cfg(target_os = "windows")]
+pub mod taskbar;
 
 pub use after_delay::AfterDelay;
 pub use alert_cleanup::AlertCleanupController;

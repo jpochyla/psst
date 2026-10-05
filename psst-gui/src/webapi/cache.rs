@@ -137,6 +137,18 @@ impl WebApiCache {
         Ok(())
     }
 
+    pub fn remove(&self, bucket: &str, key: &str) -> std::io::Result<()> {
+        let _guard = self.writes.lock();
+        if let Some(path) = self.key(bucket, key) {
+            match fs::remove_file(path) {
+                Ok(()) => {}
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                Err(error) => return Err(error),
+            }
+        }
+        Ok(())
+    }
+
     fn bucket(&self, bucket: &str) -> Option<PathBuf> {
         self.base.as_ref().map(|path| path.join(bucket))
     }

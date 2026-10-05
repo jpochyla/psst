@@ -50,6 +50,7 @@ pub mod news;
 pub mod playable;
 pub mod playback;
 pub mod playlist;
+pub mod playlist_picker;
 pub mod preferences;
 #[cfg(debug_assertions)]
 mod preview;
@@ -320,6 +321,9 @@ fn root_widget() -> impl Widget<AppState> {
                 .with_child(volume_slider().fix_width(180.0).center().fix_height(88.0))
                 .background(theme::BACKGROUND_DARK),
         );
+
+    #[cfg(target_os = "windows")]
+    let shell = shell.controller(crate::controller::taskbar::TaskbarController::default());
 
     folders::controller(crate::controller::cache_hint::widget(connect::controller(
         news::controller(

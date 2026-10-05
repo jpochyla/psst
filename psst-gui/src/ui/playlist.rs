@@ -23,12 +23,22 @@ use crate::{
 
 use super::{playable, theme, track, utils};
 
+pub fn picker_cover() -> impl Widget<Playlist> {
+    RemoteImage::new(
+        crate::widget::icons::PLAYLIST
+            .scale((24.0, 24.0))
+            .with_color(theme::PLACEHOLDER_COLOR)
+            .center()
+            .background(theme::GREY_700),
+        |playlist: &Playlist, _| playlist.image(48.0, 48.0).map(|image| image.url.clone()),
+    )
+}
+
 fn library_row_widget() -> impl Widget<WithCtx<Playlist>> {
-    let cover = RemoteImage::new(utils::placeholder_widget(), |row: &WithCtx<Playlist>, _| {
-        row.data.image(48.0, 48.0).map(|image| image.url.clone())
-    })
-    .fix_size(48.0, 48.0)
-    .clip(Size::new(48.0, 48.0).to_rounded_rect(5.0));
+    let cover = picker_cover()
+        .lens(Ctx::data())
+        .fix_size(48.0, 48.0)
+        .clip(Size::new(48.0, 48.0).to_rounded_rect(5.0));
     let labels = Flex::column()
         .cross_axis_alignment(druid::widget::CrossAxisAlignment::Start)
         .with_child(
