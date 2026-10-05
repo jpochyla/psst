@@ -241,7 +241,10 @@ impl Config {
     }
 
     pub fn webapi_client_id_value(&self) -> Option<&str> {
-        self.webapi_client_id.as_deref().filter(|s| !s.is_empty())
+        self.webapi_client_id
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
     }
 
     pub fn store_webapi_token(&mut self, token: WebApiToken) {

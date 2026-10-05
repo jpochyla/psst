@@ -21,7 +21,7 @@ pub fn listen_for_callback_parameter(
     timeout: Duration,
     parameter_name: &'static str,
 ) -> Result<String, Error> {
-    listen_for_callback(socket_address, timeout, parameter_name, None)
+    listen_for_callback(socket_address, timeout, parameter_name, None, || Ok(()))
 }
 
 fn listen_for_callback(
@@ -29,6 +29,7 @@ fn listen_for_callback(
     timeout: Duration,
     parameter_name: &'static str,
     expected_state: Option<String>,
+    on_ready: impl FnOnce() -> Result<(), Error>,
 ) -> Result<String, Error> {
     if !socket_address.ip().is_loopback() {
         return Err(Error::OAuthError(
@@ -51,6 +52,8 @@ fn listen_for_callback(
     };
 
     listener.set_nonblocking(true)?;
+    // Launch the browser only after the callback port is available.
+    on_ready()?;
     let deadline = Instant::now() + timeout;
     // 2. Set up the channel for communication
     let (tx, rx) = mpsc::channel::<Result<String, Error>>();
@@ -173,6 +176,20 @@ pub fn get_authcode_listener_with_state(
     timeout: Duration,
     authorization_url: &str,
 ) -> Result<AuthorizationCode, Error> {
+    get_authcode_listener_with_state_and_ready(
+        socket_address,
+        timeout,
+        authorization_url,
+        || Ok(()),
+    )
+}
+
+pub fn get_authcode_listener_with_state_and_ready(
+    socket_address: SocketAddr,
+    timeout: Duration,
+    authorization_url: &str,
+    on_ready: impl FnOnce() -> Result<(), Error>,
+) -> Result<AuthorizationCode, Error> {
     let state = Url::parse(authorization_url)
         .ok()
         .and_then(|url| {
@@ -181,7 +198,8 @@ pub fn get_authcode_listener_with_state(
                 .map(|(_, v)| v.into_owned())
         })
         .ok_or_else(|| Error::OAuthError("Missing OAuth state".into()))?;
-    listen_for_callback(socket_address, timeout, "code", Some(state)).map(AuthorizationCode::new)
+    listen_for_callback(socket_address, timeout, "code", Some(state), on_ready)
+        .map(AuthorizationCode::new)
 }
 
 fn send_not_found_response(stream: &mut TcpStream) {
@@ -263,40 +281,6 @@ fn create_oauth_client(client_id: &str, redirect_port: u16) -> SpotifyOAuthClien
         .set_redirect_uri(RedirectUrl::new(redirect_uri).expect("Invalid redirect URL"))
 }
 
-pub fn generate_session_auth_url(redirect_port: u16) -> (String, PkceCodeVerifier) {
-    let client_id = crate::session::access_token::CLIENT_ID;
-    let scopes = get_scopes();
-    generate_auth_url(client_id, redirect_port, &scopes)
-}
-
-pub fn exchange_session_code_for_token(
-    redirect_port: u16,
-    code: AuthorizationCode,
-    pkce_verifier: PkceCodeVerifier,
-) -> Result<String, Error> {
-    let client_id = crate::session::access_token::CLIENT_ID;
-    let client = create_oauth_client(client_id, redirect_port);
-
-    let token_response = client
-        .exchange_code(code)
-        .set_pkce_verifier(pkce_verifier)
-        .request(&http_client)
-        .map_err(|_| {
-            Error::OAuthError(
-                "Spotify token exchange failed. Check authentication and network.".into(),
-            )
-        })?;
-
-    Ok(token_response.access_token().secret().to_string())
-}
-
-fn get_scopes() -> Vec<Scope> {
-    crate::session::access_token::ACCESS_SCOPES
-        .split(',')
-        .map(|s| Scope::new(s.trim().to_string()))
-        .collect()
-}
-
 /// Token for Web API calls, serializable to/from disk.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct WebApiToken {
@@ -363,7 +347,7 @@ pub fn exchange_webapi_code_for_token(
         .exchange_code(code)
         .set_pkce_verifier(pkce_verifier)
         .request(&http_client)
-        .map_err(|e| Error::OAuthError(format!("Failed to exchange Web API code: {e}")))?;
+        .map_err(|_| Error::OAuthError("No se pudo intercambiar el código de Spotify. Comprueba el Client ID y la dirección de retorno registrados.".into()))?;
 
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -428,6 +412,58 @@ pub fn refresh_webapi_token(
 mod callback_tests {
     use super::*;
     #[test]
+    fn configured_client_uses_registered_loopback_redirect_and_pkce() {
+        let (authorization_url, _) = generate_webapi_auth_url("configured-client", 8888);
+        let url = Url::parse(&authorization_url).unwrap();
+        let parameters: std::collections::HashMap<_, _> = url.query_pairs().into_owned().collect();
+        assert_eq!(parameters["client_id"], "configured-client");
+        assert_eq!(parameters["redirect_uri"], "http://127.0.0.1:8888/login");
+        assert_eq!(parameters["code_challenge_method"], "S256");
+        assert!(parameters["scope"]
+            .split_whitespace()
+            .any(|scope| scope == "streaming"));
+        assert!(!parameters["state"].is_empty());
+        assert!(!parameters["code_challenge"].is_empty());
+    }
+
+    #[test]
+    fn callback_listener_is_bound_before_browser_launch() {
+        let reserve = TcpListener::bind("127.0.0.1:0").unwrap();
+        let address = reserve.local_addr().unwrap();
+        drop(reserve);
+        let code = listen_for_callback(address, Duration::from_secs(2), "code", Some("expected".into()), || {
+            assert!(TcpListener::bind(address).is_err());
+            std::thread::spawn(move || {
+                let mut stream = TcpStream::connect(address).unwrap();
+                stream.write_all(b"GET /login?code=test-code&state=expected HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n").unwrap();
+                let mut response = String::new();
+                stream.read_to_string(&mut response).unwrap();
+                assert!(response.starts_with("HTTP/1.1 200"));
+            });
+            Ok(())
+        }).unwrap();
+        assert_eq!(code, "test-code");
+    }
+
+    #[test]
+    fn occupied_callback_port_does_not_launch_browser() {
+        let reserve = TcpListener::bind("127.0.0.1:0").unwrap();
+        let mut launched = false;
+        assert!(listen_for_callback(
+            reserve.local_addr().unwrap(),
+            Duration::from_millis(100),
+            "code",
+            Some("expected".into()),
+            || {
+                launched = true;
+                Ok(())
+            }
+        )
+        .is_err());
+        assert!(!launched);
+    }
+
+    #[test]
     fn validates_state_method_path_and_duplicates() {
         assert!(valid_oauth_callback(
             "GET /login?code=abc&state=expected HTTP/1.1",
@@ -463,7 +499,8 @@ mod callback_tests {
             address,
             Duration::from_millis(100),
             "code",
-            Some("expected".into())
+            Some("expected".into()),
+            || Ok(())
         )
         .is_err());
         std::thread::sleep(Duration::from_millis(50));

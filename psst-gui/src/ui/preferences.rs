@@ -600,128 +600,50 @@ impl Authenticate {
         Some(thread)
     }
 
-    // Helper method to simplify Spotify authentication flow.
-    // Performs two back-to-back OAuth flows:
-    // 1. Shannon session OAuth (official Spotify Client ID) - for playback
-    // 2. Web API OAuth (user-provided Client ID) - for Web API calls
+    // One PKCE authorization with the configured application covers Web API and playback.
     fn start_spotify_auth(&mut self, ctx: &mut EventCtx, data: &mut AppState) {
-        // Validate that a Web API Client ID has been provided
-        let webapi_client_id = match data.config.webapi_client_id_value() {
+        let client_id = match data.config.webapi_client_id_value() {
             Some(id) => id.to_string(),
             None => {
                 data.preferences.auth.result.reject(
                     (),
-                    "Please enter your Spotify Developer Client ID first.".to_string(),
+                    "Introduce el Client ID de tu aplicación de Spotify.".into(),
                 );
                 return;
             }
         };
-
-        // Set authentication to in-progress state
         data.preferences.auth.result.defer_default();
-
-        // Generate auth URL and store PKCE verifier for the first (session) OAuth
-        let (auth_url, pkce_verifier) = oauth::generate_session_auth_url(8888);
-        let session_auth_url = auth_url.clone();
+        let (auth_url, pkce_verifier) = oauth::generate_webapi_auth_url(&client_id, 8888);
         let config = data.preferences.auth.session_config();
-
-        // Clone client ID for use in the spawned thread
-        let client_id = webapi_client_id.clone();
-
-        // Spawn authentication thread
         self.spotify_thread = Authenticate::spawn_auth_thread(
             ctx,
             move || {
-                // ── Step 1: Session OAuth (official Client ID) ──────────────
-                // Listen for authorization code
-                let code = oauth::get_authcode_listener_with_state(
+                let code = oauth::get_authcode_listener_with_state_and_ready(
                     SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8888),
                     Duration::from_secs(300),
-                    &session_auth_url,
-                )
-                .map_err(|e| e.to_string())?;
-
-                // Exchange code for access token
-                let token = oauth::exchange_session_code_for_token(8888, code, pkce_verifier)
-                    .map_err(|e| e.to_string())?;
-
-                // Try to authenticate with token, with retries
-                let mut credentials = None;
-                let mut retries = 3;
-                while retries > 0 {
+                    &auth_url,
+                    || open::that(&auth_url).map_err(|_| psst_core::error::Error::OAuthError("No se pudo abrir el navegador. Vuelve a intentar el inicio de sesión.".into())),
+                ).map_err(|e| e.to_string())?;
+                let token =
+                    oauth::exchange_webapi_code_for_token(&client_id, 8888, code, pkce_verifier)
+                        .map_err(|e| e.to_string())?;
+                for attempt in 0..3 {
                     match Authentication::authenticate_and_get_credentials(SessionConfig {
-                        login_creds: Credentials::from_access_token(token.clone()),
+                        login_creds: Credentials::from_access_token(token.access_token.clone()),
                         ..config.clone()
                     }) {
-                        Ok(creds) => {
-                            credentials = Some(creds);
-                            break;
+                        Ok(credentials) => return Ok((credentials, Some(token))),
+                        Err(error) if attempt < 2 => {
+                            log::warn!("Spotify session authentication failed, retrying: {error}")
                         }
-                        Err(e) if retries > 1 => {
-                            log::warn!("authentication failed, retrying: {e:?}");
-                            retries -= 1;
-                        }
-                        Err(e) => return Err(e),
+                        Err(error) => return Err(error),
                     }
                 }
-                let credentials =
-                    credentials.ok_or_else(|| "Authentication retries exceeded".to_string())?;
-
-                // ── Step 2: Web API OAuth (user-provided Client ID) ────────
-                // This gives us a separate token for Web API calls, avoiding
-                // 429 rate-limit errors from Spotify's official Client ID.
-                log::info!("Session auth complete. Starting Web API OAuth flow...");
-                let (webapi_auth_url, webapi_pkce_verifier) =
-                    oauth::generate_webapi_auth_url(&client_id, 8888);
-
-                // Open browser for Web API OAuth
-                if open::that(&webapi_auth_url).is_err() {
-                    log::warn!("Failed to open browser for Web API OAuth (non-fatal)");
-                    return Ok((credentials, None));
-                }
-
-                // Listen for the callback
-                let socket_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8888);
-                match oauth::get_authcode_listener_with_state(
-                    socket_addr,
-                    Duration::from_secs(300),
-                    &webapi_auth_url,
-                ) {
-                    Ok(code) => {
-                        match oauth::exchange_webapi_code_for_token(
-                            &client_id,
-                            8888,
-                            code,
-                            webapi_pkce_verifier,
-                        ) {
-                            Ok(webapi_token) => {
-                                log::info!("Web API OAuth flow completed successfully");
-                                Ok((credentials, Some(webapi_token)))
-                            }
-                            Err(e) => {
-                                log::warn!("Web API token exchange failed (non-fatal): {e}");
-                                Ok((credentials, None))
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        log::warn!("Web API OAuth callback failed (non-fatal): {e}");
-                        Ok((credentials, None))
-                    }
-                }
+                Err("No se pudo iniciar la sesión de reproducción de Spotify.".into())
             },
             Self::SPOTIFY_RESPONSE,
             self.spotify_thread.take(),
         );
-
-        // Open browser with authorization URL (for the first/session OAuth)
-        if open::that(&auth_url).is_err() {
-            data.error_alert("Failed to open browser");
-            data.preferences
-                .auth
-                .result
-                .reject((), "Failed to open browser".to_string());
-        }
     }
 }
 
