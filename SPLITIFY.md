@@ -84,3 +84,5 @@ Timed lyrics automatically follow the active line, with a fixed **Seguir letra**
 The bell opens releases from followed artists: recent albums/singles from the last 90 days, cover images, unread indicators and a local **Marcar como leídas** action. It scans each artist's latest 20 releases and displays up to 300 unique releases. Spotify announcements and its complete official notifications inbox are not available in this view. Responses are cached for six hours; a Spotify release quota response preserves the cooldown across restarts and displays a clear notice instead of waiting indefinitely. Cached releases remain usable when available.
 
 For local visual review, `--preview-ui=news --dark` or `--light` uses synthetic releases and blocks remote actions.
+
+Library save/remove commands are attached to the main shell, so they work from every route. A successful Spotify response updates the locally known saved state even when the full saved collection was never prefetched. Failed writes leave that state unchanged. Successful writes invalidate only their saved-collection response pages; manual collection refresh clears the local overrides.

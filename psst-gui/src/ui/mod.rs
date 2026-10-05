@@ -327,7 +327,7 @@ fn root_widget() -> impl Widget<AppState> {
 
     folders::controller(crate::controller::cache_hint::widget(connect::controller(
         news::controller(
-            ThemeScope::new(download::controller(shell))
+            ThemeScope::new(download::controller(library::mutation_controller(shell)))
                 .controller(playable::KeepCurrentVisible)
                 .controller(SessionController)
                 .controller(NavController)

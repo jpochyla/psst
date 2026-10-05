@@ -115,6 +115,9 @@ impl AppState {
             saved_albums: Promise::Empty,
             saved_tracks: Promise::Empty,
             saved_shows: Promise::Empty,
+            track_overrides: Default::default(),
+            album_overrides: Default::default(),
+            show_overrides: Default::default(),
             playlists: Promise::Empty,
         });
         let common_ctx = Arc::new(CommonCtx {
@@ -240,9 +243,18 @@ impl AppState {
 
     pub fn refresh_current_route(&mut self) {
         match self.nav.clone() {
-            Nav::SavedTracks => self.with_library_mut(|library| library.saved_tracks.clear()),
-            Nav::SavedAlbums => self.with_library_mut(|library| library.saved_albums.clear()),
-            Nav::Shows => self.with_library_mut(|library| library.saved_shows.clear()),
+            Nav::SavedTracks => self.with_library_mut(|library| {
+                library.saved_tracks.clear();
+                library.track_overrides.clear();
+            }),
+            Nav::SavedAlbums => self.with_library_mut(|library| {
+                library.saved_albums.clear();
+                library.album_overrides.clear();
+            }),
+            Nav::Shows => self.with_library_mut(|library| {
+                library.saved_shows.clear();
+                library.show_overrides.clear();
+            }),
             Nav::AlbumDetail(_, _) => self.album_detail.album.clear(),
             Nav::ArtistDetail(_) => {
                 self.artist_detail.artist.clear();
@@ -409,17 +421,23 @@ pub struct Library {
     pub saved_albums: Promise<SavedAlbums>,
     pub saved_tracks: Promise<SavedTracks>,
     pub saved_shows: Promise<Shows>,
+    pub track_overrides: druid::im::HashMap<TrackId, bool>,
+    pub album_overrides: druid::im::HashMap<Arc<str>, bool>,
+    pub show_overrides: druid::im::HashMap<Arc<str>, bool>,
 }
 
 impl Library {
     pub fn add_track(&mut self, track: Arc<Track>) {
+        self.track_overrides.insert(track.id, true);
         if let Some(saved) = self.saved_tracks.resolved_mut() {
-            saved.set.insert(track.id);
-            saved.tracks.push_front(track);
+            if saved.set.insert(track.id).is_none() {
+                saved.tracks.push_front(track);
+            }
         }
     }
 
     pub fn remove_track(&mut self, track_id: &TrackId) {
+        self.track_overrides.insert(*track_id, false);
         if let Some(saved) = self.saved_tracks.resolved_mut() {
             saved.set.remove(track_id);
             saved.tracks.retain(|t| &t.id != track_id);
@@ -427,6 +445,9 @@ impl Library {
     }
 
     pub fn contains_track(&self, track: &Track) -> bool {
+        if let Some(saved) = self.track_overrides.get(&track.id) {
+            return *saved;
+        }
         if let Some(saved) = self.saved_tracks.resolved() {
             saved.set.contains(&track.id)
         } else {
@@ -435,13 +456,16 @@ impl Library {
     }
 
     pub fn add_album(&mut self, album: Arc<Album>) {
+        self.album_overrides.insert(album.id.clone(), true);
         if let Some(saved) = self.saved_albums.resolved_mut() {
-            saved.set.insert(album.id.clone());
-            saved.albums.push_front(album);
+            if saved.set.insert(album.id.clone()).is_none() {
+                saved.albums.push_front(album);
+            }
         }
     }
 
     pub fn remove_album(&mut self, album_id: &str) {
+        self.album_overrides.insert(album_id.into(), false);
         if let Some(saved) = self.saved_albums.resolved_mut() {
             saved.set.remove(album_id);
             saved.albums.retain(|a| a.id.as_ref() != album_id);
@@ -449,6 +473,9 @@ impl Library {
     }
 
     pub fn contains_album(&self, album: &Album) -> bool {
+        if let Some(saved) = self.album_overrides.get(&album.id) {
+            return *saved;
+        }
         if let Some(saved) = self.saved_albums.resolved() {
             saved.set.contains(&album.id)
         } else {
@@ -457,13 +484,16 @@ impl Library {
     }
 
     pub fn add_show(&mut self, show: Arc<Show>) {
+        self.show_overrides.insert(show.id.clone(), true);
         if let Some(saved) = self.saved_shows.resolved_mut() {
-            saved.set.insert(show.id.clone());
-            saved.shows.push_front(show);
+            if saved.set.insert(show.id.clone()).is_none() {
+                saved.shows.push_front(show);
+            }
         }
     }
 
     pub fn remove_show(&mut self, show_id: &str) {
+        self.show_overrides.insert(show_id.into(), false);
         if let Some(saved) = self.saved_shows.resolved_mut() {
             saved.set.remove(show_id);
             saved.shows.retain(|a| a.id.as_ref() != show_id);
@@ -471,6 +501,9 @@ impl Library {
     }
 
     pub fn contains_show(&self, show: &Show) -> bool {
+        if let Some(saved) = self.show_overrides.get(&show.id) {
+            return *saved;
+        }
         if let Some(saved) = self.saved_shows.resolved() {
             saved.set.contains(&show.id)
         } else {
@@ -559,6 +592,9 @@ impl Default for Library {
             saved_albums: Promise::Empty,
             saved_tracks: Promise::Empty,
             saved_shows: Promise::Empty,
+            track_overrides: Default::default(),
+            album_overrides: Default::default(),
+            show_overrides: Default::default(),
         }
     }
 }
@@ -692,5 +728,31 @@ mod refresh_tests {
         state.refresh_current_route();
         assert!(!state.library.saved_tracks.is_resolved());
         assert!(state.library.saved_albums.is_resolved());
+    }
+}
+
+#[cfg(test)]
+mod library_status_tests {
+    use super::*;
+    #[test]
+    fn confirmed_save_is_visible_without_prefetching_all_saved_tracks() {
+        let track: Track = serde_json::from_value(serde_json::json!({
+            "id":"7omij53d6AvXefx13NNyfn", "name":"Fixture", "artists":[], "duration_ms":180000,
+            "disc_number":1,"track_number":1,"explicit":false,"is_local":false
+        }))
+        .unwrap();
+        let mut library = Library::default();
+        assert!(!library.contains_track(&track));
+        library.add_track(Arc::new(track.clone()));
+        assert!(library.contains_track(&track));
+        assert!(!library.saved_tracks.is_resolved());
+        library.remove_track(&track.id);
+        assert!(!library.contains_track(&track));
+        library
+            .saved_tracks
+            .resolve((), SavedTracks::new(Vector::new()));
+        library.add_track(Arc::new(track.clone()));
+        library.add_track(Arc::new(track));
+        assert_eq!(library.saved_tracks.resolved().unwrap().tracks.len(), 1);
     }
 }

@@ -5,7 +5,7 @@ use druid::widget::{Either, Flex, Label, Scroll};
 use druid::{widget::List, LensExt, Selector, Widget, WidgetExt};
 
 use crate::data::{Artist, Ctx, HomeDetail, MixedView, Show, Shows, Track, WithCtx};
-use crate::ui::library::{LOAD_SHOWS, SAVE_SHOW, UNSAVE_SHOW};
+use crate::ui::library::LOAD_SHOWS;
 use crate::widget::Empty;
 use crate::{
     data::AppState,
@@ -216,38 +216,6 @@ pub fn your_shows() -> impl Widget<AppState> {
                 data.with_library_mut(|library| {
                     library.saved_shows.update(r);
                 });
-            },
-        )
-        .on_command_async(
-            SAVE_SHOW,
-            |a| WebApi::global().save_show(&a.id),
-            |_, data, s| {
-                data.with_library_mut(move |library| {
-                    library.add_show(s);
-                });
-            },
-            |_, data, (_, r)| {
-                if let Err(err) = r {
-                    data.error_alert(err);
-                } else {
-                    data.info_alert("Show added to library.");
-                }
-            },
-        )
-        .on_command_async(
-            UNSAVE_SHOW,
-            |l| WebApi::global().unsave_show(&l.id),
-            |_, data, l| {
-                data.with_library_mut(|library| {
-                    library.remove_show(&l.id);
-                });
-            },
-            |_, data, (_, r)| {
-                if let Err(err) = r {
-                    data.error_alert(err);
-                } else {
-                    data.info_alert("Show removed from library.");
-                }
             },
         )
 }

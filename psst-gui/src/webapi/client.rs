@@ -2236,12 +2236,18 @@ impl WebApi {
 
     // https://developer.spotify.com/documentation/web-api/reference/save-to-library/
     pub fn save_album(&self, id: &str) -> Result<(), Error> {
-        self.send_empty_json(&RequestBuilder::library_item("album", id, Method::Put))
+        self.send_empty_json(&RequestBuilder::library_item("album", id, Method::Put))?;
+        self.invalidate_pages(
+            &RequestBuilder::new("v1/me/albums", Method::Get, None).query("market", "from_token"),
+        )
     }
 
     // https://developer.spotify.com/documentation/web-api/reference/remove-from-library/
     pub fn unsave_album(&self, id: &str) -> Result<(), Error> {
-        self.send_empty_json(&RequestBuilder::library_item("album", id, Method::Delete))
+        self.send_empty_json(&RequestBuilder::library_item("album", id, Method::Delete))?;
+        self.invalidate_pages(
+            &RequestBuilder::new("v1/me/albums", Method::Get, None).query("market", "from_token"),
+        )
     }
 
     // https://developer.spotify.com/documentation/web-api/reference/get-users-saved-tracks/
@@ -2278,22 +2284,30 @@ impl WebApi {
 
     // https://developer.spotify.com/documentation/web-api/reference/save-to-library/
     pub fn save_track(&self, id: &str) -> Result<(), Error> {
-        self.send_empty_json(&RequestBuilder::library_item("track", id, Method::Put))
+        self.send_empty_json(&RequestBuilder::library_item("track", id, Method::Put))?;
+        self.invalidate_pages(
+            &RequestBuilder::new("v1/me/tracks", Method::Get, None).query("market", "from_token"),
+        )
     }
 
     // https://developer.spotify.com/documentation/web-api/reference/remove-from-library/
     pub fn unsave_track(&self, id: &str) -> Result<(), Error> {
-        self.send_empty_json(&RequestBuilder::library_item("track", id, Method::Delete))
+        self.send_empty_json(&RequestBuilder::library_item("track", id, Method::Delete))?;
+        self.invalidate_pages(
+            &RequestBuilder::new("v1/me/tracks", Method::Get, None).query("market", "from_token"),
+        )
     }
 
     // https://developer.spotify.com/documentation/web-api/reference/save-to-library/
     pub fn save_show(&self, id: &str) -> Result<(), Error> {
-        self.send_empty_json(&RequestBuilder::library_item("show", id, Method::Put))
+        self.send_empty_json(&RequestBuilder::library_item("show", id, Method::Put))?;
+        self.invalidate_pages(&RequestBuilder::new("v1/me/shows", Method::Get, None))
     }
 
     // https://developer.spotify.com/documentation/web-api/reference/remove-from-library/
     pub fn unsave_show(&self, id: &str) -> Result<(), Error> {
-        self.send_empty_json(&RequestBuilder::library_item("show", id, Method::Delete))
+        self.send_empty_json(&RequestBuilder::library_item("show", id, Method::Delete))?;
+        self.invalidate_pages(&RequestBuilder::new("v1/me/shows", Method::Get, None))
     }
 }
 
