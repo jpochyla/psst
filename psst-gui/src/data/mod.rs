@@ -111,6 +111,7 @@ impl AppState {
             now_playing: None,
             queue_behavior: config.queue_behavior,
             queue: Vector::new(),
+            up_next: Vector::new(),
             volume: config.volume,
         };
         Self {

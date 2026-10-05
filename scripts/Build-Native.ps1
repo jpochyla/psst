@@ -12,5 +12,12 @@ try {
     $outputRoot = Join-Path $projectRoot 'dist'
     New-Item -ItemType Directory -Force -Path $outputRoot | Out-Null
     Copy-Item -LiteralPath (Join-Path $targetRoot 'debug\psst-gui.exe') -Destination (Join-Path $outputRoot 'Xpotify.exe') -Force
+    $shortcutShell = New-Object -ComObject WScript.Shell
+    $shortcut = $shortcutShell.CreateShortcut((Join-Path $projectRoot 'Xpotify.lnk'))
+    $shortcut.TargetPath = Join-Path $outputRoot 'Xpotify.exe'
+    $shortcut.WorkingDirectory = $projectRoot
+    $shortcut.IconLocation = "$outputRoot\Xpotify.exe,0"
+    $shortcut.Description = 'Xpotify - Spotify + Splitify'
+    $shortcut.Save()
     Write-Host "Aplicacion compilada: $outputRoot\Xpotify.exe"
 } finally { Pop-Location }

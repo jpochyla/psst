@@ -202,6 +202,11 @@ fn player_widget() -> impl Widget<Playback> {
         .with_default_spacer()
         .with_child(Maybe::or_empty(durations_widget).lens(Playback::now_playing))
         .with_child(
+            small_button_widget(&icons::QUEUE).on_left_click(|ctx, _, _, _| {
+                ctx.submit_command(cmd::NAVIGATE.with(crate::data::Nav::Queue));
+            }),
+        )
+        .with_child(
             small_button_widget(&icons::MUSIC_NOTE)
                 .align_right()
                 .on_left_click(|ctx, _, _, _| {
@@ -417,9 +422,7 @@ impl Widget<NowPlaying> for SeekBar {
                     ctx.set_active(true);
                 }
             }
-            Event::MouseUp(mouse)
-                if ctx.is_active() && mouse.button == MouseButton::Left =>
-            {
+            Event::MouseUp(mouse) if ctx.is_active() && mouse.button == MouseButton::Left => {
                 if ctx.is_hot() {
                     let fraction = mouse.pos.x / ctx.size().width;
                     ctx.submit_command(cmd::PLAY_SEEK.with(fraction));

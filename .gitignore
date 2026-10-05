@@ -8,6 +8,7 @@ cache
 .env.local
 .tools/
 dist/
+/Xpotify.lnk
 .logs/
 *.iml
 rust-toolchain

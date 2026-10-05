@@ -4,9 +4,15 @@ The native integration lives in the existing xpotify repository, branch `splitif
 
 ## Run on this machine
 
-Double-click `Start-Xpotify.cmd`. The launcher starts `dist/Xpotify.exe` from this repository, loading `.env.local` from the project directory. To rebuild: `powershell -File scripts/Build-Native.ps1`. Rust stable and Visual Studio C++ Build Tools / Windows SDK are required for compilation. The running application requires neither Node nor a web server.
+Double-click `Xpotify.lnk` for the green app shortcut, or `Start-Xpotify.cmd`. The launcher starts `dist/Xpotify.exe` from this repository, loading `.env.local` from the project directory. To rebuild: `powershell -File scripts/Build-Native.ps1`. Rust stable and Visual Studio C++ Build Tools / Windows SDK are required for compilation. The running application requires neither Node nor a web server.
 
 The default theme is **System**. On Windows it follows AppsUseLightTheme and updates when that setting changes. Preferences can override it with Light or Dark. The system option falls back to light on other platforms.
+
+## Playback queue and app icon
+
+Open **Cola** in the sidebar or the queue icon beside the playback controls. The view shows the current song and upcoming tracks with artist and duration. It follows the actual native player's shuffle order, manually added tracks, duplicates, track changes and repeat mode. When stopped, manually queued tracks can be started with **Reproducir cola**. Stop or starting a new source resets the queue.
+
+The Windows executable has a green waveform icon, generated from the matching vector design in `psst-gui/assets/logo.svg`. To regenerate its PNG sizes, run `powershell -File scripts/Generate-AppIcon.ps1`, then rebuild. The build always regenerates the ICO resource in Cargo's output directory, avoiding a stale cached icon in the source tree.
 
 ## Spotify login
 
@@ -31,6 +37,6 @@ TZ="America/Caracas"
 
 Only musical metadata is sent to Gemini. Classification handles batches of 150 tracks and rejects invented IDs and missing tracks. Creation uses batches of 100 tracks. The web editor's SQLite history, text import and Last.fm enrichment have not been ported.
 
-Debug builds include local UI previews: `dist/Xpotify.exe --preview-ui=login`, `--preview-ui=editor`, `--preview-ui=editor-empty`, `--preview-ui=player`; add `--dark` for dark fixtures. Preview commands cannot issue remote writes and never replace normal startup data.
+Debug builds include local UI previews: `dist/Xpotify.exe --preview-ui=login`, `--preview-ui=editor`, `--preview-ui=editor-empty`, `--preview-ui=player`, `--preview-ui=queue` and `--preview-ui=queue-empty`; add `--light` or `--dark` for dark fixtures. Preview commands cannot issue remote writes and never replace normal startup data.
 
 See `SECURITY-REVIEW.md` for the security review and remaining dependency risks; `VALIDATION.md` records actual checks. Upstream MIT licensing is preserved in `LICENSE.md`.

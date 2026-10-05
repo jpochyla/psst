@@ -36,6 +36,8 @@ pub const NAVIGATE_BACK: Selector<usize> = Selector::new("app.navigate-back");
 pub const NAVIGATE_REFRESH: Selector = Selector::new("app.navigate-refresh");
 pub const TOGGLE_LYRICS: Selector = Selector::new("app.toggle-lyrics");
 
+pub const QUEUE_CHANGED: Selector<Vec<ItemId>> = Selector::new("app.queue-changed");
+
 // Playback state
 pub const PLAYBACK_LOADING: Selector<ItemId> = Selector::new("app.playback-loading");
 pub const PLAYBACK_PLAYING: Selector<(ItemId, Duration)> = Selector::new("app.playback-playing");

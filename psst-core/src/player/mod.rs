@@ -101,7 +101,8 @@ impl Player {
             | PlayerEvent::Pausing { .. }
             | PlayerEvent::Resuming { .. }
             | PlayerEvent::Stopped
-            | PlayerEvent::Blocked { .. } => {}
+            | PlayerEvent::Blocked { .. }
+            | PlayerEvent::QueueChanged { .. } => {}
         };
     }
 
@@ -118,8 +119,14 @@ impl Player {
             PlayerCommand::Stop => self.stop(),
             PlayerCommand::Seek { position } => self.seek(position),
             PlayerCommand::Configure { config } => self.configure(config),
-            PlayerCommand::SetQueueBehavior { behavior } => self.queue.set_behaviour(behavior),
-            PlayerCommand::AddToQueue { item } => self.queue.add(item),
+            PlayerCommand::SetQueueBehavior { behavior } => {
+                self.queue.set_behaviour(behavior);
+                self.publish_queue();
+            }
+            PlayerCommand::AddToQueue { item } => {
+                self.queue.add(item);
+                self.publish_queue();
+            }
             PlayerCommand::SetVolume { volume } => self.set_volume(volume),
         }
     }
@@ -213,7 +220,14 @@ impl Player {
         }
     }
 
+    fn publish_queue(&self) {
+        let _ = self.sender.send(PlayerEvent::QueueChanged {
+            upcoming: self.queue.upcoming_ids(),
+        });
+    }
+
     fn load_and_play(&mut self, item: PlaybackItem) {
+        self.publish_queue();
         // Make sure to stop the sink, so any current audio source is cleared and the
         // playback stopped.
         self.audio_output_sink.stop();
@@ -368,6 +382,7 @@ impl Player {
         self.audio_output_sink.stop();
         self.state = PlayerState::Stopped;
         self.queue.clear();
+        self.publish_queue();
         self.consecutive_loading_failures = 0;
     }
 
@@ -433,6 +448,9 @@ pub enum PlayerCommand {
 }
 
 pub enum PlayerEvent {
+    QueueChanged {
+        upcoming: Vec<crate::item_id::ItemId>,
+    },
     Command(PlayerCommand),
     /// Track has started loading.  `Loaded` follows.
     Loading {

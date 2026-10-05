@@ -47,6 +47,7 @@ pub mod playlist;
 pub mod preferences;
 #[cfg(debug_assertions)]
 mod preview;
+pub mod queue;
 #[cfg(debug_assertions)]
 pub use preview::run_if_requested;
 pub mod recommend;
@@ -343,6 +344,7 @@ fn route_widget() -> impl Widget<AppState> {
     ViewDispatcher::new(
         |state: &AppState, _| state.nav.route(),
         |route: &Route, _, _| match route {
+            Route::Queue => queue::widget().boxed(),
             Route::Home => Scroll::new(home::home_widget().padding(theme::grid(1.0)))
                 .vertical()
                 .boxed(),
@@ -435,6 +437,7 @@ fn sidebar_menu_widget() -> impl Widget<AppState> {
             Some(&icons::PODCAST),
             Nav::Shows,
         ))
+        .with_child(sidebar_link_widget("Cola", Some(&icons::QUEUE), Nav::Queue))
         .with_child(search::input_widget().padding((theme::grid(1.0), theme::grid(1.0))))
 }
 
@@ -646,6 +649,7 @@ fn route_icon_widget() -> impl Widget<Nav> {
                 Nav::Home | Nav::Lyrics | Nav::SavedTracks | Nav::SavedAlbums | Nav::Shows => {
                     Empty.boxed()
                 }
+                Nav::Queue => icon(&icons::QUEUE).boxed(),
                 Nav::SearchResults(_) | Nav::Recommendations(_) => icon(&icons::SEARCH).boxed(),
                 Nav::AlbumDetail(_, _) => icon(&icons::ALBUM).boxed(),
                 Nav::ArtistDetail(_) => icon(&icons::ARTIST).boxed(),

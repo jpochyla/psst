@@ -84,6 +84,40 @@ pub fn run_if_requested() -> bool {
             }
             crate::splitify::window()
         }
+        "queue" | "queue-empty" => {
+            state.nav = crate::data::Nav::Queue;
+            if view == "queue" {
+                for (index, (name, artist)) in [
+                    ("Instant Crush", "Daft Punk"),
+                    ("Midnight City", "M83"),
+                    ("Intro", "The xx"),
+                    ("The Less I Know the Better", "Tame Impala"),
+                    ("Electric Feel", "MGMT"),
+                ]
+                .iter()
+                .enumerate()
+                {
+                    let track: Track = serde_json::from_value(serde_json::json!({
+                        "name":name, "artists":[{"id":"preview","name":artist}], "duration_ms":240000,
+                        "disc_number":1, "track_number":index+1, "explicit":false, "is_local":false, "is_playable":true
+                    })).unwrap();
+                    let entry = crate::data::QueueEntry {
+                        item: crate::data::Playable::Track(Arc::new(track)),
+                        origin: crate::data::PlaybackOrigin::Home,
+                    };
+                    if index == 0 {
+                        state.start_playback(
+                            entry.item.clone(),
+                            entry.origin.clone(),
+                            std::time::Duration::from_secs(42),
+                        );
+                    } else {
+                        state.playback.up_next.push_back(entry);
+                    }
+                }
+            }
+            super::main_window(&state.config)
+        }
         "player" => super::main_window(&state.config),
         "login" => super::account_setup_window(),
         _ => WindowDesc::new(druid::widget::Label::new("Unknown UI preview")),

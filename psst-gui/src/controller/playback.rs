@@ -9,6 +9,7 @@ use druid::{
     widget::{prelude::*, Controller},
     Code, ExtEventSink, InternalLifeCycle, KbKey, WindowHandle,
 };
+use psst_core::lastfm::Scrobbler;
 use psst_core::{
     audio::{normalize::NormalizationLevel, output::DefaultAudioOutput},
     cache::Cache,
@@ -17,7 +18,6 @@ use psst_core::{
     player::{item::PlaybackItem, PlaybackConfig, Player, PlayerCommand, PlayerEvent},
     session::SessionService,
 };
-use psst_core::lastfm::Scrobbler;
 use souvlaki::{
     MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback, MediaPosition, PlatformConfig,
 };
@@ -115,6 +115,10 @@ impl PlaybackController {
         for event in player.receiver() {
             // Forward events that affect the UI state to the UI thread.
             match &event {
+                PlayerEvent::QueueChanged { upcoming } => {
+                    let _ =
+                        event_sink.submit_command(cmd::QUEUE_CHANGED, upcoming.clone(), widget_id);
+                }
                 PlayerEvent::Loading { item } => {
                     event_sink
                         .submit_command(cmd::PLAYBACK_LOADING, item.item_id, widget_id)
@@ -426,6 +430,14 @@ where
             Event::Command(cmd) if cmd.is(cmd::SET_FOCUS) => {
                 ctx.request_focus();
             }
+            Event::Command(cmd) if cmd.is(cmd::QUEUE_CHANGED) => {
+                data.playback.up_next = cmd
+                    .get_unchecked(cmd::QUEUE_CHANGED)
+                    .iter()
+                    .filter_map(|id| data.queued_entry(*id))
+                    .collect();
+                ctx.set_handled();
+            }
             Event::Command(cmd) if cmd.is(cmd::PLAYBACK_LOADING) => {
                 let item = cmd.get_unchecked(cmd::PLAYBACK_LOADING);
 
@@ -486,6 +498,8 @@ where
             }
             Event::Command(cmd) if cmd.is(cmd::PLAY_TRACKS) => {
                 let payload = cmd.get_unchecked(cmd::PLAY_TRACKS);
+                data.added_queue.clear();
+                data.playback.up_next.clear();
                 data.playback.queue = payload
                     .items
                     .iter()

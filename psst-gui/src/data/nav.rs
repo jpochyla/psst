@@ -13,6 +13,7 @@ use super::RecommendationsRequest;
 pub enum Route {
     Home,
     Lyrics,
+    Queue,
     SavedTracks,
     SavedAlbums,
     Shows,
@@ -29,6 +30,7 @@ pub enum Nav {
     #[default]
     Home,
     Lyrics,
+    Queue,
     SavedTracks,
     SavedAlbums,
     Shows,
@@ -45,6 +47,7 @@ impl Nav {
         match self {
             Nav::Home => Route::Home,
             Nav::Lyrics => Route::Lyrics,
+            Nav::Queue => Route::Queue,
             Nav::SavedTracks => Route::SavedTracks,
             Nav::SavedAlbums => Route::SavedAlbums,
             Nav::Shows => Route::Shows,
@@ -61,6 +64,7 @@ impl Nav {
         match self {
             Nav::Home => "Inicio".to_string(),
             Nav::Lyrics => "Letra".to_string(),
+            Nav::Queue => "Cola de reproducci\u{00f3}n".to_string(),
             Nav::SavedTracks => "Tus canciones".to_string(),
             Nav::SavedAlbums => "Tus álbumes".to_string(),
             Nav::Shows => "Podcasts".to_string(),
@@ -77,6 +81,7 @@ impl Nav {
         match self {
             Nav::Home => "Inicio".to_string(),
             Nav::Lyrics => "Letra".to_string(),
+            Nav::Queue => "Cola de reproducci\u{00f3}n".to_string(),
             Nav::SavedTracks => "Tus canciones".to_string(),
             Nav::SavedAlbums => "Tus álbumes".to_string(),
             Nav::Shows => "Tus podcasts".to_string(),
