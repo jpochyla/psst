@@ -13,8 +13,8 @@ try {
     $targetRoot = if ($env:CARGO_TARGET_DIR) { $env:CARGO_TARGET_DIR } else { Join-Path $nativeRoot 'target' }
     $outputRoot = Join-Path $projectRoot 'dist'
     New-Item -ItemType Directory -Force -Path $outputRoot | Out-Null
-    $profile = if ($Release) { 'release' } else { 'debug' }
-    Copy-Item -LiteralPath (Join-Path $targetRoot "$profile\psst-gui.exe") -Destination (Join-Path $outputRoot 'Xpotify.exe') -Force
+    $buildProfile = if ($Release) { 'release' } else { 'debug' }
+    Copy-Item -LiteralPath (Join-Path $targetRoot "$buildProfile\psst-gui.exe") -Destination (Join-Path $outputRoot 'Xpotify.exe') -Force
     $shortcutShell = New-Object -ComObject WScript.Shell
     $shortcut = $shortcutShell.CreateShortcut((Join-Path $projectRoot 'Xpotify.lnk'))
     $shortcut.TargetPath = Join-Path $outputRoot 'Xpotify.exe'
