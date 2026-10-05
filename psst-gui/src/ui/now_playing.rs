@@ -1,12 +1,11 @@
 use super::{theme, utils};
 use crate::{
     cmd,
-    data::{AppState, Nav, PlaybackState, QueueEntry},
+    data::{AppState, Nav, PlaybackState},
     widget::{MyWidgetExt, RemoteImage},
 };
 use druid::{
-    lens::Map,
-    widget::{Button, CrossAxisAlignment, Flex, Label, LineBreaking, List, Scroll},
+    widget::{Button, CrossAxisAlignment, Flex, Label, LineBreaking, Scroll},
     Widget, WidgetExt,
 };
 
@@ -21,25 +20,9 @@ pub fn widget() -> impl Widget<AppState> {
     })
     .fix_size(180.0, 180.0)
     .center()
-    .padding((0.0, 16.0));
-    let upcoming = List::new(|| {
-        Label::dynamic(|entry: &QueueEntry, _| entry.item.name().to_string())
-            .with_line_break_mode(LineBreaking::WordWrap)
-            .with_text_size(12.0)
-            .padding((0.0, 8.0))
-    })
-    .lens(Map::new(
-        |state: &AppState| {
-            state
-                .playback
-                .up_next
-                .iter()
-                .take(8)
-                .cloned()
-                .collect::<druid::im::Vector<_>>()
-        },
-        |_, _| {},
-    ));
+    .padding((0.0, 16.0))
+    .context_menu(super::queue::current_menu);
+    let upcoming = super::queue::preview_widget();
     Scroll::new(
         Flex::column()
             .cross_axis_alignment(CrossAxisAlignment::Start)
@@ -69,7 +52,8 @@ pub fn widget() -> impl Widget<AppState> {
                 })
                 .with_text_size(20.0)
                 .with_font(theme::UI_FONT_MEDIUM)
-                .with_line_break_mode(LineBreaking::WordWrap),
+                .with_line_break_mode(LineBreaking::WordWrap)
+                .context_menu(super::queue::current_menu),
             )
             .with_spacer(8.0)
             .with_child(

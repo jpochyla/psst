@@ -4,15 +4,24 @@ use druid::{
     widget::{
         Button, CrossAxisAlignment, Either, Flex, Label, LineBreaking, List, Painter, Scroll,
     },
-    RenderContext, Widget, WidgetExt,
+    Data, RenderContext, Widget, WidgetExt,
 };
 
 use crate::{
-    data::{AppState, Playable, PlaybackOrigin, QueueEntry},
+    cmd,
+    data::{AppState, CommonCtx, Playable, PlaybackOrigin, QueueEntry},
     widget::{Border, MyWidgetExt, RemoteImage},
 };
 
 use super::{theme, utils};
+use std::sync::Arc;
+
+#[derive(Clone, Data)]
+struct QueueRow {
+    entry: QueueEntry,
+    index: Option<usize>,
+    ctx: Arc<CommonCtx>,
+}
 
 fn artist(item: &Playable) -> String {
     match item {
@@ -21,22 +30,22 @@ fn artist(item: &Playable) -> String {
     }
 }
 
-fn row(current: bool) -> impl Widget<QueueEntry> {
-    let cover = RemoteImage::new(
-        utils::placeholder_widget(),
-        |entry: &QueueEntry, _| match &entry.item {
-            Playable::Track(track) => track
-                .album
-                .as_ref()
-                .or(match &entry.origin {
-                    PlaybackOrigin::Album(album) => Some(album),
-                    _ => None,
-                })
-                .and_then(|album| album.image(48.0, 48.0))
-                .map(|image| image.url.clone()),
-            Playable::Episode(episode) => episode.image(48.0, 48.0).map(|image| image.url.clone()),
-        },
-    )
+fn row(current: bool) -> impl Widget<QueueRow> {
+    let cover = RemoteImage::new(utils::placeholder_widget(), |row: &QueueRow, _| match &row
+        .entry
+        .item
+    {
+        Playable::Track(track) => track
+            .album
+            .as_ref()
+            .or(match &row.entry.origin {
+                PlaybackOrigin::Album(album) => Some(album),
+                _ => None,
+            })
+            .and_then(|album| album.image(48.0, 48.0))
+            .map(|image| image.url.clone()),
+        Playable::Episode(episode) => episode.image(48.0, 48.0).map(|image| image.url.clone()),
+    })
     .fix_size(48.0, 48.0);
     Flex::row()
         .with_child(cover)
@@ -45,7 +54,7 @@ fn row(current: bool) -> impl Widget<QueueEntry> {
             Flex::column()
                 .cross_axis_alignment(CrossAxisAlignment::Start)
                 .with_child(
-                    Label::dynamic(|entry: &QueueEntry, _| entry.item.name().to_string())
+                    Label::dynamic(|row: &QueueRow, _| row.entry.item.name().to_string())
                         .with_font(theme::UI_FONT_MEDIUM)
                         .with_text_color(if current {
                             theme::BLUE_200
@@ -57,7 +66,7 @@ fn row(current: bool) -> impl Widget<QueueEntry> {
                 )
                 .with_spacer(5.0)
                 .with_child(
-                    Label::dynamic(|entry: &QueueEntry, _| artist(&entry.item))
+                    Label::dynamic(|row: &QueueRow, _| artist(&row.entry.item))
                         .with_text_size(12.0)
                         .with_text_color(theme::PLACEHOLDER_COLOR)
                         .with_line_break_mode(LineBreaking::Clip),
@@ -67,12 +76,30 @@ fn row(current: bool) -> impl Widget<QueueEntry> {
         )
         .padding((8.0, 8.0))
         .expand_width()
-        .background(Painter::new(|ctx, _: &QueueEntry, env| {
+        .background(Painter::new(|ctx, _: &QueueRow, env| {
             if ctx.is_hot() {
                 let rect = ctx.size().to_rect().to_rounded_rect(6.0);
                 ctx.fill(rect, &env.get(theme::GREY_700));
             }
         }))
+        .on_left_click(|ctx, _, row, _| {
+            if let Some(index) = row.index {
+                ctx.submit_command(cmd::PLAY_UPCOMING.with((index, row.entry.item.id())));
+            } else {
+                ctx.submit_command(cmd::PLAY_TOGGLE);
+            }
+        })
+        .context_menu(|row| match row.entry.item.track() {
+            Some(track) => super::track::track_menu_with_play(
+                track,
+                &row.ctx.library,
+                &row.entry.origin,
+                row.index
+                    .map(|index| cmd::PLAY_UPCOMING.with((index, row.entry.item.id())))
+                    .unwrap_or_else(|| cmd::PLAY_TOGGLE.into()),
+            ),
+            None => druid::Menu::empty(),
+        })
 }
 
 pub fn widget() -> impl Widget<AppState> {
@@ -83,9 +110,13 @@ pub fn widget() -> impl Widget<AppState> {
                 .now_playing
                 .as_ref()
                 .map(|np| {
-                    Vector::unit(QueueEntry {
-                        item: np.item.clone(),
-                        origin: np.origin.clone(),
+                    Vector::unit(QueueRow {
+                        entry: QueueEntry {
+                            item: np.item.clone(),
+                            origin: np.origin.clone(),
+                        },
+                        index: None,
+                        ctx: state.common_ctx.clone(),
                     })
                 })
                 .unwrap_or_default()
@@ -98,8 +129,13 @@ pub fn widget() -> impl Widget<AppState> {
                 .playback
                 .up_next
                 .iter()
+                .enumerate()
                 .take(state.queue_visible_count)
-                .cloned()
+                .map(|(index, entry)| QueueRow {
+                    entry: entry.clone(),
+                    index: Some(index),
+                    ctx: state.common_ctx.clone(),
+                })
                 .collect::<Vector<_>>()
         },
         |_, _| {},
@@ -189,4 +225,39 @@ pub fn widget() -> impl Widget<AppState> {
         .with_flex_child(Scroll::new(contents).vertical().expand_width(), 1.0)
         .padding(8.0)
         .background(theme::BACKGROUND_DARK)
+}
+
+pub fn preview_widget() -> impl Widget<AppState> {
+    List::new(|| row(false)).lens(Map::new(
+        |state: &AppState| {
+            state
+                .playback
+                .up_next
+                .iter()
+                .enumerate()
+                .take(8)
+                .map(|(index, entry)| QueueRow {
+                    entry: entry.clone(),
+                    index: Some(index),
+                    ctx: state.common_ctx.clone(),
+                })
+                .collect::<Vector<_>>()
+        },
+        |_, _| {},
+    ))
+}
+
+pub fn current_menu(state: &AppState) -> druid::Menu<AppState> {
+    match state.playback.now_playing.as_ref() {
+        Some(np) => match np.item.track() {
+            Some(track) => super::track::track_menu_with_play(
+                track,
+                &state.library,
+                &np.origin,
+                cmd::PLAY_TOGGLE.into(),
+            ),
+            None => druid::Menu::empty(),
+        },
+        None => druid::Menu::empty(),
+    }
 }

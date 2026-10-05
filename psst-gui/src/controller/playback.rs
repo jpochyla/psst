@@ -627,6 +627,7 @@ where
                     || command.is(cmd::PLAY_RESUME)
                     || command.is(cmd::PLAY_TOGGLE)
                     || command.is(cmd::PLAY_NEXT)
+                    || command.is(cmd::PLAY_UPCOMING)
                     || command.is(cmd::PLAY_PREVIOUS)
                 {
                     data.error_alert(
@@ -786,6 +787,14 @@ where
             }
             Event::Command(cmd) if cmd.is(cmd::PLAY_NEXT) => {
                 self.next();
+                ctx.set_handled();
+            }
+            Event::Command(command) if command.is(cmd::PLAY_UPCOMING) => {
+                let (index, expected) = *command.get_unchecked(cmd::PLAY_UPCOMING);
+                self.send(PlayerEvent::Command(PlayerCommand::SelectUpcoming {
+                    index,
+                    expected,
+                }));
                 ctx.set_handled();
             }
             Event::Command(cmd) if cmd.is(cmd::PLAY_STOP) => {

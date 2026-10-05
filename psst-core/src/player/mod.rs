@@ -1,3 +1,4 @@
+mod download;
 pub mod file;
 pub mod item;
 pub mod queue;
@@ -168,6 +169,16 @@ impl Player {
             PlayerCommand::PauseOrResume => self.pause_or_resume(),
             PlayerCommand::Previous => self.previous(),
             PlayerCommand::Next => self.next(),
+            PlayerCommand::SelectUpcoming { index, expected } => {
+                if self.queue.select_upcoming(index, expected) {
+                    self.start_position = Duration::ZERO;
+                    if let Some(&item) = self.queue.get_current() {
+                        self.load_and_play(item);
+                    }
+                } else {
+                    self.publish_queue();
+                }
+            }
             PlayerCommand::Stop => self.stop(),
             PlayerCommand::Seek { position } => self.seek(position),
             PlayerCommand::Configure { config } => self.configure(config),
@@ -457,6 +468,9 @@ impl Player {
     }
 
     fn configure(&mut self, config: PlaybackConfig) {
+        if self.config.bitrate != config.bitrate {
+            self.preload = PreloadState::None;
+        }
         self.config = config;
     }
 
@@ -505,6 +519,10 @@ pub enum PlayerCommand {
     PauseOrResume,
     Previous,
     Next,
+    SelectUpcoming {
+        index: usize,
+        expected: crate::item_id::ItemId,
+    },
     Stop,
     Seek {
         position: Duration,

@@ -455,20 +455,24 @@ pub fn detail_widget() -> impl Widget<AppState> {
 }
 
 fn async_playlist_info_widget() -> impl Widget<AppState> {
-    Async::new(utils::spinner_widget, playlist_info_widget, || Empty)
-        .lens(
-            Ctx::make(
-                AppState::common_ctx,
-                AppState::playlist_detail.then(PlaylistDetail::playlist),
-            )
-            .then(Ctx::in_promise()),
+    Async::new(
+        utils::spinner_widget,
+        playlist_info_widget,
+        utils::error_widget,
+    )
+    .lens(
+        Ctx::make(
+            AppState::common_ctx,
+            AppState::playlist_detail.then(PlaylistDetail::playlist),
         )
-        .on_command_async(
-            LOAD_DETAIL,
-            |d| WebApi::global().get_playlist(&d.0.id),
-            |_, data, d| data.playlist_detail.playlist.defer(d.0),
-            |_, data, (d, r)| data.playlist_detail.playlist.update((d.0, r)),
-        )
+        .then(Ctx::in_promise()),
+    )
+    .on_command_async(
+        LOAD_DETAIL,
+        |d| WebApi::global().get_playlist(&d.0.id),
+        |_, data, d| data.playlist_detail.playlist.defer(d.0),
+        |_, data, (d, r)| data.playlist_detail.playlist.update((d.0, r)),
+    )
 }
 
 fn playlist_info_widget() -> impl Widget<WithCtx<Playlist>> {
@@ -557,12 +561,12 @@ fn async_tracks_widget() -> impl Widget<AppState> {
             },
             |_, data, d| data.playlist_detail.tracks.defer(d.0),
             |_, data, (d, r)| {
-                let tracks = PlaylistTracks {
+                let tracks = r.map(|tracks| PlaylistTracks {
                     id: d.0.id.clone(),
                     name: d.0.name.clone(),
-                    tracks: r,
-                };
-                data.playlist_detail.tracks.update((d.0, Ok(tracks)))
+                    tracks,
+                });
+                data.playlist_detail.tracks.update((d.0, tracks))
             },
         )
 }
@@ -582,11 +586,14 @@ fn tracks_widget() -> impl Widget<WithCtx<PlaylistTracks>> {
     )
 }
 
-fn sort_playlist(data: &AppState, result: Result<Vector<Arc<Track>>, Error>) -> Vector<Arc<Track>> {
+fn sort_playlist(
+    data: &AppState,
+    result: Result<Vector<Arc<Track>>, Error>,
+) -> Result<Vector<Arc<Track>>, Error> {
     let sort_criteria = data.config.sort_criteria;
     let sort_order = data.config.sort_order;
 
-    let playlist = result.unwrap_or_else(|_| Vector::new());
+    let playlist = result?;
 
     let sorted_playlist: Vector<Arc<Track>> = playlist
         .into_iter()
@@ -608,9 +615,9 @@ fn sort_playlist(data: &AppState, result: Result<Vector<Arc<Track>>, Error>) -> 
         .collect();
 
     if sort_criteria == SortCriteria::DateAdded && sort_order == SortOrder::Descending {
-        sorted_playlist.into_iter().rev().collect()
+        Ok(sorted_playlist.into_iter().rev().collect())
     } else {
-        sorted_playlist
+        Ok(sorted_playlist)
     }
 }
 

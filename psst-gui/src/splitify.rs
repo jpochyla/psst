@@ -348,7 +348,7 @@ pub fn window() -> druid::WindowDesc<AppState> {
         .with_min_size((900.0, 620.0))
 }
 
-fn assignment_widget() -> impl Widget<Assignment> {
+fn assignment_widget(library: Arc<crate::data::Library>) -> impl Widget<Assignment> {
     use crate::ui::theme;
     use druid::widget::{CrossAxisAlignment, LineBreaking};
 
@@ -394,6 +394,9 @@ fn assignment_widget() -> impl Widget<Assignment> {
         )
         .padding((0.0, 12.0))
         .background(crate::widget::Border::Bottom.with_color(theme::GREY_500))
+        .context_menu(move |row| {
+            crate::ui::track::track_menu(&row.track, &library, &PlaybackOrigin::Home)
+        })
 }
 
 pub fn widget() -> impl Widget<AppState> {
@@ -549,7 +552,7 @@ pub fn widget() -> impl Widget<AppState> {
 
     let preview = ViewSwitcher::new(
         |data: &AppState, _| data.splitify.rows.is_empty(),
-        move |empty, _, _| {
+        move |empty, data: &AppState, _| {
             if *empty {
                 Flex::column()
                     .with_child(Label::new("Tu próxima colección\nempieza aquí.").with_text_size(24.0).with_line_break_mode(LineBreaking::WordWrap))
@@ -558,7 +561,11 @@ pub fn widget() -> impl Widget<AppState> {
                     .center().expand().boxed()
             } else {
                 Scroll::new(
-                    List::new(assignment_widget).lens(AppState::splitify.then(SplitState::rows)),
+                    List::new({
+                        let library = data.library.clone();
+                        move || assignment_widget(library.clone())
+                    })
+                    .lens(AppState::splitify.then(SplitState::rows)),
                 )
                 .vertical()
                 .expand()

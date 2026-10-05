@@ -127,6 +127,7 @@ impl AppState {
             queue: Vector::new(),
             up_next: Vector::new(),
             volume: config.volume,
+            lyrics_follow: true,
         };
         let mut state = Self {
             splitify: crate::splitify::SplitState::default(),

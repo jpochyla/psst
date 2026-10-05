@@ -1,5 +1,18 @@
 # Local validation - Windows - 2026-10-05
 
+## Quota, queue, lyrics and quality update
+
+- 45 unit tests pass (17 core, 28 GUI); the explicitly live LRCLIB test remains excluded. Clippy for the core library and GUI passes with warnings denied, and the locked Windows build succeeds.
+- Actual native queue: clicking the second upcoming row selected Black Skinhead, played for four seconds and reduced the queue from 547 to 545 entries while preserving the remaining order. Playback was paused afterwards. Original saved James Blake playback at 160.298 seconds, queue and 100% volume were restored before launching the final executable.
+- Actual encrypted download: `diagnose_playback --download` authenticated the existing session and completed a fresh full-track download at requested 320 kb/s into a separate temporary cache without opening audio output. Downloads are encrypted cache entries, not exported MP3 files.
+- Visual fixtures: synchronized lyrics keep the active line visible with fixed follow/refresh controls in dark and light themes, including 900 x 620. A quota fixture visibly counted from nine to six seconds while keeping Retry disabled; the button becomes available at expiry.
+- Actual Spotify HTTP 429 deadline persists across restart and token refresh. The final application reopened paused without clearing the deadline; cached queue/artwork and local playback remained available. Cold Web API views display the quota error rather than pretending an empty playlist was loaded. This cannot remove Spotify's existing server cooldown.
+- Very High maps to 320 kb/s and is the default. Legacy quality names migrate without changing their old bitrates. This decoder's minimum supported selection is 96 kb/s; Spotify's 24 kb/s Low is not claimed as implemented.
+- Native Spotify Connect reception remains unsupported by the inherited player. The device dialog explains the limitation and offers opening the installed official desktop client as a separate receiver. Phone-to-PC control through that client was not live-tested during this update.
+- Right-click track menus are shared by queue rows, playback views, synchronized lyric heading and Splitify assignments, alongside existing library/search lists. Actions include playback, encrypted cache download, playlist/library operations and artist navigation.
+
+Reproduce the ordinary checks with `cargo test --locked -p psst-core --lib -p psst-gui --bin psst-gui`. The final Windows archive uses the explicit packaging allowlist and SHA-256 verification; local credentials and diagnostic logs are excluded.
+
 ## Roadmap update — 2026-10-05
 
 - 41 native unit tests pass (16 core + 25 GUI); one explicitly live lyrics test is excluded from the ordinary run. Coverage includes connection retries without repeating ambiguous writes, cache isolation/atomic metadata invalidation, playlist reorder indices, persistent folders, original playback positions across pages, source-specific highlighting, exact shuffle/manual queue restoration and rejection of stale/recycled search results.

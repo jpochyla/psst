@@ -99,9 +99,9 @@ pub fn run_if_requested() -> bool {
             }
             crate::splitify::window()
         }
-        "queue" | "queue-empty" | "lyrics" => {
+        "queue" | "queue-empty" | "lyrics" | "lyrics-follow" => {
             state.nav = crate::data::Nav::Home;
-            state.queue_panel_open = view != "lyrics";
+            state.queue_panel_open = !matches!(view.as_str(), "lyrics" | "lyrics-follow");
             state.config.show_now_playing = true;
             if view != "queue-empty" {
                 for (index, (name, artist)) in [
@@ -133,7 +133,7 @@ pub fn run_if_requested() -> bool {
                     }
                 }
             }
-            if view == "lyrics" {
+            if matches!(view.as_str(), "lyrics" | "lyrics-follow") {
                 state.nav = crate::data::Nav::Lyrics;
                 state.lyrics.resolve(
                     state
@@ -161,6 +161,43 @@ pub fn run_if_requested() -> bool {
                     },
                 );
             }
+            if view == "lyrics-follow" {
+                state.progress_playback(std::time::Duration::from_millis(152_500));
+                state.lyrics.resolve(
+                    state
+                        .playback
+                        .now_playing
+                        .as_ref()
+                        .unwrap()
+                        .item
+                        .id()
+                        .to_base62(),
+                    crate::data::Lyrics {
+                        notice: "LRCLIB preview: synchronized line following".into(),
+                        lines: (0..80)
+                            .map(|index| crate::data::TrackLines {
+                                start_time_ms: (index * 3000).to_string(),
+                                end_time_ms: ((index + 1) * 3000).to_string(),
+                                words: format!("Line {index}: synchronized lyric preview"),
+                            })
+                            .collect(),
+                    },
+                );
+            }
+            super::main_window(&state.config)
+        }
+        "rate-limit" => {
+            state.nav = crate::data::Nav::SavedTracks;
+            let until = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs()
+                + 10;
+            state.with_library_mut(|library| {
+                library
+                    .saved_tracks
+                    .reject((), crate::error::Error::rate_limited(until))
+            });
             super::main_window(&state.config)
         }
         "news" => {

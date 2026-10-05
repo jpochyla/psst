@@ -14,7 +14,7 @@ use druid::{
     Widget, WidgetExt,
 };
 use serde_json::json;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 pub const LOAD: Selector = Selector::new("connect.load");
 pub const SELECT: Selector<Option<Device>> = Selector::new("connect.select");
@@ -52,6 +52,16 @@ pub fn widget() -> impl Widget<AppState> {
         .with_spacer(12.0)
         .with_child(Label::new("Abre Spotify en tu teléfono, altavoz u otro equipo y conéctalo a tu cuenta para que aparezca aquí.")
             .with_line_break_mode(LineBreaking::WordWrap).expand_width())
+        .with_spacer(16.0)
+        .with_child(Label::new("El reproductor nativo de Xpotify todavía no se anuncia como receptor de Spotify Connect. Para controlar esta PC desde el teléfono, abre Spotify oficial aquí y selecciona ese equipo en la lista.")
+            .with_line_break_mode(LineBreaking::WordWrap).with_text_color(theme::PLACEHOLDER_COLOR).expand_width())
+        .with_spacer(12.0)
+        .with_child(Button::new("Abrir Spotify en esta PC").on_click(|_, state: &mut AppState, _| {
+            match open::that_detached("spotify:") {
+                Ok(()) => state.connect.status = "Mantén Spotify abierto con la misma cuenta y actualiza los dispositivos para seleccionar esta PC.".into(),
+                Err(_) => state.error_alert("No se pudo abrir Spotify. Instala o abre el cliente oficial en esta PC para usarlo como receptor Connect."),
+            }
+        }).tooltip("Usar el cliente oficial como receptor controlable desde el teléfono"))
         .with_spacer(16.0)
         .with_child(Button::new("Este equipo · Xpotify").on_click(|ctx, _: &mut AppState, _| ctx.submit_command(SELECT.with(None)))
             .expand_width().fix_height(48.0))
@@ -142,6 +152,12 @@ pub fn controller(widget: impl Widget<AppState> + 'static) -> impl Widget<AppSta
 }
 
 fn request_status(ctx: &mut EventCtx, state: &AppState) {
+    if state.connect.selected.is_none() {
+        return;
+    }
+    if WebApi::global().rate_limit_error().is_some() {
+        return;
+    }
     if !state.connect.polling {
         if let Some(id) = state
             .connect
@@ -225,6 +241,8 @@ fn current_payload(state: &AppState) -> Option<(PlaybackPayload, u64)> {
 struct ConnectController {
     timer: TimerToken,
     volume_timer: TimerToken,
+    next_poll: Instant,
+    last_tick: Instant,
 }
 
 impl Default for ConnectController {
@@ -232,6 +250,8 @@ impl Default for ConnectController {
         Self {
             timer: TimerToken::INVALID,
             volume_timer: TimerToken::INVALID,
+            next_poll: Instant::now(),
+            last_tick: Instant::now(),
         }
     }
 }
@@ -247,10 +267,26 @@ impl<W: Widget<AppState>> Controller<AppState, W> for ConnectController {
     ) {
         if let Event::Timer(token) = event {
             if *token == self.timer {
-                if !state.connect.busy {
-                    request_status(ctx, state);
+                if state.connect.selected.is_some()
+                    && state.playback.state == PlaybackState::Playing
+                {
+                    if let Some(np) = &mut state.playback.now_playing {
+                        np.progress = (np.progress
+                            + self.last_tick.elapsed().min(Duration::from_secs(2)))
+                        .min(np.item.duration());
+                    }
                 }
-                self.timer = ctx.request_timer(Duration::from_secs(3));
+                self.last_tick = Instant::now();
+                if !state.connect.busy && Instant::now() >= self.next_poll {
+                    request_status(ctx, state);
+                    self.next_poll = Instant::now()
+                        + Duration::from_secs(if state.playback.state == PlaybackState::Playing {
+                            15
+                        } else {
+                            60
+                        });
+                }
+                self.timer = ctx.request_timer(Duration::from_secs(1));
             } else if *token == self.volume_timer {
                 self.volume_timer = TimerToken::INVALID;
                 if let Some(request) = action(
@@ -329,6 +365,34 @@ impl<W: Widget<AppState>> Controller<AppState, W> for ConnectController {
                 return;
             }
             if state.connect.selected.is_some() {
+                if let Some((index, expected)) = command.get(cmd::PLAY_UPCOMING) {
+                    if state
+                        .playback
+                        .up_next
+                        .get(*index)
+                        .is_some_and(|entry| entry.item.id() == *expected)
+                    {
+                        ctx.submit_command(
+                            cmd::PLAY_TRACKS.with(PlaybackPayload {
+                                origin: state
+                                    .playback
+                                    .now_playing
+                                    .as_ref()
+                                    .map(|np| np.origin.clone())
+                                    .unwrap_or(PlaybackOrigin::Home),
+                                items: state
+                                    .playback
+                                    .up_next
+                                    .iter()
+                                    .map(|entry| entry.item.clone())
+                                    .collect(),
+                                position: *index,
+                            }),
+                        );
+                    }
+                    ctx.set_handled();
+                    return;
+                }
                 if command.is(cmd::PLAYBACK_LOADING)
                     || command.is(cmd::PLAYBACK_PLAYING)
                     || command.is(cmd::PLAYBACK_PROGRESS)
@@ -396,7 +460,9 @@ impl<W: Widget<AppState>> Controller<AppState, W> for ConnectController {
                     return;
                 } else if command.is(cmd::PLAY_RESUME) {
                     if state.connect.pending_start {
-                        if let Some((payload, progress)) = current_payload(state) { body = playback_body(&payload, progress).unwrap_or_default(); }
+                        if let Some((payload, progress)) = current_payload(state) {
+                            body = playback_body(&payload, progress).unwrap_or_default();
+                        }
                     }
                     kind = Some(if body.is_empty() { "resume" } else { "play" });
                 } else if command.is(cmd::PLAY_PAUSE) || command.is(cmd::PLAY_STOP) {
@@ -453,7 +519,7 @@ impl<W: Widget<AppState>> Controller<AppState, W> for ConnectController {
         env: &Env,
     ) {
         if matches!(event, LifeCycle::WidgetAdded) {
-            self.timer = ctx.request_timer(Duration::from_secs(3));
+            self.timer = ctx.request_timer(Duration::from_secs(1));
         }
         child.lifecycle(ctx, event, state, env);
     }
@@ -485,16 +551,28 @@ mod tests {
         let track: crate::data::Track = serde_json::from_value(json!({
             "id":"5lfWrciYtohtIMVDVZd0Rf", "name":"Example", "artists":[],
             "duration_ms":240000,"disc_number":1,"track_number":1,"explicit":false,"is_local":false
-        })).unwrap();
+        }))
+        .unwrap();
         let payload = PlaybackPayload {
-            items: druid::im::vector![Playable::Track(std::sync::Arc::new(track))], position:0,
-            origin:PlaybackOrigin::Playlist(crate::data::PlaylistLink { id:"example".into(), name:"Example".into() }),
+            items: druid::im::vector![Playable::Track(std::sync::Arc::new(track))],
+            position: 0,
+            origin: PlaybackOrigin::Playlist(crate::data::PlaylistLink {
+                id: "example".into(),
+                name: "Example".into(),
+            }),
         };
-        let value: serde_json::Value = serde_json::from_str(&playback_body(&payload, 26000).unwrap()).unwrap();
+        let value: serde_json::Value =
+            serde_json::from_str(&playback_body(&payload, 26000).unwrap()).unwrap();
         assert_eq!(value["context_uri"], "spotify:playlist:example");
-        assert_eq!(value["offset"]["uri"], "spotify:track:5lfWrciYtohtIMVDVZd0Rf");
+        assert_eq!(
+            value["offset"]["uri"],
+            "spotify:track:5lfWrciYtohtIMVDVZd0Rf"
+        );
         assert_eq!(value["position_ms"], 26000);
-        let invalid = PlaybackPayload { position:1, ..payload };
+        let invalid = PlaybackPayload {
+            position: 1,
+            ..payload
+        };
         assert!(playback_body(&invalid, 0).is_err());
     }
 }

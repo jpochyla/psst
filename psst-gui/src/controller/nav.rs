@@ -122,6 +122,8 @@ where
             Event::Command(cmd) if cmd.is(cmd::NAVIGATE_REFRESH) => {
                 if let Err(error) = crate::webapi::WebApi::global().invalidate_metadata() {
                     data.error_alert(error);
+                    ctx.set_handled();
+                    return;
                 }
                 data.refresh_all();
                 data.search.results.clear();
@@ -147,6 +149,8 @@ where
             Event::KeyDown(key) if key.mods.ctrl() && key.code == Code::KeyR => {
                 if let Err(error) = crate::webapi::WebApi::global().invalidate_metadata() {
                     data.error_alert(error);
+                    ctx.set_handled();
+                    return;
                 }
                 data.refresh_all();
                 data.search.results.clear();

@@ -61,6 +61,14 @@ Closing the app saves the current track, source playlist/album, queue and positi
 
 Open the device icon to select a Spotify Connect device or **Este equipo · Xpotify**. Remote controls use Spotify's official playback API, including play/pause, previous/next, seek, queue additions, shuffle/repeat and volume. Remote queue entries come from Spotify. Open Spotify on the other device with the same account so it can be discovered. Returning to this computer keeps the song paused, ready to continue. Device support and account permissions can limit available controls.
 
+The native fork is not a Connect receiver. To control this PC from a phone, use **Abrir Spotify en esta PC** in the device view and select the official desktop client's device. This requires Spotify desktop; it does not remotely control Xpotify's native engine. Remote status polling now runs every 15 seconds playing or 60 seconds paused, with local progress interpolation.
+
+HTTP 429 is a server quota, not a timeout. Xpotify persists Spotify's retry deadline, suppresses further requests during the cooldown, displays a countdown and disables retry until expiry. Metadata refresh preserves existing cache during the block. Ordinary cached responses last 15 minutes; timed-out reads retain their bounded retries. The existing Spotify-imposed wait cannot be removed by the app.
+
+Click an upcoming queue song to play it while preserving the native queue traversal. Right-click songs in browsing lists, the queue, current playback or the AI editor for playback, artist/album navigation, playlist/library actions and **Descargar para la caché de audio**. Downloads store complete encrypted audio; no MP3 export or bulk playlist download is provided.
+
+Timed lyrics automatically follow the active line, with a fixed **Seguir letra** switch; plain lyrics have no fabricated synchronization. Preferences now expose **Very high (320 kb/s)** separately from High (160) and Normal (96). Low uses the engine's supported 96 kb/s minimum. Existing profiles retain their bitrate when the old quality names migrate; the choice applies to subsequent loads, subject to available track formats.
+
 The bell opens releases from followed artists: recent albums/singles from the last 90 days, cover images, unread indicators and a local **Marcar como leídas** action. It scans each artist's latest 20 releases and displays up to 300 unique releases. Spotify announcements and its complete official notifications inbox are not available in this view. Responses are cached for six hours; a Spotify release quota response preserves the cooldown across restarts and displays a clear notice instead of waiting indefinitely. Cached releases remain usable when available.
 
 For local visual review, `--preview-ui=news --dark` or `--light` uses synthetic releases and blocks remote actions.

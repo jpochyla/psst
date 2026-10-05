@@ -6,7 +6,7 @@ use std::{
     path::PathBuf,
     sync::Arc,
     thread,
-    time::{Duration, SystemTime, UNIX_EPOCH},
+    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
 use druid::{
@@ -219,32 +219,21 @@ impl WebApi {
                 ));
             }
         }
-        let mut response = self.request(request)?;
-        if response.status() == StatusCode::TOO_MANY_REQUESTS {
-            let seconds = response
-                .headers()
-                .get("Retry-After")
-                .and_then(|header| header.to_str().ok())
-                .and_then(|value| value.parse::<u64>().ok())
-                .unwrap_or(60)
-                .clamp(1, 604800);
-            let until = SystemTime::now() + Duration::from_secs(seconds);
-            let mut quota = self.news_quota_until.lock();
-            *quota = Some(until);
-            self.cache.set(
-                "artist-releases",
-                "quota-until",
-                until
-                    .duration_since(UNIX_EPOCH)
-                    .unwrap()
-                    .as_secs()
-                    .to_string()
-                    .as_bytes(),
-            );
-            return cached().ok_or_else(|| {
-                Error::WebApiError("Spotify HTTP 429: release quota exhausted".into())
-            });
-        }
+        let mut response = match self.request(request) {
+            Ok(response) => response,
+            Err(error @ Error::RateLimited { retry_at, .. }) => {
+                *self.news_quota_until.lock() =
+                    UNIX_EPOCH.checked_add(Duration::from_secs(retry_at));
+                self.cache.set(
+                    "artist-releases",
+                    "quota-until",
+                    retry_at.to_string().as_bytes(),
+                );
+                return cached().ok_or(error);
+            }
+            Err(error) if Self::temporary_api_error(&error) => return cached().ok_or(error),
+            Err(error) => return Err(error),
+        };
         let value: serde_json::Value = response
             .body_mut()
             .with_config()
@@ -382,6 +371,65 @@ impl WebApi {
 mod credential_destination_tests {
     use super::*;
     #[test]
+    fn cooldown_survives_restart_and_refresh_and_preserves_stale_data() {
+        let path = std::env::temp_dir().join(format!(
+            "xpotify-quota-test-{}-{}",
+            std::process::id(),
+            rand::random::<u64>()
+        ));
+        let api = WebApi::new(Some("http://127.0.0.1:9"), Some(path.clone()), 5000);
+        api.set_webapi_credentials(
+            Some("test-client".into()),
+            Some(WebApiToken {
+                access_token: "test-access".into(),
+                refresh_token: Some("test-refresh".into()),
+                expires_at: u64::MAX,
+            }),
+        );
+        let request = RequestBuilder::new("v1/me/tracks", Method::Get, None);
+        let until = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs()
+            + 3600;
+        api.cache.set(
+            "request-limits",
+            &api.rate_limit_key(&request),
+            &serde_json::to_vec(&until).unwrap(),
+        );
+        let key = api.response_key(&request).unwrap();
+        api.cache
+            .set("responses", &key, br#"{"items":["cached-track"]}"#);
+        std::fs::OpenOptions::new()
+            .write(true)
+            .open(path.join("responses").join(&key))
+            .unwrap()
+            .set_times(std::fs::FileTimes::new().set_modified(UNIX_EPOCH))
+            .unwrap();
+        let start = Instant::now();
+        assert!(matches!(
+            api.request(&request),
+            Err(Error::RateLimited { .. })
+        ));
+        let cached: serde_json::Value = api.load(&request).unwrap();
+        assert_eq!(cached["items"][0], "cached-track");
+        assert!(api.invalidate_metadata().is_err());
+        assert!(api.cache.get("responses", &key).is_some());
+        let restarted = WebApi::new(None, Some(path.clone()), 5000);
+        restarted.set_webapi_credentials(Some("test-client".into()), None);
+        assert!(matches!(
+            restarted.request(&request),
+            Err(Error::RateLimited { .. })
+        ));
+        assert!(start.elapsed() < Duration::from_secs(1));
+        api.cache
+            .set("request-limits", &api.rate_limit_key(&request), b"0");
+        assert!(api.check_rate_limit(&request).is_ok());
+        restarted.set_webapi_credentials(Some("another-client".into()), None);
+        assert!(restarted.check_rate_limit(&request).is_ok());
+        std::fs::remove_dir_all(path).unwrap();
+    }
+    #[test]
     fn cache_keys_are_stable_across_query_order_and_separate_sessions() {
         let api = WebApi::new(None, None, 5000);
         *api.webapi_token.lock() = Some(WebApiToken {
@@ -475,6 +523,8 @@ pub struct WebApi {
     webapi_token: Mutex<Option<WebApiToken>>,
     news_quota_until: Mutex<Option<SystemTime>>,
     response_origins: Mutex<HashMap<String, SystemTime>>,
+    request_gate: Mutex<Instant>,
+    response_load: Mutex<()>,
     webapi_client_id: Mutex<Option<String>>,
     // First-party session credentials, used for `api-partner.spotify.com`
     // (pathfinder GraphQL) calls, which reject the Web API OAuth token.
@@ -508,6 +558,8 @@ impl WebApi {
             cache,
             news_quota_until: Mutex::new(news_quota_until),
             response_origins: Mutex::new(HashMap::new()),
+            request_gate: Mutex::new(Instant::now()),
+            response_load: Mutex::new(()),
             local_track_manager: Mutex::new(LocalTrackManager::new()),
             paginated_limit,
             webapi_token: Mutex::new(None),
@@ -605,6 +657,13 @@ impl WebApi {
                 "Refusing to send Spotify credentials to an untrusted destination".into(),
             ));
         }
+        // One dispatch at a time prevents parallel workers from producing bursts.
+        // Check the persisted cooldown again after obtaining the permit.
+        let mut permit = self.request_gate.lock();
+        self.check_rate_limit(request)?;
+        if let Some(wait) = permit.checked_duration_since(Instant::now()) {
+            thread::sleep(wait);
+        }
         // `api-partner.spotify.com` rejects the Web API OAuth token, so those
         // requests carry the first-party Login5 bearer + client-token instead.
         let (token, client_token) = if request.partner_auth {
@@ -659,6 +718,27 @@ impl WebApi {
         let safe = matches!(request.get_method(), Method::Get);
         let result = super::retry::run(send_request, safe, thread::sleep);
         let mut response = result.map_err(|err| Error::WebApiError(err.to_string()))?;
+        *permit = Instant::now() + Duration::from_millis(300);
+        if response.status() == StatusCode::TOO_MANY_REQUESTS {
+            let seconds = response
+                .headers()
+                .get("Retry-After")
+                .and_then(|value| value.to_str().ok())
+                .and_then(|value| value.parse::<u64>().ok())
+                .unwrap_or(60)
+                .max(1);
+            let until = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs()
+                .saturating_add(seconds);
+            self.cache.set(
+                "request-limits",
+                &self.rate_limit_key(request),
+                &serde_json::to_vec(&until)?,
+            );
+            return Err(Error::rate_limited(until));
+        }
         if (response.status().is_client_error() || response.status().is_server_error())
             && response.status() != StatusCode::TOO_MANY_REQUESTS
         {
@@ -724,6 +804,8 @@ impl WebApi {
     /// Send a request and return the deserialized JSON body.  Use for GET
     /// requests.
     fn load<T: DeserializeOwned>(&self, request: &RequestBuilder) -> Result<T, Error> {
+        // Recheck the cache after a competing load finishes instead of fetching twice.
+        let _load = self.response_load.lock();
         let cacheable = matches!(request.method, Method::Get)
             && !request.path.starts_with("v1/me/player")
             && !request.path.ends_with("/contains");
@@ -739,7 +821,7 @@ impl WebApi {
                 if let Ok(value) = serde_json::from_reader(file) {
                     if modified
                         .and_then(|time| time.elapsed().ok())
-                        .is_some_and(|age| age < Duration::from_secs(300))
+                        .is_some_and(|age| age < Duration::from_secs(900))
                     {
                         if let Some(time) = modified {
                             self.response_origins.lock().insert(request.build(), time);
@@ -796,6 +878,9 @@ impl WebApi {
     }
 
     fn temporary_api_error(error: &Error) -> bool {
+        if matches!(error, Error::RateLimited { .. }) {
+            return true;
+        }
         let message = error.to_string().to_lowercase();
         [
             "timeout",
@@ -830,9 +915,38 @@ impl WebApi {
     }
 
     pub fn invalidate_metadata(&self) -> Result<(), Error> {
+        self.check_rate_limit(&RequestBuilder::new("v1/me", Method::Get, None))?;
         self.cache.invalidate_metadata()?;
         self.response_origins.lock().clear();
         Ok(())
+    }
+
+    fn rate_limit_key(&self, request: &RequestBuilder) -> String {
+        let mut hash = std::collections::hash_map::DefaultHasher::new();
+        request.base_uri.hash(&mut hash);
+        request.partner_auth.hash(&mut hash);
+        self.webapi_client_id.lock().hash(&mut hash);
+        // The quota belongs to the application; refreshing OAuth must not reset it.
+        format!("{:016x}", hash.finish())
+    }
+
+    fn check_rate_limit(&self, request: &RequestBuilder) -> Result<(), Error> {
+        if let Some(until) = self
+            .cache
+            .get("request-limits", &self.rate_limit_key(request))
+            .and_then(|file| serde_json::from_reader::<_, u64>(file).ok())
+        {
+            let error = Error::rate_limited(until);
+            if error.retry_blocked() {
+                return Err(error);
+            }
+        }
+        Ok(())
+    }
+
+    pub fn rate_limit_error(&self) -> Option<Error> {
+        self.check_rate_limit(&RequestBuilder::new("v1/me/player", Method::Get, None))
+            .err()
     }
 
     pub fn cache_origin(&self, nav: &data::Nav) -> Option<SystemTime> {

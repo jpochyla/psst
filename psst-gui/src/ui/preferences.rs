@@ -233,9 +233,10 @@ fn general_tab_widget() -> impl Widget<AppState> {
         .with_spacer(theme::grid(2.0))
         .with_child(
             RadioGroup::column(vec![
-                ("Low (96kbit)", AudioQuality::Low),
-                ("Normal (160kbit)", AudioQuality::Normal),
-                ("High (320kbit)", AudioQuality::High),
+                ("Low (96 kb/s, mínimo compatible)", AudioQuality::Low),
+                ("Normal (96 kb/s)", AudioQuality::Normal),
+                ("High (160 kb/s)", AudioQuality::High),
+                ("Very high (320 kb/s)", AudioQuality::VeryHigh),
             ])
             .lens(AppState::config.then(Config::audio_quality)),
         );

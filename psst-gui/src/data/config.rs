@@ -111,6 +111,8 @@ pub struct Config {
     #[data(ignore)]
     credentials: Option<Credentials>,
     pub audio_quality: AudioQuality,
+    #[serde(default)]
+    pub audio_quality_version: u32,
     pub theme: Theme,
     pub volume: f64,
     pub last_route: Option<Nav>,
@@ -144,6 +146,7 @@ impl Default for Config {
         Self {
             credentials: Default::default(),
             audio_quality: Default::default(),
+            audio_quality_version: 1,
             theme: Default::default(),
             volume: 1.0,
             last_route: Default::default(),
@@ -201,7 +204,10 @@ impl Config {
         if let Ok(file) = File::open(&path) {
             log::info!("loading config: {:?}", path);
             let reader = BufReader::new(file);
-            Some(serde_json::from_reader(reader).expect("Failed to read config"))
+            let mut config: Config =
+                serde_json::from_reader(reader).expect("Failed to read config");
+            migrate_audio_quality(&mut config);
+            Some(config)
         } else {
             None
         }
@@ -323,20 +329,33 @@ impl Config {
     }
 }
 
+fn migrate_audio_quality(config: &mut Config) {
+    if config.audio_quality_version == 0 {
+        config.audio_quality = match config.audio_quality {
+            AudioQuality::Low => AudioQuality::Normal,
+            AudioQuality::Normal => AudioQuality::High,
+            _ => AudioQuality::VeryHigh,
+        };
+        config.audio_quality_version = 1;
+    }
+}
+
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Data, Serialize, Deserialize, Default)]
 pub enum AudioQuality {
     Low,
     Normal,
-    #[default]
     High,
+    #[default]
+    VeryHigh,
 }
 
 impl AudioQuality {
     fn as_bitrate(self) -> usize {
         match self {
             AudioQuality::Low => 96,
-            AudioQuality::Normal => 160,
-            AudioQuality::High => 320,
+            AudioQuality::Normal => 96,
+            AudioQuality::High => 160,
+            AudioQuality::VeryHigh => 320,
         }
     }
 }
@@ -376,4 +395,26 @@ fn get_dir_size(path: &Path) -> Option<u64> {
         };
         Some(acc + size)
     })
+}
+
+#[cfg(test)]
+mod audio_quality_tests {
+    use super::*;
+    #[test]
+    fn legacy_quality_names_keep_their_bitrate_after_migration() {
+        for (old, bitrate) in [("Low", 96), ("Normal", 160), ("High", 320)] {
+            let mut config: Config =
+                serde_json::from_str(&format!(r#"{{"audio_quality":"{old}"}}"#)).unwrap();
+            assert_eq!(config.audio_quality_version, 0);
+            migrate_audio_quality(&mut config);
+            assert_eq!(config.playback().bitrate, bitrate);
+            let encoded = serde_json::to_string(&config).unwrap();
+            let mut restored: Config = serde_json::from_str(&encoded).unwrap();
+            migrate_audio_quality(&mut restored);
+            assert_eq!(restored.playback().bitrate, bitrate);
+        }
+        assert_eq!(Config::default().playback().bitrate, 320);
+        assert_eq!(AudioQuality::High.as_bitrate(), 160);
+        assert_eq!(AudioQuality::VeryHigh.as_bitrate(), 320);
+    }
 }

@@ -198,9 +198,7 @@ pub fn playable_widget(track: &Track, display: Display) -> impl Widget<PlayRow<A
                 return *target_id == row.item.id;
             }
             // Otherwise check if it's playing or is the current track
-            row.is_playing || row.ctx.now_playing.as_ref().is_some_and(|playable| {
-                matches!(playable, Playable::Track(track) if track.id == row.item.id)
-            })
+            row.is_playing
         })
         .rounded(theme::BUTTON_BORDER_RADIUS)
         .context_menu(track_row_menu)
@@ -270,7 +268,32 @@ pub fn track_menu(
     library: &Library,
     origin: &PlaybackOrigin,
 ) -> Menu<AppState> {
+    track_menu_with_play(
+        track,
+        library,
+        origin,
+        cmd::PLAY_TRACKS.with(crate::data::PlaybackPayload {
+            origin: origin.clone(),
+            items: druid::im::vector![Playable::Track(track.clone())],
+            position: 0,
+        }),
+    )
+}
+
+pub fn track_menu_with_play(
+    track: &Arc<Track>,
+    library: &Library,
+    origin: &PlaybackOrigin,
+    play: druid::Command,
+) -> Menu<AppState> {
     let mut menu = Menu::empty();
+    menu = menu.entry(MenuItem::new("Reproducir").command(play));
+    if track.id.0.id_type == ItemIdType::Track {
+        menu = menu.entry(
+            MenuItem::new("Descargar para la caché de audio")
+                .command(cmd::DOWNLOAD_TRACK.with(track.clone())),
+        );
+    }
 
     menu = menu.entry(
         MenuItem::new("Buscar videoclip en YouTube")

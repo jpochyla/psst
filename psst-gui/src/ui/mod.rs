@@ -1,3 +1,4 @@
+mod download;
 mod folders;
 mod grid;
 mod now_playing;
@@ -322,7 +323,7 @@ fn root_widget() -> impl Widget<AppState> {
 
     folders::controller(crate::controller::cache_hint::widget(connect::controller(
         news::controller(
-            ThemeScope::new(shell)
+            ThemeScope::new(download::controller(shell))
                 .controller(playable::KeepCurrentVisible)
                 .controller(SessionController)
                 .controller(NavController)
@@ -409,9 +410,7 @@ fn route_widget() -> impl Widget<AppState> {
             Route::Home => Scroll::new(home::home_widget().padding(theme::grid(1.0)))
                 .vertical()
                 .boxed(),
-            Route::Lyrics => Scroll::new(lyrics::lyrics_widget().padding(theme::grid(1.0)))
-                .vertical()
-                .boxed(),
+            Route::Lyrics => lyrics::lyrics_widget().boxed(),
             Route::SavedTracks => Flex::column()
                 .with_child(
                     find::finder_widget(cmd::FIND_IN_SAVED_TRACKS, "Find in Saved Tracks...")

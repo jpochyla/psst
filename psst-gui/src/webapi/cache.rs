@@ -34,12 +34,12 @@ mod tests {
         let value: serde_json::Value =
             serde_json::from_reader(cache.get("responses", "request").unwrap()).unwrap();
         assert_eq!(value["name"], "new");
-        for bucket in ["audio", "images", "artist-releases"] {
+        for bucket in ["audio", "images", "artist-releases", "request-limits"] {
             cache.set(bucket, "preserve", b"unchanged");
         }
         cache.invalidate_metadata().unwrap();
         assert!(cache.get("responses", "request").is_none());
-        for bucket in ["audio", "images", "artist-releases"] {
+        for bucket in ["audio", "images", "artist-releases", "request-limits"] {
             assert!(cache.get(bucket, "preserve").is_some());
         }
         fs::remove_dir_all(path).unwrap();

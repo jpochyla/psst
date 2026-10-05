@@ -151,6 +151,26 @@ impl Queue {
         self.compute_positions();
     }
 
+    /// Jump within the displayed traversal, preserving shuffle and manual additions.
+    /// Validate the item ID to reject a stale click after the queue changes.
+    pub fn select_upcoming(&mut self, index: usize, expected: crate::item_id::ItemId) -> bool {
+        if index >= 5000 || self.upcoming_ids().get(index) != Some(&expected) {
+            return false;
+        }
+        let mut selected = self.clone();
+        for _ in 0..=index {
+            selected.skip_to_following();
+        }
+        if selected
+            .get_current()
+            .is_none_or(|item| item.item_id != expected)
+        {
+            return false;
+        }
+        *self = selected;
+        true
+    }
+
     fn compute_positions(&mut self) {
         // In the case of switching away from shuffle, the position should be set back to
         // where it appears in the actual playlist order.
@@ -265,6 +285,31 @@ mod tests {
     }
     fn ids(queue: &Queue) -> Vec<u128> {
         queue.upcoming_ids().iter().map(|id| id.id).collect()
+    }
+    #[test]
+    fn selecting_upcoming_preserves_the_remaining_shuffle_and_manual_order() {
+        let mut queue = Queue::new();
+        queue.fill((1..=10).map(item).collect(), 0);
+        queue.set_behaviour(QueueBehavior::Random);
+        queue.add(item(99));
+        queue.add(item(99));
+        let before = queue.upcoming_ids();
+        let mut traversal = queue.clone();
+        for _ in 0..4 {
+            traversal.skip_to_following();
+        }
+        assert!(queue.select_upcoming(3, before[3]));
+        assert_eq!(queue.get_current(), traversal.get_current());
+        assert_eq!(queue.upcoming_ids(), traversal.upcoming_ids());
+        let saved = serde_json::to_string(&queue.snapshot()).unwrap();
+        assert!(!queue.select_upcoming(0, item(999).item_id));
+        assert!(!queue.select_upcoming(5000, item(99).item_id));
+        assert_eq!(saved, serde_json::to_string(&queue.snapshot()).unwrap());
+        let mut idle = Queue::new();
+        idle.add(item(1));
+        idle.add(item(2));
+        assert!(idle.select_upcoming(1, item(2).item_id));
+        assert_eq!(idle.get_current(), Some(&item(2)));
     }
     #[test]
     fn persisted_queue_restores_shuffle_and_manual_duplicates_exactly() {

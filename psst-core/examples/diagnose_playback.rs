@@ -55,6 +55,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     session.connected()?;
     println!("session: authenticated");
     let id = ItemId::from_base62(&args[2], ItemIdType::Track).ok_or("invalid track ID")?;
+    if args.iter().any(|a| a == "--download") {
+        let cache =
+            psst_core::cache::Cache::new(std::env::temp_dir().join("xpotify-download-validation"))?;
+        psst_core::player::item::PlaybackItem {
+            item_id: id,
+            norm_level: psst_core::audio::normalize::NormalizationLevel::Track,
+        }
+        .download(
+            &session,
+            Cdn::new(session.clone(), None)?,
+            cache,
+            &psst_core::player::PlaybackConfig::default(),
+        )?;
+        println!(
+            "download: complete encrypted track cached at requested 320 kb/s (no audio output)"
+        );
+        return Ok(());
+    }
     let track = librespot_protocol::metadata::Track::fetch(&session, id)?;
     println!("metadata: received");
     let path = track
