@@ -373,6 +373,7 @@ fn assignment_widget() -> impl Widget<Assignment> {
         .with_spacer(8.0)
         .with_child(
             Button::new("▶")
+                .tooltip("Escuchar esta canción")
                 .on_click(|ctx, row: &mut Assignment, _| {
                     ctx.submit_command(cmd::PLAY_TRACKS.with(PlaybackPayload {
                         origin: PlaybackOrigin::Library,

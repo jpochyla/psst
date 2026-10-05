@@ -40,3 +40,5 @@ Only musical metadata is sent to Gemini. Classification handles batches of 150 t
 Debug builds include local UI previews: `dist/Xpotify.exe --preview-ui=login`, `--preview-ui=editor`, `--preview-ui=editor-empty`, `--preview-ui=player`, `--preview-ui=queue` and `--preview-ui=queue-empty`; add `--light` or `--dark` for dark fixtures. Preview commands cannot issue remote writes and never replace normal startup data.
 
 See `SECURITY-REVIEW.md` for the security review and remaining dependency risks; `VALIDATION.md` records actual checks. Upstream MIT licensing is preserved in `LICENSE.md`.
+
+Icon controls show Spanish tooltips after 500 ms of hover. Playback hints describe the current shuffle/repeat mode and the next action; save hints distinguish adding from removing. Hints appear above controls when possible and disappear on exit or click.

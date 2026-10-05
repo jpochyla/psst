@@ -501,7 +501,8 @@ fn volume_slider() -> impl Widget<AppState> {
                     env.set(theme::FOREGROUND_LIGHT, env.get(theme::GREY_400));
                     env.set(theme::FOREGROUND_DARK, env.get(theme::GREY_400));
                 })
-                .with_cursor(Cursor::Pointer),
+                .with_cursor(Cursor::Pointer)
+                .tooltip("Ajustar volumen"),
             1.0,
         )
         .with_default_spacer()
@@ -533,7 +534,8 @@ fn topbar_sort_widget() -> impl Widget<AppState> {
         .on_left_click(|ctx, _, _, _| {
             ctx.submit_command(cmd::TOGGLE_SORT_ORDER);
         })
-        .context_menu(sorting_menu);
+        .context_menu(sorting_menu)
+        .tooltip("Cambiar orden. Clic derecho: elegir criterio");
 
     let descending_icon = down_icon
         .padding(theme::grid(1.0))
@@ -542,7 +544,8 @@ fn topbar_sort_widget() -> impl Widget<AppState> {
         .on_left_click(|ctx, _, _, _| {
             ctx.submit_command(cmd::TOGGLE_SORT_ORDER);
         })
-        .context_menu(sorting_menu);
+        .context_menu(sorting_menu)
+        .tooltip("Cambiar orden. Clic derecho: elegir criterio");
     let enabled = Either::new(
         |data: &AppState, _| {
             // check if the current nav is PlaylistDetail
@@ -579,7 +582,8 @@ fn topbar_back_button_widget() -> impl Widget<AppState> {
         .on_left_click(|ctx, _, _, _| {
             ctx.submit_command(cmd::NAVIGATE_BACK.with(1));
         })
-        .context_menu(history_menu);
+        .context_menu(history_menu)
+        .tooltip("Volver. Clic derecho: ver historial");
     Either::new(
         |history: &Vector<Nav>, _| history.is_empty(),
         disabled,

@@ -60,4 +60,5 @@ fn preferences_widget<T: Data>(svg: &SvgIcon) -> impl Widget<T> {
         .link()
         .rounded(theme::BUTTON_BORDER_RADIUS)
         .on_left_click(|ctx, _, _, _| ctx.submit_command(commands::SHOW_PREFERENCES))
+        .tooltip("Abrir ajustes")
 }

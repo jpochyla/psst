@@ -25,3 +25,5 @@ cargo run --locked -p psst-core --features cpal --example diagnose_playback -- "
 ```
 
 The diagnostic prints stages, never credentials. `--play` plays briefly at low volume; `--authorize` opens the native Spotify authorization and updates only local playback credentials/theme. Cargo Audit reports no primary vulnerabilities but retains unsound/unmaintained framework warnings documented in SECURITY-REVIEW.md. No absolute claim of absence of backdoors is made.
+
+- Tooltip update: locked Windows build and Clippy with warnings denied pass. Native dark fixture hover confirmed queue and current/next playback mode hints above the player; moving away removes the hint. Updated local executable and shortcut.

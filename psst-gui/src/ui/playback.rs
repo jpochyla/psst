@@ -133,11 +133,17 @@ fn playing_item_widget() -> impl Widget<NowPlaying> {
                                 .contains_track(now_playing.item.track().unwrap())
                         },
                         |selector: &bool, _, _| {
-                            match selector {
+                            let icon: Box<dyn Widget<NowPlaying>> = match selector {
                                 true => &icons::CIRCLE_CHECK,
                                 false => &icons::CIRCLE_PLUS,
                             }
                             .scale(theme::ICON_SIZE_SMALL)
+                            .boxed();
+                            icon.tooltip(if *selector {
+                                "Quitar de canciones guardadas"
+                            } else {
+                                "Guardar canción"
+                            })
                             .boxed()
                         },
                     )
@@ -165,6 +171,7 @@ fn cover_widget(size: f64) -> impl Widget<NowPlaying> {
     })
     .fix_size(size, size)
     .clip(Size::new(size, size).to_rounded_rect(4.0))
+    .tooltip("Ampliar portada")
     .on_left_click(|ctx, _, _, _| {
         ctx.submit_command(SHOW_ARTWORK);
     })
@@ -185,29 +192,36 @@ fn playback_origin_icon(origin: &PlaybackOrigin) -> &'static SvgIcon {
 fn player_widget() -> impl Widget<Playback> {
     Flex::row()
         .with_child(
-            small_button_widget(&icons::SKIP_BACK).on_left_click(|ctx, _, _, _| {
-                ctx.submit_command(cmd::PLAY_PREVIOUS);
-            }),
+            small_button_widget(&icons::SKIP_BACK)
+                .tooltip("Canción anterior / volver al inicio")
+                .on_left_click(|ctx, _, _, _| {
+                    ctx.submit_command(cmd::PLAY_PREVIOUS);
+                }),
         )
         .with_default_spacer()
         .with_child(player_play_pause_widget())
         .with_default_spacer()
         .with_child(
-            small_button_widget(&icons::SKIP_FORWARD).on_left_click(|ctx, _, _, _| {
-                ctx.submit_command(cmd::PLAY_NEXT);
-            }),
+            small_button_widget(&icons::SKIP_FORWARD)
+                .tooltip("Siguiente canción")
+                .on_left_click(|ctx, _, _, _| {
+                    ctx.submit_command(cmd::PLAY_NEXT);
+                }),
         )
         .with_default_spacer()
         .with_child(queue_behavior_widget())
         .with_default_spacer()
         .with_child(Maybe::or_empty(durations_widget).lens(Playback::now_playing))
         .with_child(
-            small_button_widget(&icons::QUEUE).on_left_click(|ctx, _, _, _| {
-                ctx.submit_command(cmd::NAVIGATE.with(crate::data::Nav::Queue));
-            }),
+            small_button_widget(&icons::QUEUE)
+                .tooltip("Ver cola de canciones")
+                .on_left_click(|ctx, _, _, _| {
+                    ctx.submit_command(cmd::NAVIGATE.with(crate::data::Nav::Queue));
+                }),
         )
         .with_child(
             small_button_widget(&icons::MUSIC_NOTE)
+                .tooltip("Mostrar u ocultar letras")
                 .align_right()
                 .on_left_click(|ctx, _, _, _| {
                     ctx.submit_command(TOGGLE_LYRICS);
@@ -227,6 +241,7 @@ fn player_play_pause_widget() -> impl Widget<Playback> {
                 .link()
                 .circle()
                 .border(theme::GREY_600, 1.0)
+                .tooltip("Cancelar carga")
                 .on_left_click(|ctx, _, _, _| ctx.submit_command(cmd::PLAY_STOP))
                 .boxed(),
             PlaybackState::Playing => icons::PAUSE
@@ -235,6 +250,7 @@ fn player_play_pause_widget() -> impl Widget<Playback> {
                 .link()
                 .circle()
                 .border(theme::GREY_500, 1.0)
+                .tooltip("Pausar")
                 .on_left_click(|ctx, _, _, _| ctx.submit_command(cmd::PLAY_PAUSE))
                 .boxed(),
             PlaybackState::Paused => icons::PLAY
@@ -243,6 +259,7 @@ fn player_play_pause_widget() -> impl Widget<Playback> {
                 .link()
                 .circle()
                 .border(theme::GREY_500, 1.0)
+                .tooltip("Reanudar")
                 .on_left_click(|ctx, _, _, _| ctx.submit_command(cmd::PLAY_RESUME))
                 .boxed(),
             PlaybackState::Stopped => Empty.boxed(),
@@ -255,6 +272,12 @@ fn queue_behavior_widget() -> impl Widget<Playback> {
         |playback: &Playback, _| playback.queue_behavior,
         |behavior, _, _| {
             faded_button_widget(queue_behavior_icon(behavior))
+                .tooltip(match behavior {
+                    QueueBehavior::Sequential => "Orden normal. Activar reproducción aleatoria",
+                    QueueBehavior::Random => "Modo aleatorio. Repetir esta canción",
+                    QueueBehavior::LoopTrack => "Repetir canción. Repetir toda la cola",
+                    QueueBehavior::LoopAll => "Repetir cola. Volver al orden normal",
+                })
                 .on_left_click(|ctx, _, playback: &mut Playback, _| {
                     ctx.submit_command(
                         cmd::PLAY_QUEUE_BEHAVIOR

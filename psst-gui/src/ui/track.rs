@@ -149,11 +149,17 @@ pub fn playable_widget(track: &Track, display: Display) -> impl Widget<PlayRow<A
             true => ViewSwitcher::new(
                 |row: &PlayRow<Arc<Track>>, _| row.ctx.library.contains_track(&row.item),
                 |selector: &bool, _, _| {
-                    match selector {
+                    let icon: Box<dyn Widget<PlayRow<Arc<Track>>>> = match selector {
                         true => &icons::CIRCLE_CHECK,
                         false => &icons::CIRCLE_PLUS,
                     }
                     .scale(theme::ICON_SIZE_SMALL)
+                    .boxed();
+                    icon.tooltip(if *selector {
+                        "Quitar de canciones guardadas"
+                    } else {
+                        "Guardar canción"
+                    })
                     .boxed()
                 },
             )
