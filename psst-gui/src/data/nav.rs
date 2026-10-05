@@ -59,33 +59,33 @@ impl Nav {
 
     pub fn title(&self) -> String {
         match self {
-            Nav::Home => "Home".to_string(),
-            Nav::Lyrics => "Lyrics".to_string(),
-            Nav::SavedTracks => "Saved Tracks".to_string(),
-            Nav::SavedAlbums => "Saved Albums".to_string(),
+            Nav::Home => "Inicio".to_string(),
+            Nav::Lyrics => "Letra".to_string(),
+            Nav::SavedTracks => "Tus canciones".to_string(),
+            Nav::SavedAlbums => "Tus álbumes".to_string(),
             Nav::Shows => "Podcasts".to_string(),
             Nav::SearchResults(query) => query.to_string(),
             Nav::AlbumDetail(link, _) => link.name.to_string(),
             Nav::ArtistDetail(link) => link.name.to_string(),
             Nav::PlaylistDetail(link) => link.name.to_string(),
             Nav::ShowDetail(link) => link.name.to_string(),
-            Nav::Recommendations(_) => "Recommended".to_string(),
+            Nav::Recommendations(_) => "Recomendaciones".to_string(),
         }
     }
 
     pub fn full_title(&self) -> String {
         match self {
-            Nav::Home => "Home".to_string(),
-            Nav::Lyrics => "Lyrics".to_string(),
-            Nav::SavedTracks => "Saved Tracks".to_string(),
-            Nav::SavedAlbums => "Saved Albums".to_string(),
-            Nav::Shows => "Saved Shows".to_string(),
+            Nav::Home => "Inicio".to_string(),
+            Nav::Lyrics => "Letra".to_string(),
+            Nav::SavedTracks => "Tus canciones".to_string(),
+            Nav::SavedAlbums => "Tus álbumes".to_string(),
+            Nav::Shows => "Tus podcasts".to_string(),
             Nav::SearchResults(query) => format!("Search \"{query}\""),
             Nav::AlbumDetail(link, _) => format!("Album \"{}\"", link.name),
             Nav::ArtistDetail(link) => format!("Artist \"{}\"", link.name),
             Nav::PlaylistDetail(link) => format!("Playlist \"{}\"", link.name),
             Nav::ShowDetail(link) => format!("Show \"{}\"", link.name),
-            Nav::Recommendations(_) => "Recommended".to_string(),
+            Nav::Recommendations(_) => "Recomendaciones".to_string(),
         }
     }
 }

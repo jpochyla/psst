@@ -4,7 +4,7 @@
 
 Esta versión añade un editor nativo de playlists con `gemini-3.5-flash-lite`. Abre **View → Splitify · Organizar con IA** o haz clic derecho en una playlist y elige **Dividir con Splitify IA**. Configura `AI_AGENT_API_KEY` y `SPOTIFY_CLIENT_ID` en `.env.local`; añade `http://127.0.0.1:8888/login` como redirect URI en Spotify Developer Dashboard. La IA propone una vista previa editable y el botón de creación genera playlists privadas. La reproducción sigue usando el cliente nativo.
 
-Consulta [la revisión de seguridad](SECURITY-REVIEW.md): se corrigieron fugas de tokens en el código heredado y se actualizaron dependencias. La rama `main` del repositorio Splitify conserva la aplicación web; su rama `native` incorpora este cliente Rust.
+Consulta [la revisión de seguridad](SECURITY-REVIEW.md): se corrigieron fugas de tokens en el código heredado y se actualizaron dependencias. La rama `main` del repositorio Splitify conserva la aplicación web; la integración nativa vive en este repositorio xpotify, rama `splitify-integration`. Ejecuta `Start-Xpotify.cmd`; consulta [uso y configuración](SPLITIFY.md).
 
 A fast Spotify client with a native GUI written in Rust, without Electron.
 Psst is still very early in development, lacking in features, stability, and general user experience.

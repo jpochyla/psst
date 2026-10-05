@@ -333,113 +333,317 @@ fn create(input: SplitState) -> Result<String, Error> {
     ))
 }
 
+fn field(label: &'static str, child: impl Widget<AppState> + 'static) -> impl Widget<AppState> {
+    Flex::column()
+        .cross_axis_alignment(druid::widget::CrossAxisAlignment::Start)
+        .with_child(Label::new(label).with_font(crate::ui::theme::UI_FONT_MEDIUM))
+        .with_spacer(8.0)
+        .with_child(child)
+}
+
+pub fn window() -> druid::WindowDesc<AppState> {
+    druid::WindowDesc::new(widget())
+        .title("Splitify · Organizar con IA")
+        .window_size((1120.0, 800.0))
+        .with_min_size((900.0, 620.0))
+}
+
+fn assignment_widget() -> impl Widget<Assignment> {
+    use crate::ui::theme;
+    use druid::widget::{CrossAxisAlignment, LineBreaking};
+
+    let metadata = Flex::column()
+        .cross_axis_alignment(CrossAxisAlignment::Start)
+        .with_child(
+            Label::dynamic(|row: &Assignment, _| row.track.name.to_string())
+                .with_font(theme::UI_FONT_MEDIUM)
+                .with_line_break_mode(LineBreaking::Clip)
+                .expand_width(),
+        )
+        .with_spacer(4.0)
+        .with_child(
+            Label::dynamic(|row: &Assignment, _| row.track.artist_names())
+                .with_text_size(12.0)
+                .with_text_color(theme::PLACEHOLDER_COLOR)
+                .with_line_break_mode(LineBreaking::Clip)
+                .expand_width(),
+        );
+    Flex::row()
+        .with_child(Checkbox::new("").lens(Assignment::keep))
+        .with_spacer(8.0)
+        .with_child(
+            Button::new("▶")
+                .on_click(|ctx, row: &mut Assignment, _| {
+                    ctx.submit_command(cmd::PLAY_TRACKS.with(PlaybackPayload {
+                        origin: PlaybackOrigin::Library,
+                        items: druid::im::vector![Playable::Track(row.track.clone())],
+                        position: 0,
+                    }));
+                })
+                .fix_size(32.0, 32.0),
+        )
+        .with_spacer(12.0)
+        .with_flex_child(metadata, 1.0)
+        .with_spacer(12.0)
+        .with_child(
+            TextBox::new()
+                .with_placeholder("Categoría")
+                .fix_width(160.0)
+                .lens(Assignment::category),
+        )
+        .padding((0.0, 12.0))
+        .background(crate::widget::Border::Bottom.with_color(theme::GREY_500))
+}
+
 pub fn widget() -> impl Widget<AppState> {
-    let source = TextBox::new()
-        .with_placeholder("Enlace de la playlist de Spotify")
-        .expand_width()
-        .lens(AppState::splitify.then(SplitState::source));
-    let prompt = TextBox::multiline()
-        .with_placeholder("Describe tus subcategorías, géneros o estados de ánimo")
-        .fix_height(65.0)
-        .expand_width()
-        .lens(AppState::splitify.then(SplitState::prompt));
-    let categories = TextBox::new()
-        .with_placeholder("Subcategorías opcionales, separadas por comas")
-        .expand_width()
-        .lens(AppState::splitify.then(SplitState::categories));
-    let generate_button = Button::new("Generar vista previa")
-        .on_click(|ctx, data: &mut AppState, _| {
-            ctx.submit_command(GENERATE.with(data.splitify.clone()));
-        })
-        .disabled_if(|data: &AppState, _| data.splitify.busy);
-    let create_button = Button::new("Crear playlists privadas en Spotify")
-        .on_click(
-            |ctx, data: &mut AppState, _| match grouped_rows(&data.splitify) {
-                Ok(_) => ctx.submit_command(CREATE.with(data.splitify.clone())),
-                Err(error) => data.splitify.status = error.to_string(),
-            },
+    use crate::ui::{design, theme};
+    use druid::widget::{CrossAxisAlignment, LineBreaking, Split, ViewSwitcher};
+
+    let source = field(
+        "1. Elige tu playlist",
+        TextBox::new()
+            .with_placeholder("Pega un enlace de Spotify")
+            .expand_width()
+            .lens(AppState::splitify.then(SplitState::source)),
+    );
+    let prompt = field(
+        "2. ¿Cómo quieres organizarla?",
+        TextBox::multiline()
+            .with_placeholder("Por géneros, energía, décadas…")
+            .fix_height(108.0)
+            .expand_width()
+            .lens(AppState::splitify.then(SplitState::prompt)),
+    );
+    let categories = field(
+        "Tus subcategorías (opcional)",
+        TextBox::new()
+            .with_placeholder("Indie, Chill, Para entrenar…")
+            .expand_width()
+            .lens(AppState::splitify.then(SplitState::categories)),
+    );
+    let generate_button = design::primary(
+        Button::new("Generar vista previa")
+            .on_click(|ctx, data: &mut AppState, _| {
+                ctx.submit_command(GENERATE.with(data.splitify.clone()));
+            })
+            .fix_height(44.0)
+            .expand_width()
+            .disabled_if(|data: &AppState, _| {
+                data.splitify.busy || data.splitify.source.trim().is_empty()
+            }),
+    );
+    let create_button = design::primary(
+        Button::new("Crear playlists privadas")
+            .on_click(
+                |ctx, data: &mut AppState, _| match grouped_rows(&data.splitify) {
+                    Ok(_) => ctx.submit_command(CREATE.with(data.splitify.clone())),
+                    Err(error) => data.splitify.status = error.to_string(),
+                },
+            )
+            .fix_height(44.0)
+            .expand_width()
+            .disabled_if(|data: &AppState, _| {
+                data.splitify.busy
+                    || data.splitify.completed
+                    || !data.splitify.rows.iter().any(|row| row.keep)
+            }),
+    );
+
+    let form = Flex::column()
+        .cross_axis_alignment(CrossAxisAlignment::Start)
+        .with_child(
+            Label::new("DISEÑA TU SELECCIÓN")
+                .with_text_size(11.0)
+                .with_text_color(theme::BLUE_200),
+        )
+        .with_spacer(24.0)
+        .with_child(source)
+        .with_spacer(8.0)
+        .with_child(
+            Label::new("Tu playlist original se conserva intacta.")
+                .with_text_color(theme::PLACEHOLDER_COLOR)
+                .with_line_break_mode(LineBreaking::WordWrap),
+        )
+        .with_spacer(24.0)
+        .with_child(prompt)
+        .with_spacer(20.0)
+        .with_child(categories)
+        .with_spacer(8.0)
+        .with_child(
+            Label::new("Separa los nombres con comas.").with_text_color(theme::PLACEHOLDER_COLOR),
+        )
+        .with_spacer(16.0)
+        .with_child(
+            Checkbox::new("Usar solo mis subcategorías")
+                .lens(AppState::splitify.then(SplitState::manual_only)),
+        )
+        .with_spacer(12.0)
+        .with_child(
+            Checkbox::new("Permitir canciones en varias playlists")
+                .lens(AppState::splitify.then(SplitState::overlap)),
+        )
+        .with_spacer(24.0)
+        .with_child(field(
+            "3. Nombra las nuevas playlists",
+            TextBox::new()
+                .with_placeholder("Prefijo de los nombres")
+                .expand_width()
+                .lens(AppState::splitify.then(SplitState::prefix)),
+        ))
+        .with_spacer(24.0)
+        .with_child(generate_button)
+        .with_spacer(12.0)
+        .with_child(
+            Label::new("Gemini recibe títulos, artistas y álbumes para clasificar tu música.")
+                .with_text_size(12.0)
+                .with_line_break_mode(LineBreaking::WordWrap)
+                .with_text_color(theme::PLACEHOLDER_COLOR),
+        )
+        .disabled_if(|data: &AppState, _| data.splitify.busy)
+        .padding(24.0);
+
+    let rename = Flex::column()
+        .cross_axis_alignment(CrossAxisAlignment::Start)
+        .with_child(Label::new("Renombrar o fusionar categorías").with_font(theme::UI_FONT_MEDIUM))
+        .with_spacer(8.0)
+        .with_child(
+            Flex::row()
+                .with_flex_child(
+                    TextBox::new()
+                        .with_placeholder("Categoría actual")
+                        .expand_width()
+                        .lens(AppState::splitify.then(SplitState::rename_from)),
+                    1.0,
+                )
+                .with_spacer(8.0)
+                .with_flex_child(
+                    TextBox::new()
+                        .with_placeholder("Nuevo nombre")
+                        .expand_width()
+                        .lens(AppState::splitify.then(SplitState::rename_to)),
+                    1.0,
+                )
+                .with_spacer(8.0)
+                .with_child(
+                    Button::new("Aplicar")
+                        .on_click(|_, data: &mut AppState, _| {
+                            let from = normalize_name(&data.splitify.rename_from);
+                            let to = normalize_name(&data.splitify.rename_to);
+                            if !to.is_empty() {
+                                for row in data.splitify.rows.iter_mut() {
+                                    if row.category.eq_ignore_ascii_case(&from) {
+                                        row.category = to.clone();
+                                    }
+                                }
+                                data.splitify.rename_from.clear();
+                                data.splitify.rename_to.clear();
+                            }
+                        })
+                        .fix_height(36.0),
+                ),
         )
         .disabled_if(|data: &AppState, _| {
-            data.splitify.busy || data.splitify.rows.is_empty() || data.splitify.completed
+            data.splitify.busy || data.splitify.completed || data.splitify.rows.is_empty()
         });
-    let rows = List::new(|| {
-        Flex::row()
-            .with_child(Checkbox::new("").lens(Assignment::keep))
-            .with_spacer(8.0)
-            .with_child(Button::new("▶").on_click(|ctx, row: &mut Assignment, _| {
-                ctx.submit_command(cmd::PLAY_TRACKS.with(PlaybackPayload {
-                    origin: PlaybackOrigin::Library,
-                    items: druid::im::vector![Playable::Track(row.track.clone())],
-                    position: 0,
-                }));
-            }))
-            .with_spacer(8.0)
-            .with_flex_child(
-                Label::dynamic(|row: &Assignment, _| {
-                    format!("{} — {}", row.track.name, row.track.artist_names())
-                })
-                .expand_width(),
-                1.0,
-            )
-            .with_child(
-                TextBox::new()
-                    .with_placeholder("Categoría")
-                    .fix_width(260.0)
-                    .lens(Assignment::category),
-            )
-            .padding(5.0)
-    })
-    .lens(AppState::splitify.then(SplitState::rows));
-    let rename = Flex::row()
+
+    let preview = ViewSwitcher::new(
+        |data: &AppState, _| data.splitify.rows.is_empty(),
+        move |empty, _, _| {
+            if *empty {
+                Flex::column()
+                    .with_child(Label::new("Tu próxima colección\nempieza aquí.").with_text_size(24.0).with_line_break_mode(LineBreaking::WordWrap))
+                    .with_spacer(16.0)
+                    .with_child(Label::new("Elige una playlist y genera la vista previa.\nPodrás escuchar, mover y excluir canciones\nantes de guardar nada en Spotify.").with_line_break_mode(LineBreaking::WordWrap).with_text_color(theme::PLACEHOLDER_COLOR))
+                    .center().expand().boxed()
+            } else {
+                Scroll::new(
+                    List::new(assignment_widget).lens(AppState::splitify.then(SplitState::rows)),
+                )
+                .vertical()
+                .expand()
+                .disabled_if(|d: &AppState, _| d.splitify.busy || d.splitify.completed)
+                .boxed()
+            }
+        },
+    );
+    // The list remains inside its own scroll area; form fields scroll independently.
+
+    let review = Flex::column()
+        .cross_axis_alignment(CrossAxisAlignment::Start)
         .with_child(
-            TextBox::new()
-                .with_placeholder("Categoría actual")
-                .fix_width(240.0)
-                .lens(AppState::splitify.then(SplitState::rename_from)),
+            Label::new("Vista previa")
+                .with_font(theme::UI_FONT_MEDIUM)
+                .with_text_size(22.0),
         )
         .with_spacer(8.0)
         .with_child(
-            TextBox::new()
-                .with_placeholder("Nuevo nombre / fusionar con")
-                .fix_width(240.0)
-                .lens(AppState::splitify.then(SplitState::rename_to)),
+            Label::dynamic(|data: &AppState, _| {
+                let groups: HashSet<_> = data
+                    .splitify
+                    .rows
+                    .iter()
+                    .filter(|r| r.keep)
+                    .map(|r| normalize_name(&r.category))
+                    .collect();
+                format!(
+                    "{} canciones seleccionadas · {} categorías",
+                    data.splitify.rows.iter().filter(|r| r.keep).count(),
+                    groups.len()
+                )
+            })
+            .with_text_color(theme::PLACEHOLDER_COLOR)
+            .with_line_break_mode(LineBreaking::WordWrap),
         )
-        .with_spacer(8.0)
+        .with_spacer(20.0)
+        .with_flex_child(preview, 1.0)
+        .with_spacer(16.0)
+        .with_child(rename)
+        .with_spacer(16.0)
         .with_child(
-            Button::new("Renombrar / fusionar").on_click(|_, data: &mut AppState, _| {
-                let from = normalize_name(&data.splitify.rename_from);
-                let to = normalize_name(&data.splitify.rename_to);
-                if !to.is_empty() {
-                    for row in data.splitify.rows.iter_mut() {
-                        if row.category.eq_ignore_ascii_case(&from) {
-                            row.category = to.clone();
-                        }
-                    }
-                }
-            }),
-        );
-    Flex::column()
-        .with_child(Label::new("Splitify · Organiza tu música con IA").with_text_size(25.0))
-        .with_spacer(12.0).with_child(source).with_spacer(8.0).with_child(prompt).with_spacer(8.0).with_child(categories)
-        .with_spacer(8.0)
-        .with_child(Flex::row().with_child(Checkbox::new("Permitir canciones en varias playlists").lens(AppState::splitify.then(SplitState::overlap)))
-            .with_spacer(16.0).with_child(Checkbox::new("Usar solo mis subcategorías").lens(AppState::splitify.then(SplitState::manual_only))))
-        .with_spacer(8.0).with_child(TextBox::new().with_placeholder("Prefijo de las nuevas playlists").expand_width().lens(AppState::splitify.then(SplitState::prefix)))
-        .with_spacer(12.0).with_child(Flex::row().with_child(generate_button).with_spacer(12.0).with_child(create_button))
-        .with_spacer(8.0).with_child(Label::dynamic(|data: &AppState, _| data.splitify.status.clone()).with_line_break_mode(druid::widget::LineBreaking::WordWrap).expand_width())
-        .with_spacer(8.0).with_child(Label::dynamic(|data: &AppState, _| {
-            let groups: HashSet<_> = data.splitify.rows.iter().filter(|r| r.keep).map(|r| normalize_name(&r.category)).collect();
-            format!("{} canciones seleccionadas · {} subcategorías. Edita la categoría para mover canciones; desmarca para excluir.", data.splitify.rows.iter().filter(|r| r.keep).count(), groups.len())
-        }).expand_width())
-        .with_spacer(8.0).with_child(rename.disabled_if(|d: &AppState, _| d.splitify.busy || d.splitify.completed))
-        .with_spacer(8.0).with_flex_child(Scroll::new(rows).vertical().expand().disabled_if(|d: &AppState, _| d.splitify.busy || d.splitify.completed), 1.0)
-        .padding(20.0)
+            Label::new("Edita la categoría para mover una canción. Desmárcala para excluirla.")
+                .with_text_size(12.0)
+                .with_text_color(theme::PLACEHOLDER_COLOR)
+                .with_line_break_mode(LineBreaking::WordWrap),
+        )
+        .with_spacer(12.0)
+        .with_child(
+            Scroll::new(
+                Label::dynamic(|data: &AppState, _| data.splitify.status.clone())
+                    .with_line_break_mode(LineBreaking::WordWrap)
+                    .expand_width(),
+            )
+            .vertical()
+            .fix_height(60.0),
+        )
+        .with_spacer(12.0)
+        .with_child(create_button)
+        .padding(24.0);
+    let header = Flex::column()
+        .cross_axis_alignment(CrossAxisAlignment::Start)
+        .with_child(
+            Label::new("Organiza tu música")
+                .with_font(theme::UI_FONT_MEDIUM)
+                .with_text_size(28.0),
+        )
+        .with_spacer(6.0)
+        .with_child(
+            Label::new("Una playlist. Nuevas formas de escucharla.")
+                .with_text_color(theme::PLACEHOLDER_COLOR),
+        )
+        .padding((28.0, 24.0));
+    crate::widget::ThemeScope::new(Flex::column()
+        .cross_axis_alignment(CrossAxisAlignment::Start)
+        .with_child(header)
+        .with_flex_child(Split::columns(Scroll::new(form).vertical().expand(), review)
+            .split_point(0.37).min_size(340.0, 440.0).bar_size(1.0).solid_bar(true)
+            .background(theme::GREY_700), 1.0)
+        .background(theme::GREY_600)
         .on_command_async(GENERATE, generate,
             |_, data, _| { data.splitify.busy = true; data.splitify.status = "Leyendo Spotify y clasificando con Gemini…".into(); },
-            |_, data, (_, result)| { data.splitify.busy = false; match result { Ok(rows) => { data.splitify.rows = rows; data.splitify.completed = false; data.splitify.status = "Vista previa lista. Revisa las categorías antes de crear las playlists. Solo títulos, artistas y álbumes se enviaron a Gemini.".into(); }, Err(e) => data.splitify.status = e.to_string() } })
+            |_, data, (_, result)| { data.splitify.busy = false; match result { Ok(rows) => { data.splitify.rows = rows; data.splitify.completed = false; data.splitify.status = "Vista previa lista. Revisa las categorías antes de crear las playlists.".into(); }, Err(e) => data.splitify.status = e.to_string() } })
         .on_command_async(CREATE, create,
             |_, data, _| { data.splitify.busy = true; data.splitify.status = "Creando playlists privadas…".into(); },
-            |ctx, data, (_, result)| { data.splitify.busy = false; match result { Ok(message) => { data.splitify.completed = true; data.splitify.status = message; ctx.submit_command(crate::ui::playlist::LOAD_LIST); }, Err(e) => { data.splitify.completed = true; data.splitify.status = e.to_string(); } } })
+            |ctx, data, (_, result)| { data.splitify.busy = false; match result { Ok(message) => { data.splitify.completed = true; data.splitify.status = message; ctx.submit_command(crate::ui::playlist::LOAD_LIST); }, Err(e) => { data.splitify.completed = true; data.splitify.status = e.to_string(); } } }))
 }
 
 #[cfg(test)]

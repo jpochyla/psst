@@ -43,14 +43,15 @@ pub const LINK_ACTIVE_COLOR: Key<Color> = Key::new("app.link-active-color");
 pub const LINK_COLD_COLOR: Key<Color> = Key::new("app.link-cold-color");
 
 pub fn setup(env: &mut Env, state: &AppState) {
-    match state.config.theme {
+    match super::system_theme::resolve(state.config.theme) {
         Theme::Light => setup_light_theme(env),
         Theme::Dark => setup_dark_theme(env),
+        Theme::System => unreachable!("system theme is resolved"),
     };
 
     env.set(WINDOW_BACKGROUND_COLOR, env.get(GREY_700));
     env.set(TEXT_COLOR, env.get(GREY_100));
-    env.set(ICON_COLOR, env.get(GREY_400));
+    env.set(ICON_COLOR, env.get(GREY_300));
     env.set(PLACEHOLDER_COLOR, env.get(GREY_300));
     env.set(PRIMARY_LIGHT, env.get(BLUE_100));
     env.set(PRIMARY_DARK, env.get(BLUE_200));
@@ -59,8 +60,13 @@ pub fn setup(env: &mut Env, state: &AppState) {
     env.set(BACKGROUND_DARK, env.get(GREY_600));
     env.set(FOREGROUND_LIGHT, env.get(GREY_100));
     env.set(FOREGROUND_DARK, env.get(GREY_000));
+    env.set(DISABLED_BUTTON_LIGHT, env.get(GREY_600));
+    env.set(DISABLED_BUTTON_DARK, env.get(GREY_500));
+    env.set(DISABLED_TEXT_COLOR, env.get(GREY_300));
+    env.set(DISABLED_FOREGROUND_LIGHT, env.get(GREY_400));
+    env.set(DISABLED_FOREGROUND_DARK, env.get(GREY_500));
 
-    match state.config.theme {
+    match super::system_theme::resolve(state.config.theme) {
         Theme::Light => {
             env.set(BUTTON_LIGHT, env.get(GREY_700));
             env.set(BUTTON_DARK, env.get(GREY_600));
@@ -69,6 +75,7 @@ pub fn setup(env: &mut Env, state: &AppState) {
             env.set(BUTTON_LIGHT, env.get(GREY_600));
             env.set(BUTTON_DARK, env.get(GREY_700));
         }
+        Theme::System => unreachable!("system theme is resolved"),
     }
 
     env.set(BORDER_LIGHT, env.get(GREY_400));
@@ -80,7 +87,7 @@ pub fn setup(env: &mut Env, state: &AppState) {
     env.set(CURSOR_COLOR, env.get(GREY_000));
 
     env.set(PROGRESS_BAR_RADIUS, 4.0);
-    env.set(BUTTON_BORDER_RADIUS, 4.0);
+    env.set(BUTTON_BORDER_RADIUS, 8.0);
     env.set(BUTTON_BORDER_WIDTH, 1.0);
 
     env.set(
@@ -97,7 +104,7 @@ pub fn setup(env: &mut Env, state: &AppState) {
         UI_FONT_MONO,
         FontDescriptor::new(FontFamily::MONOSPACE).with_size(13.0),
     );
-    env.set(TEXT_SIZE_SMALL, 11.0);
+    env.set(TEXT_SIZE_SMALL, 12.0);
     env.set(TEXT_SIZE_NORMAL, 13.0);
     env.set(TEXT_SIZE_LARGE, 16.0);
 
@@ -105,7 +112,7 @@ pub fn setup(env: &mut Env, state: &AppState) {
     env.set(WIDE_WIDGET_WIDTH, grid(12.0));
     env.set(BORDERED_WIDGET_HEIGHT, grid(4.0));
 
-    env.set(TEXTBOX_BORDER_RADIUS, 4.0);
+    env.set(TEXTBOX_BORDER_RADIUS, 8.0);
     env.set(TEXTBOX_BORDER_WIDTH, 1.0);
     env.set(TEXTBOX_INSETS, Insets::uniform_xy(grid(1.2), grid(1.0)));
 
@@ -132,13 +139,13 @@ fn setup_light_theme(env: &mut Env) {
     env.set(GREY_000, Color::grey8(0x00));
     env.set(GREY_100, Color::grey8(0x33));
     env.set(GREY_200, Color::grey8(0x4f));
-    env.set(GREY_300, Color::grey8(0x82));
+    env.set(GREY_300, Color::rgb8(97, 108, 119));
     env.set(GREY_400, Color::grey8(0xbd));
-    env.set(GREY_500, Color::from_rgba32_u32(0xe5e6e7ff));
-    env.set(GREY_600, Color::from_rgba32_u32(0xf5f6f7ff));
+    env.set(GREY_500, Color::rgb8(221, 228, 225));
+    env.set(GREY_600, Color::rgb8(244, 247, 245));
     env.set(GREY_700, Color::from_rgba32_u32(0xffffffff));
-    env.set(BLUE_100, Color::rgb8(0x5c, 0xc4, 0xff));
-    env.set(BLUE_200, Color::rgb8(0x00, 0x8d, 0xdd));
+    env.set(BLUE_100, Color::rgb8(36, 180, 105));
+    env.set(BLUE_200, Color::rgb8(19, 132, 75));
 
     env.set(RED, Color::rgba8(0xEB, 0x57, 0x57, 0xFF));
 
@@ -153,11 +160,11 @@ fn setup_dark_theme(env: &mut Env) {
     env.set(GREY_200, Color::grey8(0xe0));
     env.set(GREY_300, Color::grey8(0xbd));
     env.set(GREY_400, Color::grey8(0x82));
-    env.set(GREY_500, Color::grey8(0x4f));
-    env.set(GREY_600, Color::grey8(0x33));
-    env.set(GREY_700, Color::grey8(0x28));
-    env.set(BLUE_100, Color::rgb8(0x00, 0x8d, 0xdd));
-    env.set(BLUE_200, Color::rgb8(0x5c, 0xc4, 0xff));
+    env.set(GREY_500, Color::rgb8(52, 65, 58));
+    env.set(GREY_600, Color::rgb8(19, 26, 23));
+    env.set(GREY_700, Color::rgb8(26, 35, 30));
+    env.set(BLUE_100, Color::rgb8(36, 180, 105));
+    env.set(BLUE_200, Color::rgb8(90, 225, 150));
 
     env.set(RED, Color::rgba8(0xEB, 0x57, 0x57, 0xFF));
 

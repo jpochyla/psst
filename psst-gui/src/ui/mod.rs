@@ -34,6 +34,7 @@ use std::time::Duration;
 pub mod album;
 pub mod artist;
 pub mod credits;
+pub mod design;
 pub mod episode;
 pub mod find;
 pub mod home;
@@ -44,9 +45,14 @@ pub mod playable;
 pub mod playback;
 pub mod playlist;
 pub mod preferences;
+#[cfg(debug_assertions)]
+mod preview;
+#[cfg(debug_assertions)]
+pub use preview::run_if_requested;
 pub mod recommend;
 pub mod search;
 pub mod show;
+pub mod system_theme;
 pub mod theme;
 pub mod track;
 pub mod user;
@@ -57,7 +63,7 @@ pub const DOWNLOAD_ARTWORK: Selector<(String, String)> = Selector::new("app.artw
 pub fn main_window(config: &Config) -> WindowDesc<AppState> {
     let win = WindowDesc::new(root_widget())
         .title(compute_main_window_title)
-        .with_min_size((theme::grid(65.0), theme::grid(50.0)))
+        .with_min_size((900.0, 620.0))
         .window_size(config.window_size)
         .show_title(false)
         .transparent_titlebar(true);
@@ -94,9 +100,10 @@ pub fn preferences_window() -> WindowDesc<AppState> {
 
 pub fn account_setup_window() -> WindowDesc<AppState> {
     let win = WindowDesc::new(account_setup_widget())
-        .title(if std::env::var_os("SPLITIFY_NATIVE").is_some() { "Splitify Native · Login" } else { "Login" })
-        .window_size((theme::grid(50.0), theme::grid(45.0)))
-        .resizable(false)
+        .title("Xpotify \u{00b7} Login")
+        .window_size((520.0, 760.0))
+        .with_min_size((440.0, 520.0))
+        .resizable(true)
         .show_title(false)
         .transparent_titlebar(true);
     if cfg!(target_os = "macos") {
@@ -258,9 +265,9 @@ fn root_widget() -> impl Widget<AppState> {
         .background(theme::BACKGROUND_LIGHT);
 
     let split = Split::columns(sidebar, main)
-        .split_point(0.2)
+        .split_point(0.22)
         .bar_size(1.0)
-        .min_size(150.0, 300.0)
+        .min_size(200.0, 500.0)
         .min_bar_area(1.0)
         .solid_bar(true);
 
@@ -394,14 +401,32 @@ fn route_widget() -> impl Widget<AppState> {
 fn sidebar_menu_widget() -> impl Widget<AppState> {
     Flex::column()
         .with_default_spacer()
-        .with_child(sidebar_link_widget("Home", Some(&icons::HOME), Nav::Home))
+        .with_child(
+            Label::new("Xpotify")
+                .with_font(theme::UI_FONT_MEDIUM)
+                .with_text_size(24.0)
+                .align_left()
+                .padding((16.0, 8.0)),
+        )
+        .with_child(
+            design::primary(
+                druid::widget::Button::new("Organizar con IA")
+                    .on_click(|ctx, _: &mut AppState, _| {
+                        ctx.submit_command(crate::splitify::OPEN.with(String::new()));
+                    })
+                    .fix_height(40.0)
+                    .expand_width(),
+            )
+            .padding((12.0, 10.0)),
+        )
+        .with_child(sidebar_link_widget("Inicio", Some(&icons::HOME), Nav::Home))
         .with_child(sidebar_link_widget(
-            "Tracks",
+            "Canciones",
             Some(&icons::MUSIC_NOTE),
             Nav::SavedTracks,
         ))
         .with_child(sidebar_link_widget(
-            "Albums",
+            "Álbumes",
             Some(&icons::ALBUM),
             Nav::SavedAlbums,
         ))
@@ -647,10 +672,6 @@ fn compute_main_window_title(data: &AppState, _env: &Env) -> String {
             Playable::Episode(episode) => episode.name.to_string(),
         }
     } else {
-        if std::env::var_os("SPLITIFY_NATIVE").is_some() {
-            "Splitify Native".to_owned()
-        } else {
-            "Psst".to_owned()
-        }
+        "Xpotify".to_owned()
     }
 }

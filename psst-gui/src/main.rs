@@ -35,6 +35,11 @@ fn main() {
     )
     .init();
 
+    #[cfg(debug_assertions)]
+    if ui::run_if_requested() {
+        return;
+    }
+
     // Load configuration
     let mut config = Config::load().unwrap_or_default();
     if config.webapi_client_id_value().is_none() {
@@ -107,14 +112,6 @@ fn main() {
         delegate = Delegate::with_preferences(window.id);
         launcher = AppLauncher::with_window(window).configure_env(ui::theme::setup);
     };
-
-    if state.config.has_credentials() && std::env::var_os("SPLITIFY_NATIVE").is_some() {
-        let _ = launcher.get_external_handle().submit_command(
-            splitify::OPEN,
-            String::new(),
-            druid::Target::Global,
-        );
-    }
 
     launcher
         .delegate(delegate)

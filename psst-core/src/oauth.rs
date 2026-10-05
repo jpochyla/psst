@@ -329,6 +329,15 @@ pub fn generate_auth_url(
 
 /// Generate the authorization URL specifically for the Web API OAuth flow.
 /// Returns `(auth_url, pkce_verifier)`.
+/// Spotify desktop playback uses its registered loopback callback and streaming scope.
+pub fn generate_playback_auth_url() -> (String, PkceCodeVerifier) {
+    generate_auth_url(
+        crate::system_info::CLIENT_ID,
+        8898,
+        &[Scope::new("streaming".into())],
+    )
+}
+
 pub fn generate_webapi_auth_url(client_id: &str, redirect_port: u16) -> (String, PkceCodeVerifier) {
     let scopes = get_webapi_scopes();
     generate_auth_url(client_id, redirect_port, &scopes)
@@ -411,6 +420,18 @@ pub fn refresh_webapi_token(
 #[cfg(test)]
 mod callback_tests {
     use super::*;
+    #[test]
+    fn playback_uses_registered_desktop_callback_and_streaming_only() {
+        let (authorization, _) = generate_playback_auth_url();
+        let url = Url::parse(&authorization).unwrap();
+        let params: std::collections::HashMap<_, _> = url.query_pairs().into_owned().collect();
+        assert_eq!(params["client_id"], crate::system_info::CLIENT_ID);
+        assert_eq!(params["redirect_uri"], "http://127.0.0.1:8898/login");
+        assert_eq!(params["scope"], "streaming");
+        assert_eq!(params["code_challenge_method"], "S256");
+        assert!(!params["state"].is_empty());
+    }
+
     #[test]
     fn configured_client_uses_registered_loopback_redirect_and_pkce() {
         let (authorization_url, _) = generate_webapi_auth_url("configured-client", 8888);

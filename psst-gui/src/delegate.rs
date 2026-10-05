@@ -151,9 +151,7 @@ impl AppDelegate<AppState> for Delegate {
                 if !id.is_empty() {
                     data.splitify.source = id.clone();
                 }
-                let window = WindowDesc::new(crate::splitify::widget())
-                    .title("Splitify · Spotify + Gemini")
-                    .window_size((1050.0, 760.0));
+                let window = crate::splitify::window();
                 self.splitify_window = Some(window.id);
                 ctx.new_window(window);
             }
@@ -170,9 +168,6 @@ impl AppDelegate<AppState> for Delegate {
             Handled::Yes
         } else if cmd.is(cmd::SHOW_MAIN) {
             self.show_main(&data.config, ctx);
-            if std::env::var_os("SPLITIFY_NATIVE").is_some() {
-                ctx.submit_command(crate::splitify::OPEN.with(String::new()));
-            }
             Handled::Yes
         } else if cmd.is(cmd::SHOW_ACCOUNT_SETUP) {
             self.show_account_setup(ctx);

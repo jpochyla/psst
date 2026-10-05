@@ -20,7 +20,6 @@ use psst_core::{
 use serde::{Deserialize, Serialize};
 
 use super::{Nav, Promise, QueueBehavior, SliderScrollScale};
-use crate::ui::theme;
 
 #[derive(Clone, Debug, Data, Lens)]
 pub struct Preferences {
@@ -145,7 +144,7 @@ impl Default for Config {
             last_route: Default::default(),
             queue_behavior: Default::default(),
             show_track_cover: Default::default(),
-            window_size: Size::new(theme::grid(80.0), theme::grid(100.0)),
+            window_size: Size::new(1120.0, 800.0),
             slider_scroll_scale: Default::default(),
             sort_order: Default::default(),
             sort_criteria: Default::default(),
@@ -329,6 +328,7 @@ impl AudioQuality {
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Data, Serialize, Deserialize, Default)]
 pub enum Theme {
     #[default]
+    System,
     Light,
     Dark,
 }

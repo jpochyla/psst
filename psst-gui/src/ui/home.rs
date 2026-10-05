@@ -23,6 +23,35 @@ pub const LOAD_MADE_FOR_YOU: Selector = Selector::new("app.home.load-made-for-yo
 
 pub fn home_widget() -> impl Widget<AppState> {
     Flex::column()
+        .with_child(
+            super::design::card(
+                Flex::column()
+                    .cross_axis_alignment(druid::widget::CrossAxisAlignment::Start)
+                    .with_child(
+                        Label::new("Redescubre tu biblioteca.")
+                            .with_font(theme::UI_FONT_MEDIUM)
+                            .with_text_size(26.0),
+                    )
+                    .with_spacer(10.0)
+                    .with_child(
+                        Label::new(
+                            "Convierte una playlist en nuevas colecciones para cada momento.",
+                        )
+                        .with_line_break_mode(druid::widget::LineBreaking::WordWrap)
+                        .with_text_color(theme::PLACEHOLDER_COLOR),
+                    )
+                    .with_spacer(20.0)
+                    .with_child(super::design::primary(
+                        druid::widget::Button::new("Organizar una playlist")
+                            .on_click(|ctx, _: &mut AppState, _| {
+                                ctx.submit_command(crate::splitify::OPEN.with(String::new()));
+                            })
+                            .fix_height(40.0),
+                    )),
+            )
+            .expand_width()
+            .padding((0.0, 16.0, 0.0, 24.0)),
+        )
         .with_child(made_for_you())
         .with_child(jump_back_in())
         .with_child(user_top_mixes())
@@ -31,9 +60,9 @@ pub fn home_widget() -> impl Widget<AppState> {
         .with_child(uniquely_yours())
         .with_child(your_shows())
         .with_child(shows_that_you_might_like())
-        .with_child(simple_title_label("Your top artists"))
+        .with_child(simple_title_label("Tus artistas más escuchados"))
         .with_child(user_top_artists_widget())
-        .with_child(simple_title_label("Your top tracks"))
+        .with_child(simple_title_label("Tus canciones más escuchadas"))
         .with_child(user_top_tracks_widget())
 }
 

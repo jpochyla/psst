@@ -51,21 +51,58 @@ use super::{cache::WebApiCache, local::LocalTrackManager};
 use sanitize_html::{rules::predefined::DEFAULT, sanitize_str};
 
 fn trusted_api_destination(url: &url::Url) -> bool {
-    url.scheme() == "https" && url.username().is_empty() && url.password().is_none()
+    url.scheme() == "https"
+        && url.username().is_empty()
+        && url.password().is_none()
         && url.port_or_known_default() == Some(443)
-        && matches!(url.host_str(), Some("api.spotify.com" | "api-partner.spotify.com" | "spclient.wg.spotify.com"))
+        && matches!(
+            url.host_str(),
+            Some("api.spotify.com" | "api-partner.spotify.com" | "spclient.wg.spotify.com")
+        )
 }
 
 #[cfg(test)]
 mod credential_destination_tests {
     use super::*;
     #[test]
+    fn library_mutations_use_current_endpoint_and_encoded_spotify_uri() {
+        for kind in ["track", "album", "show", "playlist"] {
+            for method in [Method::Put, Method::Delete] {
+                let request = RequestBuilder::library_item(kind, "5lfWrciYtohtIMVDVZd0Rf", method);
+                let uri = url::Url::parse(&request.build()).unwrap();
+                assert_eq!(uri.path(), "/v1/me/library");
+                assert_eq!(
+                    uri.query_pairs().collect::<Vec<_>>(),
+                    [(
+                        "uris".into(),
+                        format!("spotify:{kind}:5lfWrciYtohtIMVDVZd0Rf").into()
+                    )]
+                );
+                assert!(request.body.is_none());
+            }
+        }
+    }
+
+    #[test]
     fn only_official_https_api_hosts_receive_credentials() {
-        for trusted in ["https://api.spotify.com/v1/me", "https://api-partner.spotify.com/pathfinder/v1/query", "https://spclient.wg.spotify.com/track-credits-view/"] {
+        for trusted in [
+            "https://api.spotify.com/v1/me",
+            "https://api-partner.spotify.com/pathfinder/v1/query",
+            "https://spclient.wg.spotify.com/track-credits-view/",
+        ] {
             assert!(trusted_api_destination(&url::Url::parse(trusted).unwrap()));
         }
-        for rejected in ["http://ip-api.com/json", "https://i.scdn.co/image/cover", "http://api.spotify.com/v1/me", "https://api.spotify.com.evil.example/v1/me", "https://api.spotify.com@evil.example/v1/me", "https://api.spotify.com:8888/v1/me"] {
-            assert!(!trusted_api_destination(&url::Url::parse(rejected).unwrap()));
+        for rejected in [
+            "http://ip-api.com/json",
+            "https://i.scdn.co/image/cover",
+            "http://api.spotify.com/v1/me",
+            "https://api.spotify.com.evil.example/v1/me",
+            "https://api.spotify.com@evil.example/v1/me",
+            "https://api.spotify.com:8888/v1/me",
+        ] {
+            assert!(!trusted_api_destination(
+                &url::Url::parse(rejected).unwrap()
+            ));
         }
     }
 }
@@ -90,7 +127,10 @@ impl WebApi {
         cache_base: Option<PathBuf>,
         paginated_limit: usize,
     ) -> Self {
-        let mut agent = Agent::config_builder().timeout_global(Some(Duration::from_secs(30))).max_redirects(0);
+        let mut agent = Agent::config_builder()
+            .timeout_global(Some(Duration::from_secs(30)))
+            .max_redirects(0)
+            .http_status_as_error(false);
         if let Some(proxy_url) = proxy_url {
             let proxy = ureq::Proxy::new(proxy_url).ok();
             agent = agent.proxy(proxy);
@@ -223,21 +263,54 @@ impl WebApi {
 
         let ct = client_token.as_deref();
         let headers = request.get_headers();
-        match request.get_method() {
-            Method::Get => configure_request(self.agent.get(&url), &token, ct, headers)
-                .call()
-                .map_err(|err| Error::WebApiError(err.to_string())),
-            Method::Post => configure_request(self.agent.post(&url), &token, ct, headers)
-                .send_json(request.get_body())
-                .map_err(|err| Error::WebApiError(err.to_string())),
-            Method::Put => configure_request(self.agent.put(&url), &token, ct, headers)
-                .send_json(request.get_body())
-                .map_err(|err| Error::WebApiError(err.to_string())),
-            Method::Delete => configure_request(self.agent.delete(&url), &token, ct, headers)
-                .force_send_body()
-                .send_json(request.get_body())
-                .map_err(|err| Error::WebApiError(err.to_string())),
+        let result = match request.get_method() {
+            Method::Get => configure_request(self.agent.get(&url), &token, ct, headers).call(),
+            Method::Post => {
+                let req = configure_request(self.agent.post(&url), &token, ct, headers);
+                match request.get_body() {
+                    Some(body) => req.send_json(body),
+                    None => req.send_empty(),
+                }
+            }
+            Method::Put => {
+                let req = configure_request(self.agent.put(&url), &token, ct, headers);
+                match request.get_body() {
+                    Some(body) => req.send_json(body),
+                    None => req.send_empty(),
+                }
+            }
+            Method::Delete => {
+                let req = configure_request(self.agent.delete(&url), &token, ct, headers);
+                match request.get_body() {
+                    Some(body) => req.force_send_body().send_json(body),
+                    None => req.call(),
+                }
+            }
+        };
+        let mut response = result.map_err(|err| Error::WebApiError(err.to_string()))?;
+        if (response.status().is_client_error() || response.status().is_server_error())
+            && response.status() != StatusCode::TOO_MANY_REQUESTS
+        {
+            let status = response.status().as_u16();
+            let message = response
+                .body_mut()
+                .with_config()
+                .limit(16_384)
+                .read_json::<serde_json::Value>()
+                .ok()
+                .and_then(|v| v["error"]["message"].as_str().map(String::from))
+                .unwrap_or_else(|| "Spotify rechaz\u{00f3} la solicitud".into());
+            let message: String = message
+                .chars()
+                .filter(|c| !c.is_control())
+                .take(240)
+                .collect();
+            return Err(Error::WebApiError(format!(
+                "Spotify HTTP {status} ({}): {message}",
+                destination.path()
+            )));
         }
+        Ok(response)
     }
 
     fn with_retry(f: impl Fn() -> Result<Response<Body>, Error>) -> Result<Response<Body>, Error> {
@@ -1418,16 +1491,12 @@ impl WebApi {
 
     // https://developer.spotify.com/documentation/web-api/reference/save-to-library/
     pub fn save_album(&self, id: &str) -> Result<(), Error> {
-        let request = &RequestBuilder::new("v1/me/library", Method::Put, None)
-            .set_body(Some(json!({"uris": [format!("spotify:album:{id}")]})));
-        self.send_empty_json(request)
+        self.send_empty_json(&RequestBuilder::library_item("album", id, Method::Put))
     }
 
     // https://developer.spotify.com/documentation/web-api/reference/remove-from-library/
     pub fn unsave_album(&self, id: &str) -> Result<(), Error> {
-        let request = &RequestBuilder::new("v1/me/library", Method::Delete, None)
-            .set_body(Some(json!({"uris": [format!("spotify:album:{id}")]})));
-        self.send_empty_json(request)
+        self.send_empty_json(&RequestBuilder::library_item("album", id, Method::Delete))
     }
 
     // https://developer.spotify.com/documentation/web-api/reference/get-users-saved-tracks/
@@ -1464,30 +1533,22 @@ impl WebApi {
 
     // https://developer.spotify.com/documentation/web-api/reference/save-to-library/
     pub fn save_track(&self, id: &str) -> Result<(), Error> {
-        // Spotify's /v1/me/tracks takes the base62 ids as a query param, not a
-        // uris body.
-        let request = &RequestBuilder::new("v1/me/tracks", Method::Put, None).query("ids", id);
-        self.send_empty_json(request)
+        self.send_empty_json(&RequestBuilder::library_item("track", id, Method::Put))
     }
 
     // https://developer.spotify.com/documentation/web-api/reference/remove-from-library/
     pub fn unsave_track(&self, id: &str) -> Result<(), Error> {
-        let request = &RequestBuilder::new("v1/me/tracks", Method::Delete, None).query("ids", id);
-        self.send_empty_json(request)
+        self.send_empty_json(&RequestBuilder::library_item("track", id, Method::Delete))
     }
 
     // https://developer.spotify.com/documentation/web-api/reference/save-to-library/
     pub fn save_show(&self, id: &str) -> Result<(), Error> {
-        let request = &RequestBuilder::new("v1/me/library", Method::Put, None)
-            .set_body(Some(json!({"uris": [format!("spotify:show:{id}")]})));
-        self.send_empty_json(request)
+        self.send_empty_json(&RequestBuilder::library_item("show", id, Method::Put))
     }
 
     // https://developer.spotify.com/documentation/web-api/reference/remove-from-library/
     pub fn unsave_show(&self, id: &str) -> Result<(), Error> {
-        let request = &RequestBuilder::new("v1/me/library", Method::Delete, None)
-            .set_body(Some(json!({"uris": [format!("spotify:show:{id}")]})));
-        self.send_empty_json(request)
+        self.send_empty_json(&RequestBuilder::library_item("show", id, Method::Delete))
     }
 }
 
@@ -1589,15 +1650,13 @@ impl WebApi {
     }
 
     pub fn follow_playlist(&self, id: &str) -> Result<(), Error> {
-        let request = &RequestBuilder::new("v1/me/library", Method::Put, None)
-            .set_body(Some(json!({"uris": [format!("spotify:playlist:{id}")]})));
+        let request = &RequestBuilder::library_item("playlist", id, Method::Put);
         self.send_empty_json(request)?;
         Ok(())
     }
 
     pub fn unfollow_playlist(&self, id: &str) -> Result<(), Error> {
-        let request = &RequestBuilder::new("v1/me/library", Method::Delete, None)
-            .set_body(Some(json!({"uris": [format!("spotify:playlist:{id}")]})));
+        let request = &RequestBuilder::library_item("playlist", id, Method::Delete);
         self.send_empty_json(request)?;
         Ok(())
     }
@@ -1971,6 +2030,11 @@ struct RequestBuilder {
 }
 
 impl RequestBuilder {
+    fn library_item(kind: &str, id: &str, method: Method) -> Self {
+        let uri = format!("spotify:{kind}:{id}");
+        Self::new("v1/me/library", method, None).query("uris", urlencoding::encode(&uri))
+    }
+
     // By default, we use https and the api.spotify.com
     fn new(path: impl Display, method: Method, body: Option<serde_json::Value>) -> Self {
         Self {
