@@ -117,6 +117,8 @@ cargo bundle --release
 
 ## Roadmap
 
+Native fork status: see [ROADMAP.md](ROADMAP.md) for implementation details, validation and platform/API limits. Windows is the tested platform. Playlist folders are local; Spotify's public API does not expose its folders. Native listen reporting remains pending.
+
 - [x] Vorbis track playback
 - [x] Browsing saved albums and tracks
 - [x] Save / unsave albums and tracks
@@ -130,39 +132,39 @@ cargo bundle --release
 - [x] Genre playlists and "For You" content
 - [x] Dark theme
 - [x] Credits support
-- [ ] Resilience to network errors (automatically retry timed-out requests)
-- [ ] Managing playlists
+- [x] Resilience to network errors (bounded retries for read requests)
+- [x] Managing playlists
   - Follow/unfollow
   - Add/remove tracks
   - Reorder tracks
   - Rename playlist
-  - Playlist folders
+  - Local playlist folders (not synchronized with Spotify folders)
 - [x] Playback queue
-- [ ] React to audio output device events
+- [x] React to default audio output device events (CPAL; physical headphone checks pending)
   - Pause after disconnecting headphones
   - Transfer playback after connecting headphones
-- [ ] Better caching
+- [x] Better caching
   - Cache as many WebAPI responses as possible
   - Visualize cache utilization
     - Total cache usage in the config dialog
     - Show time origin of cached data, allow to refresh
-- [ ] Trivia on the artist page, Wikipedia links
-- [ ] Downloading encrypted tracks
+- [x] Artist biography/statistics and Wikipedia links
+- [x] Downloading encrypted tracks into the playback cache
 - [ ] Reporting played tracks to Spotify servers
-- [ ] OS-specific application bundles
+- [ ] OS-specific application bundles (Windows ZIP tested; macOS/Linux packaging scripts await platform validation)
 - UI
-  - [ ] Rethink the current design, consider a two-pane layout
+  - [x] Rethink the current design, consider a two-pane layout
     - Left pane for browsing
     - Right pane for current playback
-  - [ ] Detect light/dark OS theme
-  - [ ] Robust error states, ideally with a retry button
-  - [ ] Correct playback highlight
+  - [x] Detect light/dark OS theme (Windows; other platforms need validation)
+  - [x] Robust error states, with a retry button
+  - [x] Correct playback highlight
     - Highlight now-playing track only in the correct album/playlist
     - Keep highlighted track in viewport
-  - [ ] Paging or virtualized lists for albums and tracks
-  - [ ] Grid for albums and artists
-  - [ ] Robust active/inactive menu visualization
-  - [ ] Save playback state
+  - [x] Paging for albums, tracks and queue entries
+  - [x] Grid for albums and artists
+  - [x] Robust active/inactive navigation and disabled controls
+  - [x] Save playback state, including shuffle order and manual queue additions
 
 ## Development
 

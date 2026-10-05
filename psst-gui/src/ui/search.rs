@@ -192,7 +192,7 @@ fn artist_results_widget(include_header: bool) -> impl Widget<WithCtx<SearchResu
         include_header,
         Ctx::data().then(SearchResults::artists),
         |artists| artists.is_empty(),
-        || List::new(|| artist::artist_widget(false)),
+        || super::grid::widget(|| artist::artist_widget(true).boxed()),
     )
 }
 
@@ -202,7 +202,7 @@ fn album_results_widget(include_header: bool) -> impl Widget<WithCtx<SearchResul
         include_header,
         Ctx::map(SearchResults::albums),
         |albums| albums.data.is_empty(),
-        || List::new(|| album::album_widget(false)),
+        || super::grid::with_context(|| album::album_widget(true).boxed()),
     )
 }
 

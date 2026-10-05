@@ -113,7 +113,12 @@ where
                 self.load_route_data(ctx, data);
             }
             Event::Command(cmd) if cmd.is(cmd::NAVIGATE_REFRESH) => {
-                data.refresh_playlist();
+                if let Err(error) = crate::webapi::WebApi::global().invalidate_metadata() {
+                    data.error_alert(error);
+                }
+                data.refresh_all();
+                data.search.results.clear();
+                data.news.feed.clear();
                 ctx.set_handled();
                 self.load_route_data(ctx, data);
             }
@@ -133,7 +138,12 @@ where
                 self.load_route_data(ctx, data);
             }
             Event::KeyDown(key) if key.mods.ctrl() && key.code == Code::KeyR => {
+                if let Err(error) = crate::webapi::WebApi::global().invalidate_metadata() {
+                    data.error_alert(error);
+                }
                 data.refresh_all();
+                data.search.results.clear();
+                data.news.feed.clear();
                 ctx.set_handled();
                 self.load_route_data(ctx, data);
             }
@@ -155,9 +165,11 @@ where
             // Loads the library's saved tracks without the user needing to click on the tab.
             ctx.submit_command(cmd::NAVIGATE.with(Nav::SavedTracks));
             // Load the last route, or the default.
-            ctx.submit_command(
-                cmd::NAVIGATE.with(if data.playback.now_playing.is_some() { data.nav.clone() } else { data.config.last_route.to_owned().unwrap_or_default() }),
-            );
+            ctx.submit_command(cmd::NAVIGATE.with(if data.playback.now_playing.is_some() {
+                data.nav.clone()
+            } else {
+                data.config.last_route.to_owned().unwrap_or_default()
+            }));
         }
         child.lifecycle(ctx, event, data, env)
     }

@@ -14,6 +14,9 @@ pub struct ResumeSnapshot {
     pub items: Vector<ResumeEntry>,
     pub position: usize,
     pub progress_ms: u64,
+    #[serde(default)]
+    #[data(ignore)]
+    pub engine_queue: Option<psst_core::player::queue::QueueSnapshot>,
 }
 
 impl AppState {
@@ -38,7 +41,7 @@ impl AppState {
             })
             .take(5000)
             .collect();
-        let (items, position) = match position {
+        let (mut items, mut position) = match position {
             Some(position) if entries.len() == queue.len() && position < entries.len() => {
                 (entries, position)
             }
@@ -50,6 +53,36 @@ impl AppState {
                 0,
             ),
         };
+        let mut engine_queue = None;
+        if self.connect.selected.is_none() {
+            if let Some(engine) = &self.engine_queue {
+                let all = engine.items.iter().chain(engine.user_items.iter());
+                let entries: Vector<_> = all
+                    .filter_map(|item| self.queued_entry(item.item_id))
+                    .filter_map(|entry| {
+                        entry.item.track().map(|track| ResumeEntry {
+                            track: track.clone(),
+                            origin: entry.origin.to_nav(),
+                        })
+                    })
+                    .collect();
+                if !engine.items.is_empty()
+                    && entries.len() == engine.items.len() + engine.user_items.len()
+                    && entries.len() <= 5000
+                {
+                    if let Some(index) = engine.positions.get(engine.position) {
+                        if entries
+                            .get(*index)
+                            .is_some_and(|entry| entry.track.id == current.id)
+                        {
+                            items = entries;
+                            position = *index;
+                            engine_queue = Some(engine.clone());
+                        }
+                    }
+                }
+            }
+        }
         self.config.last_playback = Some(ResumeSnapshot {
             items,
             position,
@@ -58,6 +91,7 @@ impl AppState {
                 .as_millis()
                 .min(current.duration.as_millis().saturating_sub(1))
                 as u64,
+            engine_queue,
         });
     }
 
@@ -85,6 +119,26 @@ impl AppState {
                 origin: origin_from_nav(&entry.origin),
             })
             .collect();
+        self.engine_queue = snapshot.engine_queue.filter(|engine| {
+            let mut queue = psst_core::player::queue::Queue::new();
+            queue.restore(engine.clone())
+                && queue
+                    .get_current()
+                    .is_some_and(|item| item.item_id == entry.track.id.0)
+                && engine
+                    .items
+                    .iter()
+                    .chain(engine.user_items.iter())
+                    .all(|item| {
+                        snapshot
+                            .items
+                            .iter()
+                            .any(|entry| entry.track.id.0 == item.item_id)
+                    })
+        });
+        if let Some(saved) = &mut self.config.last_playback {
+            saved.engine_queue = self.engine_queue.clone();
+        }
         self.start_playback(Playable::Track(entry.track.clone()), origin, progress);
         self.playback.state = PlaybackState::Paused;
         self.nav = entry.origin.clone();
@@ -107,6 +161,63 @@ pub fn origin_from_nav(nav: &Nav) -> PlaybackOrigin {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn app_snapshot_keeps_manual_tracks_and_exact_engine_order() {
+        use psst_core::{
+            audio::normalize::NormalizationLevel,
+            item_id::{ItemId, ItemIdType},
+            player::{
+                item::PlaybackItem,
+                queue::{Queue, QueueBehavior},
+            },
+        };
+        let tracks: Vec<_> = (1..=3)
+            .map(|index| {
+                let mut track: Track = serde_json::from_value(serde_json::json!({
+                    "id":"5lfWrciYtohtIMVDVZd0Rf","name":format!("Song {index}"),
+                    "artists":[{"id":"example","name":"Artist"}],"duration_ms":240000,
+                    "disc_number":1,"track_number":1,"explicit":false,"is_local":false
+                }))
+                .unwrap();
+                track.id = super::super::TrackId(ItemId::new(index, ItemIdType::Track));
+                Arc::new(track)
+            })
+            .collect();
+        let entry = |index: usize| QueueEntry {
+            item: Playable::Track(tracks[index].clone()),
+            origin: PlaybackOrigin::Library,
+        };
+        let item = |index: usize| PlaybackItem {
+            item_id: tracks[index].id.0,
+            norm_level: NormalizationLevel::Track,
+        };
+        let mut state = AppState::default_with_config(super::super::Config::default());
+        state.playback.queue = druid::im::vector![entry(0), entry(1)];
+        state.added_queue = druid::im::vector![entry(2), entry(2)];
+        let mut engine = Queue::new();
+        engine.fill(vec![item(0), item(1)], 0);
+        engine.set_behaviour(QueueBehavior::Random);
+        engine.add(item(2));
+        engine.add(item(2));
+        engine.skip_to_following();
+        state.engine_queue = Some(engine.snapshot());
+        state.start_playback(
+            Playable::Track(tracks[2].clone()),
+            PlaybackOrigin::Library,
+            Duration::from_secs(37),
+        );
+        state.capture_resume();
+        let config = serde_json::from_str(&serde_json::to_string(&state.config).unwrap()).unwrap();
+        let restored = AppState::default_with_config(config);
+        assert_eq!(restored.playback.state, PlaybackState::Paused);
+        assert_eq!(
+            restored.playback.now_playing.as_ref().unwrap().item.id(),
+            tracks[2].id.0
+        );
+        let mut resumed_engine = Queue::new();
+        assert!(resumed_engine.restore(restored.engine_queue.unwrap()));
+        assert_eq!(resumed_engine.upcoming_ids(), engine.upcoming_ids());
+    }
     #[test]
     fn round_trip_restores_track_queue_position_and_pause_without_credentials() {
         let track: Track = serde_json::from_value(serde_json::json!({

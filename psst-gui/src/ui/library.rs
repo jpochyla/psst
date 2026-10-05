@@ -1,9 +1,6 @@
 use std::sync::Arc;
 
-use druid::{
-    widget::{Flex, List},
-    LensExt, Selector, Widget, WidgetExt,
-};
+use druid::{widget::Flex, LensExt, Selector, Widget, WidgetExt};
 
 use crate::{
     cmd,
@@ -108,7 +105,10 @@ pub fn saved_tracks_widget() -> impl Widget<AppState> {
 pub fn saved_albums_widget() -> impl Widget<AppState> {
     Async::new(
         utils::spinner_widget,
-        || List::new(|| album::album_widget(false)).lens(Ctx::map(SavedAlbums::albums)),
+        || {
+            super::grid::with_context(|| album::album_widget(true).boxed())
+                .lens(Ctx::map(SavedAlbums::albums))
+        },
         utils::error_widget,
     )
     .lens(

@@ -1,6 +1,7 @@
 use std::{
     collections::HashMap,
     fmt::Display,
+    hash::{Hash, Hasher},
     io::{self, Read},
     path::PathBuf,
     sync::Arc,
@@ -167,7 +168,13 @@ impl WebApi {
                     Err(_) => failed += 1,
                 }
             }
-            log::info!("Release lookup: {} of {} artists, {} recent releases, {} failures", ((batch_index + 1) * 4).min(followed.len()), followed.len(), releases.len(), failed);
+            log::info!(
+                "Release lookup: {} of {} artists, {} recent releases, {} failures",
+                ((batch_index + 1) * 4).min(followed.len()),
+                followed.len(),
+                releases.len(),
+                failed
+            );
         }
         releases.sort_by(|a, b| b.date.cmp(&a.date).then(a.album.name.cmp(&b.album.name)));
         Ok(data::news::NewsFeed {
@@ -178,32 +185,74 @@ impl WebApi {
         })
     }
 
-    fn news_albums<T: DeserializeOwned>(&self, id: &str, request: &RequestBuilder) -> Result<T, Error> {
+    fn news_albums<T: DeserializeOwned>(
+        &self,
+        id: &str,
+        request: &RequestBuilder,
+    ) -> Result<T, Error> {
         if id.len() != 22 || !id.chars().all(|c| c.is_ascii_alphanumeric()) {
             return Err(Error::WebApiError("Invalid artist ID".into()));
         }
-        let cached = || self.cache.get("artist-releases", id).and_then(|file| serde_json::from_reader(file).ok());
-        let quota_active = self.news_quota_until.lock().is_some_and(|until| until > SystemTime::now());
-        let fresh = self.cache.get("artist-releases", id).and_then(|file| file.metadata().ok())
-            .and_then(|metadata| metadata.modified().ok()).and_then(|modified| modified.elapsed().ok())
+        let cached = || {
+            self.cache
+                .get("artist-releases", id)
+                .and_then(|file| serde_json::from_reader(file).ok())
+        };
+        let quota_active = self
+            .news_quota_until
+            .lock()
+            .is_some_and(|until| until > SystemTime::now());
+        let fresh = self
+            .cache
+            .get("artist-releases", id)
+            .and_then(|file| file.metadata().ok())
+            .and_then(|metadata| metadata.modified().ok())
+            .and_then(|modified| modified.elapsed().ok())
             .is_some_and(|age| age < Duration::from_secs(6 * 3600));
         if quota_active || fresh {
-            if let Some(value) = cached() { return Ok(value); }
-            if quota_active { return Err(Error::WebApiError("Spotify HTTP 429: release quota exhausted".into())); }
+            if let Some(value) = cached() {
+                return Ok(value);
+            }
+            if quota_active {
+                return Err(Error::WebApiError(
+                    "Spotify HTTP 429: release quota exhausted".into(),
+                ));
+            }
         }
         let mut response = self.request(request)?;
         if response.status() == StatusCode::TOO_MANY_REQUESTS {
-            let seconds = response.headers().get("Retry-After").and_then(|header| header.to_str().ok())
-                .and_then(|value| value.parse::<u64>().ok()).unwrap_or(60).clamp(1, 604800);
+            let seconds = response
+                .headers()
+                .get("Retry-After")
+                .and_then(|header| header.to_str().ok())
+                .and_then(|value| value.parse::<u64>().ok())
+                .unwrap_or(60)
+                .clamp(1, 604800);
             let until = SystemTime::now() + Duration::from_secs(seconds);
             let mut quota = self.news_quota_until.lock();
             *quota = Some(until);
-            self.cache.set("artist-releases", "quota-until", until.duration_since(UNIX_EPOCH).unwrap().as_secs().to_string().as_bytes());
-            return cached().ok_or_else(|| Error::WebApiError("Spotify HTTP 429: release quota exhausted".into()));
+            self.cache.set(
+                "artist-releases",
+                "quota-until",
+                until
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs()
+                    .to_string()
+                    .as_bytes(),
+            );
+            return cached().ok_or_else(|| {
+                Error::WebApiError("Spotify HTTP 429: release quota exhausted".into())
+            });
         }
-        let value: serde_json::Value = response.body_mut().with_config().limit(2 * 1024 * 1024).read_json()?;
+        let value: serde_json::Value = response
+            .body_mut()
+            .with_config()
+            .limit(2 * 1024 * 1024)
+            .read_json()?;
         let parsed = serde_json::from_value(value.clone())?;
-        self.cache.set("artist-releases", id, &serde_json::to_vec(&value)?);
+        self.cache
+            .set("artist-releases", id, &serde_json::to_vec(&value)?);
         Ok(parsed)
     }
 
@@ -256,13 +305,23 @@ impl WebApi {
         };
         match action.kind.as_str() {
             "transfer" | "switch-play" => {
-                let already_active = self.get_devices()?.iter().any(|device| device.id.as_ref() == Some(&action.device_id) && device.is_active);
-                if !already_active { self.send_empty_json(&RequestBuilder::new(
-                    "v1/me/player",
-                    Method::Put,
-                    Some(json!({"device_ids":[action.device_id],"play":false})),
-                ))?; }
-                if already_active && action.kind == "transfer" && self.remote_playback()?.is_some_and(|playback| playback.is_playing && playback.device.id.as_ref() == Some(&action.device_id)) {
+                let already_active = self.get_devices()?.iter().any(|device| {
+                    device.id.as_ref() == Some(&action.device_id) && device.is_active
+                });
+                if !already_active {
+                    self.send_empty_json(&RequestBuilder::new(
+                        "v1/me/player",
+                        Method::Put,
+                        Some(json!({"device_ids":[action.device_id],"play":false})),
+                    ))?;
+                }
+                if already_active
+                    && action.kind == "transfer"
+                    && self.remote_playback()?.is_some_and(|playback| {
+                        playback.is_playing
+                            && playback.device.id.as_ref() == Some(&action.device_id)
+                    })
+                {
                     send("v1/me/player/pause", Method::Put, None)?;
                 }
                 if action.kind == "switch-play" {
@@ -323,6 +382,36 @@ impl WebApi {
 mod credential_destination_tests {
     use super::*;
     #[test]
+    fn cache_keys_are_stable_across_query_order_and_separate_sessions() {
+        let api = WebApi::new(None, None, 5000);
+        *api.webapi_token.lock() = Some(WebApiToken {
+            access_token: "test-access".into(),
+            refresh_token: Some("test-account-a".into()),
+            expires_at: u64::MAX,
+        });
+        let first = RequestBuilder::new("v1/me/tracks", Method::Get, None)
+            .query("limit", 50)
+            .query("offset", 0);
+        let reordered = RequestBuilder::new("v1/me/tracks", Method::Get, None)
+            .query("offset", 0)
+            .query("limit", 50);
+        let key = api.response_key(&first).unwrap();
+        assert_eq!(Some(key.clone()), api.response_key(&reordered));
+        api.webapi_token.lock().as_mut().unwrap().access_token = "rotated-access-token".into();
+        assert_eq!(Some(key.clone()), api.response_key(&first));
+        api.webapi_token.lock().as_mut().unwrap().refresh_token = Some("test-account-b".into());
+        assert_ne!(Some(key), api.response_key(&first));
+        assert!(!WebApi::temporary_api_error(&Error::WebApiError(
+            "http status: 403".into()
+        )));
+        assert!(!WebApi::temporary_api_error(&Error::WebApiError(
+            "http status: 401".into()
+        )));
+        assert!(WebApi::temporary_api_error(&Error::WebApiError(
+            "http status: 503".into()
+        )));
+    }
+    #[test]
     fn exhausted_release_quota_returns_without_network_or_sleep() {
         let api = WebApi::new(None, None, 5000);
         *api.news_quota_until.lock() = Some(SystemTime::now() + Duration::from_secs(86400));
@@ -331,7 +420,9 @@ mod credential_destination_tests {
         let result = api.news_albums::<serde_json::Value>("5lfWrciYtohtIMVDVZd0Rf", &request);
         assert!(result.unwrap_err().to_string().contains("429"));
         assert!(start.elapsed() < Duration::from_secs(1));
-        assert!(api.news_albums::<serde_json::Value>("../escape", &request).is_err());
+        assert!(api
+            .news_albums::<serde_json::Value>("../escape", &request)
+            .is_err());
     }
     #[test]
     fn library_mutations_use_current_endpoint_and_encoded_spotify_uri() {
@@ -383,6 +474,7 @@ pub struct WebApi {
     paginated_limit: usize,
     webapi_token: Mutex<Option<WebApiToken>>,
     news_quota_until: Mutex<Option<SystemTime>>,
+    response_origins: Mutex<HashMap<String, SystemTime>>,
     webapi_client_id: Mutex<Option<String>>,
     // First-party session credentials, used for `api-partner.spotify.com`
     // (pathfinder GraphQL) calls, which reject the Web API OAuth token.
@@ -406,7 +498,8 @@ impl WebApi {
             agent = agent.proxy(proxy);
         }
         let cache = WebApiCache::new(cache_base);
-        let news_quota_until = cache.get("artist-releases", "quota-until")
+        let news_quota_until = cache
+            .get("artist-releases", "quota-until")
             .and_then(|file| serde_json::from_reader::<_, u64>(file).ok())
             .and_then(|seconds| UNIX_EPOCH.checked_add(Duration::from_secs(seconds)));
         let client_token_provider = ClientTokenProvider::new_shared(proxy_url);
@@ -414,6 +507,7 @@ impl WebApi {
             agent: agent.build().into(),
             cache,
             news_quota_until: Mutex::new(news_quota_until),
+            response_origins: Mutex::new(HashMap::new()),
             local_track_manager: Mutex::new(LocalTrackManager::new()),
             paginated_limit,
             webapi_token: Mutex::new(None),
@@ -538,7 +632,7 @@ impl WebApi {
 
         let ct = client_token.as_deref();
         let headers = request.get_headers();
-        let result = match request.get_method() {
+        let send_request = || match request.get_method() {
             Method::Get => configure_request(self.agent.get(&url), &token, ct, headers).call(),
             Method::Post => {
                 let req = configure_request(self.agent.post(&url), &token, ct, headers);
@@ -562,6 +656,8 @@ impl WebApi {
                 }
             }
         };
+        let safe = matches!(request.get_method(), Method::Get);
+        let result = super::retry::run(send_request, safe, thread::sleep);
         let mut response = result.map_err(|err| Error::WebApiError(err.to_string()))?;
         if (response.status().is_client_error() || response.status().is_server_error())
             && response.status() != StatusCode::TOO_MANY_REQUESTS
@@ -585,26 +681,38 @@ impl WebApi {
                 destination.path()
             )));
         }
+        if response.status().is_success()
+            && request.base_uri == "api.spotify.com"
+            && !matches!(request.method, Method::Get)
+            && !request.path.starts_with("v1/me/player")
+        {
+            if let Err(error) = self.invalidate_metadata() {
+                log::warn!("Metadata invalidation failed: {error}");
+            }
+        }
         Ok(response)
     }
 
     fn with_retry(f: impl Fn() -> Result<Response<Body>, Error>) -> Result<Response<Body>, Error> {
-        loop {
+        for attempt in 0..3 {
             let response = f()?;
-            match response.status() {
-                StatusCode::TOO_MANY_REQUESTS => {
-                    let retry_after_secs = response
-                        .headers()
-                        .get("Retry-After")
-                        .and_then(|secs| secs.to_str().ok());
-                    let secs = retry_after_secs.unwrap_or("2").parse::<u64>().unwrap_or(2);
-                    thread::sleep(Duration::from_secs(secs));
-                }
-                _ => {
-                    break Ok(response);
-                }
+            if response.status() != StatusCode::TOO_MANY_REQUESTS {
+                return Ok(response);
             }
+            let seconds = response
+                .headers()
+                .get("Retry-After")
+                .and_then(|header| header.to_str().ok())
+                .and_then(|value| value.parse::<u64>().ok())
+                .unwrap_or(2);
+            if seconds > 5 || attempt == 2 {
+                return Err(Error::WebApiError(format!(
+                    "Spotify HTTP 429. Vuelve a intentarlo en {seconds} segundos."
+                )));
+            }
+            thread::sleep(Duration::from_secs(seconds.max(1)));
         }
+        unreachable!()
     }
 
     /// Send a request with an empty JSON object, throw away the response body.
@@ -616,11 +724,131 @@ impl WebApi {
     /// Send a request and return the deserialized JSON body.  Use for GET
     /// requests.
     fn load<T: DeserializeOwned>(&self, request: &RequestBuilder) -> Result<T, Error> {
-        let mut response = Self::with_retry(|| self.request(request))?;
-        response
-            .body_mut()
-            .read_json()
-            .map_err(|err| Error::WebApiError(err.to_string()))
+        let cacheable = matches!(request.method, Method::Get)
+            && !request.path.starts_with("v1/me/player")
+            && !request.path.ends_with("/contains");
+        let key = if cacheable {
+            self.response_key(request)
+        } else {
+            None
+        };
+        let mut old = None;
+        if let Some(key) = &key {
+            if let Some(file) = self.cache.get("responses", key) {
+                let modified = file.metadata().ok().and_then(|meta| meta.modified().ok());
+                if let Ok(value) = serde_json::from_reader(file) {
+                    if modified
+                        .and_then(|time| time.elapsed().ok())
+                        .is_some_and(|age| age < Duration::from_secs(300))
+                    {
+                        if let Some(time) = modified {
+                            self.response_origins.lock().insert(request.build(), time);
+                        }
+                        return Ok(value);
+                    }
+                    old = Some((value, modified));
+                }
+            }
+        }
+        let result = self.request_json(request);
+        match result {
+            Ok(value) => {
+                let parsed = serde_json::from_value(value.clone())?;
+                if let Some(key) = key {
+                    self.cache
+                        .set("responses", &key, &serde_json::to_vec(&value)?);
+                }
+                self.response_origins.lock().remove(&request.build());
+                Ok(parsed)
+            }
+            Err(error) if Self::temporary_api_error(&error) && old.is_some() => {
+                let (value, modified) = old.unwrap();
+                if let Some(time) = modified {
+                    self.response_origins.lock().insert(request.build(), time);
+                }
+                Ok(value)
+            }
+            Err(error) => Err(error),
+        }
+    }
+
+    fn request_json(&self, request: &RequestBuilder) -> Result<serde_json::Value, Error> {
+        for attempt in 0..3 {
+            let mut response = Self::with_retry(|| self.request(request))?;
+            match response
+                .body_mut()
+                .with_config()
+                .limit(16 * 1024 * 1024)
+                .read_json()
+            {
+                Ok(value) => return Ok(value),
+                Err(error)
+                    if matches!(request.method, Method::Get)
+                        && super::retry::transient(&error)
+                        && attempt < 2 =>
+                {
+                    thread::sleep(Duration::from_millis(250 * (attempt + 1)));
+                }
+                Err(error) => return Err(error.into()),
+            }
+        }
+        unreachable!("bounded retry returns on final attempt")
+    }
+
+    fn temporary_api_error(error: &Error) -> bool {
+        let message = error.to_string().to_lowercase();
+        [
+            "timeout",
+            "timed out",
+            "connection",
+            "host not found",
+            "429",
+            "http 500",
+            "http 502",
+            "http 503",
+            "http 504",
+            "http status: 500",
+            "http status: 502",
+            "http status: 503",
+            "http status: 504",
+        ]
+        .iter()
+        .any(|term| message.contains(term))
+    }
+
+    fn response_key(&self, request: &RequestBuilder) -> Option<String> {
+        let guard = self.webapi_token.lock();
+        let token = guard.as_ref()?;
+        let mut hash = std::collections::hash_map::DefaultHasher::new();
+        token
+            .refresh_token
+            .as_ref()
+            .unwrap_or(&token.access_token)
+            .hash(&mut hash);
+        request.build().hash(&mut hash);
+        Some(format!("{:016x}", hash.finish()))
+    }
+
+    pub fn invalidate_metadata(&self) -> Result<(), Error> {
+        self.cache.invalidate_metadata()?;
+        self.response_origins.lock().clear();
+        Ok(())
+    }
+
+    pub fn cache_origin(&self, nav: &data::Nav) -> Option<SystemTime> {
+        let prefix = match nav {
+            data::Nav::PlaylistDetail(link) => format!("v1/playlists/{}", link.id),
+            data::Nav::SavedTracks => "v1/me/tracks".into(),
+            data::Nav::SavedAlbums => "v1/me/albums".into(),
+            data::Nav::SearchResults(_) => "v1/search".into(),
+            _ => return None,
+        };
+        self.response_origins
+            .lock()
+            .iter()
+            .filter(|(path, _)| path.starts_with(&format!("https://api.spotify.com/{prefix}")))
+            .map(|(_, time)| *time)
+            .min()
     }
 
     /// Send a request using `self.load()`, but only if it isn't already present
@@ -631,21 +859,31 @@ impl WebApi {
         bucket: &str,
         key: &str,
     ) -> Result<Cached<T>, Error> {
+        let mut old = None;
         if let Some(file) = self.cache.get(bucket, key) {
-            let cached_at = file.metadata()?.modified()?;
-            let value = serde_json::from_reader(file)?;
-            Ok(Cached::new(value, cached_at))
-        } else {
-            let response = Self::with_retry(|| self.request(request))?;
-            let body = {
-                let mut reader = response.into_body().into_reader();
-                let mut body = Vec::new();
-                reader.read_to_end(&mut body)?;
-                body
-            };
-            let value = serde_json::from_slice(&body)?;
-            self.cache.set(bucket, key, &body);
-            Ok(Cached::fresh(value))
+            let modified = file.metadata().ok().and_then(|meta| meta.modified().ok());
+            if let (Some(time), Ok(value)) = (modified, serde_json::from_reader::<_, T>(file)) {
+                if time
+                    .elapsed()
+                    .ok()
+                    .is_some_and(|age| age < Duration::from_secs(86400))
+                {
+                    return Ok(Cached::new(value, time));
+                }
+                old = Some((value, time));
+            }
+        }
+        match self.request_json(request) {
+            Ok(value) => {
+                let parsed = serde_json::from_value(value.clone())?;
+                self.cache.set(bucket, key, &serde_json::to_vec(&value)?);
+                Ok(Cached::fresh(parsed))
+            }
+            Err(error) if Self::temporary_api_error(&error) && old.is_some() => {
+                let (value, time) = old.unwrap();
+                Ok(Cached::new(value, time))
+            }
+            Err(error) => Err(error),
         }
     }
 
@@ -656,29 +894,31 @@ impl WebApi {
         request: &RequestBuilder,
         mut func: impl FnMut(Page<T>) -> Result<(), Error>,
     ) -> Result<(), Error> {
-        // TODO: Some result sets, like very long playlists and saved tracks/albums can
-        // be very big.  Implement virtualized scrolling and lazy-loading of results.
-        let mut limit = 50;
         let mut offset = 0;
-        loop {
+        while offset < self.paginated_limit {
+            let limit = 50.min(self.paginated_limit - offset);
             let req = request
                 .clone()
-                .query("limit".to_string(), limit.to_string())
-                .query("offset".to_string(), offset.to_string());
+                .query("limit", limit)
+                .query("offset", offset);
             let page: Page<T> = self.load(&req)?;
-
-            let page_total = page.total;
-            let page_offset = page.offset;
-            let page_limit = page.limit;
-            func(page)?;
-
-            if page_total > offset && offset < self.paginated_limit {
-                limit = page_limit;
-                offset = page_offset + page_limit;
-            } else {
-                break Ok(());
+            if page.offset != offset || page.limit == 0 {
+                return Err(Error::WebApiError(
+                    "Spotify devolvio una pagina inconsistente. Actualiza la vista.".into(),
+                ));
             }
+            let next = page
+                .offset
+                .checked_add(page.limit)
+                .ok_or_else(|| Error::WebApiError("Invalid page offset".into()))?;
+            let finished = page.items.is_empty() || next >= page.total;
+            func(page)?;
+            if finished {
+                break;
+            }
+            offset = next;
         }
+        Ok(())
     }
 
     /// Very similar to `for_all_pages`, but only returns a certain number of results
@@ -2040,6 +2280,51 @@ impl WebApi {
         Ok(())
     }
 
+    pub fn reorder_playlist_track(
+        &self,
+        movement: &crate::data::PlaylistReorder,
+    ) -> Result<(), Error> {
+        let id = &movement.link.id;
+        // Read live state, bypassing cache, and verify the original occurrence before writing.
+        let mut response = self.request(&RequestBuilder::new(
+            format!("v1/playlists/{id}"),
+            Method::Get,
+            None,
+        ))?;
+        let metadata: serde_json::Value = response.body_mut().read_json()?;
+        let snapshot = metadata
+            .get("snapshot_id")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| {
+                Error::WebApiError("Spotify no devolvió la versión de la playlist.".into())
+            })?;
+        let mut response = self.request(
+            &RequestBuilder::new(format!("v1/playlists/{id}/items"), Method::Get, None)
+                .query("offset", movement.position.to_string())
+                .query("limit", "1"),
+        )?;
+        let page: serde_json::Value = response.body_mut().read_json()?;
+        let track = page
+            .pointer("/items/0/item/id")
+            .or_else(|| page.pointer("/items/0/track/id"))
+            .and_then(|v| v.as_str());
+        let expected = movement.track_id.0.to_base62();
+        if track != Some(expected.as_str()) {
+            return Err(Error::WebApiError(
+                "La playlist cambió. Actualízala antes de reordenar.".into(),
+            ));
+        }
+        let total = page.get("total").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
+        let insert_before = reorder_destination(movement.position, total, movement.down)?;
+        self.request(&RequestBuilder::new(
+            format!("v1/playlists/{id}/items"),
+            Method::Put,
+            Some(json!({"range_start": movement.position, "range_length": 1,
+                "insert_before": insert_before, "snapshot_id": snapshot})),
+        ))?;
+        Ok(())
+    }
+
     // https://developer.spotify.com/documentation/web-api/reference/add-items-to-playlist
     pub fn add_track_to_playlist(&self, playlist_id: &str, track_uri: &str) -> Result<(), Error> {
         let request = &RequestBuilder::new(
@@ -2234,11 +2519,9 @@ impl WebApi {
             return Err(Error::WebApiError("Untrusted image source".into()));
         }
         // Image CDNs never receive Spotify authorization or client-token headers.
-        let response = self
-            .agent
-            .get(parsed.as_str())
-            .call()
-            .map_err(|e| Error::WebApiError(e.to_string()))?;
+        let response =
+            psst_core::util::retry_network_read(|| self.agent.get(parsed.as_str()).call())
+                .map_err(|e| Error::WebApiError(e.to_string()))?;
         let mut body = Vec::new();
         response
             .into_body()
@@ -2384,11 +2667,35 @@ impl RequestBuilder {
                 &self
                     .queries
                     .iter()
+                    .sorted_by_key(|(key, _)| *key)
                     .map(|(k, v)| format!("{k}={v}"))
                     .collect::<Vec<_>>()
                     .join("&"),
             );
         }
         url
+    }
+}
+
+fn reorder_destination(position: usize, total: usize, down: bool) -> Result<usize, Error> {
+    if position >= total || (down && position + 1 >= total) || (!down && position == 0) {
+        return Err(Error::WebApiError(
+            "La cancion ya esta en el extremo de la playlist.".into(),
+        ));
+    }
+    Ok(if down { position + 2 } else { position - 1 })
+}
+
+#[cfg(test)]
+mod reorder_tests {
+    use super::reorder_destination;
+    #[test]
+    fn spotify_insertion_indices_preserve_adjacent_order() {
+        assert_eq!(reorder_destination(3, 8, true).unwrap(), 5);
+        assert_eq!(reorder_destination(3, 8, false).unwrap(), 2);
+        assert!(reorder_destination(0, 8, false).is_err());
+        assert!(reorder_destination(7, 8, true).is_err());
+        assert!(reorder_destination(8, 8, false).is_err());
+        assert!(reorder_destination(0, 0, true).is_err());
     }
 }

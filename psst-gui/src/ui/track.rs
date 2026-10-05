@@ -238,7 +238,31 @@ fn popularity_stars(popularity: u32) -> String {
 }
 
 fn track_row_menu(row: &PlayRow<Arc<Track>>) -> Menu<AppState> {
-    track_menu(&row.item, &row.ctx.library, &row.origin)
+    let mut menu = track_menu(&row.item, &row.ctx.library, &row.origin);
+    if let PlaybackOrigin::Playlist(link) = row.origin.as_ref() {
+        if row
+            .ctx
+            .library
+            .writable_playlists()
+            .iter()
+            .any(|p| p.id == link.id)
+        {
+            for (title, down) in [
+                ("Mover arriba en la playlist", false),
+                ("Mover abajo en la playlist", true),
+            ] {
+                menu = menu.entry(MenuItem::new(title).command(playlist::REORDER_TRACK.with(
+                    crate::data::PlaylistReorder {
+                        link: link.clone(),
+                        track_id: row.item.id,
+                        position: row.item.track_pos,
+                        down,
+                    },
+                )));
+            }
+        }
+    }
+    menu
 }
 
 pub fn track_menu(
@@ -248,8 +272,10 @@ pub fn track_menu(
 ) -> Menu<AppState> {
     let mut menu = Menu::empty();
 
-    menu = menu.entry(MenuItem::new("Buscar videoclip en YouTube")
-        .command(cmd::OPEN_MUSIC_VIDEO.with(track.clone())));
+    menu = menu.entry(
+        MenuItem::new("Buscar videoclip en YouTube")
+            .command(cmd::OPEN_MUSIC_VIDEO.with(track.clone())),
+    );
 
     for artist_link in &track.artists {
         let more_than_one_artist = track.artists.len() > 1;

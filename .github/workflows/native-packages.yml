@@ -1,0 +1,33 @@
+name: Xpotify native packages
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  package:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev libssl-dev libasound2-dev
+      - name: Build Windows package
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./scripts/Package-Native.ps1
+      - name: Build macOS or Linux package
+        if: runner.os != 'Windows'
+        run: bash scripts/Package-Native.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Xpotify-${{ runner.os }}-${{ runner.arch }}
+          path: |
+            dist/*.zip
+            dist/*.tar.gz
+            dist/*.sha256

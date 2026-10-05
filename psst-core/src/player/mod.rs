@@ -111,15 +111,43 @@ impl Player {
     fn handle_command(&mut self, cmd: PlayerCommand) {
         match cmd {
             PlayerCommand::LoadQueue { items, position } => self.load_queue(items, position),
+            PlayerCommand::ChangeAudioOutput { sink, resume } => {
+                self.audio_output_sink.stop();
+                self.audio_output_sink.close();
+                let position = match self.state {
+                    PlayerState::Playing { position, .. }
+                    | PlayerState::Paused { position, .. }
+                    | PlayerState::Ready { position, .. } => position,
+                    _ => self.start_position,
+                };
+                self.audio_output_sink = sink;
+                self.playback_mgr =
+                    PlaybackManager::new(self.audio_output_sink.clone(), self.sender.clone());
+                self.state = self
+                    .queue
+                    .get_current()
+                    .map(|item| PlayerState::Ready {
+                        item: *item,
+                        position,
+                    })
+                    .unwrap_or(PlayerState::Stopped);
+                if resume {
+                    self.resume();
+                }
+            }
             PlayerCommand::RestoreQueue {
                 items,
                 position,
                 progress,
+                snapshot,
             } => {
                 self.audio_output_sink.stop();
                 self.preload = PreloadState::None;
                 self.start_position = Duration::ZERO;
                 self.queue.fill(items, position);
+                if let Some(snapshot) = snapshot {
+                    self.queue.restore(snapshot);
+                }
                 if let Some(&item) = self.queue.get_current() {
                     self.state = PlayerState::Ready {
                         item,
@@ -250,6 +278,7 @@ impl Player {
     fn publish_queue(&self) {
         let _ = self.sender.send(PlayerEvent::QueueChanged {
             upcoming: self.queue.upcoming_ids(),
+            snapshot: self.queue.snapshot(),
         });
     }
 
@@ -450,11 +479,16 @@ impl Player {
 }
 
 pub enum PlayerCommand {
+    ChangeAudioOutput {
+        sink: DefaultAudioSink,
+        resume: bool,
+    },
     /// Restore metadata and queue without fetching or starting any audio.
     RestoreQueue {
         items: Vec<PlaybackItem>,
         position: usize,
         progress: Duration,
+        snapshot: Option<queue::QueueSnapshot>,
     },
     LoadQueue {
         items: Vec<PlaybackItem>,
@@ -493,6 +527,7 @@ pub enum PlayerCommand {
 pub enum PlayerEvent {
     QueueChanged {
         upcoming: Vec<crate::item_id::ItemId>,
+        snapshot: queue::QueueSnapshot,
     },
     Command(PlayerCommand),
     /// Track has started loading.  `Loaded` follows.

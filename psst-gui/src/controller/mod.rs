@@ -1,5 +1,6 @@
 mod after_delay;
 mod alert_cleanup;
+pub mod cache_hint;
 mod ex_click;
 mod ex_cursor;
 mod ex_scroll;

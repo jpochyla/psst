@@ -82,15 +82,17 @@ fn fetch_public(track: &Track) -> Result<Lyrics, Error> {
                 query.append_pair("album_name", &track.album_name());
             }
         }
-        let mut response = agent
-            .get(url.as_str())
-            .header("User-Agent", "Xpotify/0.1 (native lyrics)")
-            .call()
-            .map_err(|_| {
-                Error::WebApiError(
-                    "No se pudo conectar con el servicio de letras. Intenta de nuevo.".into(),
-                )
-            })?;
+        let mut response = psst_core::util::retry_network_read(|| {
+            agent
+                .get(url.as_str())
+                .header("User-Agent", "Xpotify/0.1 (native lyrics)")
+                .call()
+        })
+        .map_err(|_| {
+            Error::WebApiError(
+                "No se pudo conectar con el servicio de letras. Intenta de nuevo.".into(),
+            )
+        })?;
         if response.status().as_u16() == 404 {
             continue;
         }

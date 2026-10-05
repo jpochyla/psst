@@ -2,6 +2,8 @@
 
 The native integration lives in the existing xpotify repository, branch `splitify-integration`. The original Splitify repository stays on `main` with its Next.js web application. No nested Rust copy or separate native repository is required.
 
+The fork roadmap and its remaining limits are tracked in [ROADMAP.md](ROADMAP.md). The native app now includes paged track lists, album/artist grids, local playlist folders, safe playlist reordering, a resizable current-playback pane, network retries and metadata cache dates/refresh. Playback state preserves the engine's actual shuffle order and manually queued tracks and restores in pause. Windows distribution: `powershell -File scripts/Package-Native.ps1`; the ZIP contains no account credentials or Gemini key. macOS/Linux packaging scripts and a manual workflow are provided but have not been tested on this Windows machine.
+
 ## Run on this machine
 
 Double-click `Xpotify.lnk` for the green app shortcut, or `Start-Xpotify.cmd`. The launcher starts `dist/Xpotify.exe` from this repository, loading `.env.local` from the project directory. To rebuild: `powershell -File scripts/Build-Native.ps1`. Rust stable and Visual Studio C++ Build Tools / Windows SDK are required for compilation. The running application requires neither Node nor a web server.
@@ -55,7 +57,7 @@ Development UI review: `--preview-ui=lyrics --dark` or `--light` uses synthetic 
 
 The main window now has a global search field and Home button at the top, playlist cover thumbnails in the library, and a full-width player with volume at the bottom. Device and news icons remain available across routes. System remains the default theme.
 
-Closing the app saves the current track, source playlist/album, base queue and position in the local profile. Startup restores them paused and loads the source view. Audio is loaded only after pressing Play. Snapshots contain up to 5,000 tracks; manual queue additions and the previous shuffle order are not persisted.
+Closing the app saves the current track, source playlist/album, queue and position in the local profile. Startup restores them paused and loads the source view. Audio is loaded only after pressing Play. Snapshots contain up to 5,000 entries and preserve the engine's exact shuffle order, repeat mode and manual queue additions. Older profiles gain this state when saved. The default library loading limit is now 5,000, with 100 visible track rows per page.
 
 Open the device icon to select a Spotify Connect device or **Este equipo · Xpotify**. Remote controls use Spotify's official playback API, including play/pause, previous/next, seek, queue additions, shuffle/repeat and volume. Remote queue entries come from Spotify. Open Spotify on the other device with the same account so it can be discovered. Returning to this computer keeps the song paused, ready to continue. Device support and account permissions can limit available controls.
 

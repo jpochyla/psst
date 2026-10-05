@@ -1,5 +1,5 @@
 use druid::{
-    widget::{Button, CrossAxisAlignment, Either, Flex, Label, LineBreaking, List, Scroll},
+    widget::{Button, CrossAxisAlignment, Either, Flex, Label, LineBreaking, Scroll},
     LensExt, Widget, WidgetExt,
 };
 
@@ -132,7 +132,7 @@ pub fn widget() -> impl Widget<AppState> {
             .with_text_color(theme::PLACEHOLDER_COLOR),
         );
 
-    let list = List::new(|| {
+    let list = super::grid::list(|| {
         Flex::row()
             .with_flex_child(
                 Flex::column()
@@ -166,6 +166,7 @@ pub fn widget() -> impl Widget<AppState> {
             .border(theme::GREY_500, 1.0)
             .rounded(8.0)
             .padding((0.0, 0.0, 0.0, 8.0))
+            .boxed()
     })
     .lens(AppState::playback.then(Playback::up_next));
 

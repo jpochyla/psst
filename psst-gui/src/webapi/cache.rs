@@ -11,11 +11,39 @@ use druid::image;
 use druid::ImageBuf;
 use lru::LruCache;
 use parking_lot::Mutex;
-use psst_core::cache::mkdir_if_not_exists;
 
 pub struct WebApiCache {
     base: Option<PathBuf>,
     images: Mutex<LruCache<Arc<str>, ImageBuf>>,
+    writes: Mutex<()>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn metadata_invalidation_preserves_audio_images_and_release_quota() {
+        let path = std::env::temp_dir().join(format!(
+            "xpotify-cache-test-{}-{}",
+            std::process::id(),
+            rand::random::<u64>()
+        ));
+        let cache = WebApiCache::new(Some(path.clone()));
+        cache.set("responses", "request", br#"{"name":"old"}"#);
+        cache.set("responses", "request", br#"{"name":"new"}"#);
+        let value: serde_json::Value =
+            serde_json::from_reader(cache.get("responses", "request").unwrap()).unwrap();
+        assert_eq!(value["name"], "new");
+        for bucket in ["audio", "images", "artist-releases"] {
+            cache.set(bucket, "preserve", b"unchanged");
+        }
+        cache.invalidate_metadata().unwrap();
+        assert!(cache.get("responses", "request").is_none());
+        for bucket in ["audio", "images", "artist-releases"] {
+            assert!(cache.get(bucket, "preserve").is_some());
+        }
+        fs::remove_dir_all(path).unwrap();
+    }
 }
 
 impl WebApiCache {
@@ -24,6 +52,7 @@ impl WebApiCache {
         Self {
             base,
             images: Mutex::new(LruCache::new(NonZeroUsize::new(IMAGE_CACHE_SIZE).unwrap())),
+            writes: Mutex::new(()),
         }
     }
 
@@ -64,16 +93,48 @@ impl WebApiCache {
     }
 
     pub fn set(&self, bucket: &str, key: &str, value: &[u8]) {
+        let _guard = self.writes.lock();
         if let Some(path) = self.bucket(bucket) {
-            if let Err(err) = mkdir_if_not_exists(&path) {
+            if let Err(err) = fs::create_dir_all(&path) {
                 log::error!("failed to create WebAPI cache bucket: {err:?}");
             }
         }
         if let Some(path) = self.key(bucket, key) {
-            if let Err(err) = fs::write(path, value) {
+            let temporary = path.with_extension("tmp");
+            if let Err(err) = fs::write(&temporary, value).and_then(|_| fs::rename(temporary, path))
+            {
                 log::error!("failed to save to WebAPI cache: {err:?}");
             }
         }
+    }
+
+    pub fn invalidate_metadata(&self) -> std::io::Result<()> {
+        let _guard = self.writes.lock();
+        for bucket in [
+            "responses",
+            "artist",
+            "artist-overview",
+            "album",
+            "show",
+            "lyrics",
+            "audio-analysis",
+        ] {
+            if let Some(path) = self.bucket(bucket) {
+                match fs::read_dir(path) {
+                    Ok(entries) => {
+                        for entry in entries {
+                            let entry = entry?;
+                            if entry.file_type()?.is_file() {
+                                fs::remove_file(entry.path())?;
+                            }
+                        }
+                    }
+                    Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                    Err(error) => return Err(error),
+                }
+            }
+        }
+        Ok(())
     }
 
     fn bucket(&self, bucket: &str) -> Option<PathBuf> {

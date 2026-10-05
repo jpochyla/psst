@@ -25,7 +25,7 @@ pub struct LoadedPlaybackItem {
     pub norm_factor: f32,
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct PlaybackItem {
     pub item_id: ItemId,
     pub norm_level: NormalizationLevel,

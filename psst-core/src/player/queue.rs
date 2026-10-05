@@ -2,13 +2,23 @@ use rand::prelude::SliceRandom;
 
 use super::PlaybackItem;
 
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum QueueBehavior {
     #[default]
     Sequential,
     Random,
     LoopTrack,
     LoopAll,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct QueueSnapshot {
+    pub items: Vec<PlaybackItem>,
+    pub user_items: Vec<PlaybackItem>,
+    pub position: usize,
+    pub user_items_position: usize,
+    pub positions: Vec<usize>,
+    pub behavior: QueueBehavior,
 }
 
 #[derive(Clone)]
@@ -22,6 +32,42 @@ pub struct Queue {
 }
 
 impl Queue {
+    pub fn snapshot(&self) -> QueueSnapshot {
+        QueueSnapshot {
+            items: self.items.clone(),
+            user_items: self.user_items.clone(),
+            position: self.position,
+            user_items_position: self.user_items_position,
+            positions: self.positions.clone(),
+            behavior: self.behavior.clone(),
+        }
+    }
+
+    pub fn restore(&mut self, snapshot: QueueSnapshot) -> bool {
+        if snapshot.items.len() + snapshot.user_items.len() > 5000
+            || snapshot.positions.len() != snapshot.items.len()
+            || snapshot.user_items_position > snapshot.user_items.len()
+            || snapshot.position > snapshot.positions.len()
+        {
+            return false;
+        }
+        let mut indices = snapshot.positions.clone();
+        indices.sort_unstable();
+        if indices
+            .iter()
+            .enumerate()
+            .any(|(index, value)| *value != index)
+        {
+            return false;
+        }
+        self.items = snapshot.items;
+        self.user_items = snapshot.user_items;
+        self.position = snapshot.position;
+        self.user_items_position = snapshot.user_items_position;
+        self.positions = snapshot.positions;
+        self.behavior = snapshot.behavior;
+        true
+    }
     pub fn new() -> Self {
         Self {
             items: Vec::new(),
@@ -219,6 +265,35 @@ mod tests {
     }
     fn ids(queue: &Queue) -> Vec<u128> {
         queue.upcoming_ids().iter().map(|id| id.id).collect()
+    }
+    #[test]
+    fn persisted_queue_restores_shuffle_and_manual_duplicates_exactly() {
+        let mut queue = Queue::new();
+        queue.fill((1..12).map(item).collect(), 4);
+        queue.set_behaviour(QueueBehavior::Random);
+        queue.add(item(90));
+        queue.add(item(90));
+        queue.add(item(91));
+        queue.skip_to_following();
+        let expected = ids(&queue);
+        let current = queue.get_current().copied();
+        let json = serde_json::to_string(&queue.snapshot()).unwrap();
+        let mut restored = Queue::new();
+        assert!(restored.restore(serde_json::from_str(&json).unwrap()));
+        assert_eq!(restored.get_current().copied(), current);
+        assert_eq!(ids(&restored), expected);
+        for id in expected {
+            restored.skip_to_following();
+            assert_eq!(restored.get_current().unwrap().item_id.id, id);
+        }
+        let mut invalid = queue.snapshot();
+        invalid.positions[1] = invalid.positions[0];
+        assert!(!restored.restore(invalid));
+        let large = item(u128::MAX - 7);
+        queue.fill(vec![large], 0);
+        let json = serde_json::to_string(&queue.snapshot()).unwrap();
+        assert!(restored.restore(serde_json::from_str(&json).unwrap()));
+        assert_eq!(restored.get_current(), Some(&large));
     }
     #[test]
     fn preview_preserves_current_and_manual_fifo_order_with_duplicates() {

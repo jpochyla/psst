@@ -40,7 +40,8 @@ pub const SUSPEND_LOCAL_PLAYBACK: Selector = Selector::new("app.suspend-local-pl
 pub const RESTORE_LOCAL_PLAYBACK: Selector = Selector::new("app.restore-local-playback");
 pub const PLAY_TOGGLE: Selector = Selector::new("app.play-toggle");
 
-pub const QUEUE_CHANGED: Selector<Vec<ItemId>> = Selector::new("app.queue-changed");
+pub const QUEUE_CHANGED: Selector<(Vec<ItemId>, psst_core::player::queue::QueueSnapshot)> =
+    Selector::new("app.queue-changed");
 
 // Playback state
 pub const PLAYBACK_LOADING: Selector<ItemId> = Selector::new("app.playback-loading");

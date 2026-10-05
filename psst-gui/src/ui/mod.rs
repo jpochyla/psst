@@ -1,3 +1,6 @@
+mod folders;
+mod grid;
+mod now_playing;
 use crate::data::config::SortCriteria;
 use crate::data::Track;
 use crate::error::Error;
@@ -231,6 +234,7 @@ fn root_widget() -> impl Widget<AppState> {
     let playlists = Flex::column()
         .must_fill_main_axis(true)
         .with_child(sidebar_menu_widget())
+        .with_child(folders::toolbar())
         .with_default_spacer()
         .with_flex_child(playlists, 1.0)
         .padding(if cfg!(target_os = "macos") {
@@ -254,13 +258,45 @@ fn root_widget() -> impl Widget<AppState> {
     let topbar = Flex::row()
         .must_fill_main_axis(true)
         .with_flex_child(topbar_title_widget(), 1.0)
+        .with_child(
+            Label::dynamic(|state: &AppState, _| state.cache_notice.clone())
+                .with_text_size(10.0)
+                .with_text_color(theme::PLACEHOLDER_COLOR)
+                .padding((8.0, 0.0)),
+        )
+        .with_child(
+            druid::widget::Button::new("Actualizar")
+                .on_click(|ctx, _: &mut AppState, _| ctx.submit_command(cmd::NAVIGATE_REFRESH))
+                .padding((8.0, 2.0)),
+        )
+        .with_child(
+            druid::widget::Button::new("Panel")
+                .on_click(|_, state: &mut AppState, _| {
+                    state.config.show_now_playing = !state.config.show_now_playing
+                })
+                .tooltip("Mostrar u ocultar el panel de reproduccion"),
+        )
         .with_child(topbar_sort_widget())
         .background(Border::Bottom.with_color(theme::BACKGROUND_DARK));
 
     let main = Flex::column()
         .cross_axis_alignment(CrossAxisAlignment::Start)
         .with_child(topbar)
-        .with_flex_child(Overlay::bottom(route_widget(), alert_widget()), 1.0)
+        .with_flex_child(
+            druid::widget::Either::new(
+                |state: &AppState, _| state.config.show_now_playing,
+                Split::columns(
+                    Overlay::bottom(route_widget(), alert_widget()),
+                    now_playing::widget(),
+                )
+                .split_point(0.67)
+                .bar_size(8.0)
+                .min_size(340.0, 220.0)
+                .solid_bar(true),
+                Overlay::bottom(route_widget(), alert_widget()),
+            ),
+            1.0,
+        )
         .background(theme::BACKGROUND_LIGHT);
 
     let split = Split::columns(sidebar, main)
@@ -280,33 +316,40 @@ fn root_widget() -> impl Widget<AppState> {
                 .background(theme::BACKGROUND_DARK),
         );
 
-    connect::controller(news::controller(
-        ThemeScope::new(shell)
-            .controller(SessionController)
-            .controller(NavController)
-            .controller(SortController)
-            .on_command_async(
-                cmd::LOAD_TRACK_CREDITS,
-                |track: Arc<Track>| {
-                    log::debug!("fetching credits for track: {}", track.name);
-                    WebApi::global().get_track_credits(&track.id.0.to_base62())
-                },
-                |_, data: &mut AppState, _| {
-                    data.credits = None;
-                },
-                |_ctx, data, (_track, result): (Arc<Track>, Result<TrackCredits, Error>)| {
-                    match result {
-                        Ok(credits) => {
-                            data.credits = Some(credits);
+    folders::controller(crate::controller::cache_hint::widget(connect::controller(
+        news::controller(
+            ThemeScope::new(shell)
+                .controller(playable::KeepCurrentVisible)
+                .controller(SessionController)
+                .controller(NavController)
+                .controller(SortController)
+                .on_command_async(
+                    cmd::LOAD_TRACK_CREDITS,
+                    |track: Arc<Track>| {
+                        log::debug!("fetching credits for track: {}", track.name);
+                        WebApi::global().get_track_credits(&track.id.0.to_base62())
+                    },
+                    |_, data: &mut AppState, _| {
+                        data.credits = None;
+                    },
+                    |_ctx, data, (_track, result): (Arc<Track>, Result<TrackCredits, Error>)| {
+                        match result {
+                            Ok(credits) => {
+                                data.credits = Some(credits);
+                            }
+                            Err(err) => {
+                                log::error!(
+                                    "Failed to fetch credits for {}: {:?}",
+                                    _track.name,
+                                    err
+                                );
+                                data.error_alert(format!("Failed to fetch track credits: {err}"));
+                            }
                         }
-                        Err(err) => {
-                            log::error!("Failed to fetch credits for {}: {:?}", _track.name, err);
-                            data.error_alert(format!("Failed to fetch track credits: {err}"));
-                        }
-                    }
-                },
-            ),
-    ))
+                    },
+                ),
+        ),
+    )))
     // .debug_invalidation()
     // .debug_widget_id()
     // .debug_paint_layout()

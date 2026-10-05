@@ -17,7 +17,22 @@ impl AppDelegate<AppState> for PreviewDelegate {
         _: &Env,
     ) -> Handled {
         // Prevent remote requests and writes while reviewing fixture screens.
-        if command.is(druid::commands::QUIT_APP) || command.is(druid::commands::CLOSE_WINDOW) {
+        let local_ui_command = [
+            "app.playable.reveal-playing",
+            "app.show-finder",
+            "app.set-focus",
+            "find",
+            "report-match",
+            "focus-match",
+            "find-in-playlist",
+            "find-in-saved-tracks",
+        ]
+        .iter()
+        .any(|symbol| command.is(druid::Selector::<()>::new(symbol)));
+        if command.is(druid::commands::QUIT_APP)
+            || command.is(druid::commands::CLOSE_WINDOW)
+            || local_ui_command
+        {
             Handled::No
         } else {
             Handled::Yes
@@ -156,7 +171,68 @@ pub fn run_if_requested() -> bool {
                 })).expect("news preview");
                 crate::data::news::Release { album:Arc::new(album),artist:"Artista seguido".into(),date:"2026-10-01".into(),unread:true }
             }).collect();
-            state.news.feed.resolve((),crate::data::news::NewsFeed { releases, followed_count:199,failed_count:0,notice:String::new() });
+            state.news.feed.resolve(
+                (),
+                crate::data::news::NewsFeed {
+                    releases,
+                    followed_count: 199,
+                    failed_count: 0,
+                    notice: String::new(),
+                },
+            );
+            super::main_window(&state.config)
+        }
+        "roadmap" | "roadmap-find" => {
+            if view == "roadmap-find" {
+                state.finder.show = true;
+            }
+            let playlist: crate::data::Playlist = serde_json::from_value(serde_json::json!({
+                "id":"preview-playlist", "name":"Playlist grande", "description":"Vista previa local",
+                "owner":{"id":"preview","display_name":"Angel"}, "items":{"total":750},
+                "collaborative":false, "public":false, "images":[]
+            })).unwrap();
+            let tracks: druid::im::Vector<_> = (0..750).map(|index| {
+                let mut track: Track = serde_json::from_value(serde_json::json!({
+                    "name":format!("Song {index}"), "artists":[{"id":"preview","name":"Artista de ejemplo"}],
+                    "duration_ms":240000,"disc_number":1,"track_number":index+1,"explicit":false,"is_local":false
+                })).unwrap();
+                track.id = crate::data::TrackId(psst_core::item_id::ItemId::new(index as u128 + 1, psst_core::item_id::ItemIdType::Track));
+                track.track_pos = index;
+                Arc::new(track)
+            }).collect();
+            state.with_library_mut(|library| {
+                library
+                    .playlists
+                    .resolve((), druid::im::vector![playlist.clone()])
+            });
+            state.nav = crate::data::Nav::PlaylistDetail(playlist.link());
+            state.common_ctx_mut().nav = state.nav.clone();
+            state
+                .playlist_detail
+                .playlist
+                .resolve(playlist.link(), playlist.clone());
+            state.playlist_detail.tracks.resolve(
+                playlist.link(),
+                crate::data::PlaylistTracks {
+                    id: playlist.id.clone(),
+                    name: playlist.name.clone(),
+                    tracks: tracks.clone(),
+                },
+            );
+            state.playback.queue = tracks
+                .iter()
+                .map(|track| crate::data::QueueEntry {
+                    item: crate::data::Playable::Track(track.clone()),
+                    origin: crate::data::PlaybackOrigin::Playlist(playlist.link()),
+                })
+                .collect();
+            state.start_playback(
+                crate::data::Playable::Track(tracks[612].clone()),
+                crate::data::PlaybackOrigin::Playlist(playlist.link()),
+                std::time::Duration::from_secs(42),
+            );
+            state.playback.state = crate::data::PlaybackState::Paused;
+            state.playback.up_next = state.playback.queue.iter().skip(613).cloned().collect();
             super::main_window(&state.config)
         }
         "player" => super::main_window(&state.config),

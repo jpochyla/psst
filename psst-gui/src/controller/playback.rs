@@ -33,6 +33,8 @@ use crate::{
     ui::lyrics,
 };
 
+const AUDIO_FAILURE: druid::Selector<String> = druid::Selector::new("app.audio.failure");
+
 pub struct PlaybackController {
     sender: Option<Sender<PlayerEvent>>,
     thread: Option<JoinHandle<()>>,
@@ -42,6 +44,10 @@ pub struct PlaybackController {
     scrobbler: Option<Scrobbler>,
     startup: bool,
     last_resume_save: Instant,
+    #[cfg(feature = "cpal")]
+    audio_timer: druid::TimerToken,
+    #[cfg(feature = "cpal")]
+    audio_device: Option<String>,
 }
 fn init_scrobbler_instance(data: &AppState) -> Option<Scrobbler> {
     if data.config.lastfm_enable {
@@ -69,6 +75,64 @@ fn init_scrobbler_instance(data: &AppState) -> Option<Scrobbler> {
     None
 }
 
+#[cfg(feature = "cpal")]
+fn audio_transfer_should_resume(
+    old: Option<&str>,
+    new: Option<&str>,
+    available: &[String],
+    playing: bool,
+    failed: bool,
+) -> bool {
+    playing
+        && !failed
+        && new.is_some()
+        && old.is_some_and(|name| available.iter().any(|device| device == name))
+}
+
+#[cfg(all(test, feature = "cpal"))]
+mod audio_device_tests {
+    use super::audio_transfer_should_resume;
+    #[test]
+    fn disconnect_pauses_and_connect_preserves_user_pause() {
+        let outputs = vec!["Speakers".into(), "Headphones".into()];
+        assert!(audio_transfer_should_resume(
+            Some("Speakers"),
+            Some("Headphones"),
+            &outputs,
+            true,
+            false
+        ));
+        assert!(!audio_transfer_should_resume(
+            Some("Speakers"),
+            Some("Headphones"),
+            &outputs,
+            false,
+            false
+        ));
+        assert!(!audio_transfer_should_resume(
+            Some("Headphones"),
+            Some("Speakers"),
+            &["Speakers".into()],
+            true,
+            false
+        ));
+        assert!(!audio_transfer_should_resume(
+            Some("Headphones"),
+            None,
+            &[],
+            true,
+            false
+        ));
+        assert!(!audio_transfer_should_resume(
+            Some("Speakers"),
+            Some("Headphones"),
+            &outputs,
+            true,
+            true
+        ));
+    }
+}
+
 impl PlaybackController {
     pub fn new() -> Self {
         Self {
@@ -80,6 +144,10 @@ impl PlaybackController {
             scrobbler: None,
             startup: true,
             last_resume_save: Instant::now(),
+            #[cfg(feature = "cpal")]
+            audio_timer: druid::TimerToken::INVALID,
+            #[cfg(feature = "cpal")]
+            audio_device: None,
         }
     }
 
@@ -90,14 +158,15 @@ impl PlaybackController {
         event_sink: ExtEventSink,
         widget_id: WidgetId,
         #[allow(unused_variables)] window: &WindowHandle,
-    ) {
-        let output = DefaultAudioOutput::open().unwrap();
-        let cache_dir = Config::cache_dir().unwrap();
+    ) -> Result<(), psst_core::error::Error> {
+        let output = DefaultAudioOutput::open()?;
+        let cache_dir = Config::cache_dir()
+            .ok_or_else(|| psst_core::error::Error::ConfigError("No cache directory".into()))?;
         let proxy_url = Config::proxy();
         let player = Player::new(
             session.clone(),
-            Cdn::new(session, proxy_url.as_deref()).unwrap(),
-            Cache::new(cache_dir).unwrap(),
+            Cdn::new(session, proxy_url.as_deref())?,
+            Cache::new(cache_dir)?,
             config,
             &output,
         );
@@ -111,15 +180,109 @@ impl PlaybackController {
             Self::service_events(player, event_sink, widget_id);
         }));
         self.output.replace(output);
+        Ok(())
+    }
+
+    #[cfg(feature = "cpal")]
+    fn check_audio_device(&mut self, ctx: &mut EventCtx, data: &mut AppState) {
+        use psst_core::audio::output::AudioOutput;
+        let (current, available) = DefaultAudioOutput::devices();
+        let failed = self
+            .output
+            .as_ref()
+            .is_some_and(|output| output.has_failed());
+        let changed = current != self.audio_device;
+        let resume = audio_transfer_should_resume(
+            self.audio_device.as_deref(),
+            current.as_deref(),
+            &available,
+            data.playback.state == PlaybackState::Playing,
+            failed,
+        );
+        if changed || failed || self.output.is_none() {
+            if data.connect.selected.is_none() && (!resume || current.is_none()) {
+                self.pause();
+                if data.playback.now_playing.is_some() {
+                    data.playback.state = PlaybackState::Paused;
+                }
+            }
+            if current.is_some() {
+                if self.sender.is_some() {
+                    match DefaultAudioOutput::open() {
+                        Ok(output) => {
+                            self.send(PlayerEvent::Command(PlayerCommand::ChangeAudioOutput {
+                                sink: output.sink(),
+                                resume: resume && data.connect.selected.is_none(),
+                            }));
+                            self.output = Some(output);
+                            self.audio_device = current.clone();
+                            self.set_volume(data.playback.volume);
+                            if changed {
+                                data.info_alert(format!(
+                                    "Salida de audio: {}",
+                                    current.as_deref().unwrap_or_default()
+                                ));
+                            }
+                        }
+                        Err(error) => {
+                            if changed {
+                                data.error_alert(format!(
+                                    "No se pudo abrir la salida de audio: {error}"
+                                ));
+                            }
+                        }
+                    }
+                } else if self
+                    .open_audio_output_and_start_threads(
+                        data.session.clone(),
+                        data.config.playback(),
+                        ctx.get_external_handle(),
+                        ctx.widget_id(),
+                        ctx.window(),
+                    )
+                    .is_ok()
+                {
+                    self.audio_device = current.clone();
+                    self.set_volume(data.playback.volume);
+                    self.set_queue_behavior(data.playback.queue_behavior);
+                    if let Some(snapshot) = &data.config.last_playback {
+                        self.send(PlayerEvent::Command(PlayerCommand::RestoreQueue {
+                            items: data
+                                .playback
+                                .queue
+                                .iter()
+                                .map(|entry| PlaybackItem {
+                                    item_id: entry.item.id(),
+                                    norm_level: NormalizationLevel::Track,
+                                })
+                                .collect(),
+                            position: snapshot.position,
+                            progress: Duration::from_millis(snapshot.progress_ms),
+                            snapshot: snapshot.engine_queue.clone(),
+                        }));
+                    }
+                }
+            } else if changed && data.connect.selected.is_none() {
+                data.info_alert("Salida desconectada. Reproducción en pausa.");
+            }
+            // Keep the previous device when reopening failed, so the next timer retries.
+            if current.is_none() {
+                self.audio_device = None;
+            }
+        }
+        self.audio_timer = ctx.request_timer(Duration::from_secs(2));
     }
 
     fn service_events(mut player: Player, event_sink: ExtEventSink, widget_id: WidgetId) {
         for event in player.receiver() {
             // Forward events that affect the UI state to the UI thread.
             match &event {
-                PlayerEvent::QueueChanged { upcoming } => {
-                    let _ =
-                        event_sink.submit_command(cmd::QUEUE_CHANGED, upcoming.clone(), widget_id);
+                PlayerEvent::QueueChanged { upcoming, snapshot } => {
+                    let _ = event_sink.submit_command(
+                        cmd::QUEUE_CHANGED,
+                        (upcoming.clone(), snapshot.clone()),
+                        widget_id,
+                    );
                 }
                 PlayerEvent::Loading { item } => {
                     event_sink
@@ -431,18 +594,57 @@ where
         data: &mut AppState,
         env: &Env,
     ) {
+        #[cfg(feature = "cpal")]
+        if matches!(event, Event::Timer(token) if *token == self.audio_timer) {
+            self.check_audio_device(ctx, data);
+        }
         if data.connect.selected.is_some() {
             if let Event::Command(command) = event {
-                if command.is(cmd::PLAYBACK_LOADING) || command.is(cmd::PLAYBACK_PLAYING)
-                    || command.is(cmd::PLAYBACK_PROGRESS) || command.is(cmd::PLAYBACK_PAUSING)
-                    || command.is(cmd::PLAYBACK_RESUMING) || command.is(cmd::PLAYBACK_STOPPED)
-                    || command.is(cmd::QUEUE_CHANGED) || command.is(cmd::PLAYBACK_BLOCKED) {
+                if command.is(cmd::PLAYBACK_LOADING)
+                    || command.is(cmd::PLAYBACK_PLAYING)
+                    || command.is(cmd::PLAYBACK_PROGRESS)
+                    || command.is(cmd::PLAYBACK_PAUSING)
+                    || command.is(cmd::PLAYBACK_RESUMING)
+                    || command.is(cmd::PLAYBACK_STOPPED)
+                    || command.is(cmd::QUEUE_CHANGED)
+                    || command.is(cmd::PLAYBACK_BLOCKED)
+                {
+                    ctx.set_handled();
+                    return;
+                }
+            }
+        }
+        #[cfg(feature = "cpal")]
+        if data.connect.selected.is_none()
+            && (self.audio_device.is_none()
+                || self
+                    .output
+                    .as_ref()
+                    .is_none_or(|output| output.has_failed()))
+        {
+            if let Event::Command(command) = event {
+                if command.is(cmd::PLAY_TRACKS)
+                    || command.is(cmd::PLAY_RESUME)
+                    || command.is(cmd::PLAY_TOGGLE)
+                    || command.is(cmd::PLAY_NEXT)
+                    || command.is(cmd::PLAY_PREVIOUS)
+                {
+                    data.error_alert(
+                        "Conecta una salida de audio. Xpotify la detectará automáticamente.",
+                    );
                     ctx.set_handled();
                     return;
                 }
             }
         }
         match event {
+            Event::Command(command) if command.is(AUDIO_FAILURE) => {
+                data.error_alert(format!(
+                    "Audio no disponible: {}. Se reintentará al conectar una salida.",
+                    command.get_unchecked(AUDIO_FAILURE)
+                ));
+                ctx.set_handled();
+            }
             Event::Command(command) if command.is(cmd::SUSPEND_LOCAL_PLAYBACK) => {
                 self.stop();
                 ctx.set_handled();
@@ -465,6 +667,7 @@ where
                             .collect(),
                         position: snapshot.position,
                         progress: Duration::from_millis(snapshot.progress_ms),
+                        snapshot: snapshot.engine_queue.clone(),
                     }));
                 }
                 data.playback.state = PlaybackState::Paused;
@@ -474,8 +677,9 @@ where
                 ctx.request_focus();
             }
             Event::Command(cmd) if cmd.is(cmd::QUEUE_CHANGED) => {
-                data.playback.up_next = cmd
-                    .get_unchecked(cmd::QUEUE_CHANGED)
+                let (upcoming, snapshot) = cmd.get_unchecked(cmd::QUEUE_CHANGED);
+                data.engine_queue = Some(snapshot.clone());
+                data.playback.up_next = upcoming
                     .iter()
                     .filter_map(|id| data.queued_entry(*id))
                     .collect();
@@ -609,7 +813,9 @@ where
                         now_playing.item.duration().as_secs_f64() * fraction,
                     );
                     self.seek(position);
-                    if data.playback.state == PlaybackState::Paused { data.progress_playback(position); }
+                    if data.playback.state == PlaybackState::Paused {
+                        data.progress_playback(position);
+                    }
                 }
                 ctx.set_handled();
             }
@@ -631,7 +837,9 @@ where
                 let location = cmd.get_unchecked(cmd::SKIP_TO_POSITION);
                 let position = Duration::from_millis(*location);
                 self.seek(position);
-                if data.playback.state == PlaybackState::Paused { data.progress_playback(position); }
+                if data.playback.state == PlaybackState::Paused {
+                    data.progress_playback(position);
+                }
                 ctx.set_handled();
             }
             // Keyboard shortcuts.
@@ -708,13 +916,21 @@ where
     ) {
         match event {
             LifeCycle::WidgetAdded => {
-                self.open_audio_output_and_start_threads(
+                let result = self.open_audio_output_and_start_threads(
                     data.session.clone(),
                     data.config.playback(),
                     ctx.get_external_handle(),
                     ctx.widget_id(),
                     ctx.window(),
                 );
+                if let Err(error) = result {
+                    ctx.submit_command(AUDIO_FAILURE.with(error.to_string()).to(ctx.widget_id()));
+                }
+                #[cfg(feature = "cpal")]
+                {
+                    self.audio_device = DefaultAudioOutput::devices().0;
+                    self.audio_timer = ctx.request_timer(Duration::from_secs(2));
+                }
 
                 // Initialize values loaded from the config.
                 self.set_volume(data.playback.volume);
@@ -735,6 +951,7 @@ where
                             items,
                             position: snapshot.position,
                             progress: now_playing.progress,
+                            snapshot: snapshot.engine_queue.clone(),
                         }));
                     }
                 }

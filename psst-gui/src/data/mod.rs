@@ -50,7 +50,7 @@ pub use crate::data::{
     },
     playlist::{
         Playlist, PlaylistAddTrack, PlaylistDetail, PlaylistLink, PlaylistRemoveTrack,
-        PlaylistTracks,
+        PlaylistReorder, PlaylistTracks,
     },
     promise::{Promise, PromiseState},
     recommend::{
@@ -88,8 +88,14 @@ pub struct AppState {
     pub common_ctx: Arc<CommonCtx>,
     pub home_detail: HomeDetail,
     pub alerts: Vector<Alert>,
+    pub cache_notice: String,
+    pub selected_folder: Option<String>,
+    pub folder_name: String,
+    pub editing_folder: Option<String>,
     pub finder: Finder,
     pub added_queue: Vector<QueueEntry>,
+    #[data(ignore)]
+    pub engine_queue: Option<psst_core::player::queue::QueueSnapshot>,
     pub lyrics: Promise<Lyrics, String>,
     pub connect: connect::ConnectState,
     pub news: news::NewsState,
@@ -107,6 +113,7 @@ impl AppState {
         });
         let common_ctx = Arc::new(CommonCtx {
             now_playing: None,
+            playing_origin: None,
             library: Arc::clone(&library),
             show_track_cover: config.show_track_cover,
             nav: Nav::Home,
@@ -134,6 +141,7 @@ impl AppState {
             },
             playback,
             added_queue: Vector::new(),
+            engine_queue: None,
             search: Search {
                 input: "".into(),
                 topic: None,
@@ -174,6 +182,10 @@ impl AppState {
             library,
             common_ctx,
             alerts: Vector::new(),
+            cache_notice: String::new(),
+            selected_folder: None,
+            folder_name: String::new(),
+            editing_folder: None,
             finder: Finder::new(),
             lyrics: Promise::Empty,
             connect: connect::ConnectState::default(),
@@ -223,11 +235,6 @@ impl AppState {
         self.show_detail.episodes = Promise::Empty;
         self.show_detail.show = Promise::Empty;
     }
-
-    pub fn refresh_playlist(&mut self) {
-        self.playlist_detail.tracks = Promise::Empty;
-        self.playlist_detail.playlist = Promise::Empty;
-    }
 }
 
 impl AppState {
@@ -265,6 +272,7 @@ impl AppState {
 
     pub fn start_playback(&mut self, item: Playable, origin: PlaybackOrigin, progress: Duration) {
         self.common_ctx_mut().now_playing.replace(item.clone());
+        self.common_ctx_mut().playing_origin = Some(origin.clone());
         self.playback.state = PlaybackState::Playing;
         self.playback.now_playing.replace(NowPlaying {
             item,
@@ -556,14 +564,25 @@ impl Shows {
 #[derive(Clone, Data)]
 pub struct CommonCtx {
     pub now_playing: Option<Playable>,
+    pub playing_origin: Option<PlaybackOrigin>,
     pub library: Arc<Library>,
     pub show_track_cover: bool,
     pub nav: Nav,
 }
 
 impl CommonCtx {
-    pub fn is_playing(&self, item: &Playable) -> bool {
-        matches!(&self.now_playing, Some(i) if i.same(item))
+    pub fn is_playing_at(&self, item: &Playable, origin: &PlaybackOrigin) -> bool {
+        let source_matches = match (&self.playing_origin, origin) {
+            (Some(PlaybackOrigin::Playlist(a)), PlaybackOrigin::Playlist(b)) => a.id == b.id,
+            (Some(PlaybackOrigin::Album(a)), PlaybackOrigin::Album(b)) => a.id == b.id,
+            (Some(a), b) => a.same(b),
+            _ => false,
+        };
+        source_matches
+            && self
+                .now_playing
+                .as_ref()
+                .is_some_and(|current| current.id() == item.id())
     }
 }
 

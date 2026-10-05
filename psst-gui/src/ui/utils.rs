@@ -110,14 +110,21 @@ pub fn error_widget() -> impl Widget<Error> {
         )
         .with_child(
             Label::dynamic(|err: &Error, _| err.to_string())
+                .with_line_break_mode(druid::widget::LineBreaking::WordWrap)
                 .with_text_size(theme::TEXT_SIZE_SMALL)
-                .with_text_color(theme::PLACEHOLDER_COLOR),
+                .with_text_color(theme::PLACEHOLDER_COLOR)
+                .expand_width(),
         );
     Flex::row()
         .with_child(icon)
         .with_default_spacer()
-        .with_child(error)
-        .padding((0.0, theme::grid(6.0)))
+        .with_flex_child(error, 1.0)
+        .with_default_spacer()
+        .with_child(
+            druid::widget::Button::new("Reintentar")
+                .on_click(|ctx, _: &mut Error, _| ctx.submit_command(crate::cmd::NAVIGATE_REFRESH)),
+        )
+        .padding((16.0, theme::grid(4.0)))
         .center()
 }
 

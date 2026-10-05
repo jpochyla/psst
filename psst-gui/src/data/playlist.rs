@@ -24,6 +24,14 @@ pub struct PlaylistRemoveTrack {
     pub track_uri: Arc<str>,
 }
 
+#[derive(Clone, Debug, Data)]
+pub struct PlaylistReorder {
+    pub link: PlaylistLink,
+    pub track_id: TrackId,
+    pub position: usize,
+    pub down: bool,
+}
+
 #[derive(Clone, Debug, Data, Lens)]
 pub struct Playlist {
     pub id: Arc<str>,
