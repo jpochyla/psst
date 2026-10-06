@@ -31,6 +31,8 @@
 
 Reproduce the ordinary checks with `cargo test --locked -p psst-core --lib -p psst-gui --bin psst-gui`. The final Windows archive uses the explicit packaging allowlist and SHA-256 verification; local credentials and diagnostic logs are excluded.
 
+Windows branding in 0.3.1 was checked against the running application's window property store: the AppUserModel ID is `com.angelopol.xpotify`, the relaunch display resource resolves to `Xpotify`, and the relaunch command points to the running portable executable. FileDescription/InternalName/OriginalFilename also use Xpotify. The existing green icon is retained. The property strings use COM-owned allocations so the Windows bindings can safely release them. Clippy passes with warnings denied.
+
 ## Roadmap update — 2026-10-05
 
 - 41 native unit tests pass (16 core + 25 GUI); one explicitly live lyrics test is excluded from the ordinary run. Coverage includes connection retries without repeating ambiguous writes, cache isolation/atomic metadata invalidation, playlist reorder indices, persistent folders, original playback positions across pages, source-specific highlighting, exact shuffle/manual queue restoration and rejection of stale/recycled search results.

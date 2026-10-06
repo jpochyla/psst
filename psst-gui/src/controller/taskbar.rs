@@ -10,7 +10,7 @@ use std::sync::{
     Arc,
 };
 use windows::{
-    core::{w, GUID, PWSTR},
+    core::{w, GUID, HSTRING},
     Win32::{
         Foundation::{HWND, LPARAM, LRESULT, PROPERTYKEY, WPARAM},
         System::{
@@ -24,8 +24,8 @@ use windows::{
             Shell::{
                 DefSubclassProc, ITaskbarList3,
                 PropertiesSystem::{IPropertyStore, SHGetPropertyStoreForWindow},
-                RemoveWindowSubclass, SetWindowSubclass, TaskbarList, THBF_DISABLED, THBF_ENABLED,
-                THBN_CLICKED, THB_FLAGS, THB_ICON, THB_TOOLTIP, THUMBBUTTON,
+                RemoveWindowSubclass, SHStrDupW, SetWindowSubclass, TaskbarList, THBF_DISABLED,
+                THBF_ENABLED, THBN_CLICKED, THB_FLAGS, THB_ICON, THB_TOOLTIP, THUMBBUTTON,
             },
             WindowsAndMessaging::{
                 CreateIcon, DestroyIcon, RegisterWindowMessageW, HICON, WM_COMMAND, WM_NCDESTROY,
@@ -54,14 +54,14 @@ fn set_application_identity(hwnd: HWND, executable: &std::path::Path) -> windows
             fmtid: GUID::from_u128(0x9f4c2855_9f79_4b39_a8d0_e1d42de1d5f3),
             pid,
         };
-        let mut text: Vec<u16> = text.encode_utf16().chain(std::iter::once(0)).collect();
         let mut value = PROPVARIANT::default();
-        // SetValue copies this borrowed UTF-16 string before its buffer is dropped.
-        // Do not PropVariantClear it: the buffer is owned by the Vec above.
+        // PROPVARIANT's Rust Drop calls PropVariantClear. Give it a COM-owned
+        // allocation from SHStrDupW, never a borrowed Rust string buffer.
         unsafe {
+            let text = SHStrDupW(&HSTRING::from(text))?;
             let inner = &mut *value.Anonymous.Anonymous;
             inner.vt = VT_LPWSTR;
-            inner.Anonymous.pwszVal = PWSTR(text.as_mut_ptr());
+            inner.Anonymous.pwszVal = text;
             store.SetValue(&key, &value)?;
         }
     }
