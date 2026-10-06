@@ -425,12 +425,19 @@ fn from_audio(item: &AudioItem, album_id: Option<String>) -> Option<Playable> {
     })))
 }
 
+struct PendingLoad {
+    payload: PlaybackPayload,
+    progress: Duration,
+    playing: bool,
+}
+
 pub struct NativeConnectController {
     worker: Option<Worker>,
     timer: TimerToken,
     next_retry: Instant,
     failures: u32,
     restore_pending: bool,
+    pending_load: Option<PendingLoad>,
     audio_item: Option<Box<AudioItem>>,
     cluster: Option<ClusterUpdate>,
     last_volume: Option<u16>,
@@ -447,6 +454,7 @@ impl Default for NativeConnectController {
             next_retry: Instant::now(),
             failures: 0,
             restore_pending: true,
+            pending_load: None,
             audio_item: None,
             cluster: None,
             last_volume: None,
@@ -458,15 +466,23 @@ impl Default for NativeConnectController {
     }
 }
 impl NativeConnectController {
-    fn send(&self, state: &mut AppState, action: Action) {
+    fn send(&mut self, state: &mut AppState, action: Action) {
         if let Some(worker) = &self.worker {
-            if worker.sender.try_send(action).is_err() {
-                state.error_alert("Connect está ocupado. Espera un momento y vuelve a intentarlo.");
+            match worker.sender.try_send(action) {
+                Ok(()) => {}
+                Err(tokio::sync::mpsc::error::TrySendError::Full(_)) => {
+                    state.info_alert("Spotify está procesando los controles. Espera un momento.");
+                }
+                Err(tokio::sync::mpsc::error::TrySendError::Closed(_)) => {
+                    self.worker = None;
+                    state.connect.native_ready = false;
+                    self.restore_pending = true;
+                    self.next_retry = Instant::now();
+                    state.info_alert("Reconectando con Spotify…");
+                }
             }
         } else {
-            state.error_alert(
-                "Connect nativo aún no está conectado. Consulta Dispositivos para reintentar.",
-            );
+            state.info_alert("Conectando con Spotify… Consulta el estado en Dispositivos.");
         }
     }
     fn payload(state: &AppState) -> Option<(PlaybackPayload, Duration)> {
@@ -506,14 +522,36 @@ impl NativeConnectController {
     ) {
         match load(payload, progress, playing, state.playback.queue_behavior) {
             Ok(request) => {
-                if !self
-                    .worker
-                    .as_ref()
-                    .is_some_and(|worker| worker.sender.try_send(Action::Load(request)).is_ok())
-                {
-                    state.error_alert("Connect aún no está listo o está ocupado. Puedes volver a intentarlo sin perder la canción seleccionada.");
+                let sent = if state.connect.native_ready {
+                    self.worker
+                        .as_ref()
+                        .map(|worker| worker.sender.try_send(Action::Load(request)))
+                } else {
+                    None
+                };
+                if !matches!(sent, Some(Ok(()))) {
+                    let first = self.pending_load.is_none();
+                    if matches!(
+                        sent,
+                        Some(Err(tokio::sync::mpsc::error::TrySendError::Closed(_)))
+                    ) {
+                        self.worker = None;
+                        state.connect.native_ready = false;
+                    }
+                    self.pending_load = Some(PendingLoad {
+                        payload: payload.clone(),
+                        progress,
+                        playing,
+                    });
+                    if first {
+                        if self.worker.is_none() {
+                            self.next_retry = Instant::now();
+                        }
+                        state.info_alert("Conectando con Spotify… Tu selección se reproducirá cuando esté listo.");
+                    }
                     return;
                 }
+                self.pending_load = None;
                 self.restore_pending = false;
                 state.engine_queue = None;
                 state.playback.queue = payload
@@ -535,6 +573,18 @@ impl NativeConnectController {
             Err(error) => state.error_alert(error),
         }
     }
+    fn flush_pending(&mut self, state: &mut AppState) {
+        if state.connect.selected.is_some() {
+            self.pending_load = None;
+        } else if state.connect.native_ready {
+            if let Some(pending) = self.pending_load.as_ref() {
+                let payload = pending.payload.clone();
+                let progress = pending.progress;
+                let playing = pending.playing;
+                self.load(state, &payload, progress, playing);
+            }
+        }
+    }
     fn notice(&mut self, ctx: &mut EventCtx, state: &mut AppState, notice: &Notice) {
         match notice {
             Notice::CommandFailed(error) => state.error_alert(format!("Connect: {error}")),
@@ -543,6 +593,7 @@ impl NativeConnectController {
                 state.connect.native_ready = true;
                 self.failures = 0;
                 state.connect.native_status = "Connect nativo listo. Selecciona Xpotify en Spotify del teléfono. Las escuchas del motor nativo no se reportan al historial de Spotify.".into();
+                self.flush_pending(state);
             }
             Notice::Failed(error) => {
                 state.connect.native_ready = false;
@@ -566,6 +617,11 @@ impl NativeConnectController {
                 self.local_queue_observed = local;
                 self.cluster = Some(update.clone());
                 if let Some(cluster) = update.cluster.as_ref() {
+                    if cluster.active_device_id != state.config.connect_device_id
+                        && !cluster.active_device_id.is_empty()
+                    {
+                        self.pending_load = None;
+                    }
                     if cluster.active_device_id == state.config.connect_device_id {
                         // A phone can transfer back to this receiver while paused.
                         // Retire requests targeting the previous remote device.
@@ -822,6 +878,7 @@ impl<W: Widget<AppState>> Controller<AppState, W> for NativeConnectController {
     ) {
         if let Event::Timer(token) = event {
             if *token == self.timer {
+                self.flush_pending(state);
                 #[cfg(feature = "cpal")]
                 if state.config.native_connect && Instant::now() >= self.next_audio_check {
                     self.next_audio_check = Instant::now() + Duration::from_secs(2);
@@ -859,6 +916,7 @@ impl<W: Widget<AppState>> Controller<AppState, W> for NativeConnectController {
             }
         }
         if let Event::WindowDisconnected = event {
+            self.pending_load = None;
             self.worker = None;
         }
         if let Event::Command(command) = event {
@@ -876,6 +934,7 @@ impl<W: Widget<AppState>> Controller<AppState, W> for NativeConnectController {
                 return;
             }
             if command.is(TOGGLE) {
+                self.pending_load = None;
                 state.config.native_connect = !state.config.native_connect;
                 state.config.save();
                 self.worker = None;
@@ -893,10 +952,14 @@ impl<W: Widget<AppState>> Controller<AppState, W> for NativeConnectController {
                 self.worker = None;
                 state.connect.native_ready = false;
                 self.next_retry = Instant::now();
+                self.restore_pending = true;
                 ctx.set_handled();
                 return;
             }
             if state.config.native_connect && command.is(cmd::SUSPEND_LOCAL_PLAYBACK) {
+                if state.connect.selected.is_some() {
+                    self.pending_load = None;
+                }
                 if state.connect.native_ready && self.worker.is_some() {
                     self.send(state, Action::Suspend);
                 }
@@ -904,6 +967,28 @@ impl<W: Widget<AppState>> Controller<AppState, W> for NativeConnectController {
                 return;
             }
             if state.config.native_connect && state.connect.selected.is_none() {
+                if (command.is(cmd::PLAY_RESUME) || command.is(cmd::PLAY_TOGGLE))
+                    && self.pending_load.is_some()
+                {
+                    if let Some(pending) = &mut self.pending_load {
+                        pending.playing = command.is(cmd::PLAY_RESUME) || !pending.playing;
+                    }
+                    self.flush_pending(state);
+                    ctx.set_handled();
+                    return;
+                }
+                if (command.is(cmd::PLAY_PAUSE) || command.is(cmd::PLAY_STOP))
+                    && self.pending_load.is_some()
+                {
+                    if command.is(cmd::PLAY_STOP) {
+                        self.pending_load = None;
+                    } else if let Some(pending) = &mut self.pending_load {
+                        pending.playing = false;
+                    }
+                    state.playback.state = PlaybackState::Paused;
+                    ctx.set_handled();
+                    return;
+                }
                 if command.is(cmd::RESTORE_LOCAL_PLAYBACK) {
                     self.restore_pending = true;
                     state.playback.state = PlaybackState::Paused;
@@ -1012,6 +1097,10 @@ impl<W: Widget<AppState>> Controller<AppState, W> for NativeConnectController {
                     })
                 } else if let Some(behavior) = command.get(cmd::PLAY_QUEUE_BEHAVIOR) {
                     state.set_queue_behavior(*behavior);
+                    if self.restore_pending || !state.connect.native_ready {
+                        ctx.set_handled();
+                        return;
+                    }
                     Some(Action::Behavior(*behavior))
                 } else {
                     None
@@ -1110,8 +1199,10 @@ impl<W: Widget<AppState>> Controller<AppState, W> for NativeConnectController {
             || old.config.username() != state.config.username()
         {
             self.worker = None;
+            self.pending_load = None;
             self.next_retry = Instant::now();
             self.restore_pending = true;
+            ctx.submit_command(RETRY);
         }
         child.update(ctx, old, state, env);
     }
@@ -1120,6 +1211,115 @@ impl<W: Widget<AppState>> Controller<AppState, W> for NativeConnectController {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn pending_payload(name: &str) -> PlaybackPayload {
+        let track: Track = serde_json::from_value(serde_json::json!({
+            "id":"0123456789012345678901", "name":name, "artists":[],
+            "duration_ms":240000, "disc_number":1, "track_number":1,
+            "explicit":false, "is_local":false
+        }))
+        .unwrap();
+        PlaybackPayload {
+            items: druid::im::vector![Playable::Track(Arc::new(track))],
+            position: 0,
+            origin: PlaybackOrigin::Home,
+        }
+    }
+
+    #[test]
+    fn startup_retains_only_latest_selection_and_delivers_it_once_with_pause_and_seek() {
+        let mut state = AppState::default_with_config(Config::default());
+        let (sender, mut receiver) = tokio::sync::mpsc::channel(1);
+        let mut controller = NativeConnectController {
+            worker: Some(Worker { sender, epoch: 1 }),
+            ..Default::default()
+        };
+        controller.load(&mut state, &pending_payload("First"), Duration::ZERO, true);
+        controller.load(
+            &mut state,
+            &pending_payload("Latest"),
+            Duration::from_secs(12),
+            false,
+        );
+        assert!(receiver.try_recv().is_err()); // No command before receiver registration.
+        assert_eq!(
+            controller.pending_load.as_ref().unwrap().payload.items[0]
+                .name()
+                .as_ref(),
+            "Latest"
+        );
+        state.connect.native_ready = true;
+        controller.flush_pending(&mut state);
+        match receiver.try_recv().unwrap() {
+            Action::Load(request) => {
+                assert!(!request.start_playing);
+                assert_eq!(request.seek_to, 12_000);
+            }
+            _ => panic!("expected a load"),
+        }
+        assert_eq!(state.playback.queue[0].item.name().as_ref(), "Latest");
+        assert!(controller.pending_load.is_none());
+        controller.flush_pending(&mut state);
+        assert!(receiver.try_recv().is_err());
+        assert!(!controller.restore_pending);
+    }
+
+    #[test]
+    fn full_channel_retries_without_duplicate_alerts_and_closed_channel_reconnects() {
+        let mut state = AppState::default_with_config(Config::default());
+        state.connect.native_ready = true;
+        let (sender, mut receiver) = tokio::sync::mpsc::channel(1);
+        assert!(sender.try_send(Action::Pause).is_ok());
+        let mut controller = NativeConnectController {
+            worker: Some(Worker { sender, epoch: 1 }),
+            ..Default::default()
+        };
+        controller.load(
+            &mut state,
+            &pending_payload("Selected"),
+            Duration::ZERO,
+            true,
+        );
+        let alerts = state.alerts.len();
+        controller.flush_pending(&mut state);
+        assert_eq!(state.alerts.len(), alerts);
+        assert!(matches!(receiver.try_recv(), Ok(Action::Pause)));
+        controller.flush_pending(&mut state);
+        assert!(matches!(receiver.try_recv(), Ok(Action::Load(_))));
+        drop(receiver);
+        controller.load(
+            &mut state,
+            &pending_payload("After disconnect"),
+            Duration::ZERO,
+            true,
+        );
+        assert!(controller.worker.is_none());
+        assert!(!state.connect.native_ready);
+        assert!(controller.pending_load.is_some());
+        assert!(controller.next_retry <= Instant::now());
+    }
+
+    #[test]
+    fn switching_to_remote_cancels_deferred_local_playback() {
+        let mut state = AppState::default_with_config(Config::default());
+        let mut controller = NativeConnectController::default();
+        controller.load(
+            &mut state,
+            &pending_payload("Selected"),
+            Duration::ZERO,
+            true,
+        );
+        state.connect.selected = Some(crate::data::connect::Device {
+            id: Some("phone".into()),
+            name: "Phone".into(),
+            kind: "Smartphone".into(),
+            is_active: true,
+            is_restricted: false,
+            volume_percent: Some(50),
+        });
+        controller.flush_pending(&mut state);
+        assert!(controller.pending_load.is_none());
+    }
     #[test]
     fn full_audio_buffer_waits_for_output_instead_of_failing() {
         let buffer = SpscRb::new(4);

@@ -6,6 +6,8 @@ Cliente nativo basado en Psst, con organización de playlists mediante Gemini, l
 
 ## Integración local con Splitify
 
+En **0.4.5**, la biblioteca se abre como una barra compacta de portadas, con tooltips y un botón para expandirla. La app recuerda esa elección. Las filas horizontales reservan espacio para el scroll y Connect conserva la última selección mientras se conecta.
+
 En **0.4.4**, la cola muestra páginas de 50 canciones, con botones para avanzar y volver tanto en el panel del reproductor como en la vista completa. Cambiar de página no consulta la API de Spotify.
 
 En **0.4.3**, la sombra llega hasta el volumen y la línea de progreso mide 2 píxeles, conservando un área de clic cómoda.

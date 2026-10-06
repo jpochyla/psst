@@ -35,13 +35,7 @@ pub fn user_widget() -> impl Widget<AppState> {
         },
         || Empty,
     )
-    .lens(AppState::library.then(Library::user_profile.in_arc()))
-    .on_command_async(
-        LOAD_PROFILE,
-        |_| WebApi::global().get_user_profile(),
-        |_, data, d| data.with_library_mut(|l| l.user_profile.defer(d)),
-        |_, data, r| data.with_library_mut(|l| l.user_profile.update(r)),
-    );
+    .lens(AppState::library.then(Library::user_profile.in_arc()));
 
     Flex::row()
         .with_child(
@@ -52,6 +46,15 @@ pub fn user_widget() -> impl Widget<AppState> {
                 .padding(theme::grid(1.0)),
         )
         .with_child(preferences_widget(&icons::PREFERENCES))
+}
+
+pub fn profile_controller(inner: impl Widget<AppState> + 'static) -> impl Widget<AppState> {
+    inner.on_command_async(
+        LOAD_PROFILE,
+        |_| WebApi::global().get_user_profile(),
+        |_, data, d| data.with_library_mut(|l| l.user_profile.defer(d)),
+        |_, data, r| data.with_library_mut(|l| l.user_profile.update(r)),
+    )
 }
 
 fn preferences_widget<T: Data>(svg: &SvgIcon) -> impl Widget<T> {

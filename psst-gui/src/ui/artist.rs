@@ -92,7 +92,8 @@ pub fn artist_widget(horizontal: bool) -> impl Widget<Artist> {
                     .with_font(theme::UI_FONT_MEDIUM)
                     .align_horizontal(UnitPoint::CENTER)
                     .align_vertical(UnitPoint::TOP)
-                    .fix_size(theme::grid(16.0), theme::grid(8.0))
+                    .fix_size(theme::grid(16.0), theme::grid(10.0))
+                    .clip(Size::new(theme::grid(16.0), theme::grid(10.0)).to_rect())
                     .lens(Artist::name),
             )
     } else {

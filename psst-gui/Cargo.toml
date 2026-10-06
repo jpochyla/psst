@@ -1,6 +1,6 @@
 [package]
 name = "psst-gui"
-version = "0.4.4"
+version = "0.4.5"
 authors = ["Jan Pochyla <jpochyla@gmail.com>"]
 edition = "2021"
 build = "build.rs"

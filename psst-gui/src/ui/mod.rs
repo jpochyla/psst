@@ -56,6 +56,7 @@ pub mod preferences;
 #[cfg(debug_assertions)]
 mod preview;
 pub mod queue;
+mod sidebar;
 #[cfg(debug_assertions)]
 pub use preview::run_if_requested;
 pub mod recommend;
@@ -253,10 +254,16 @@ fn root_widget() -> impl Widget<AppState> {
         .fix_height(56.0)
         .background(Border::Top.with_color(theme::GREY_500));
 
-    let sidebar = Flex::column()
+    let expanded_sidebar = Flex::column()
         .with_flex_child(playlists, 1.0)
         .with_child(controls)
         .background(theme::BACKGROUND_DARK);
+
+    let sidebar = playlist::list_controller(Either::new(
+        |state: &AppState, _| state.config.library_compact,
+        sidebar::compact(),
+        expanded_sidebar,
+    ));
 
     let topbar = Flex::row()
         .must_fill_main_axis(true)
@@ -307,12 +314,19 @@ fn root_widget() -> impl Widget<AppState> {
         )
         .background(theme::BACKGROUND_LIGHT);
 
-    let split = Split::columns(sidebar, main)
-        .split_point(0.24)
-        .bar_size(1.0)
-        .min_size(235.0, 500.0)
-        .min_bar_area(8.0)
-        .solid_bar(true);
+    let split = Flex::row()
+        .with_child(sidebar.fix_width(sidebar::WIDTH))
+        .with_flex_child(main, 1.0)
+        .env_scope(|env, state: &AppState| {
+            env.set(
+                sidebar::WIDTH,
+                if state.config.library_compact {
+                    72.0
+                } else {
+                    260.0
+                },
+            );
+        });
 
     let shell = Flex::column()
         .with_child(global_navigation_widget())
@@ -329,8 +343,9 @@ fn root_widget() -> impl Widget<AppState> {
     #[cfg(target_os = "windows")]
     let shell = shell.controller(crate::controller::taskbar::TaskbarController::default());
 
-    let shell =
-        shell.controller(crate::controller::native_connect::NativeConnectController::default());
+    let shell = user::profile_controller(
+        shell.controller(crate::controller::native_connect::NativeConnectController::default()),
+    );
 
     folders::controller(crate::controller::cache_hint::widget(connect::controller(
         news::controller(
@@ -493,10 +508,15 @@ fn sidebar_menu_widget() -> impl Widget<AppState> {
     Flex::column()
         .with_default_spacer()
         .with_child(
-            Label::new("Tu biblioteca")
-                .with_font(theme::UI_FONT_MEDIUM)
-                .with_text_size(18.0)
-                .align_left()
+            Flex::row()
+                .with_flex_child(
+                    Label::new("Tu biblioteca")
+                        .with_font(theme::UI_FONT_MEDIUM)
+                        .with_text_size(18.0)
+                        .align_left(),
+                    1.0,
+                )
+                .with_child(sidebar::toggle(false))
                 .padding((16.0, 8.0)),
         )
         .with_child(

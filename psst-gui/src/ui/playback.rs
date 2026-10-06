@@ -104,8 +104,10 @@ fn playing_item_widget() -> impl Widget<NowPlaying> {
                     .with_child(detail)
                     .with_spacer(2.0)
                     .with_child(origin)
-                    .on_click(|ctx, now_playing, _| {
+                    .tooltip("Abrir el origen de esta canción")
+                    .on_left_click(|ctx, _, now_playing: &mut NowPlaying, _| {
                         ctx.submit_command(cmd::NAVIGATE.with(now_playing.origin.to_nav()));
+                        ctx.set_handled();
                     })
                     .context_menu(|now_playing| match &now_playing.item {
                         Playable::Track(track) => {

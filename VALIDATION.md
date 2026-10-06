@@ -1,5 +1,13 @@
 # Local validation - Windows - 2026-10-06
 
+## Compact library and Connect readiness, Windows 0.4.5
+
+- 72 core/GUI tests pass (19 core and 53 GUI); one live LRCLIB lookup remains explicitly ignored. Clippy passes with warnings denied. New tests cover existing-profile compact defaults, persisted expansion, latest-only deferred playback, exactly-once delivery, paused intent/seek, full versus closed command channels and cancellation when selecting a remote device.
+- Home fixture reviewed in dark and light at 1120 x 800 and 900 x 700. The rail occupies 72 px and expands to 260 px; toggling it preserves the central view. Carousels reserve 16 px below 80 px clipped card labels. Dragging the horizontal scrollbar reached Daily Mix 9–12, with long descriptions clear of the scrollbar and following heading.
+- Native session: Play was sent through the Windows taskbar notification while registration was still incomplete (Ready before Play: false). The pending selection stayed visible with an informational connecting message; once ready, Low by SZA loaded through the native receiver, advanced from 1:03 to 1:10 and paused successfully. The real La/Us cover artwork appears in the compact library. Clicking the playlist-origin icon after navigating home returned to Us without changing the paused track or progress.
+- A development fixture toggle exposed a pre-existing ability to save its temporary Config over the actual profile. Config::save now refuses writes from development preview processes. The account was reauthorized and its cached profile/playlists were restored only after matching their account identity and snapshot revision. No credentials are committed or packaged. A full-file SHA-256 comparison after preview expansion, collapse, resize and close verifies that the entire recovered configuration stays unchanged.
+- Spotify's existing Web API HTTP 429 cooldown remains in force. Cache restoration retained original dates and that cooldown; native playback still worked during it. Missing local-tracks-path and a temporary unavailable-context warning were logged; there was no native UI panic. The original track, playback position, route, volume, queue mode, theme and window size are restored after QA, with the compact library enabled as requested.
+
 ## Queue pagination, Windows 0.4.4
 
 - 68 core/GUI tests pass (19 core and 49 GUI); one live LRCLIB test explicitly ignored. Clippy passes with warnings denied, and the locked development build succeeds. New tests cover page boundaries, empty queues, stale pages after shrinking, extreme lengths and absolute selection indices with repeated tracks.

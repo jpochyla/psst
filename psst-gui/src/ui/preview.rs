@@ -319,6 +319,38 @@ pub fn run_if_requested() -> bool {
             state.playback.up_next = state.playback.queue.iter().skip(613).cloned().collect();
             super::main_window(&state.config)
         }
+        "home-scroll" => {
+            let playlists = (0..12).map(|index| {
+                serde_json::from_value(serde_json::json!({
+                    "id":format!("preview-playlist-{index}"),
+                    "name":format!("Daily Mix {}", index + 1),
+                    "description":"Feid, Jowell & Randy, Rauw Alejandro and more music for your day.",
+                    "owner":{"id":"preview","display_name":"Angel"},
+                    "public":false,"collaborative":false,"images":[],"items":{"total":50}
+                })).unwrap()
+            }).collect();
+            state.home_detail.made_for_you.resolve(
+                (),
+                crate::data::MixedView {
+                    title: "Made For Angelo".into(),
+                    playlists,
+                    albums: Default::default(),
+                    artists: Default::default(),
+                    shows: Default::default(),
+                },
+            );
+            state.home_detail.jump_back_in.resolve(
+                (),
+                crate::data::MixedView {
+                    title: "Jump back in".into(),
+                    playlists: Default::default(),
+                    albums: Default::default(),
+                    artists: Default::default(),
+                    shows: Default::default(),
+                },
+            );
+            super::main_window(&state.config)
+        }
         "player" => super::main_window(&state.config),
         "login" => super::account_setup_window(),
         _ => WindowDesc::new(druid::widget::Label::new("Unknown UI preview")),

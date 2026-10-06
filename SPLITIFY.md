@@ -1,6 +1,12 @@
 # Xpotify with Splitify
 
-## Windows 0.4.4
+## Windows 0.4.5
+
+The library defaults to a 72 px compact rail with playlist artwork, navigation icons, tooltips and Preferences. Its top library button expands the full 260 px sidebar; the same button collapses it. This preference persists across restarts. Both views retain playlist context menus, active navigation and the same cached playlist/profile data; their request handlers stay mounted while switching modes. Playlist folders remain available in the expanded view.
+
+Home carousels use one horizontal scroll per section and reserve 16 px below their cards. Card labels have an 80 px clipped area so long descriptions cannot paint over the scrollbar or following section. The source icon beside the current track opens its album/playlist page, with an explicit tooltip and left-click navigation.
+
+If local Connect is still registering or its command channel is full, Xpotify retains the latest validated playback selection and sends it once the receiver is ready. Pause/resume changes that pending intent; Stop, switching to a remote device, disabling Connect or closing the app cancels it. An explicit selection may trigger reconnection, while automatic network failures retain the existing retry backoff. A closed command channel is distinguished from a full one. Startup still restores in pause and does not activate this PC without a playback request.
 
 Both the current-playback panel and full queue show 50 upcoming songs per page. Use **‹ 50** / **50 ›** to move backward or forward; the range label shows the current entries and total. Scroll within each page to see all its rows. The final page contains the remaining songs, and unavailable navigation buttons are disabled. Pagination keeps absolute queue positions, including duplicate tracks, and returns to the top of the queue rows when changing pages. Only visible rows create widgets and request artwork; paging makes no additional Spotify Web API calls. Native Connect currently supplies an 80-track upcoming window, so its second page can contain 30 songs; this UI does not infer additional songs from the unshuffled playlist or change the engine's wire limit.
 
