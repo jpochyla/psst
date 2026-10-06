@@ -1,4 +1,16 @@
-# Local validation - Windows - 2026-10-05
+# Local validation - Windows - 2026-10-06
+
+
+## Spotifast-based improvements, Windows 0.4.0
+
+- 66 offline tests pass: 17 core, 45 GUI, 4 Connect; one live LRCLIB test remains explicitly ignored. Clippy passes with warnings denied. Tests cover bounded request/body concurrency, per-key coalescing, stale A -> B -> A replies and a viewport within a 50,000-entry list, alongside existing account/cooldown/security checks.
+- Actual development preview with 5,000 upcoming tracks rendered both the first rows and rows 4,993-5,000 after scrollbar/wheel navigation. Reviewed dark at 1120 x 800 and light at 900 x 700. No widget/lifecycle errors or panics appeared. Twenty alternating wheel operations took 2.27 s wall time with 0.172 s process CPU and 0.082 MiB working-set growth in this local sample; this is not a cross-machine benchmark.
+- Actual account playlist `Us`, shuffle enabled: after resuming the restored track, the first pending song was HOTEL LOBBY (Unc & Phew). A separate authenticated Connect peer sent skip-next and pause through Spotify; both were acknowledged. Xpotify played HOTEL LOBBY and advanced its displayed queue to Potholderz, preserving the following order and playlist context. This validates remote-to-PC advancement, not a physical phone test.
+- Spotify registration and native decoded audio succeeded. Startup retained the saved song in pause. Live QA used 1% volume; the original playback snapshot and volume are restored after testing. No remote playlist edits were performed.
+- Optimized executable: clicking the third upcoming row selected I'll Come Too. Encouragement, previously fourth, became first; the following entries retained their order, the playlist remained Us and the engine observer reported shuffle=true. Audio loaded once for the selection and was paused after the check. This exercises actual GUI-to-engine selection, including the virtual row's index and occurrence lookup.
+- The optimized application starts successfully. A diagnostic build with the development GUI optimization explicitly overridden to zero exceeded the Windows main-thread stack during startup; that experimental executable was excluded. The supported default development profile and optimized release were exercised successfully.
+- Adaptation remains in the Xpotify fork; the separate Splitify web repository is unchanged. Spotifast's MIT attribution is included in packaging. See `vendor/librespot-connect/PATCHES.md` for the minimal published-upstream queue patch.
+- Installed Windows release reports product version 0.4.0, Xpotify relaunch/display identity and the existing green icon. Its original persisted song/queue snapshot, volume, System theme and shuffle mode match the pre-test profile; playback starts paused. The ZIP contains exactly eight allowlisted files, including all three licenses. ZIP integrity, embedded/installed executable equality, AMD64 PE machine type and both SHA-256 sidecars were checked. The shell packaging script passes Bash syntax checking; macOS/Linux builds remain untested.
 
 ## Native Spotify Connect, Windows 0.3.0
 

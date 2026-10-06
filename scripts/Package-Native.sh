@@ -27,19 +27,19 @@ case "$(uname -s)" in
 <key>CFBundleIdentifier</key><string>com.xpotify.desktop</string>
 <key>CFBundleExecutable</key><string>Xpotify</string>
 <key>CFBundleIconFile</key><string>Xpotify.icns</string>
-<key>CFBundleVersion</key><string>0.1.0</string>
+<key>CFBundleVersion</key><string>0.4.0</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>NSHighResolutionCapable</key><true/>
 </dict></plist>
 PLIST
-    cp LICENSE.md LICENSE-librespot.md "$app_root/Resources/"
+    cp LICENSE.md LICENSE-librespot.md LICENSE-Spotifast.md "$app_root/Resources/"
     ditto -c -k --sequesterRsrc --keepParent "$stage_root/Xpotify.app" "$output_root/Xpotify-macOS-$(uname -m).zip"
     ;;
   Linux)
     mkdir -p "$stage_root/Xpotify/bin" "$stage_root/Xpotify/share/applications" "$stage_root/Xpotify/share/icons/hicolor/256x256/apps"
     cp target/release/psst-gui "$stage_root/Xpotify/bin/xpotify"
     cp psst-gui/assets/logo_256.png "$stage_root/Xpotify/share/icons/hicolor/256x256/apps/xpotify.png"
-    cp LICENSE.md LICENSE-librespot.md SPLITIFY.md ROADMAP.md "$stage_root/Xpotify/"
+    cp LICENSE.md LICENSE-librespot.md LICENSE-Spotifast.md SPLITIFY.md ROADMAP.md "$stage_root/Xpotify/"
     cat > "$stage_root/Xpotify/Start-Xpotify.sh" <<'LAUNCHER'
 #!/usr/bin/env sh
 set -eu

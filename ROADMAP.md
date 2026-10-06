@@ -1,16 +1,18 @@
 # Roadmap de Xpotify + Splitify
 
-Trabajo en el repositorio original `xpotify`, rama `splitify-integration`. El repositorio web `Splitify` conserva `main`. Actualizado el 5 de octubre de 2026.
+Trabajo en el repositorio original `xpotify`, rama `splitify-integration`. El repositorio web `Splitify` conserva `main`. Actualizado el 6 de octubre de 2026.
+
+En 0.4.0 el panel de cola usa filas virtualizadas y el orden efectivo de Connect, incluyendo shuffle. Seleccionar una fila activa conserva el contexto del motor. Las consultas HTTP permiten dos respuestas simultáneas con separación mínima de 300 ms; las lecturas repetidas comparten caché por clave. [Adaptación de Spotifast](SPOTIFAST-INTEGRATION.md).
 
 | Punto del fork | Implementación y límites |
 | --- | --- |
-| Resistencia a errores de red | Lecturas con reintentos limitados. Las solicitudes se despachan de una en una, con separación mínima de 300 ms; las cargas duplicadas reutilizan caché. HTTP 429 guarda el plazo de Spotify por aplicación/host, incluso tras reiniciar o renovar OAuth. Hasta que expire no se vuelve a consultar ese host. Los errores muestran una cuenta atrás y bloquean Reintentar; Actualizar no borra caché durante el bloqueo. No se repiten escrituras ambiguas ni se evade la cuota de Spotify. |
+| Resistencia a errores de red | Lecturas con reintentos limitados. Se permiten como máximo dos respuestas simultáneas, con separación mínima de 300 ms; las cargas duplicadas reutilizan caché. HTTP 429 guarda el plazo de Spotify por aplicación/host, incluso tras reiniciar o renovar OAuth. Hasta que expire no se vuelve a consultar ese host. Los errores muestran una cuenta atrás y bloquean Reintentar; Actualizar no borra caché durante el bloqueo. No se repiten escrituras ambiguas ni se evade la cuota de Spotify. |
 | Seguir/dejar de seguir playlists | Operaciones del endpoint actual de biblioteca. La biblioteca cambia después de la confirmación de Spotify. |
 | Añadir/eliminar canciones | Operaciones del endpoint `/playlists/{id}/items`, con errores visibles y actualización de la playlist abierta. La eliminación por URI elimina sus apariciones según el contrato de Spotify. |
 | Reordenar canciones | Menú de cada canción en playlists editables: mover arriba/abajo. Comprueba el ID en su posición original y envía `snapshot_id` para detectar cambios concurrentes. Funciona aunque la vista esté ordenada o filtrada. No hay arrastre de filas. |
 | Renombrar playlists | Diálogo existente; confirma el servidor antes de actualizar el nombre. |
 | Carpetas de playlists | Carpetas locales persistentes: crear, renombrar, eliminar, asignar playlists y filtrar la biblioteca. No sincronizan con carpetas de Spotify: su API pública no las devuelve ni permite crearlas. |
-| Cola de reproducción | Panel derecho con portadas y filas compactas. Un clic reproduce la canción seleccionada y conserva la cola aleatoria/manual restante. Valida posición e ID para rechazar clics de una cola que ya cambió. Menú de canciones compartido y carga visual por bloques de 100. |
+| Cola de reproducción | Panel derecho con portadas y filas compactas. Un clic reproduce la canción seleccionada y conserva la cola aleatoria/manual restante. Valida posición e ID para rechazar clics de una cola que ya cambió. Menú de canciones compartido y panel de cola con filas virtualizadas. |
 | Eventos de salida de audio | En el backend CPAL se comprueba la salida predeterminada cada dos segundos. La desaparición de la salida anterior o un error pausa el audio. Una nueva salida mantiene la reproducción si la anterior sigue disponible; una pausa del usuario se conserva. Se reabre el motor sin reemplazar la cola. La identificación usa los nombres publicados por el backend. |
 | Mejor caché | GET de metadatos/biblioteca/búsqueda con TTL de quince minutos y separación por sesión; álbumes y artistas con TTL de 24 horas. Un fallo temporal permite usar datos vencidos. Los errores 401/403 no se ocultan con datos antiguos. Escrituras atómicas y actualización manual que invalida metadatos sin borrar audio ni el límite de cuota. |
 | Uso y fecha de caché | Tamaño total en Preferencias → Caché; fecha UTC de los datos almacenados junto a la navegación y botón Actualizar. |

@@ -31,10 +31,7 @@ use serde::{de::DeserializeOwned, Deserialize};
 use serde_json::json;
 use std::sync::OnceLock;
 use time::{Date, Month};
-use ureq::{
-    http::{Response, StatusCode},
-    Agent, Body,
-};
+use ureq::{http::StatusCode, Agent};
 
 use crate::{
     data::{
@@ -48,6 +45,7 @@ use crate::{
     ui::credits::TrackCredits,
 };
 
+use super::dispatch::{ApiResponse, Dispatcher, Loads};
 use super::{cache::WebApiCache, local::LocalTrackManager};
 use sanitize_html::{rules::predefined::DEFAULT, sanitize_str};
 
@@ -523,8 +521,8 @@ pub struct WebApi {
     webapi_token: Mutex<Option<WebApiToken>>,
     news_quota_until: Mutex<Option<SystemTime>>,
     response_origins: Mutex<HashMap<String, SystemTime>>,
-    request_gate: Mutex<Instant>,
-    response_load: Mutex<()>,
+    request_gate: Dispatcher,
+    response_load: Loads,
     read_failures: Mutex<HashMap<String, (Instant, Error)>>,
     webapi_client_id: Mutex<Option<String>>,
     // First-party session credentials, used for `api-partner.spotify.com`
@@ -559,8 +557,8 @@ impl WebApi {
             cache,
             news_quota_until: Mutex::new(news_quota_until),
             response_origins: Mutex::new(HashMap::new()),
-            request_gate: Mutex::new(Instant::now()),
-            response_load: Mutex::new(()),
+            request_gate: Dispatcher::default(),
+            response_load: Loads::default(),
             read_failures: Mutex::new(HashMap::new()),
             local_track_manager: Mutex::new(LocalTrackManager::new()),
             paginated_limit,
@@ -651,7 +649,15 @@ impl WebApi {
         ))
     }
 
-    fn request(&self, request: &RequestBuilder) -> Result<Response<Body>, Error> {
+    fn request(&self, request: &RequestBuilder) -> Result<ApiResponse, Error> {
+        self.request_impl(request, true)
+    }
+
+    fn request_impl(
+        &self,
+        request: &RequestBuilder,
+        retry_transport: bool,
+    ) -> Result<ApiResponse, Error> {
         let destination = url::Url::parse(&request.build())
             .map_err(|_| Error::WebApiError("Invalid API URL".into()))?;
         if !trusted_api_destination(&destination) {
@@ -659,13 +665,7 @@ impl WebApi {
                 "Refusing to send Spotify credentials to an untrusted destination".into(),
             ));
         }
-        // One dispatch at a time prevents parallel workers from producing bursts.
-        // Check the persisted cooldown again after obtaining the permit.
-        let mut permit = self.request_gate.lock();
         self.check_rate_limit(request)?;
-        if let Some(wait) = permit.checked_duration_since(Instant::now()) {
-            thread::sleep(wait);
-        }
         // `api-partner.spotify.com` rejects the Web API OAuth token, so those
         // requests carry the first-party Login5 bearer + client-token instead.
         let (token, client_token) = if request.partner_auth {
@@ -717,10 +717,11 @@ impl WebApi {
                 }
             }
         };
-        let safe = matches!(request.get_method(), Method::Get);
-        let result = super::retry::run(send_request, safe, thread::sleep);
-        let mut response = result.map_err(|err| Error::WebApiError(err.to_string()))?;
-        *permit = Instant::now() + Duration::from_millis(300);
+        let permit = self.request_gate.acquire();
+        self.check_rate_limit(request)?;
+        let safe = retry_transport && matches!(request.get_method(), Method::Get);
+        let mut response = super::retry::run(send_request, safe, thread::sleep)
+            .map_err(|error| Error::WebApiError(error.to_string()))?;
         if response.status() == StatusCode::TOO_MANY_REQUESTS {
             let seconds = response
                 .headers()
@@ -772,10 +773,10 @@ impl WebApi {
                 log::warn!("Metadata invalidation failed: {error}");
             }
         }
-        Ok(response)
+        Ok(ApiResponse::new(response, permit))
     }
 
-    fn with_retry(f: impl Fn() -> Result<Response<Body>, Error>) -> Result<Response<Body>, Error> {
+    fn with_retry(f: impl Fn() -> Result<ApiResponse, Error>) -> Result<ApiResponse, Error> {
         for attempt in 0..3 {
             let response = f()?;
             if response.status() != StatusCode::TOO_MANY_REQUESTS {
@@ -806,8 +807,6 @@ impl WebApi {
     /// Send a request and return the deserialized JSON body.  Use for GET
     /// requests.
     fn load<T: DeserializeOwned>(&self, request: &RequestBuilder) -> Result<T, Error> {
-        // Recheck the cache after a competing load finishes instead of fetching twice.
-        let _load = self.response_load.lock();
         let cacheable = matches!(request.method, Method::Get)
             && !request.path.starts_with("v1/me/player")
             && !request.path.ends_with("/contains");
@@ -816,6 +815,11 @@ impl WebApi {
         } else {
             None
         };
+        // Coalesce only equivalent reads, keeping unrelated cached pages responsive.
+        let flight = self
+            .response_load
+            .for_key(key.clone().unwrap_or_else(|| request.build()));
+        let _load = flight.lock();
         let mut old = None;
         if let Some(key) = &key {
             if let Some(file) = self.cache.get("responses", key) {
@@ -851,14 +855,16 @@ impl WebApi {
             }
         }
         // Never launch another failing GET immediately when navigating back to a view.
-        let result = if let Some((_, error)) = self
+        let recent_failure = self
             .read_failures
             .lock()
             .get(&request.build())
             .filter(|(at, _)| {
                 matches!(request.method, Method::Get) && at.elapsed() < Duration::from_secs(30)
-            }) {
-            Err(error.clone())
+            })
+            .map(|(_, error)| error.clone());
+        let result = if let Some(error) = recent_failure {
+            Err(error)
         } else {
             self.request_json(request)
         };
@@ -903,22 +909,28 @@ impl WebApi {
 
     fn request_json(&self, request: &RequestBuilder) -> Result<serde_json::Value, Error> {
         for attempt in 0..3 {
-            let mut response = Self::with_retry(|| self.request(request))?;
-            match response
-                .body_mut()
-                .with_config()
-                .limit(16 * 1024 * 1024)
-                .read_json()
-            {
+            // One total retry budget covers connection, HTTP 5xx and body reads.
+            // Drop the response/permit before backoff; never retry ambiguous writes.
+            let result = (|| {
+                let mut response = self.request_impl(request, false)?;
+                response
+                    .body_mut()
+                    .with_config()
+                    .limit(16 * 1024 * 1024)
+                    .read_json()
+                    .map_err(Error::from)
+            })();
+            match result {
                 Ok(value) => return Ok(value),
                 Err(error)
                     if matches!(request.method, Method::Get)
-                        && super::retry::transient(&error)
+                        && Self::temporary_api_error(&error)
+                        && !matches!(error, Error::RateLimited { .. })
                         && attempt < 2 =>
                 {
                     thread::sleep(Duration::from_millis(250 * (attempt + 1)));
                 }
-                Err(error) => return Err(error.into()),
+                Err(error) => return Err(error),
             }
         }
         unreachable!("bounded retry returns on final attempt")

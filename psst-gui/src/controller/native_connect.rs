@@ -29,7 +29,9 @@ use librespot_playback::{
     player::{Player, PlayerEvent},
 };
 use librespot_protocol::{
-    authentication::AuthenticationType, connect::ClusterUpdate, player::ProvidedTrack,
+    authentication::AuthenticationType,
+    connect::{Cluster, ClusterUpdate},
+    player::ProvidedTrack,
 };
 use psst_core::audio::{
     output::{AudioOutput, AudioSink, DefaultAudioOutput},
@@ -50,10 +52,14 @@ const NOTICE: Selector<(u64, Notice)> = Selector::new("native-connect.notice");
 enum Notice {
     Ready,
     Failed(String),
+    CommandFailed(String),
     Player(PlayerEvent),
     Cluster(ClusterUpdate),
+    LocalQueue(ClusterUpdate),
 }
 enum Action {
+    PlayQueued { uid: String, uri: String },
+    Add(String),
     Load(LoadRequest),
     Play,
     Pause,
@@ -231,6 +237,7 @@ impl Worker {
                     ..ConnectConfig::default()
                 }, session.clone(), credentials, player.clone(), mixer);
                 let (spirc, task) = tokio::time::timeout(Duration::from_secs(35), setup).await.map_err(|_| "Spotify Connect tardó demasiado en conectar".to_string())?.map_err(|e| e.to_string())?;
+                let mut local_queue = spirc.queue_state();
                 // Stay inactive on startup: do not steal playback from a phone.
                 let mut task = tokio::spawn(task);
                 notify(Notice::Ready);
@@ -240,6 +247,8 @@ impl Worker {
                         action = commands.recv() => {
                             let result = match action {
                                 Some(Action::Load(request)) => spirc.activate().and_then(|_| spirc.load(request)),
+                                Some(Action::Add(uri)) => spirc.add_to_queue(uri),
+                                Some(Action::PlayQueued { uid, uri }) => spirc.play_queued(uid, uri),
                                 Some(Action::Play) => spirc.play(),
                                 Some(Action::Pause) => spirc.pause(),
                                 Some(Action::Toggle) => spirc.play_pause(),
@@ -253,9 +262,26 @@ impl Worker {
                                 Some(Action::Suspend) => spirc.disconnect(true),
                                 Some(Action::Quit) | None => break,
                             };
-                            if let Err(error) = result { log::warn!("Connect command failed: {error}"); }
+                            if let Err(error) = result { notify(Notice::CommandFailed(error.to_string())); }
                         }
                         event = events.recv() => { if let Some(event) = event { notify(Notice::Player(event)); } else { break; } }
+                        changed = local_queue.changed() => {
+                            if changed.is_ok() {
+                                let player = local_queue.borrow_and_update().clone();
+                                if let Some(player) = player {
+                                    log::debug!("Native queue: current={} first={} upcoming={} shuffle={}",
+                                        player.track.as_ref().map_or("", |track| track.uri.as_str()),
+                                        player.next_tracks.first().map_or("", |track| track.uri.as_str()),
+                                        player.next_tracks.len(), player.options.shuffling_context);
+                                    let mut cluster = Cluster::new();
+                                    cluster.active_device_id = config.connect_device_id.clone();
+                                    cluster.player_state = Some(player).into();
+                                    let mut update = ClusterUpdate::new();
+                                    update.cluster = Some(cluster).into();
+                                    notify(Notice::LocalQueue(update));
+                                }
+                            }
+                        }
                         update = clusters.next() => { if let Some(Ok(update)) = update { notify(Notice::Cluster(update)); } }
                         _ = &mut task => { stopping.store(true, std::sync::atomic::Ordering::Release); player.stop(); session.shutdown(); return Err("La conexión con Spotify se cerró. Se reintentará automáticamente.".into()); }
                     }
@@ -408,6 +434,8 @@ pub struct NativeConnectController {
     audio_item: Option<Box<AudioItem>>,
     cluster: Option<ClusterUpdate>,
     last_volume: Option<u16>,
+    local_queue_observed: bool,
+    next_audio_check: Instant,
     #[cfg(feature = "cpal")]
     audio_device: Option<String>,
 }
@@ -422,6 +450,8 @@ impl Default for NativeConnectController {
             audio_item: None,
             cluster: None,
             last_volume: None,
+            local_queue_observed: false,
+            next_audio_check: Instant::now(),
             #[cfg(feature = "cpal")]
             audio_device: DefaultAudioOutput::devices().0,
         }
@@ -507,7 +537,9 @@ impl NativeConnectController {
     }
     fn notice(&mut self, ctx: &mut EventCtx, state: &mut AppState, notice: &Notice) {
         match notice {
+            Notice::CommandFailed(error) => state.error_alert(format!("Connect: {error}")),
             Notice::Ready => {
+                self.local_queue_observed = false;
                 state.connect.native_ready = true;
                 self.failures = 0;
                 state.connect.native_status = "Connect nativo listo. Selecciona Xpotify en Spotify del teléfono. Las escuchas del motor nativo no se reportan al historial de Spotify.".into();
@@ -521,7 +553,17 @@ impl NativeConnectController {
                 state.playback.state = PlaybackState::Paused;
                 self.restore_pending = true;
             }
-            Notice::Cluster(update) => {
+            Notice::Cluster(update) | Notice::LocalQueue(update) => {
+                let local = matches!(notice, Notice::LocalQueue(_));
+                if !local
+                    && self.local_queue_observed
+                    && update.cluster.as_ref().is_some_and(|cluster| {
+                        cluster.active_device_id == state.config.connect_device_id
+                    })
+                {
+                    return; // A lagging server echo must not overwrite this engine's queue.
+                }
+                self.local_queue_observed = local;
                 self.cluster = Some(update.clone());
                 if let Some(cluster) = update.cluster.as_ref() {
                     if cluster.active_device_id == state.config.connect_device_id {
@@ -575,16 +617,26 @@ impl NativeConnectController {
                                     state.set_queue_behavior(behavior);
                                 }
                             }
+                            let mut known = std::collections::HashMap::new();
+                            for entry in state.playback.queue.iter().chain(state.added_queue.iter())
+                            {
+                                known
+                                    .entry(entry.item.id())
+                                    .or_insert_with(|| entry.clone());
+                            }
                             state.playback.up_next = player
                                 .next_tracks
                                 .iter()
                                 .filter_map(|provided| {
-                                    let playable = from_provided(provided)?;
-                                    let mut entry =
-                                        state.queued_entry(playable.id()).unwrap_or(QueueEntry {
-                                            item: playable,
+                                    let item_id =
+                                        psst_core::item_id::ItemId::from_uri(&provided.uri)?;
+                                    let mut entry = match known.get(&item_id) {
+                                        Some(entry) => entry.clone(),
+                                        None => QueueEntry {
+                                            item: from_provided(provided)?,
                                             origin: PlaybackOrigin::Home,
-                                        });
+                                        },
+                                    };
                                     if let Some(origin) = &origin {
                                         entry.origin = origin.clone();
                                     }
@@ -771,7 +823,8 @@ impl<W: Widget<AppState>> Controller<AppState, W> for NativeConnectController {
         if let Event::Timer(token) = event {
             if *token == self.timer {
                 #[cfg(feature = "cpal")]
-                if state.config.native_connect {
+                if state.config.native_connect && Instant::now() >= self.next_audio_check {
+                    self.next_audio_check = Instant::now() + Duration::from_secs(2);
                     let current = DefaultAudioOutput::devices().0;
                     if current != self.audio_device {
                         self.worker = None;
@@ -869,6 +922,38 @@ impl<W: Widget<AppState>> Controller<AppState, W> for NativeConnectController {
                         .get(*index)
                         .is_some_and(|q| q.item.id() == *expected)
                     {
+                        if !self.restore_pending {
+                            let occurrence = self
+                                .cluster
+                                .as_ref()
+                                .and_then(|update| update.cluster.as_ref())
+                                .and_then(|cluster| cluster.player_state.as_ref())
+                                .and_then(|player| {
+                                    player
+                                        .next_tracks
+                                        .iter()
+                                        .filter(|provided| {
+                                            psst_core::item_id::ItemId::from_uri(&provided.uri)
+                                                .is_some_and(|id| {
+                                                    state.queued_entry(id).is_some()
+                                                        || from_provided(provided).is_some()
+                                                })
+                                        })
+                                        .nth(*index)
+                                })
+                                .filter(|provided| {
+                                    expected.to_uri().as_deref() == Some(provided.uri.as_str())
+                                })
+                                .map(|provided| (provided.uid.clone(), provided.uri.clone()));
+                            if let Some((uid, uri)) = occurrence {
+                                self.send(state, Action::PlayQueued { uid, uri });
+                            } else {
+                                state
+                                    .error_alert("La cola cambió. Selecciona de nuevo la canción.");
+                            }
+                            ctx.set_handled();
+                            return;
+                        }
                         let items = state
                             .playback
                             .up_next
@@ -937,6 +1022,31 @@ impl<W: Widget<AppState>> Controller<AppState, W> for NativeConnectController {
                     return;
                 }
                 if let Some((entry, _)) = command.get(cmd::ADD_TO_QUEUE) {
+                    if !self.restore_pending {
+                        let manual_count = self
+                            .cluster
+                            .as_ref()
+                            .and_then(|update| update.cluster.as_ref())
+                            .and_then(|cluster| cluster.player_state.as_ref())
+                            .map_or(0, |player| {
+                                player
+                                    .next_tracks
+                                    .iter()
+                                    .filter(|track| track.provider == "queue")
+                                    .count()
+                            });
+                        if manual_count >= 80 {
+                            state.error_alert("La cola manual del motor Connect está llena (80 canciones). Reproduce alguna antes de añadir más.");
+                            ctx.set_handled();
+                            return;
+                        }
+                        if let Some(uri) = entry.item.id().to_uri() {
+                            state.add_queued_entry(entry.clone());
+                            self.send(state, Action::Add(uri));
+                        }
+                        ctx.set_handled();
+                        return;
+                    }
                     if let Some(current) = state.playback.now_playing.as_ref() {
                         let mut items = druid::im::vector![current.item.clone()];
                         items.extend(state.playback.up_next.iter().map(|q| q.item.clone()));

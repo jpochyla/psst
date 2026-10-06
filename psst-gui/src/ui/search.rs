@@ -119,6 +119,7 @@ fn async_results_widget() -> impl Widget<AppState> {
         |_, data, (q, t)| data.search.results.defer((q, t)),
         |_, data, r| data.search.results.update(r),
     )
+    .latest_only()
     .on_command(SET_TOPIC, |ctx, topic, data: &mut AppState| {
         data.search.topic = *topic;
         if !data.search.input.is_empty() {
@@ -141,6 +142,7 @@ fn async_results_widget() -> impl Widget<AppState> {
             }
         },
     )
+    .latest_only()
 }
 
 fn loaded_results_widget() -> impl Widget<WithCtx<SearchResults>> {

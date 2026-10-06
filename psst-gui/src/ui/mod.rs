@@ -296,7 +296,8 @@ fn root_widget() -> impl Widget<AppState> {
                     ),
                 )
                 .split_point(0.62)
-                .bar_size(8.0)
+                .bar_size(1.0)
+                .min_bar_area(8.0)
                 .min_size(300.0, 260.0)
                 .solid_bar(true),
                 Overlay::bottom(route_widget(), alert_widget()),
@@ -306,10 +307,10 @@ fn root_widget() -> impl Widget<AppState> {
         .background(theme::BACKGROUND_LIGHT);
 
     let split = Split::columns(sidebar, main)
-        .split_point(0.27)
-        .bar_size(8.0)
+        .split_point(0.24)
+        .bar_size(1.0)
         .min_size(235.0, 500.0)
-        .min_bar_area(1.0)
+        .min_bar_area(8.0)
         .solid_bar(true);
 
     let shell = Flex::column()

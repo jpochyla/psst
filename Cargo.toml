@@ -1,6 +1,10 @@
 [workspace]
 resolver = "2"
-members = ["psst-core", "psst-cli", "psst-gui"]
+members = ["psst-core", "psst-cli", "psst-gui", "vendor/librespot-connect"]
+
+[patch.crates-io]
+# Upstream 0.8.0 plus local queue observation/enqueue; no extra Web API requests.
+librespot-connect = { path = "vendor/librespot-connect" }
 
 [profile.dev]
 opt-level = 1

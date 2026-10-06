@@ -78,8 +78,13 @@ pub fn setup(env: &mut Env, state: &AppState) {
         Theme::System => unreachable!("system theme is resolved"),
     }
 
-    env.set(BORDER_LIGHT, env.get(GREY_400));
-    env.set(BORDER_DARK, env.get(GREY_500));
+    let outline = if super::system_theme::resolve(state.config.theme) == Theme::Dark {
+        Color::rgb8(0x2a, 0x30, 0x38)
+    } else {
+        Color::rgb8(0xdd, 0xe1, 0xe6)
+    };
+    env.set(BORDER_LIGHT, outline);
+    env.set(BORDER_DARK, outline);
 
     env.set(SELECTED_TEXT_BACKGROUND_COLOR, env.get(BLUE_200));
     env.set(SELECTION_TEXT_COLOR, env.get(GREY_700));
@@ -87,7 +92,7 @@ pub fn setup(env: &mut Env, state: &AppState) {
     env.set(CURSOR_COLOR, env.get(GREY_000));
 
     env.set(PROGRESS_BAR_RADIUS, 4.0);
-    env.set(BUTTON_BORDER_RADIUS, 8.0);
+    env.set(BUTTON_BORDER_RADIUS, 12.0);
     env.set(BUTTON_BORDER_WIDTH, 1.0);
 
     env.set(
@@ -136,16 +141,17 @@ pub fn setup(env: &mut Env, state: &AppState) {
 }
 
 fn setup_light_theme(env: &mut Env) {
+    // Palette adapted from Spotifast (MIT, Carmine Paolino). See LICENSE-Spotifast.md.
     env.set(GREY_000, Color::grey8(0x00));
     env.set(GREY_100, Color::grey8(0x33));
     env.set(GREY_200, Color::grey8(0x4f));
-    env.set(GREY_300, Color::rgb8(97, 108, 119));
+    env.set(GREY_300, Color::rgb8(0x53, 0x5b, 0x66));
     env.set(GREY_400, Color::grey8(0xbd));
-    env.set(GREY_500, Color::rgb8(221, 228, 225));
-    env.set(GREY_600, Color::rgb8(244, 247, 245));
-    env.set(GREY_700, Color::from_rgba32_u32(0xffffffff));
-    env.set(BLUE_100, Color::rgb8(36, 180, 105));
-    env.set(BLUE_200, Color::rgb8(19, 132, 75));
+    env.set(GREY_500, Color::rgb8(0xee, 0xf0, 0xf3));
+    env.set(GREY_600, Color::rgb8(0xff, 0xff, 0xff));
+    env.set(GREY_700, Color::rgb8(0xf8, 0xf9, 0xfb));
+    env.set(BLUE_100, Color::rgb8(0x12, 0x8f, 0x40));
+    env.set(BLUE_200, Color::rgb8(0x15, 0xa6, 0x4a));
 
     env.set(RED, Color::rgba8(0xEB, 0x57, 0x57, 0xFF));
 
@@ -156,15 +162,15 @@ fn setup_light_theme(env: &mut Env) {
 
 fn setup_dark_theme(env: &mut Env) {
     env.set(GREY_000, Color::grey8(0xff));
-    env.set(GREY_100, Color::grey8(0xf2));
+    env.set(GREY_100, Color::rgb8(0xf2, 0xf4, 0xf6));
     env.set(GREY_200, Color::grey8(0xe0));
-    env.set(GREY_300, Color::grey8(0xbd));
-    env.set(GREY_400, Color::grey8(0x82));
-    env.set(GREY_500, Color::grey8(0x33));
-    env.set(GREY_600, Color::grey8(0x08));
-    env.set(GREY_700, Color::grey8(0x12));
-    env.set(BLUE_100, Color::rgb8(36, 180, 105));
-    env.set(BLUE_200, Color::rgb8(90, 225, 150));
+    env.set(GREY_300, Color::rgb8(0xa9, 0xb1, 0xbc));
+    env.set(GREY_400, Color::rgb8(0x6e, 0x77, 0x84));
+    env.set(GREY_500, Color::rgb8(0x1d, 0x21, 0x27));
+    env.set(GREY_600, Color::rgb8(0x15, 0x18, 0x1c));
+    env.set(GREY_700, Color::rgb8(0x0f, 0x11, 0x14));
+    env.set(BLUE_100, Color::rgb8(0x3c, 0xe8, 0x7a));
+    env.set(BLUE_200, Color::rgb8(0x1e, 0xd7, 0x60));
 
     env.set(RED, Color::rgba8(0xEB, 0x57, 0x57, 0xFF));
 

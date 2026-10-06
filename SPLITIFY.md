@@ -1,8 +1,10 @@
 # Xpotify with Splitify
 
-## Windows 0.2.0
+## Windows 0.4.0
 
-Download the optimized Windows x64 executable or portable ZIP from [GitHub Releases](https://github.com/angelopol/xpotify/releases/latest). The package includes the launcher, documentation, both licenses and SHA-256 verification. Build locally with `powershell -File scripts/Build-Native.ps1 -Release`; `Package-Native.ps1` now uses the release build by default. The release executable excludes development preview modes.
+This update adapts Spotifast's compact colors and divider spacing. The native Connect queue observes actual engine shuffle/advancement directly, without Web API polling. Selecting an active queue row retains its context and remaining order. Large queue panels render only visible rows; equivalent cached reads share a per-key lock, while at most two HTTP responses are in flight. Transient JSON reads share a three-attempt budget. See `SPOTIFAST-INTEGRATION.md` in the source repository for details and limits.
+
+Download the optimized Windows x64 executable or portable ZIP from [GitHub Releases](https://github.com/angelopol/xpotify/releases/latest). The package includes the launcher, documentation, the Psst, librespot and Spotifast licenses and SHA-256 verification. Build locally with `powershell -File scripts/Build-Native.ps1 -Release`; `Package-Native.ps1` now uses the release build by default. The release executable excludes development preview modes.
 
 Windows taskbar thumbnails include **Anterior**, **Reproducir/Pausar** and **Siguiente**, including while the main window is minimized. The middle icon follows playback state. Controls are disabled when playback is unavailable, and reinstalled when Explorer recreates the taskbar.
 

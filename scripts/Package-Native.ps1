@@ -14,6 +14,7 @@ try {
     Copy-Item -LiteralPath $executable -Destination (Join-Path $stageRoot 'Xpotify.exe')
     Copy-Item -LiteralPath (Join-Path $projectRoot 'LICENSE.md') -Destination $stageRoot
     Copy-Item -LiteralPath (Join-Path $projectRoot 'LICENSE-librespot.md') -Destination $stageRoot
+    Copy-Item -LiteralPath (Join-Path $projectRoot 'LICENSE-Spotifast.md') -Destination $stageRoot
     Copy-Item -LiteralPath (Join-Path $projectRoot 'SPLITIFY.md') -Destination (Join-Path $stageRoot 'README.md')
     Copy-Item -LiteralPath (Join-Path $projectRoot 'ROADMAP.md') -Destination $stageRoot
     # Use an explicit file list: user credentials, .env.local and logs never enter the package.

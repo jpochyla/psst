@@ -6,6 +6,8 @@ Cliente nativo basado en Psst, con organización de playlists mediante Gemini, l
 
 ## Integración local con Splitify
 
+La versión **0.4.0** adapta mejoras de Spotifast: cola del motor con orden aleatorio real, filas virtualizadas para listas largas, colores y separadores compactos, consultas HTTP acotadas y caché por petición. Consulta [qué se incorporó y sus límites](SPOTIFAST-INTEGRATION.md).
+
 Esta versión añade un editor nativo de playlists con `gemini-3.5-flash-lite`. Pulsa **Organizar con IA** o haz clic derecho en una playlist y elige **Dividir con Splitify IA**. Configura `GEMINI_API_KEY` y `SPOTIFY_CLIENT_ID` en `.env.local`; añade `http://127.0.0.1:8888/login` como redirect URI en Spotify Developer Dashboard. La autorización de reproducción nativa utiliza por separado `http://127.0.0.1:8898/login`. La IA propone una vista previa editable y el botón de creación genera playlists privadas. La reproducción sigue usando el cliente nativo.
 
 Consulta [la revisión de seguridad](SECURITY-REVIEW.md): se corrigieron fugas de tokens en el código heredado y se actualizaron dependencias. La rama `main` del repositorio Splitify conserva la aplicación web; la integración nativa vive en este repositorio xpotify, rama `splitify-integration`. Ejecuta `Start-Xpotify.cmd`; consulta [uso y configuración](SPLITIFY.md).

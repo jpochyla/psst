@@ -52,6 +52,7 @@ pub fn run_if_requested() -> bool {
         return false;
     };
     let mut config = Config::default();
+    config.native_connect = false;
     if std::env::args().any(|arg| arg == "--dark") {
         config.theme = Theme::Dark;
     } else if std::env::args().any(|arg| arg == "--light") {
@@ -121,7 +122,7 @@ pub fn run_if_requested() -> bool {
             }
             crate::splitify::window()
         }
-        "queue" | "queue-empty" | "lyrics" | "lyrics-follow" | "menus" => {
+        "queue" | "queue-large" | "queue-empty" | "lyrics" | "lyrics-follow" | "menus" => {
             if view == "menus" {
                 fixture_library(&mut state);
             }
@@ -157,6 +158,25 @@ pub fn run_if_requested() -> bool {
                         state.playback.up_next.push_back(entry);
                     }
                 }
+            }
+            if view == "queue-large" {
+                let template = state
+                    .playback
+                    .up_next
+                    .front()
+                    .cloned()
+                    .expect("queue fixture");
+                state.playback.up_next = (0..5000)
+                    .map(|index| {
+                        let mut entry = template.clone();
+                        if let crate::data::Playable::Track(track) = &mut entry.item {
+                            let track = Arc::make_mut(track);
+                            track.name = format!("Canción de prueba {}", index + 1).into();
+                            track.id.0.id = index as u128 + 1;
+                        }
+                        entry
+                    })
+                    .collect();
             }
             if matches!(view.as_str(), "lyrics" | "lyrics-follow") {
                 state.nav = crate::data::Nav::Lyrics;

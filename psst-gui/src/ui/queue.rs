@@ -1,3 +1,4 @@
+mod virtual_rows;
 use druid::{
     im::Vector,
     lens::Map,
@@ -10,7 +11,7 @@ use druid::{
 use crate::{
     cmd,
     data::{AppState, CommonCtx, Playable, PlaybackOrigin, QueueEntry},
-    widget::{Border, MyWidgetExt, RemoteImage},
+    widget::{MyWidgetExt, RemoteImage},
 };
 
 use super::{theme, utils};
@@ -74,6 +75,19 @@ fn row(current: bool) -> impl Widget<QueueRow> {
                 .expand_width(),
             1.0,
         )
+        .with_spacer(8.0)
+        .with_child(
+            Label::dynamic(|row: &QueueRow, _| {
+                let seconds = row.entry.item.duration().as_secs();
+                if seconds == 0 {
+                    String::new()
+                } else {
+                    format!("{}:{:02}", seconds / 60, seconds % 60)
+                }
+            })
+            .with_text_size(11.0)
+            .with_text_color(theme::PLACEHOLDER_COLOR),
+        )
         .padding((8.0, 8.0))
         .expand_width()
         .background(Painter::new(|ctx, _: &QueueRow, env| {
@@ -123,23 +137,7 @@ pub fn widget() -> impl Widget<AppState> {
         },
         |_, _| {},
     ));
-    let upcoming = List::new(|| row(false)).lens(Map::new(
-        |state: &AppState| {
-            state
-                .playback
-                .up_next
-                .iter()
-                .enumerate()
-                .take(state.queue_visible_count)
-                .map(|(index, entry)| QueueRow {
-                    entry: entry.clone(),
-                    index: Some(index),
-                    ctx: state.common_ctx.clone(),
-                })
-                .collect::<Vector<_>>()
-        },
-        |_, _| {},
-    ));
+    let upcoming = virtual_rows::VirtualQueue::default();
     let contents = Flex::column()
         .cross_axis_alignment(CrossAxisAlignment::Start)
         .with_child(
@@ -181,16 +179,6 @@ pub fn widget() -> impl Widget<AppState> {
                 .padding(8.0),
             upcoming,
         ))
-        .with_child(Either::new(
-            |state: &AppState, _| state.queue_visible_count < state.playback.up_next.len(),
-            Button::new("Cargar más canciones")
-                .on_click(|_, state: &mut AppState, _| {
-                    state.queue_visible_count = state.queue_visible_count.saturating_add(100);
-                })
-                .tooltip("Mostrar las siguientes 100 canciones de la cola")
-                .padding((8.0, 16.0)),
-            crate::widget::Empty,
-        ))
         .expand_width();
     Flex::column()
         .cross_axis_alignment(CrossAxisAlignment::Start)
@@ -199,8 +187,10 @@ pub fn widget() -> impl Widget<AppState> {
                 .with_child(
                     Label::new("Cola")
                         .with_font(theme::UI_FONT_MEDIUM)
-                        .padding((0.0, 10.0))
-                        .background(Border::Bottom.with_color(theme::BLUE_200)),
+                        .with_text_color(theme::BACKGROUND_DARK)
+                        .padding((14.0, 8.0))
+                        .background(theme::TEXT_COLOR)
+                        .rounded(18.0),
                 )
                 .with_flex_spacer(1.0)
                 .with_child(

@@ -19,13 +19,21 @@ pub struct OnCommandAsync<W, T, U, V> {
     request_fn: AsyncCmdReq<U, V>,
     response_fn: AsyncCmdRes<T, U, V>,
     thread: Option<JoinHandle<()>>,
+    request_serial: u64,
+    latest_only: bool,
 }
 
 impl<W, T, U, V> OnCommandAsync<W, T, U, V>
 where
     W: Widget<T>,
 {
-    const RESPONSE: Selector<SingleUse<(U, V)>> = Selector::new("on_cmd_async.response");
+    const RESPONSE: Selector<SingleUse<(u64, U, V)>> = Selector::new("on_cmd_async.response");
+
+    /// For replaceable reads; writes retain every completion by default.
+    pub fn latest_only(mut self) -> Self {
+        self.latest_only = true;
+        self
+    }
 
     pub fn new(
         child: W,
@@ -41,6 +49,8 @@ where
             request_fn,
             response_fn,
             thread: None,
+            request_serial: 0,
+            latest_only: false,
         }
     }
 }
@@ -58,6 +68,8 @@ where
                 let req = cmd.get_unchecked(self.selector);
 
                 (self.preflight_fn)(ctx, data, req.to_owned());
+                self.request_serial = self.request_serial.wrapping_add(1);
+                let serial = self.request_serial;
 
                 let old_thread = self.thread.replace(thread::spawn({
                     let req_fn = self.request_fn.clone();
@@ -69,7 +81,7 @@ where
                         let res = req_fn(req.clone());
                         let _ = sink.submit_command(
                             Self::RESPONSE,
-                            SingleUse::new((req, res)),
+                            SingleUse::new((serial, req, res)),
                             Target::Widget(self_id),
                         );
                     }
@@ -79,9 +91,13 @@ where
                 }
             }
             Event::Command(cmd) if cmd.is(Self::RESPONSE) => {
-                let res = cmd.get_unchecked(Self::RESPONSE).take().unwrap();
-                (self.response_fn)(ctx, data, res);
-                self.thread.take();
+                let (serial, req, res) = cmd.get_unchecked(Self::RESPONSE).take().unwrap();
+                if accepts_response(self.request_serial, serial, self.latest_only) {
+                    (self.response_fn)(ctx, data, (req, res));
+                }
+                if serial == self.request_serial {
+                    self.thread.take();
+                }
                 ctx.set_handled();
             }
             _ => {
@@ -104,5 +120,23 @@ where
 
     fn paint(&mut self, ctx: &mut PaintCtx, data: &T, env: &Env) {
         self.child.paint(ctx, data, env);
+    }
+}
+
+fn accepts_response(current: u64, response: u64, latest_only: bool) -> bool {
+    !latest_only || response == current
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn returning_to_the_same_query_does_not_accept_its_previous_response() {
+        // Query A, then B, then A again. A string comparison alone accepts request 1.
+        assert!(!accepts_response(3, 1, true));
+        assert!(!accepts_response(3, 2, true));
+        assert!(accepts_response(3, 3, true));
+        // Independent playlist/library writes must still deliver all completions.
+        assert!(accepts_response(3, 1, false));
     }
 }
