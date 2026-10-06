@@ -23,7 +23,7 @@ pub fn widget() -> impl Widget<AppState> {
     .padding((0.0, 16.0))
     .context_menu(super::queue::current_menu);
     let upcoming = super::queue::preview_widget();
-    Scroll::new(
+    let body = Scroll::new(
         Flex::column()
             .cross_axis_alignment(CrossAxisAlignment::Start)
             .with_child(
@@ -133,6 +133,9 @@ pub fn widget() -> impl Widget<AppState> {
             .padding((14.0, 14.0, 24.0, 14.0))
             .expand_width(),
     )
-    .vertical()
-    .background(theme::BACKGROUND_DARK)
+    .vertical();
+    Flex::column()
+        .with_flex_child(body, 1.0)
+        .with_child(super::queue::pager().padding((14.0, 8.0, 24.0, 8.0)))
+        .background(theme::BACKGROUND_DARK)
 }

@@ -6,6 +6,8 @@ Cliente nativo basado en Psst, con organización de playlists mediante Gemini, l
 
 ## Integración local con Splitify
 
+En **0.4.4**, la cola muestra páginas de 50 canciones, con botones para avanzar y volver tanto en el panel del reproductor como en la vista completa. Cambiar de página no consulta la API de Spotify.
+
 En **0.4.3**, la sombra llega hasta el volumen y la línea de progreso mide 2 píxeles, conservando un área de clic cómoda.
 
 En **0.4.2**, el reproductor incorpora una sombra de bloques verdes que responde al audio local y se desvanece al pausar.

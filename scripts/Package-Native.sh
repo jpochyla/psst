@@ -27,7 +27,7 @@ case "$(uname -s)" in
 <key>CFBundleIdentifier</key><string>com.xpotify.desktop</string>
 <key>CFBundleExecutable</key><string>Xpotify</string>
 <key>CFBundleIconFile</key><string>Xpotify.icns</string>
-<key>CFBundleVersion</key><string>0.4.3</string>
+<key>CFBundleVersion</key><string>0.4.4</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>NSHighResolutionCapable</key><true/>
 </dict></plist>

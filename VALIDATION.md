@@ -1,5 +1,12 @@
 # Local validation - Windows - 2026-10-06
 
+## Queue pagination, Windows 0.4.4
+
+- 68 core/GUI tests pass (19 core and 49 GUI); one live LRCLIB test explicitly ignored. Clippy passes with warnings denied, and the locked development build succeeds. New tests cover page boundaries, empty queues, stale pages after shrinking, extreme lengths and absolute selection indices with repeated tracks.
+- Both queue views use pages of 50 and virtualize the viewport. A 5,000-track fixture was reviewed in light at 900 x 700 and 1120 x 800. Rapidly advancing 99 times reached 4951–5000 with titles 4951 onward; Previous showed 4901–4950 with matching titles. This caught and fixed stale row labels by keying row widgets with absolute queue positions.
+- Actual native Connect playback exposed 80 upcoming tracks: advancing showed 51–80, and selecting its first row loaded You Ain't Gotta Lie (Momma Said), retaining the Us playlist context. Playback was paused after two seconds. Returning from a scrolled page revealed the first rows of the previous page. The original playback, route, volume, queue behavior, theme and window size were restored after QA.
+- The native Connect 80-track window remains unchanged. UI pagination does not fetch playlist pages or poll Spotify; the final page may have fewer than 50 entries. One initial live session disconnected from the Spotify server and reconnected automatically; the subsequent playback check succeeded. No authentication, decoder or vendored Connect changes were needed.
+
 
 ## Full-width footer, Windows 0.4.3
 

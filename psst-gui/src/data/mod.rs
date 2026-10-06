@@ -91,7 +91,7 @@ pub struct AppState {
     pub cache_notice: String,
     pub selected_folder: Option<String>,
     pub queue_panel_open: bool,
-    pub queue_visible_count: usize,
+    pub queue_page: usize,
     pub folder_name: String,
     pub editing_folder: Option<String>,
     pub playlist_picker_track: Option<TrackId>,
@@ -152,7 +152,7 @@ impl AppState {
             playback,
             added_queue: Vector::new(),
             queue_panel_open: false,
-            queue_visible_count: 100,
+            queue_page: 0,
             engine_queue: None,
             search: Search {
                 input: "".into(),

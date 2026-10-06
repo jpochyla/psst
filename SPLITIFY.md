@@ -1,6 +1,8 @@
 # Xpotify with Splitify
 
-## Windows 0.4.3
+## Windows 0.4.4
+
+Both the current-playback panel and full queue show 50 upcoming songs per page. Use **‹ 50** / **50 ›** to move backward or forward; the range label shows the current entries and total. Scroll within each page to see all its rows. The final page contains the remaining songs, and unavailable navigation buttons are disabled. Pagination keeps absolute queue positions, including duplicate tracks, and returns to the top of the queue rows when changing pages. Only visible rows create widgets and request artwork; paging makes no additional Spotify Web API calls. Native Connect currently supplies an 80-track upcoming window, so its second page can contain 30 songs; this UI does not infer additional songs from the unshuffled playlist or change the engine's wire limit.
 
 The audio shadow spans the complete footer, including volume, with mirrored bands that bring bass pulses to both ends. The seek line is now 2 px tall while retaining its 8 px mouse target.
 
