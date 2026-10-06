@@ -1,6 +1,15 @@
 fn main() {
     #[cfg(windows)]
-    add_windows_icon();
+    {
+        // Druid constructs large typed widget trees. Reserve virtual stack space
+        // for those layouts while retaining the linker's small commit default.
+        if std::env::var("CARGO_CFG_TARGET_ENV").as_deref() == Ok("msvc") {
+            println!("cargo:rustc-link-arg-bin=psst-gui=/STACK:8388608");
+        } else {
+            println!("cargo:rustc-link-arg-bin=psst-gui=-Wl,--stack,8388608");
+        }
+        add_windows_icon();
+    }
 }
 
 #[cfg(windows)]

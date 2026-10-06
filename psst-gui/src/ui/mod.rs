@@ -229,7 +229,7 @@ pub fn artwork_widget() -> impl Widget<AppState> {
 }
 
 fn root_widget() -> impl Widget<AppState> {
-    let playlists = Scroll::new(playlist::list_widget())
+    let playlists = Scroll::new(playlist::list_widget().padding_right(16.0))
         .vertical()
         .expand_height();
 
@@ -415,7 +415,7 @@ fn route_widget() -> impl Widget<AppState> {
             Route::Devices => connect::widget().boxed(),
             Route::Notifications => news::widget().boxed(),
             Route::Queue => queue::widget().boxed(),
-            Route::Home => Scroll::new(home::home_widget().padding(theme::grid(1.0)))
+            Route::Home => Scroll::new(home::home_widget().padding(theme::SCROLL_CONTENT_INSETS))
                 .vertical()
                 .boxed(),
             Route::Lyrics => lyrics::lyrics_widget().boxed(),
@@ -425,41 +425,59 @@ fn route_widget() -> impl Widget<AppState> {
                         .lens(AppState::finder),
                 )
                 .with_flex_child(
-                    Scroll::new(library::saved_tracks_widget().padding(theme::grid(1.0)))
-                        .vertical(),
+                    Scroll::new(
+                        library::saved_tracks_widget().padding(theme::SCROLL_CONTENT_INSETS),
+                    )
+                    .vertical(),
                     1.0,
                 )
                 .boxed(),
             Route::SavedAlbums => {
-                Scroll::new(library::saved_albums_widget().padding(theme::grid(1.0)))
+                Scroll::new(library::saved_albums_widget().padding(theme::SCROLL_CONTENT_INSETS))
                     .vertical()
                     .boxed()
             }
-            Route::Shows => Scroll::new(library::saved_shows_widget().padding(theme::grid(1.0)))
-                .vertical()
+            Route::Shows => {
+                Scroll::new(library::saved_shows_widget().padding(theme::SCROLL_CONTENT_INSETS))
+                    .vertical()
+                    .boxed()
+            }
+            Route::SearchResults => search::results_widget()
+                .padding(theme::SCROLL_CONTENT_INSETS)
                 .boxed(),
-            Route::SearchResults => search::results_widget().padding(theme::grid(1.0)).boxed(),
-            Route::AlbumDetail => Scroll::new(album::detail_widget().padding(theme::grid(1.0)))
-                .vertical()
-                .boxed(),
-            Route::ArtistDetail => Scroll::new(artist::detail_widget().padding(theme::grid(1.0)))
-                .vertical()
-                .boxed(),
+            Route::AlbumDetail => {
+                Scroll::new(album::detail_widget().padding(theme::SCROLL_CONTENT_INSETS))
+                    .vertical()
+                    .boxed()
+            }
+            Route::ArtistDetail => {
+                Scroll::new(artist::detail_widget().padding(theme::SCROLL_CONTENT_INSETS))
+                    .vertical()
+                    .boxed()
+            }
             Route::PlaylistDetail => Flex::column()
+                .with_child(
+                    playlist::play_button()
+                        .padding((8.0, 8.0, 24.0, 8.0))
+                        .align_left(),
+                )
                 .with_child(
                     find::finder_widget(cmd::FIND_IN_PLAYLIST, "Find in Playlist...")
                         .lens(AppState::finder),
                 )
                 .with_flex_child(
-                    Scroll::new(playlist::detail_widget().padding(theme::grid(1.0))).vertical(),
+                    Scroll::new(playlist::detail_widget().padding(theme::SCROLL_CONTENT_INSETS))
+                        .vertical(),
                     1.0,
                 )
                 .boxed(),
-            Route::ShowDetail => Scroll::new(show::detail_widget().padding(theme::grid(1.0)))
-                .vertical()
-                .boxed(),
+            Route::ShowDetail => {
+                Scroll::new(show::detail_widget().padding(theme::SCROLL_CONTENT_INSETS))
+                    .vertical()
+                    .boxed()
+            }
             Route::Recommendations => {
-                Scroll::new(recommend::results_widget().padding(theme::grid(1.0)))
+                Scroll::new(recommend::results_widget().padding(theme::SCROLL_CONTENT_INSETS))
                     .vertical()
                     .boxed()
             }

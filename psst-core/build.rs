@@ -10,7 +10,7 @@ fn main() {
     write!(fh, r#""{now}""#).ok();
 
     // Do not require a .git directory or embed an arbitrary remote in Rust source.
-    let remote_url = "https://github.com/jpochyla/psst";
+    let remote_url = "https://github.com/angelopol/xpotify";
 
     let outfile = format!("{outdir}/remote-url.txt");
     let mut file = fs::File::create(outfile).unwrap();

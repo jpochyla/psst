@@ -212,7 +212,12 @@ pub fn widget() -> impl Widget<AppState> {
                 .padding((8.0, 4.0))
                 .expand_width(),
         )
-        .with_flex_child(Scroll::new(contents).vertical().expand_width(), 1.0)
+        .with_flex_child(
+            Scroll::new(contents.padding_right(16.0))
+                .vertical()
+                .expand_width(),
+            1.0,
+        )
         .padding(8.0)
         .background(theme::BACKGROUND_DARK)
 }

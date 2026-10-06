@@ -1,6 +1,14 @@
 # Local validation - Windows - 2026-10-06
 
 
+## Layout fixes, Windows 0.4.1
+
+- 67 offline tests pass: 17 core, 46 GUI and 4 Connect; one live LRCLIB test remains explicitly ignored. Clippy passes with warnings denied, including the Windows build script.
+- Reviewed actual windows in dark at 1120 x 800 and light at 900 x 700. Lyrics, Queue and Video buttons fit one horizontal row at the minimum panel width. Track lists and the playback sidebar reserve space before their scrollbar. The playlist play button stays above the scrolling list and remains visible on later pages.
+- A 750-track fixture validates playback of every loaded page, duplicate preservation, playlist context, position zero and rejection of empty or stale playlist data. In the actual account, clicking Play from page 4 selected loaded track zero (GONE, GONE / THANK YOU), retained the Us playlist and successfully loaded native audio. Playback was paused after three seconds; no remote playlist writes were performed. The original profile snapshot and volume are restored after QA.
+- The actual About window reports Xpotify 0.4.1 and Source https://github.com/angelopol/xpotify.
+- The larger playlist widget tree exposed a Windows main-thread stack overflow. The GUI linker now reserves 8 MiB of virtual stack while retaining the 4 KiB initial commit; the repaired default development executable starts and renders the fixture and live playlist. See Microsoft's [/STACK documentation](https://learn.microsoft.com/en-us/cpp/build/reference/stack-stack-allocations?view=msvc-170). This setting does not allocate the entire reserve eagerly.
+
 ## Spotifast-based improvements, Windows 0.4.0
 
 - 66 offline tests pass: 17 core, 45 GUI, 4 Connect; one live LRCLIB test remains explicitly ignored. Clippy passes with warnings denied. Tests cover bounded request/body concurrency, per-key coalescing, stale A -> B -> A replies and a viewport within a 50,000-entry list, alongside existing account/cooldown/security checks.

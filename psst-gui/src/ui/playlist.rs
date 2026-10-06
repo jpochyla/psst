@@ -464,6 +464,92 @@ pub fn detail_widget() -> impl Widget<AppState> {
         .with_child(playlist_tracks)
 }
 
+pub fn play_button() -> impl Widget<AppState> {
+    Button::new("▶ Reproducir playlist")
+        .on_click(|ctx, state: &mut AppState, _| {
+            if let Some(payload) = playlist_playback(state) {
+                ctx.submit_command(cmd::PLAY_TRACKS.with(payload));
+            }
+        })
+        .disabled_if(|state, _| playlist_for_playback(state).is_none())
+        .tooltip("Reproducir esta playlist desde el principio con el modo actual")
+}
+
+fn playlist_playback(state: &AppState) -> Option<crate::data::PlaybackPayload> {
+    let tracks = playlist_for_playback(state)?;
+    Some(crate::data::PlaybackPayload {
+        items: tracks
+            .tracks
+            .iter()
+            .cloned()
+            .map(crate::data::Playable::Track)
+            .collect(),
+        position: 0,
+        origin: crate::data::PlaybackOrigin::Playlist(tracks.link()),
+    })
+}
+
+fn playlist_for_playback(state: &AppState) -> Option<&PlaylistTracks> {
+    let Nav::PlaylistDetail(link) = &state.nav else {
+        return None;
+    };
+    let tracks = state.playlist_detail.tracks.resolved()?;
+    if tracks.id != link.id || tracks.tracks.is_empty() {
+        return None;
+    }
+    Some(tracks)
+}
+
+#[cfg(test)]
+mod playback_button_tests {
+    use super::*;
+
+    #[test]
+    fn playlist_button_plays_all_loaded_pages_and_rejects_stale_or_empty_data() {
+        let mut state = AppState::default_with_config(crate::data::Config::default());
+        let link = PlaylistLink {
+            id: "playlist-a".into(),
+            name: "Playlist A".into(),
+        };
+        state.nav = Nav::PlaylistDetail(link.clone());
+        assert!(playlist_playback(&state).is_none());
+        let track: Track = serde_json::from_value(serde_json::json!({
+            "name":"Repeated song", "artists":[], "duration_ms":240000,
+            "disc_number":1,"track_number":1,"explicit":false,"is_local":false
+        }))
+        .unwrap();
+        let track = Arc::new(track);
+        state.playlist_detail.tracks.resolve(
+            link.clone(),
+            PlaylistTracks {
+                id: link.id.clone(),
+                name: link.name.clone(),
+                tracks: (0..750).map(|_| track.clone()).collect(),
+            },
+        );
+        let payload = playlist_playback(&state).unwrap();
+        assert_eq!(payload.items.len(), 750);
+        assert_eq!(payload.position, 0);
+        assert!(
+            matches!(payload.origin, crate::data::PlaybackOrigin::Playlist(origin) if origin.id == link.id)
+        );
+        state.nav = Nav::PlaylistDetail(PlaylistLink {
+            id: "playlist-b".into(),
+            name: "B".into(),
+        });
+        assert!(playlist_playback(&state).is_none());
+        state.nav = Nav::PlaylistDetail(link);
+        state
+            .playlist_detail
+            .tracks
+            .resolved_mut()
+            .unwrap()
+            .tracks
+            .clear();
+        assert!(playlist_playback(&state).is_none());
+    }
+}
+
 fn async_playlist_info_widget() -> impl Widget<AppState> {
     Async::new(
         utils::spinner_widget,

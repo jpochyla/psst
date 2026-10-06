@@ -89,43 +89,48 @@ pub fn widget() -> impl Widget<AppState> {
             )
             .with_spacer(14.0)
             .with_child(
-                Button::new("Letras")
-                    .on_click(|ctx, _, _| ctx.submit_command(cmd::TOGGLE_LYRICS))
-                    .tooltip("Ver las letras de esta canción"),
-            )
-            .with_spacer(8.0)
-            .with_child(
-                Button::new("Cola completa")
-                    .on_click(|ctx, _, _| ctx.submit_command(cmd::NAVIGATE.with(Nav::Queue)))
-                    .tooltip("Ver el orden de las próximas canciones"),
-            )
-            .with_spacer(8.0)
-            .with_child(
-                Button::new("Videoclip")
-                    .on_click(|ctx, state: &mut AppState, _| {
-                        if let Some(track) = state
-                            .playback
-                            .now_playing
-                            .as_ref()
-                            .and_then(|np| np.item.track())
-                        {
-                            ctx.submit_command(cmd::OPEN_MUSIC_VIDEO.with(track.clone()));
-                        }
-                    })
-                    .tooltip("Buscar el videoclip en YouTube")
-                    .disabled_if(|state, _| {
-                        state
-                            .playback
-                            .now_playing
-                            .as_ref()
-                            .and_then(|np| np.item.track())
-                            .is_none()
-                    }),
+                Flex::row()
+                    .with_child(
+                        Button::new("Letras")
+                            .on_click(|ctx, _, _| ctx.submit_command(cmd::TOGGLE_LYRICS))
+                            .tooltip("Ver las letras de esta canción"),
+                    )
+                    .with_spacer(6.0)
+                    .with_child(
+                        Button::new("Cola")
+                            .on_click(|ctx, _, _| {
+                                ctx.submit_command(cmd::NAVIGATE.with(Nav::Queue))
+                            })
+                            .tooltip("Ver la cola completa y el orden de las próximas canciones"),
+                    )
+                    .with_spacer(6.0)
+                    .with_child(
+                        Button::new("Videoclip")
+                            .on_click(|ctx, state: &mut AppState, _| {
+                                if let Some(track) = state
+                                    .playback
+                                    .now_playing
+                                    .as_ref()
+                                    .and_then(|np| np.item.track())
+                                {
+                                    ctx.submit_command(cmd::OPEN_MUSIC_VIDEO.with(track.clone()));
+                                }
+                            })
+                            .tooltip("Buscar el videoclip en YouTube")
+                            .disabled_if(|state, _| {
+                                state
+                                    .playback
+                                    .now_playing
+                                    .as_ref()
+                                    .and_then(|np| np.item.track())
+                                    .is_none()
+                            }),
+                    ),
             )
             .with_spacer(24.0)
             .with_child(Label::new("A continuación").with_font(theme::UI_FONT_MEDIUM))
             .with_child(upcoming)
-            .padding(14.0)
+            .padding((14.0, 14.0, 24.0, 14.0))
             .expand_width(),
     )
     .vertical()

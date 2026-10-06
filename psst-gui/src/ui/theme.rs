@@ -9,6 +9,8 @@ pub fn grid(m: f64) -> f64 {
 }
 
 pub const GRID: f64 = 8.0;
+/// Keep scrollbar hit areas clear of titles, durations and row menus.
+pub const SCROLL_CONTENT_INSETS: Insets = Insets::new(8.0, 8.0, 24.0, 8.0);
 
 pub const GREY_000: Key<Color> = Key::new("app.grey_000");
 pub const GREY_100: Key<Color> = Key::new("app.grey_100");

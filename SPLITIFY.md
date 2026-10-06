@@ -1,6 +1,8 @@
 # Xpotify with Splitify
 
-## Windows 0.4.0
+## Windows 0.4.1
+
+Playlist pages now have a persistent **Reproducir playlist** button, which starts all loaded tracks from the beginning using the current playback mode. It is disabled while tracks are unavailable. Scrollable library views reserve a wider right gutter, and the playback panel places **Letras**, **Cola** and **Videoclip** in one row. Preferences → About → Source points to `https://github.com/angelopol/xpotify`.
 
 This update adapts Spotifast's compact colors and divider spacing. The native Connect queue observes actual engine shuffle/advancement directly, without Web API polling. Selecting an active queue row retains its context and remaining order. Large queue panels render only visible rows; equivalent cached reads share a per-key lock, while at most two HTTP responses are in flight. Transient JSON reads share a three-attempt budget. See `SPOTIFAST-INTEGRATION.md` in the source repository for details and limits.
 
