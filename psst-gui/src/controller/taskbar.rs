@@ -10,18 +10,22 @@ use std::sync::{
     Arc,
 };
 use windows::{
-    core::w,
+    core::{w, GUID, PWSTR},
     Win32::{
-        Foundation::{HWND, LPARAM, LRESULT, WPARAM},
-        System::Com::{
-            CoCreateInstance, CoInitializeEx, CoUninitialize, CLSCTX_INPROC_SERVER,
-            COINIT_APARTMENTTHREADED,
+        Foundation::{HWND, LPARAM, LRESULT, PROPERTYKEY, WPARAM},
+        System::{
+            Com::{
+                CoCreateInstance, CoInitializeEx, CoUninitialize, StructuredStorage::PROPVARIANT,
+                CLSCTX_INPROC_SERVER, COINIT_APARTMENTTHREADED,
+            },
+            Variant::VT_LPWSTR,
         },
         UI::{
             Shell::{
-                DefSubclassProc, ITaskbarList3, RemoveWindowSubclass, SetWindowSubclass,
-                TaskbarList, THBF_DISABLED, THBF_ENABLED, THBN_CLICKED, THB_FLAGS, THB_ICON,
-                THB_TOOLTIP, THUMBBUTTON,
+                DefSubclassProc, ITaskbarList3,
+                PropertiesSystem::{IPropertyStore, SHGetPropertyStoreForWindow},
+                RemoveWindowSubclass, SetWindowSubclass, TaskbarList, THBF_DISABLED, THBF_ENABLED,
+                THBN_CLICKED, THB_FLAGS, THB_ICON, THB_TOOLTIP, THUMBBUTTON,
             },
             WindowsAndMessaging::{
                 CreateIcon, DestroyIcon, RegisterWindowMessageW, HICON, WM_COMMAND, WM_NCDESTROY,
@@ -35,6 +39,35 @@ const SUBCLASS: usize = 0x58504F54;
 const PREVIOUS: u32 = 0x7101;
 const TOGGLE: u32 = 0x7102;
 const NEXT: u32 = 0x7103;
+
+fn set_application_identity(hwnd: HWND, executable: &std::path::Path) -> windows::core::Result<()> {
+    let store: IPropertyStore = unsafe { SHGetPropertyStoreForWindow(hwnd)? };
+    let executable = executable.to_string_lossy();
+    // Relaunch properties must be supplied together, with an explicit window AppID.
+    // Resource 101 is defined in build.rs; the existing executable icon is retained.
+    for (pid, text) in [
+        (2, format!("\"{executable}\"")),
+        (4, format!("@{executable},-101")),
+        (5, "com.angelopol.xpotify".to_owned()),
+    ] {
+        let key = PROPERTYKEY {
+            fmtid: GUID::from_u128(0x9f4c2855_9f79_4b39_a8d0_e1d42de1d5f3),
+            pid,
+        };
+        let mut text: Vec<u16> = text.encode_utf16().chain(std::iter::once(0)).collect();
+        let mut value = PROPVARIANT::default();
+        // SetValue copies this borrowed UTF-16 string before its buffer is dropped.
+        // Do not PropVariantClear it: the buffer is owned by the Vec above.
+        unsafe {
+            let inner = &mut *value.Anonymous.Anonymous;
+            inner.vt = VT_LPWSTR;
+            inner.Anonymous.pwszVal = PWSTR(text.as_mut_ptr());
+            store.SetValue(&key, &value)?;
+        }
+    }
+    // Window property stores apply values immediately; Commit is unnecessary.
+    Ok(())
+}
 
 struct Icon(HICON);
 impl Drop for Icon {
@@ -223,6 +256,11 @@ impl<W: Widget<AppState>> Controller<AppState, W> for TaskbarController {
             if let RawWindowHandle::Win32(handle) = ctx.window().raw_window_handle() {
                 // Druid and other media integrations may already initialize COM.
                 let initialized = unsafe { CoInitializeEx(None, COINIT_APARTMENTTHREADED).is_ok() };
+                if let Ok(executable) = std::env::current_exe() {
+                    if let Err(error) = set_application_identity(HWND(handle.hwnd), &executable) {
+                        log::warn!("Could not set Xpotify taskbar identity: {error}");
+                    }
+                }
                 let result = (|| -> windows::core::Result<Box<Toolbar>> {
                     let taskbar: ITaskbarList3 =
                         unsafe { CoCreateInstance(&TaskbarList, None, CLSCTX_INPROC_SERVER)? };

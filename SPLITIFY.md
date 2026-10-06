@@ -30,6 +30,8 @@ Open **Cola** in the sidebar or the queue icon beside the playback controls. The
 
 The Windows executable has a green waveform icon, generated from the matching vector design in `psst-gui/assets/logo.svg`. To regenerate its PNG sizes, run `powershell -File scripts/Generate-AppIcon.ps1`, then rebuild. The build always regenerates the ICO resource in Cargo's output directory, avoiding a stale cached icon in the source tree.
 
+Windows uses the embedded **Xpotify** name and explicit window relaunch properties for the taskbar menu, independently of Cargo's internal `psst-gui` target name. The relaunch command points to the running executable, so pinning also works for the portable download.
+
 ## Spotify login
 
 Set your Spotify Developer application's redirect URI to exactly `http://127.0.0.1:8888/login`. Keep the web application's redirect URIs too. The first browser authorization uses your configured Client ID to access the library and playlists. The second uses the native playback client, the `streaming` scope, and its registered `http://127.0.0.1:8898/login` callback. You do not add the second callback to your Developer application.

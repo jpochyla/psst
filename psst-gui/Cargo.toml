@@ -1,6 +1,6 @@
 [package]
 name = "psst-gui"
-version = "0.3.0"
+version = "0.3.1"
 authors = ["Jan Pochyla <jpochyla@gmail.com>"]
 edition = "2021"
 build = "build.rs"
@@ -68,7 +68,7 @@ image = { version = "0.25.6", default-features = false, features = ["png", "ico"
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61.2", features = ["Win32_System_Registry"] }
-windows = { version = "0.62.2", features = ["Win32_Foundation", "Win32_System_Com", "Win32_UI_Shell", "Win32_UI_Controls", "Win32_UI_WindowsAndMessaging"] }
+windows = { version = "0.62.2", features = ["Win32_Foundation", "Win32_System_Com", "Win32_System_Com_StructuredStorage", "Win32_System_Variant", "Win32_UI_Shell", "Win32_UI_Shell_PropertiesSystem", "Win32_UI_Controls", "Win32_UI_WindowsAndMessaging"] }
 
 [package.metadata.bundle]
 name = "Psst"

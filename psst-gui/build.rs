@@ -17,7 +17,11 @@ fn add_windows_icon() {
     let mut res = winres::WindowsResource::new();
     res.set_icon(ico_path.to_str().unwrap());
     res.set("ProductName", "Xpotify");
-    res.set("FileDescription", "Xpotify - Spotify + Splitify");
+    res.set("FileDescription", "Xpotify");
+    res.set("InternalName", "Xpotify");
+    res.set("OriginalFilename", "Xpotify.exe");
+    // The taskbar resolves its application label from this executable resource.
+    res.append_rc_content("STRINGTABLE\nBEGIN\n    101 \"Xpotify\"\nEND\n");
     res.compile().expect("Could not attach exe icon");
 
     fn load_images() -> Vec<IcoFrame<'static>> {

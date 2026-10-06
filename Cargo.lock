@@ -3912,7 +3912,7 @@ dependencies = [
 
 [[package]]
 name = "psst-gui"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "crossbeam-channel",
  "directories",
