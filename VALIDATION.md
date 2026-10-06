@@ -1,6 +1,14 @@
 # Local validation - Windows - 2026-10-06
 
 
+## Audio shadow, Windows 0.4.2
+
+- 70 offline tests pass: 19 core, 47 GUI and 4 Connect; one live LRCLIB test remains explicitly ignored. New tests cover frequency/amplitude response, opposite-phase stereo, silence/non-finite samples, incomplete frames and complete pause decay. Clippy passes with warnings denied.
+- One initial upstream random shuffle test selected the item that was already first, but expected two swapped positions; the unchanged upstream test passed on repeat. The vendored Connect implementation was not modified for this feature.
+- Actual native playback: the footer displays square green cells from eight local PCM bands, behind artwork/text/controls. Two frames 400 ms apart changed 8,028 pixels in the bottom shadow region. A paused capture one second later had zero green shadow pixels in that region. Reviewed dark at 1120 x 800 and light at 900 x 700; transport and volume hit targets continue to work. Low-volume/37% passages remained subtle; the 66% check made the band heights clearly visible.
+- The analyzer uses fixed arrays and atomics, without callback allocations, locks or network requests. Publishing is bounded to 30 windows per second. The local 33 ms paint timer does not mutate AppState or queue rows and stops after the pause/mute fade. Output older than 250 ms targets zero, including when playback transfers away from this PC; remote-device audio is not claimed as visualized.
+- Native audio and Connect registration succeeded. Playback was paused after each short check; original playback, route, volume, queue mode and System theme are restored after QA. Windows development build starts without panic. macOS/Linux and Cubeb runtime remain untested.
+
 ## Layout fixes, Windows 0.4.1
 
 - 67 offline tests pass: 17 core, 46 GUI and 4 Connect; one live LRCLIB test remains explicitly ignored. Clippy passes with warnings denied, including the Windows build script.

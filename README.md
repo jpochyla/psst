@@ -6,6 +6,8 @@ Cliente nativo basado en Psst, con organización de playlists mediante Gemini, l
 
 ## Integración local con Splitify
 
+En **0.4.2**, el reproductor incorpora una sombra de bloques verdes que responde al audio local y se desvanece al pausar.
+
 En **0.4.1** se amplía el margen del scroll, Letras/Cola/Videoclip comparten una fila y las playlists tienen un botón de reproducción visible al desplazarse. El enlace Source de la aplicación apunta a este repositorio.
 
 La versión **0.4.0** adapta mejoras de Spotifast: cola del motor con orden aleatorio real, filas virtualizadas para listas largas, colores y separadores compactos, consultas HTTP acotadas y caché por petición. Consulta [qué se incorporó y sus límites](SPOTIFAST-INTEGRATION.md).

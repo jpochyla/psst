@@ -9,6 +9,7 @@ use std::sync::{
 use crate::{
     actor::{Act, Actor, ActorHandle},
     audio::{
+        meter::AudioMeter,
         output::{AudioOutput, AudioSink},
         source::{AudioSource, Empty},
     },
@@ -210,6 +211,7 @@ impl Stream {
             source: Box::new(Empty),
             volume: 1.0, // We start with the full volume.
             state: CallbackState::Paused,
+            meter: AudioMeter::new(config.sample_rate.0, config.channels as usize),
         };
 
         log::info!("opening output stream: {config:?}");
@@ -283,6 +285,7 @@ enum CallbackState {
 }
 
 struct StreamCallback {
+    meter: AudioMeter,
     #[allow(unused)]
     stream_send: Sender<StreamMsg>,
     callback_recv: Receiver<CallbackMsg>,
@@ -315,6 +318,8 @@ impl StreamCallback {
             // Write out as many samples as possible from the audio source to the
             // output buffer.
             let written = self.source.write(output);
+
+            self.meter.process(&output[..written]);
 
             // Apply scaled global volume level.
             let scaled_volume = self.volume.pow(4);

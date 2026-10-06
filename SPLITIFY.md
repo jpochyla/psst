@@ -1,6 +1,8 @@
 # Xpotify with Splitify
 
-## Windows 0.4.1
+## Windows 0.4.2
+
+The playback footer in 0.4.2 has a subtle green square-cell audio shadow driven by eight local PCM bands. It fades out on pause, silence, mute or stale output. The animation uses a local 30 Hz timer and never requests Spotify audio analysis or updates queue data. Remote devices do not expose their PCM to this PC.
 
 Playlist pages now have a persistent **Reproducir playlist** button, which starts all loaded tracks from the beginning using the current playback mode. It is disabled while tracks are unavailable. Scrollable library views reserve a wider right gutter, and the playback panel places **Letras**, **Cola** and **Videoclip** in one row. Preferences → About → Source points to `https://github.com/angelopol/xpotify`.
 
@@ -94,3 +96,4 @@ The bell opens releases from followed artists: recent albums/singles from the la
 For local visual review, `--preview-ui=news --dark` or `--light` uses synthetic releases and blocks remote actions.
 
 Library save/remove commands are attached to the main shell, so they work from every route. A successful Spotify response updates the locally known saved state even when the full saved collection was never prefetched. Failed writes leave that state unchanged. Successful writes invalidate only their saved-collection response pages; manual collection refresh clears the local overrides.
+

@@ -2,6 +2,7 @@ mod download;
 mod folders;
 mod grid;
 mod now_playing;
+mod sound_shadow;
 use crate::data::config::SortCriteria;
 use crate::data::Track;
 use crate::error::Error;

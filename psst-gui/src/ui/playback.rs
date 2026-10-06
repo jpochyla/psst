@@ -34,7 +34,9 @@ pub fn panel_widget() -> impl Widget<AppState> {
     );
     Flex::column()
         .with_child(seek_bar)
-        .with_child(BarLayout::new(item_info, controls))
+        .with_child(super::sound_shadow::SoundShadow::new(BarLayout::new(
+            item_info, controls,
+        )))
         .lens(AppState::playback)
         .controller(PlaybackController::new())
         .on_command(ADD_TO_QUEUE, |_, _, data| {
