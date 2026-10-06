@@ -34,9 +34,7 @@ pub fn panel_widget() -> impl Widget<AppState> {
     );
     Flex::column()
         .with_child(seek_bar)
-        .with_child(super::sound_shadow::SoundShadow::new(BarLayout::new(
-            item_info, controls,
-        )))
+        .with_child(BarLayout::new(item_info, controls))
         .lens(AppState::playback)
         .controller(PlaybackController::new())
         .on_command(ADD_TO_QUEUE, |_, _, data| {
@@ -622,15 +620,18 @@ fn paint_progress_bar(ctx: &mut PaintCtx, data: &NowPlaying, env: &Env) {
     let elapsed_frac = elapsed_time / total_time;
     let elapsed_width = bounds.width * elapsed_frac;
     let remaining_width = bounds.width - elapsed_width;
-    let elapsed = Size::new(elapsed_width, bounds.height).round();
-    let remaining = Size::new(remaining_width, bounds.height).round();
+    // Preserve the 8px seek hit area while painting a slim 2px line.
+    let bar_height = 2.0;
+    let bar_y = ((bounds.height - bar_height) * 0.5).round();
+    let elapsed = Size::new(elapsed_width, bar_height).round();
+    let remaining = Size::new(remaining_width, bar_height).round();
 
     ctx.fill(
-        Rect::from_origin_size(Point::ORIGIN, elapsed),
+        Rect::from_origin_size(Point::new(0.0, bar_y), elapsed),
         &elapsed_color,
     );
     ctx.fill(
-        Rect::from_origin_size(Point::new(elapsed.width, 0.0), remaining),
+        Rect::from_origin_size(Point::new(elapsed.width, bar_y), remaining),
         &remaining_color,
     );
 }

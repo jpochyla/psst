@@ -6,7 +6,7 @@ use druid::{
 };
 use psst_core::audio::meter::{self, BAND_COUNT};
 
-use crate::data::{Playback, PlaybackState};
+use crate::data::{AppState, Playback, PlaybackState};
 
 use super::theme;
 
@@ -14,12 +14,12 @@ const FRAME_TIME: Duration = Duration::from_millis(33);
 
 /// A local paint-only animation: its timer never changes application data or queue rows.
 pub struct SoundShadow<W> {
-    child: WidgetPod<Playback, W>,
+    child: WidgetPod<AppState, W>,
     levels: [f32; BAND_COUNT],
     timer: TimerToken,
 }
 
-impl<W: Widget<Playback>> SoundShadow<W> {
+impl<W: Widget<AppState>> SoundShadow<W> {
     pub fn new(child: W) -> Self {
         Self {
             child: WidgetPod::new(child),
@@ -47,12 +47,12 @@ fn approach(levels: &mut [f32; BAND_COUNT], target: [f32; BAND_COUNT]) -> bool {
     changed
 }
 
-impl<W: Widget<Playback>> Widget<Playback> for SoundShadow<W> {
-    fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut Playback, env: &Env) {
+impl<W: Widget<AppState>> Widget<AppState> for SoundShadow<W> {
+    fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut AppState, env: &Env) {
         if let Event::Timer(token) = event {
             if *token == self.timer {
                 self.timer = TimerToken::INVALID;
-                let target = if audible(data) {
+                let target = if audible(&data.playback) {
                     meter::levels()
                 } else {
                     [0.0; BAND_COUNT]
@@ -60,7 +60,7 @@ impl<W: Widget<Playback>> Widget<Playback> for SoundShadow<W> {
                 if approach(&mut self.levels, target) {
                     ctx.request_paint();
                 }
-                if audible(data) || self.levels.iter().any(|level| *level > 0.0) {
+                if audible(&data.playback) || self.levels.iter().any(|level| *level > 0.0) {
                     self.timer = ctx.request_timer(FRAME_TIME);
                 }
                 ctx.set_handled();
@@ -68,7 +68,7 @@ impl<W: Widget<Playback>> Widget<Playback> for SoundShadow<W> {
             }
         }
         if matches!(event, Event::WindowConnected)
-            && audible(data)
+            && audible(&data.playback)
             && self.timer == TimerToken::INVALID
         {
             self.timer = ctx.request_timer(FRAME_TIME);
@@ -76,12 +76,12 @@ impl<W: Widget<Playback>> Widget<Playback> for SoundShadow<W> {
         self.child.event(ctx, event, data, env);
     }
 
-    fn lifecycle(&mut self, ctx: &mut LifeCycleCtx, event: &LifeCycle, data: &Playback, env: &Env) {
+    fn lifecycle(&mut self, ctx: &mut LifeCycleCtx, event: &LifeCycle, data: &AppState, env: &Env) {
         self.child.lifecycle(ctx, event, data, env);
     }
 
-    fn update(&mut self, ctx: &mut UpdateCtx, _old: &Playback, data: &Playback, env: &Env) {
-        if audible(data) && self.timer == TimerToken::INVALID {
+    fn update(&mut self, ctx: &mut UpdateCtx, _old: &AppState, data: &AppState, env: &Env) {
+        if audible(&data.playback) && self.timer == TimerToken::INVALID {
             self.timer = ctx.request_timer(FRAME_TIME);
         }
         self.child.update(ctx, data, env);
@@ -91,7 +91,7 @@ impl<W: Widget<Playback>> Widget<Playback> for SoundShadow<W> {
         &mut self,
         ctx: &mut LayoutCtx,
         bc: &BoxConstraints,
-        data: &Playback,
+        data: &AppState,
         env: &Env,
     ) -> Size {
         let size = self.child.layout(ctx, bc, data, env);
@@ -99,7 +99,7 @@ impl<W: Widget<Playback>> Widget<Playback> for SoundShadow<W> {
         size
     }
 
-    fn paint(&mut self, ctx: &mut PaintCtx, data: &Playback, env: &Env) {
+    fn paint(&mut self, ctx: &mut PaintCtx, data: &AppState, env: &Env) {
         let size = ctx.size();
         let columns = ((size.width / 10.0) as usize).clamp(1, 96);
         let spacing = size.width / columns as f64;
@@ -108,8 +108,9 @@ impl<W: Widget<Playback>> Widget<Playback> for SoundShadow<W> {
         ctx.with_save(|ctx| {
             ctx.clip(size.to_rect());
             for column in 0..columns {
-                let band = column as f64 / columns.saturating_sub(1).max(1) as f64
-                    * (BAND_COUNT - 1) as f64;
+                // Mirror the real bands so bass pulses also reach the volume end.
+                let position = column as f64 / columns.saturating_sub(1).max(1) as f64;
+                let band = (1.0 - (position * 2.0 - 1.0).abs()) * (BAND_COUNT - 1) as f64;
                 let left = band.floor() as usize;
                 let right = (left + 1).min(BAND_COUNT - 1);
                 let fraction = band.fract() as f32;

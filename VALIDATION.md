@@ -1,6 +1,13 @@
 # Local validation - Windows - 2026-10-06
 
 
+## Full-width footer, Windows 0.4.3
+
+- 66 core/GUI tests pass (19 core and 47 GUI), one live LRCLIB test explicitly ignored; Clippy passes with warnings denied. No Connect or audio decoder changes were made.
+- The paint-only audio shadow wraps the complete footer, including the volume slider. Mirrored real bands bring bass pulses to both ends without changing the analyzer or its cadence. Actual native playback of GONE, GONE / THANK YOU displayed 1,218 green shadow pixels in the volume region of the 1120 x 800 capture; paused output cleared the shadow.
+- The seek indicator paints exactly two rows (707 and 708 in the capture), retaining the existing eight-pixel widget hit area. Clicking outside the painted line but inside that area sought successfully to about 1:21 and retained pause. Native transport and volume controls remain above the background and keep their layout.
+- The latest user playback snapshot, route, volume, queue mode, theme and window size are restored after the short native check. The development executable starts and registers Connect successfully.
+
 ## Audio shadow, Windows 0.4.2
 
 - 70 offline tests pass: 19 core, 47 GUI and 4 Connect; one live LRCLIB test remains explicitly ignored. New tests cover frequency/amplitude response, opposite-phase stereo, silence/non-finite samples, incomplete frames and complete pause decay. Clippy passes with warnings denied.

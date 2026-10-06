@@ -1,6 +1,8 @@
 # Xpotify with Splitify
 
-## Windows 0.4.2
+## Windows 0.4.3
+
+The audio shadow spans the complete footer, including volume, with mirrored bands that bring bass pulses to both ends. The seek line is now 2 px tall while retaining its 8 px mouse target.
 
 The playback footer in 0.4.2 has a subtle green square-cell audio shadow driven by eight local PCM bands. It fades out on pause, silence, mute or stale output. The animation uses a local 30 Hz timer and never requests Spotify audio analysis or updates queue data. Remote devices do not expose their PCM to this PC.
 
@@ -96,4 +98,3 @@ The bell opens releases from followed artists: recent albums/singles from the la
 For local visual review, `--preview-ui=news --dark` or `--light` uses synthetic releases and blocks remote actions.
 
 Library save/remove commands are attached to the main shell, so they work from every route. A successful Spotify response updates the locally known saved state even when the full saved collection was never prefetched. Failed writes leave that state unchanged. Successful writes invalidate only their saved-collection response pages; manual collection refresh clears the local overrides.
-

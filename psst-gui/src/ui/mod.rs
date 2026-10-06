@@ -318,10 +318,12 @@ fn root_widget() -> impl Widget<AppState> {
         .with_child(global_navigation_widget())
         .with_flex_child(split, 1.0)
         .with_child(
-            Flex::row()
-                .with_flex_child(playback::panel_widget(), 1.0)
-                .with_child(volume_slider().fix_width(180.0).center().fix_height(88.0))
-                .background(theme::BACKGROUND_DARK),
+            sound_shadow::SoundShadow::new(
+                Flex::row()
+                    .with_flex_child(playback::panel_widget(), 1.0)
+                    .with_child(volume_slider().fix_width(180.0).center().fix_height(88.0)),
+            )
+            .background(theme::BACKGROUND_DARK),
         );
 
     #[cfg(target_os = "windows")]
