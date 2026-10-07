@@ -1,6 +1,8 @@
 name: Xpotify native packages
 on:
   workflow_dispatch:
+  push:
+    tags: ['v*']
 permissions:
   contents: read
 jobs:
@@ -8,7 +10,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, macos-latest, ubuntu-latest]
+        os: [windows-latest, ubuntu-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -21,13 +23,33 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: ./scripts/Package-Native.ps1
-      - name: Build macOS or Linux package
-        if: runner.os != 'Windows'
+      - name: Build Linux package
+        if: runner.os == 'Linux'
         run: bash scripts/Package-Native.sh
       - uses: actions/upload-artifact@v4
         with:
           name: Xpotify-${{ runner.os }}-${{ runner.arch }}
           path: |
+            dist/Xpotify.exe
             dist/*.zip
             dist/*.tar.gz
             dist/*.sha256
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: assets
+          merge-multiple: true
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          ls -l assets
+          gh release create "$TAG" assets/* --title "Xpotify ${TAG#v}" --notes-file "docs/release-notes/$TAG.md" --latest
