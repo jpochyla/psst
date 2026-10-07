@@ -443,6 +443,13 @@ impl Player {
     where
         F: FnOnce() -> Box<dyn Sink> + Send + 'static,
     {
+        // Keep two minutes ahead for unstable connections, without delaying startup
+        // until the entire read-ahead window has downloaded. OnceLock preserves any
+        // explicit configuration supplied by an embedding application.
+        let _ = AudioFetchParams::set(AudioFetchParams {
+            read_ahead_during_playback: Duration::from_secs(120),
+            ..AudioFetchParams::default()
+        });
         let (cmd_tx, cmd_rx) = mpsc::unbounded_channel();
 
         if config.normalisation {
@@ -1538,6 +1545,20 @@ impl Future for PlayerInternal {
                             self.handle_packet(result, normalisation_factor);
                         }
                         Err(e) => {
+                            if matches!(&e, crate::decoder::DecoderError::Io(error) if matches!(
+                                error.kind(),
+                                std::io::ErrorKind::TimedOut
+                                    | std::io::ErrorKind::BrokenPipe
+                                    | std::io::ErrorKind::ConnectionReset
+                                    | std::io::ErrorKind::ConnectionAborted
+                                    | std::io::ErrorKind::NotConnected
+                            )) {
+                                // A missing download is not the end of the song. Let
+                                // the receiver reconnect and reload at its last position.
+                                warn!("Audio download interrupted, reconnecting: {e}");
+                                self.session.shutdown();
+                                return Poll::Ready(());
+                            }
                             error!(
                                 "Skipping to next track, unable to get next packet for track <{track_id:?}>: {e:?}"
                             );
@@ -2441,8 +2462,10 @@ impl PlayerInternal {
                 (read_ahead_during_playback.as_secs_f32() * bytes_per_second as f32) as usize;
 
             // Request the part we want to wait for blocking. This effectively means we wait for the previous request to partially complete.
-            let wait_for_data_length =
-                (read_ahead_during_playback.as_secs_f32() * bytes_per_second as f32) as usize;
+            let wait_for_data_length = (AudioFetchParams::get()
+                .read_ahead_before_playback
+                .as_secs_f32()
+                * bytes_per_second as f32) as usize;
 
             stream_loader_controller.fetch_next_and_wait(request_data_length, wait_for_data_length)
         } else {

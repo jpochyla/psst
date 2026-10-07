@@ -15,3 +15,4 @@ rust-toolchain
 *.ico
 Xpotify.exe
 *.code-workspace
+xpotify.log

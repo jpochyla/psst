@@ -126,6 +126,27 @@ pub fn preview() -> String {
     })();
     result.unwrap_or_else(|e| format!("No se pudieron leer los logs: {e}"))
 }
+pub fn clear() -> std::io::Result<()> {
+    let _guard = FILE_LOCK.lock();
+    let dir = directory().ok_or_else(|| std::io::Error::other("No log directory"))?;
+    clear_in(&dir)
+}
+
+fn clear_in(dir: &Path) -> std::io::Result<()> {
+    fs::create_dir_all(dir)?;
+    for name in ["xpotify.2.log", "xpotify.1.log"] {
+        match fs::remove_file(dir.join(name)) {
+            Ok(()) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => return Err(error),
+        }
+    }
+    // Keep an empty current log so preview works immediately. The logger opens
+    // it on each write, under the same lock used for clearing and rotation.
+    fs::File::create(dir.join("xpotify.log"))?;
+    Ok(())
+}
+
 pub fn export(path: &Path) -> std::io::Result<()> {
     let _guard = FILE_LOCK.lock();
     let dir = directory().ok_or_else(|| std::io::Error::other("No log directory"))?;
@@ -157,6 +178,43 @@ pub fn export(path: &Path) -> std::io::Result<()> {
 }
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn clearing_logs_preserves_other_files_and_allows_new_events() {
+        use std::{fs, io::Write};
+        let dir = std::env::temp_dir().join(format!("xpotify-log-test-{}", rand::random::<u64>()));
+        fs::create_dir(&dir).unwrap();
+        for name in [
+            "xpotify.log",
+            "xpotify.1.log",
+            "xpotify.2.log",
+            "export.log",
+        ] {
+            fs::write(dir.join(name), "old event\n").unwrap();
+        }
+        super::clear_in(&dir).unwrap();
+        assert_eq!(fs::metadata(dir.join("xpotify.log")).unwrap().len(), 0);
+        assert!(!dir.join("xpotify.1.log").exists());
+        assert!(!dir.join("xpotify.2.log").exists());
+        assert_eq!(
+            fs::read_to_string(dir.join("export.log")).unwrap(),
+            "old event\n"
+        );
+        let mut current = fs::OpenOptions::new()
+            .append(true)
+            .open(dir.join("xpotify.log"))
+            .unwrap();
+        writeln!(current, "new event").unwrap();
+        drop(current);
+        assert_eq!(
+            fs::read_to_string(dir.join("xpotify.log")).unwrap(),
+            "new event\n"
+        );
+        super::clear_in(&dir).unwrap();
+        fs::remove_file(dir.join("xpotify.log")).unwrap();
+        fs::remove_file(dir.join("export.log")).unwrap();
+        fs::remove_dir(dir).unwrap();
+    }
+
     #[test]
     fn removes_credentials_and_signed_urls() {
         let result = super::sanitize(

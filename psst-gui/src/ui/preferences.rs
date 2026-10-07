@@ -1071,6 +1071,19 @@ fn logs_tab_widget() -> impl Widget<AppState> {
                     }),
                 )
                 .with_spacer(12.0)
+                .with_child(
+                    Button::new("Limpiar logs").on_click(|_, data: &mut AppState, _| {
+                        data.preferences.log_status = match crate::diagnostics::clear() {
+                            Ok(()) => {
+                                "Logs limpiados. Los nuevos eventos seguirán apareciendo aquí."
+                                    .into()
+                            }
+                            Err(error) => format!("No se pudieron limpiar los logs: {error}"),
+                        };
+                        data.preferences.logs = crate::diagnostics::preview();
+                    }),
+                )
+                .with_spacer(12.0)
                 .with_child(Button::new("Exportar logs...").on_click(|ctx, _, _| {
                     ctx.submit_command(
                         druid::commands::SHOW_SAVE_PANEL.with(

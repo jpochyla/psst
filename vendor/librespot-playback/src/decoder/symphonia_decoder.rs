@@ -227,7 +227,7 @@ impl AudioDecoder for SymphoniaDecoder {
                     if err.kind() == io::ErrorKind::UnexpectedEof {
                         return Ok(None);
                     } else {
-                        return Err(DecoderError::SymphoniaDecoder(err.to_string()));
+                        return Err(DecoderError::Io(err));
                     }
                 }
                 Err(err) => {

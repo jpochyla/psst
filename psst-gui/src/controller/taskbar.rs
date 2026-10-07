@@ -5,14 +5,15 @@ use crate::{
 };
 use druid::{widget::prelude::*, widget::Controller, ExtEventSink, Target};
 use raw_window_handle::{HasRawWindowHandle, RawWindowHandle};
+use std::os::windows::ffi::OsStrExt;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc,
 };
 use windows::{
-    core::{w, GUID, HSTRING},
+    core::{w, GUID, HSTRING, PCWSTR},
     Win32::{
-        Foundation::{HWND, LPARAM, LRESULT, PROPERTYKEY, WPARAM},
+        Foundation::{HWND, LPARAM, LRESULT, POINT, PROPERTYKEY, WPARAM},
         System::{
             Com::{
                 CoCreateInstance, CoInitializeEx, CoUninitialize, StructuredStorage::PROPVARIANT,
@@ -28,7 +29,10 @@ use windows::{
                 THBF_ENABLED, THBN_CLICKED, THB_FLAGS, THB_ICON, THB_TOOLTIP, THUMBBUTTON,
             },
             WindowsAndMessaging::{
-                CreateIcon, DestroyIcon, RegisterWindowMessageW, HICON, WM_COMMAND, WM_NCDESTROY,
+                AppendMenuW, CreateIcon, CreatePopupMenu, DestroyIcon, DestroyMenu, GetCursorPos,
+                PostMessageW, RegisterWindowMessageW, TrackPopupMenu, HICON, MF_GRAYED,
+                MF_SEPARATOR, MF_STRING, TPM_RETURNCMD, TPM_RIGHTBUTTON, WM_CLOSE, WM_COMMAND,
+                WM_NCDESTROY, WM_NULL,
             },
         },
     },
@@ -39,15 +43,24 @@ use windows::Win32::UI::{
         RegisterHotKey, UnregisterHotKey, MOD_ALT, MOD_CONTROL, MOD_NOREPEAT,
     },
     Shell::{
-        Shell_NotifyIconW, NIF_ICON, NIF_MESSAGE, NIF_TIP, NIM_ADD, NIM_DELETE, NOTIFYICONDATAW,
+        ExtractIconW, Shell_NotifyIconW, NIF_ICON, NIF_MESSAGE, NIF_TIP, NIM_ADD, NIM_DELETE,
+        NOTIFYICONDATAW,
     },
     WindowsAndMessaging::{
-        SetForegroundWindow, ShowWindow, SW_HIDE, SW_RESTORE, WM_APP, WM_HOTKEY, WM_LBUTTONDBLCLK,
-        WM_RBUTTONUP,
+        IsWindowVisible, SetForegroundWindow, ShowWindow, SW_HIDE, SW_RESTORE, WM_APP, WM_HOTKEY,
+        WM_LBUTTONDBLCLK, WM_RBUTTONUP,
     },
 };
 const TRAY_MESSAGE: u32 = WM_APP + 74;
 const HOTKEY_ID: i32 = 0x5850;
+const SHOWN: druid::Selector = druid::Selector::new("app.desktop.shown");
+const TRAY_MUTE: druid::Selector = druid::Selector::new("app.desktop.tray-mute");
+const MENU_OPEN: usize = 1;
+const MENU_TOGGLE: usize = 2;
+const MENU_NEXT: usize = 3;
+const MENU_PREVIOUS: usize = 4;
+const MENU_MUTE: usize = 5;
+const MENU_QUIT: usize = 6;
 const RESUME_HOTKEY: druid::Selector = druid::Selector::new("app.desktop.resume-hotkey");
 const DESKTOP_SYNC: druid::Selector<bool> = druid::Selector::new("app.desktop.sync");
 
@@ -132,6 +145,19 @@ impl Drop for Icon {
     }
 }
 
+/// The icon embedded in the executable, so the tray matches the app instead of a transport glyph.
+fn app_icon() -> Option<Icon> {
+    let executable: Vec<u16> = std::env::current_exe()
+        .ok()?
+        .as_os_str()
+        .encode_wide()
+        .chain(Some(0))
+        .collect();
+    let handle = unsafe { ExtractIconW(None, PCWSTR(executable.as_ptr()), 0) };
+    // 0 means no icon and 1 means the file is not an executable.
+    (handle.0 as usize > 1).then_some(Icon(handle))
+}
+
 fn icon(kind: usize) -> windows::core::Result<Icon> {
     // Small white transport glyphs with a transparent background; no disk assets.
     let mut mask = [255u8; 24 * 4];
@@ -165,6 +191,9 @@ struct Hook {
     explorer_message: u32,
     destroyed: AtomicBool,
     available: AtomicBool,
+    playing: AtomicBool,
+    muted: AtomicBool,
+    close_to_tray: AtomicBool,
 }
 
 struct Toolbar {
@@ -178,6 +207,7 @@ struct Toolbar {
     available: bool,
     com_initialized: bool,
     tray: bool,
+    app_icon: Option<Icon>,
     hotkey: bool,
 }
 
@@ -189,7 +219,10 @@ impl Toolbar {
             uID: 1,
             uFlags: NIF_ICON | NIF_MESSAGE | NIF_TIP,
             uCallbackMessage: TRAY_MESSAGE,
-            hIcon: self.icons[1].0,
+            hIcon: self
+                .app_icon
+                .as_ref()
+                .map_or(self.icons[1].0, |icon| icon.0),
             ..Default::default()
         };
         for (dst, ch) in data
@@ -210,6 +243,13 @@ impl Toolbar {
         if !self.tray {
             log::warn!("Could not create tray icon");
         }
+    }
+    /// Closing the window hides it when Windows autostart and tray startup are both enabled.
+    fn sync_close_to_tray(&self, config: &crate::data::Config) {
+        self.hook.close_to_tray.store(
+            self.tray && config.start_with_windows && config.start_in_tray,
+            Ordering::Relaxed,
+        );
     }
     fn configure_hotkey(&mut self, enabled: bool) -> windows::core::Result<()> {
         if self.hotkey && !enabled {
@@ -263,6 +303,10 @@ impl Toolbar {
 
     fn sync(&mut self) {
         let Some(taskbar) = &self.taskbar else { return };
+        // Updating thumbnail buttons on a window hidden in the tray makes Windows show its taskbar button.
+        if self.tray && !unsafe { IsWindowVisible(self.hwnd) }.as_bool() {
+            return;
+        }
         if self.hook.destroyed.load(Ordering::Relaxed) {
             return;
         }
@@ -307,6 +351,86 @@ impl Drop for Toolbar {
     }
 }
 
+unsafe fn restore_window(hwnd: HWND, hook: &Hook) {
+    unsafe {
+        let _ = ShowWindow(hwnd, SW_RESTORE);
+        let _ = SetForegroundWindow(hwnd);
+    }
+    let _ = hook.sink.submit_command(SHOWN, (), Target::Global);
+}
+
+/// Tray context menu. It runs on the UI thread and only talks to the app through commands.
+unsafe fn show_tray_menu(hwnd: HWND, hook: &Hook) {
+    unsafe {
+        let Ok(menu) = CreatePopupMenu() else { return };
+        let available = hook.available.load(Ordering::Relaxed);
+        let transport = if available {
+            MF_STRING
+        } else {
+            MF_STRING | MF_GRAYED
+        };
+        let toggle = if hook.playing.load(Ordering::Relaxed) {
+            "Pausar"
+        } else {
+            "Reproducir"
+        };
+        let mute = if hook.muted.load(Ordering::Relaxed) {
+            "Activar sonido"
+        } else {
+            "Silenciar"
+        };
+        let _ = AppendMenuW(menu, MF_STRING, MENU_OPEN, &HSTRING::from("Abrir Xpotify"));
+        let _ = AppendMenuW(menu, MF_SEPARATOR, 0, None);
+        let _ = AppendMenuW(menu, transport, MENU_TOGGLE, &HSTRING::from(toggle));
+        let _ = AppendMenuW(menu, transport, MENU_NEXT, &HSTRING::from("Siguiente"));
+        let _ = AppendMenuW(menu, transport, MENU_PREVIOUS, &HSTRING::from("Anterior"));
+        let _ = AppendMenuW(menu, MF_STRING, MENU_MUTE, &HSTRING::from(mute));
+        let _ = AppendMenuW(menu, MF_SEPARATOR, 0, None);
+        let _ = AppendMenuW(menu, MF_STRING, MENU_QUIT, &HSTRING::from("Salir"));
+        let mut point = POINT::default();
+        let _ = GetCursorPos(&mut point);
+        // Required so the menu closes when the user clicks elsewhere.
+        let _ = SetForegroundWindow(hwnd);
+        let choice = TrackPopupMenu(
+            menu,
+            TPM_RETURNCMD | TPM_RIGHTBUTTON,
+            point.x,
+            point.y,
+            None,
+            hwnd,
+            None,
+        )
+        .0 as usize;
+        let _ = PostMessageW(Some(hwnd), WM_NULL, WPARAM(0), LPARAM(0));
+        let _ = DestroyMenu(menu);
+        match choice {
+            MENU_OPEN => restore_window(hwnd, hook),
+            MENU_TOGGLE => {
+                let _ = hook
+                    .sink
+                    .submit_command(cmd::PLAY_TOGGLE, (), Target::Global);
+            }
+            MENU_NEXT => {
+                let _ = hook.sink.submit_command(cmd::PLAY_NEXT, (), Target::Global);
+            }
+            MENU_PREVIOUS => {
+                let _ = hook
+                    .sink
+                    .submit_command(cmd::PLAY_PREVIOUS, (), Target::Global);
+            }
+            MENU_MUTE => {
+                let _ = hook.sink.submit_command(TRAY_MUTE, (), Target::Global);
+            }
+            MENU_QUIT => {
+                // Let the close request through instead of hiding the window again.
+                hook.close_to_tray.store(false, Ordering::Relaxed);
+                let _ = PostMessageW(Some(hwnd), WM_CLOSE, WPARAM(0), LPARAM(0));
+            }
+            _ => {}
+        }
+    }
+}
+
 unsafe extern "system" fn window_proc(
     hwnd: HWND,
     message: u32,
@@ -320,12 +444,17 @@ unsafe extern "system" fn window_proc(
     if message == WM_HOTKEY && wp.0 == HOTKEY_ID as usize {
         let _ = hook.sink.submit_command(RESUME_HOTKEY, (), Target::Global);
         return LRESULT(0);
+    } else if message == WM_CLOSE && hook.close_to_tray.load(Ordering::Relaxed) {
+        unsafe {
+            let _ = ShowWindow(hwnd, SW_HIDE);
+        }
+        return LRESULT(0);
     } else if message == TRAY_MESSAGE {
-        if lp.0 as u32 == WM_LBUTTONDBLCLK || lp.0 as u32 == WM_RBUTTONUP {
-            unsafe {
-                let _ = ShowWindow(hwnd, SW_RESTORE);
-                let _ = SetForegroundWindow(hwnd);
-            }
+        if lp.0 as u32 == WM_RBUTTONUP {
+            unsafe { show_tray_menu(hwnd, hook) };
+        } else if lp.0 as u32 == WM_LBUTTONDBLCLK {
+            unsafe { restore_window(hwnd, hook) };
+            let _ = hook.sink.submit_command(SHOWN, (), Target::Global);
         }
         return LRESULT(0);
     } else if message == hook.created_message || message == hook.explorer_message {
@@ -354,6 +483,7 @@ unsafe extern "system" fn window_proc(
 
 pub struct TaskbarController {
     toolbar: Option<Box<Toolbar>>,
+    volume_before_mute: Option<f64>,
     hide_timer: druid::TimerToken,
 }
 
@@ -361,6 +491,7 @@ impl Default for TaskbarController {
     fn default() -> Self {
         Self {
             toolbar: None,
+            volume_before_mute: None,
             hide_timer: druid::TimerToken::INVALID,
         }
     }
@@ -415,6 +546,7 @@ impl<W: Widget<AppState>> Controller<AppState, W> for TaskbarController {
                     }
                 }
                 if let Some(toolbar) = &mut self.toolbar {
+                    toolbar.sync_close_to_tray(&data.config);
                     if let Err(error) = toolbar.configure_hotkey(data.config.resume_hotkey) {
                         log::warn!("Global hotkey registration failed: {error}");
                         data.error_alert(
@@ -425,10 +557,28 @@ impl<W: Widget<AppState>> Controller<AppState, W> for TaskbarController {
                 ctx.set_handled();
                 return;
             }
+            if command.is(TRAY_MUTE) {
+                if data.playback.volume > 0.0 {
+                    self.volume_before_mute = Some(data.playback.volume);
+                    data.playback.volume = 0.0;
+                } else {
+                    data.playback.volume = self.volume_before_mute.take().unwrap_or(0.5);
+                }
+                ctx.set_handled();
+                return;
+            }
+            if command.is(SHOWN) {
+                if let Some(toolbar) = &mut self.toolbar {
+                    toolbar.sync();
+                }
+                ctx.set_handled();
+                return;
+            }
             if command.is(READY) {
                 if let Some(toolbar) = &mut self.toolbar {
                     toolbar.installed = false;
                     toolbar.add_tray();
+                    toolbar.sync_close_to_tray(&data.config);
                     if !toolbar.tray {
                         unsafe {
                             let _ = ShowWindow(toolbar.hwnd, SW_RESTORE);
@@ -472,6 +622,9 @@ impl<W: Widget<AppState>> Controller<AppState, W> for TaskbarController {
                             },
                             destroyed: AtomicBool::new(false),
                             available: AtomicBool::new(data.playback.now_playing.is_some()),
+                            playing: AtomicBool::new(data.playback.state == PlaybackState::Playing),
+                            muted: AtomicBool::new(data.playback.volume == 0.0),
+                            close_to_tray: AtomicBool::new(false),
                         }),
                         installed: false,
                         hook_reference: None,
@@ -479,6 +632,7 @@ impl<W: Widget<AppState>> Controller<AppState, W> for TaskbarController {
                         available: data.playback.now_playing.is_some(),
                         com_initialized: initialized,
                         tray: false,
+                        app_icon: app_icon(),
                         hotkey: false,
                     }))
                 })();
@@ -497,6 +651,7 @@ impl<W: Widget<AppState>> Controller<AppState, W> for TaskbarController {
                         } {
                             toolbar.sync();
                             toolbar.add_tray();
+                            toolbar.sync_close_to_tray(&data.config);
                             if let Err(error) = toolbar.configure_hotkey(data.config.resume_hotkey)
                             {
                                 log::warn!("Global hotkey registration failed: {error}");
@@ -535,6 +690,7 @@ impl<W: Widget<AppState>> Controller<AppState, W> for TaskbarController {
     ) {
         if old.config.start_with_windows != data.config.start_with_windows
             || old.config.resume_hotkey != data.config.resume_hotkey
+            || old.config.start_in_tray != data.config.start_in_tray
         {
             ctx.submit_command(
                 DESKTOP_SYNC.with(old.config.start_with_windows != data.config.start_with_windows),
@@ -550,6 +706,11 @@ impl<W: Widget<AppState>> Controller<AppState, W> for TaskbarController {
                 toolbar.hook.available.store(available, Ordering::Relaxed);
                 toolbar.sync();
             }
+            toolbar.hook.playing.store(playing, Ordering::Relaxed);
+            toolbar
+                .hook
+                .muted
+                .store(data.playback.volume == 0.0, Ordering::Relaxed);
         }
         child.update(ctx, old, data, env);
     }

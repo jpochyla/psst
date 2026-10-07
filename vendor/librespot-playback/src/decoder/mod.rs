@@ -12,6 +12,8 @@ pub use symphonia_decoder::SymphoniaDecoder;
 
 #[derive(Error, Debug)]
 pub enum DecoderError {
+    #[error("Audio I/O Error: {0}")]
+    Io(#[from] std::io::Error),
     #[error("Passthrough Decoder Error: {0}")]
     PassthroughDecoder(String),
     #[error("Symphonia Decoder Error: {0}")]
@@ -87,6 +89,9 @@ impl From<DecoderError> for librespot_core::error::Error {
 
 impl From<symphonia::core::errors::Error> for DecoderError {
     fn from(err: symphonia::core::errors::Error) -> Self {
-        Self::SymphoniaDecoder(err.to_string())
+        match err {
+            symphonia::core::errors::Error::IoError(err) => Self::Io(err),
+            err => Self::SymphoniaDecoder(err.to_string()),
+        }
     }
 }
