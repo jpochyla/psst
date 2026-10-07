@@ -5,6 +5,7 @@ mod cmd;
 mod controller;
 mod data;
 mod delegate;
+mod diagnostics;
 mod error;
 mod splitify;
 mod ui;
@@ -12,7 +13,6 @@ mod webapi;
 mod widget;
 
 use druid::AppLauncher;
-use env_logger::{Builder, Env};
 use webapi::WebApi;
 
 use psst_core::cache::Cache;
@@ -22,9 +22,6 @@ use crate::{
     delegate::Delegate,
 };
 
-const ENV_LOG: &str = "PSST_LOG";
-const ENV_LOG_STYLE: &str = "PSST_LOG_STYLE";
-
 fn main() {
     #[cfg(target_os = "windows")]
     unsafe {
@@ -33,13 +30,7 @@ fn main() {
         );
     }
     let _ = dotenvy::from_filename(".env.local");
-    // Setup logging from the env variables, with defaults.
-    Builder::from_env(
-        Env::new()
-            .filter_or(ENV_LOG, "info")
-            .write_style(ENV_LOG_STYLE),
-    )
-    .init();
+    diagnostics::init();
 
     #[cfg(debug_assertions)]
     if ui::run_if_requested() {

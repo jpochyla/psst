@@ -140,6 +140,22 @@ impl AppState {
             saved.engine_queue = self.engine_queue.clone();
         }
         self.start_playback(Playable::Track(entry.track.clone()), origin, progress);
+        self.playback.up_next = if let Some(engine) = &self.engine_queue {
+            let mut queue = psst_core::player::queue::Queue::new();
+            queue.restore(engine.clone());
+            queue
+                .upcoming_ids()
+                .into_iter()
+                .filter_map(|id| self.queued_entry(id))
+                .collect()
+        } else {
+            self.playback
+                .queue
+                .iter()
+                .skip(snapshot.position + 1)
+                .cloned()
+                .collect()
+        };
         self.playback.state = PlaybackState::Paused;
         self.nav = entry.origin.clone();
         self.common_ctx_mut().nav = self.nav.clone();
@@ -213,6 +229,15 @@ mod tests {
         assert_eq!(
             restored.playback.now_playing.as_ref().unwrap().item.id(),
             tracks[2].id.0
+        );
+        assert_eq!(
+            restored
+                .playback
+                .up_next
+                .iter()
+                .map(|entry| entry.item.id())
+                .collect::<Vec<_>>(),
+            engine.upcoming_ids()
         );
         let mut resumed_engine = Queue::new();
         assert!(resumed_engine.restore(restored.engine_queue.unwrap()));

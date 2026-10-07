@@ -114,6 +114,7 @@ pub fn preferences_widget() -> impl Widget<AppState> {
                         account_tab_widget(AccountTab::InPreferences).boxed()
                     }
                     PreferencesTab::Cache => cache_tab_widget().boxed(),
+                    PreferencesTab::Logs => logs_tab_widget().boxed(),
                     PreferencesTab::About => about_tab_widget().boxed(),
                 },
             )
@@ -172,6 +173,12 @@ fn tabs_widget() -> impl Widget<AppState> {
         ))
         .with_default_spacer()
         .with_child(tab_link_widget(
+            "Logs",
+            &icons::STORAGE,
+            PreferencesTab::Logs,
+        ))
+        .with_default_spacer()
+        .with_child(tab_link_widget(
             "About",
             &icons::HEART,
             PreferencesTab::About,
@@ -193,6 +200,9 @@ fn tab_link_widget(
         .active(move |state: &AppState, _| tab == state.preferences.active)
         .on_left_click(move |_, _, state: &mut AppState, _| {
             state.preferences.active = tab;
+            if tab == PreferencesTab::Logs {
+                state.preferences.logs = crate::diagnostics::preview();
+            }
         })
         .env_scope(|env, _| {
             env.set(theme::LINK_ACTIVE_COLOR, env.get(theme::BACKGROUND_DARK));
@@ -203,6 +213,32 @@ fn general_tab_widget() -> impl Widget<AppState> {
     let mut col = Flex::column()
         .cross_axis_alignment(CrossAxisAlignment::Start)
         .must_fill_main_axis(true);
+
+    #[cfg(windows)]
+    {
+        col = col
+            .with_child(Label::new("Windows").with_font(theme::UI_FONT_MEDIUM))
+            .with_child(
+                Checkbox::new("Iniciar con Windows")
+                    .lens(AppState::config.then(Config::start_with_windows)),
+            )
+            .with_child(
+                Checkbox::new("Al iniciar Windows, abrir en la bandeja")
+                    .lens(AppState::config.then(Config::start_in_tray)),
+            )
+            .with_child(
+                Checkbox::new("Activar atajo global Ctrl + Alt + P")
+                    .lens(AppState::config.then(Config::resume_hotkey)),
+            )
+            .with_child(
+                RadioGroup::column(vec![
+                    ("Atajo: reanudar la última canción", false),
+                    ("Atajo: reproducir la siguiente de la cola", true),
+                ])
+                .lens(AppState::config.then(Config::resume_hotkey_next)),
+            )
+            .with_spacer(theme::grid(3.0));
+    }
 
     // Theme
     col = col
@@ -226,6 +262,11 @@ fn general_tab_widget() -> impl Widget<AppState> {
     );
 
     col = col.with_spacer(theme::grid(3.0));
+
+    col = col.with_child(
+        Label::new("La calidad se aplica a la siguiente canción.")
+            .with_line_break_mode(LineBreaking::WordWrap),
+    );
 
     // Audio quality
     col = col
@@ -976,4 +1017,89 @@ fn about_tab_widget() -> impl Widget<AppState> {
         .with_child(commit_hash)
         .with_child(build_time)
         .with_child(remote_url)
+}
+
+struct LogsRefresh(druid::TimerToken);
+impl<W: Widget<AppState>> Controller<AppState, W> for LogsRefresh {
+    fn lifecycle(
+        &mut self,
+        child: &mut W,
+        ctx: &mut LifeCycleCtx,
+        event: &LifeCycle,
+        data: &AppState,
+        env: &Env,
+    ) {
+        if matches!(event, LifeCycle::WidgetAdded) {
+            self.0 = ctx.request_timer(Duration::from_secs(2));
+        }
+        child.lifecycle(ctx, event, data, env);
+    }
+    fn event(
+        &mut self,
+        child: &mut W,
+        ctx: &mut EventCtx,
+        event: &Event,
+        data: &mut AppState,
+        env: &Env,
+    ) {
+        if matches!(event, Event::Timer(token) if *token == self.0) {
+            data.preferences.logs = crate::diagnostics::preview();
+            self.0 = ctx.request_timer(Duration::from_secs(2));
+        }
+        child.event(ctx, event, data, env);
+    }
+}
+
+fn logs_tab_widget() -> impl Widget<AppState> {
+    const EXPORT: Selector<druid::FileInfo> = Selector::new("app.logs.export");
+    Flex::column()
+        .cross_axis_alignment(CrossAxisAlignment::Start)
+        .with_child(
+            Label::new("Errores, advertencias y eventos importantes")
+                .with_line_break_mode(LineBreaking::WordWrap),
+        )
+        .with_child(
+            Label::new("Historial persistente: hasta 6 MB. Vista de los últimos 64 KB.")
+                .with_line_break_mode(LineBreaking::WordWrap),
+        )
+        .with_spacer(12.0)
+        .with_child(
+            Flex::row()
+                .with_child(
+                    Button::new("Actualizar").on_click(|_, data: &mut AppState, _| {
+                        data.preferences.logs = crate::diagnostics::preview();
+                    }),
+                )
+                .with_spacer(12.0)
+                .with_child(Button::new("Exportar logs...").on_click(|ctx, _, _| {
+                    ctx.submit_command(
+                        druid::commands::SHOW_SAVE_PANEL.with(
+                            druid::FileDialogOptions::new()
+                                .default_name("xpotify-debug.log")
+                                .accept_command(EXPORT),
+                        ),
+                    );
+                })),
+        )
+        .with_child(
+            Label::dynamic(|data: &AppState, _| data.preferences.log_status.clone())
+                .with_line_break_mode(LineBreaking::WordWrap),
+        )
+        .with_spacer(12.0)
+        .with_child(
+            Label::dynamic(|data: &AppState, _| data.preferences.logs.clone())
+                .with_text_size(11.0)
+                .with_line_break_mode(LineBreaking::WordWrap)
+                .expand_width(),
+        )
+        .controller(LogsRefresh(druid::TimerToken::INVALID))
+        .on_command(EXPORT, |_, info, data| {
+            data.preferences.log_status = match crate::diagnostics::export(info.path()) {
+                Ok(()) => format!("Logs exportados: {}", info.path().display()),
+                Err(error) => {
+                    log::error!("Log export failed: {error}");
+                    format!("No se pudieron exportar: {error}")
+                }
+            };
+        })
 }

@@ -164,6 +164,7 @@ fn write_buffer(
 }
 
 struct Worker {
+    quality: tokio::sync::watch::Sender<usize>,
     sender: tokio::sync::mpsc::Sender<Action>,
     epoch: u64,
 }
@@ -177,6 +178,7 @@ impl Worker {
     fn start(config: Config, sink: ExtEventSink) -> Self {
         let epoch = rand::random();
         let (sender, mut commands) = tokio::sync::mpsc::channel(64);
+        let (quality, mut quality_changes) = tokio::sync::watch::channel(config.playback().bitrate);
         thread::spawn(move || {
             let notify = |notice| {
                 let _ = sink.submit_command(NOTICE, (epoch, notice), druid::Target::Global);
@@ -244,6 +246,13 @@ impl Worker {
                 log::info!("Native Spotify Connect receiver registered");
                 loop {
                     tokio::select! {
+                        changed = quality_changes.changed() => {
+                            if changed.is_ok() {
+                                let value = *quality_changes.borrow_and_update();
+                                player.set_bitrate(match value { 96 => Bitrate::Bitrate96, 160 => Bitrate::Bitrate160, _ => Bitrate::Bitrate320 });
+                                log::info!("Audio quality queued for next track: {value} kb/s");
+                            }
+                        }
                         action = commands.recv() => {
                             let result = match action {
                                 Some(Action::Load(request)) => spirc.activate().and_then(|_| spirc.load(request)),
@@ -304,7 +313,11 @@ impl Worker {
             }
             runtime.shutdown_timeout(Duration::from_secs(2));
         });
-        Self { sender, epoch }
+        Self {
+            sender,
+            epoch,
+            quality,
+        }
     }
 }
 
@@ -1194,8 +1207,12 @@ impl<W: Widget<AppState>> Controller<AppState, W> for NativeConnectController {
                 }
             }
         }
-        if old.config.audio_quality != state.config.audio_quality
-            || old.config.has_credentials() != state.config.has_credentials()
+        if old.config.audio_quality != state.config.audio_quality {
+            if let Some(worker) = &self.worker {
+                worker.quality.send_replace(state.config.playback().bitrate);
+            }
+        }
+        if old.config.has_credentials() != state.config.has_credentials()
             || old.config.username() != state.config.username()
         {
             self.worker = None;
@@ -1231,7 +1248,11 @@ mod tests {
         let mut state = AppState::default_with_config(Config::default());
         let (sender, mut receiver) = tokio::sync::mpsc::channel(1);
         let mut controller = NativeConnectController {
-            worker: Some(Worker { sender, epoch: 1 }),
+            worker: Some(Worker {
+                sender,
+                epoch: 1,
+                quality: tokio::sync::watch::channel(320).0,
+            }),
             ..Default::default()
         };
         controller.load(&mut state, &pending_payload("First"), Duration::ZERO, true);
@@ -1271,7 +1292,11 @@ mod tests {
         let (sender, mut receiver) = tokio::sync::mpsc::channel(1);
         assert!(sender.try_send(Action::Pause).is_ok());
         let mut controller = NativeConnectController {
-            worker: Some(Worker { sender, epoch: 1 }),
+            worker: Some(Worker {
+                sender,
+                epoch: 1,
+                quality: tokio::sync::watch::channel(320).0,
+            }),
             ..Default::default()
         };
         controller.load(

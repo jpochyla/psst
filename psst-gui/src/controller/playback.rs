@@ -1006,6 +1006,11 @@ where
         data: &AppState,
         env: &Env,
     ) {
+        if old_data.config.audio_quality != data.config.audio_quality {
+            self.send(PlayerEvent::Command(PlayerCommand::Configure {
+                config: data.config.playback(),
+            }));
+        }
         if !old_data.playback.volume.same(&data.playback.volume) {
             self.set_volume(data.playback.volume);
         }

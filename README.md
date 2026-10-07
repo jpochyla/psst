@@ -208,3 +208,11 @@ This project would not exist without the following:
 - [`druid`](https://github.com/linebender/druid) native GUI library for Rust.
 - [`ncspot`](https://github.com/hrkfdn/ncspot) cross-platform ncurses Spotify client written in Rust, using `librespot`.
 - ...and of course other libraries and projects.
+
+
+### Diagnostico e inicio en Windows
+
+- **Ajustes > Logs** muestra errores, advertencias y eventos importantes, se actualiza cada dos segundos y permite exportar el historial a un `.log`. Se conservan tres archivos de aproximadamente 2 MB en la carpeta de configuracion de Psst, subcarpeta `logs`; la vista muestra los ultimos 64 KB. Los secretos reconocidos y las URLs se ocultan antes de guardar.
+- La calidad de audio elegida se aplica a las siguientes cargas; la cancion actual continua sin reiniciar el receptor. Se descarta cualquier precarga hecha con la calidad anterior.
+- **Ajustes > General > Windows** permite iniciar con Windows y abrir en la bandeja. Un doble clic en el icono recupera la ventana. El inicio automatico usa `--autostart`; abrir la app normalmente sigue mostrando la ventana.
+- El atajo global opcional **Ctrl + Alt + P** funciona mientras Xpotify esta abierto, incluso en la bandeja. Puede reanudar la ultima cancion desde su posicion guardada o reproducir la siguiente de la cola. Si no hay siguiente cancion o el atajo esta ocupado, la app muestra un aviso.

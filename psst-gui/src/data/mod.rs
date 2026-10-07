@@ -144,6 +144,8 @@ impl AppState {
             config,
             preferences: Preferences {
                 active: PreferencesTab::General,
+                logs: String::new(),
+                log_status: String::new(),
                 cache: None,
                 cache_size: Promise::Empty,
                 auth: Authentication::new(),
@@ -400,6 +402,7 @@ impl AppState {
     }
 
     pub fn error_alert(&mut self, message: impl Display) {
+        log::error!("{message}");
         self.add_alert(message, AlertStyle::Error);
     }
 

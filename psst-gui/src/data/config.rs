@@ -24,6 +24,8 @@ use super::{Nav, Promise, QueueBehavior, SliderScrollScale};
 #[derive(Clone, Debug, Data, Lens)]
 pub struct Preferences {
     pub active: PreferencesTab,
+    pub logs: String,
+    pub log_status: String,
     #[data(ignore)]
     pub cache: Option<CacheHandle>,
     pub cache_size: Promise<u64, (), ()>,
@@ -49,6 +51,7 @@ pub enum PreferencesTab {
     General,
     Account,
     Cache,
+    Logs,
     About,
 }
 
@@ -114,6 +117,10 @@ pub struct Config {
     #[serde(default)]
     pub audio_quality_version: u32,
     pub native_connect: bool,
+    pub start_with_windows: bool,
+    pub start_in_tray: bool,
+    pub resume_hotkey: bool,
+    pub resume_hotkey_next: bool,
     pub connect_device_id: String,
     pub theme: Theme,
     pub volume: f64,
@@ -151,6 +158,10 @@ impl Default for Config {
             audio_quality: Default::default(),
             audio_quality_version: 1,
             native_connect: true,
+            start_with_windows: false,
+            start_in_tray: false,
+            resume_hotkey: false,
+            resume_hotkey_next: false,
             connect_device_id: format!("xpotify-{:032x}", rand::random::<u128>()),
             theme: Default::default(),
             volume: 1.0,
@@ -412,6 +423,28 @@ fn get_dir_size(path: &Path) -> Option<u64> {
 mod audio_quality_tests {
     use super::*;
 
+    #[test]
+    fn desktop_preferences_migrate_and_round_trip() {
+        let mut config: Config = serde_json::from_str("{}").unwrap();
+        assert!(
+            !config.start_with_windows
+                && !config.start_in_tray
+                && !config.resume_hotkey
+                && !config.resume_hotkey_next
+        );
+        config.start_with_windows = true;
+        config.start_in_tray = true;
+        config.resume_hotkey = true;
+        config.resume_hotkey_next = true;
+        let restored: Config =
+            serde_json::from_str(&serde_json::to_string(&config).unwrap()).unwrap();
+        assert!(
+            restored.start_with_windows
+                && restored.start_in_tray
+                && restored.resume_hotkey
+                && restored.resume_hotkey_next
+        );
+    }
     #[test]
     fn compact_library_defaults_for_existing_profiles_and_remembers_expansion() {
         let migrated: Config = serde_json::from_value(serde_json::json!({"volume":0.4})).unwrap();

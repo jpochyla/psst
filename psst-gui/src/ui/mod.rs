@@ -78,6 +78,12 @@ pub fn main_window(config: &Config) -> WindowDesc<AppState> {
         .window_size(config.window_size)
         .show_title(false)
         .transparent_titlebar(true);
+    #[cfg(windows)]
+    let win = if crate::controller::taskbar::startup_in_tray(config) {
+        win.set_window_state(druid_shell::WindowState::Minimized)
+    } else {
+        win
+    };
     if cfg!(target_os = "macos") {
         win.menu(menu::main_menu)
     } else {
