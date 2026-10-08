@@ -146,6 +146,19 @@ impl AppDelegate<AppState> for Delegate {
         data: &mut AppState,
         _env: &Env,
     ) -> Handled {
+        #[cfg(windows)]
+        if cmd.is(crate::single_instance::ACTIVATE) {
+            if data.config.has_credentials() {
+                self.show_main(&data.config, ctx);
+            } else {
+                self.show_account_setup(ctx);
+            }
+            crate::single_instance::restore_window();
+            if let Some(id) = self.main_window {
+                ctx.submit_command(crate::controller::taskbar::SHOWN.to(id));
+            }
+            return Handled::Yes;
+        }
         if let Some(track) = cmd.get(ui::playlist_picker::OPEN) {
             data.playlist_picker_track = Some(*track);
             data.playlist_picker_filter.clear();
@@ -272,6 +285,22 @@ impl AppDelegate<AppState> for Delegate {
             Handled::Yes
         } else {
             Handled::No
+        }
+    }
+
+    #[cfg(windows)]
+    fn window_added(
+        &mut self,
+        id: WindowId,
+        handle: druid::WindowHandle,
+        _data: &mut AppState,
+        _env: &Env,
+        _ctx: &mut DelegateCtx,
+    ) {
+        if self.main_window == Some(id)
+            || (self.main_window.is_none() && self.preferences_window == Some(id))
+        {
+            crate::single_instance::mark_window(&handle);
         }
     }
 

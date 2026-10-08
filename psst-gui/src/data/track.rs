@@ -29,6 +29,8 @@ pub struct Track {
     pub popularity: Option<u32>,
     #[serde(skip)]
     pub track_pos: usize,
+    #[serde(default)]
+    pub playlist_added_at: Option<Arc<str>>,
     pub lyrics: Option<Arc<[TrackLines]>>,
 }
 

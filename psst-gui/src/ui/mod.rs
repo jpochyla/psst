@@ -485,6 +485,7 @@ fn route_widget() -> impl Widget<AppState> {
                         .padding((8.0, 8.0, 24.0, 8.0))
                         .align_left(),
                 )
+                .with_child(playlist::playlist_toolbar().padding((8.0, 0.0, 24.0, 8.0)))
                 .with_child(
                     find::finder_widget(cmd::FIND_IN_PLAYLIST, "Find in Playlist...")
                         .lens(AppState::finder),

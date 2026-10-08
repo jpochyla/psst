@@ -7,6 +7,8 @@ mod data;
 mod delegate;
 mod diagnostics;
 mod error;
+#[cfg(windows)]
+mod single_instance;
 mod splitify;
 mod ui;
 mod webapi;
@@ -23,6 +25,17 @@ use crate::{
 };
 
 fn main() {
+    #[cfg(windows)]
+    let mut instance = if cfg!(debug_assertions)
+        && std::env::args().any(|arg| arg.starts_with("--preview-ui="))
+    {
+        None
+    } else {
+        match single_instance::SingleInstance::acquire().expect("Acquire Xpotify instance lock") {
+            Some(instance) => Some(instance),
+            None => return,
+        }
+    };
     #[cfg(target_os = "windows")]
     unsafe {
         let _ = windows::Win32::UI::Shell::SetCurrentProcessExplicitAppUserModelID(
@@ -109,6 +122,13 @@ fn main() {
         delegate = Delegate::with_preferences(window.id);
         launcher = AppLauncher::with_window(window).configure_env(ui::theme::setup);
     };
+
+    #[cfg(windows)]
+    if let Some(instance) = &mut instance {
+        instance
+            .listen(launcher.get_external_handle())
+            .expect("Listen for Xpotify activation");
+    }
 
     launcher
         .delegate(delegate)

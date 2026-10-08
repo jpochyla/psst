@@ -186,6 +186,7 @@ impl AppState {
                 overview: Promise::Empty,
             },
             playlist_detail: PlaylistDetail {
+                query: String::new(),
                 playlist: Promise::Empty,
                 tracks: Promise::Empty,
             },

@@ -8,6 +8,7 @@ use crate::data::{user::PublicUser, Image, Promise, Track, TrackId};
 
 #[derive(Clone, Debug, Data, Lens)]
 pub struct PlaylistDetail {
+    pub query: String,
     pub playlist: Promise<Playlist, PlaylistLink>,
     pub tracks: Promise<PlaylistTracks, PlaylistLink>,
 }
@@ -104,6 +105,7 @@ impl Playlist {
 
 #[derive(Clone, Debug, Data, Lens)]
 pub struct PlaylistTracks {
+    pub query: String,
     pub id: Arc<str>,
     pub name: Arc<str>,
     pub tracks: Vector<Arc<Track>>,

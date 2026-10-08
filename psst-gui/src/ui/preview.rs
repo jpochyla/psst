@@ -24,6 +24,7 @@ impl AppDelegate<AppState> for PreviewDelegate {
         // Prevent remote requests and writes while reviewing fixture screens.
         let local_ui_command = [
             "app.playable.reveal-playing",
+            "app.playlist.set-sort",
             "app.show-finder",
             "app.set-focus",
             "find",
@@ -298,6 +299,7 @@ pub fn run_if_requested() -> bool {
             state.playlist_detail.tracks.resolve(
                 playlist.link(),
                 crate::data::PlaylistTracks {
+                    query: String::new(),
                     id: playlist.id.clone(),
                     name: playlist.name.clone(),
                     tracks: tracks.clone(),

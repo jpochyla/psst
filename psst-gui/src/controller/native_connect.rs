@@ -464,6 +464,7 @@ fn from_audio(item: &AudioItem, album_id: Option<String>) -> Option<Playable> {
         is_playable: Some(true),
         popularity: Some(*popularity as u32),
         track_pos: 0,
+        playlist_added_at: None,
         lyrics: None,
     })))
 }

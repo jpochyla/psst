@@ -70,6 +70,9 @@ fn page_bar() -> impl Widget<TrackPage> {
         )
         .with_flex_child(
             Label::dynamic(|data: &TrackPage, _| {
+                if data.total == 0 {
+                    return "No hay canciones que coincidan".to_string();
+                }
                 format!(
                     "Página {} / {} · {} canciones",
                     data.page + 1,
@@ -97,6 +100,7 @@ struct PagedTracks<T: Data> {
     query: Option<FindQuery>,
     selector: Option<Selector<Find>>,
     last_playing: Option<Playable>,
+    last_filter: String,
     marker: std::marker::PhantomData<T>,
 }
 
@@ -127,11 +131,18 @@ impl<T: Data + PlayableIter> PagedTracks<T> {
             query: None,
             selector,
             last_playing: None,
+            last_filter: String::new(),
             marker: std::marker::PhantomData,
         }
     }
 
     fn rebuild(&mut self, data: &WithCtx<T>) {
+        let filter = data.data.filter_query().trim();
+        if self.last_filter != filter {
+            self.page.page = 0;
+            self.last_filter = filter.to_string();
+        }
+        let filter = FindQuery::new(filter);
         let origin = Arc::new(data.data.origin());
         let mut matches = Vector::new();
         data.data.for_each(|item, position| {
@@ -142,10 +153,22 @@ impl<T: Data + PlayableIter> PagedTracks<T> {
                 origin: origin.clone(),
                 ctx: data.ctx.clone(),
             };
-            if self
-                .query
-                .as_ref()
-                .is_none_or(|q| q.is_empty() || row.matches_query(q))
+            let matches_filter = filter.is_empty()
+                || match &row.item {
+                    Playable::Track(track) => {
+                        filter.matches_str(&track.name)
+                            || track
+                                .artists
+                                .iter()
+                                .any(|artist| filter.matches_str(&artist.name))
+                    }
+                    Playable::Episode(_) => true,
+                };
+            if matches_filter
+                && self
+                    .query
+                    .as_ref()
+                    .is_none_or(|q| q.is_empty() || row.matches_query(q))
             {
                 matches.push_back(row);
             }
@@ -380,6 +403,9 @@ impl MatchFindQuery for PlayRow<Playable> {
 }
 
 pub trait PlayableIter {
+    fn filter_query(&self) -> &str {
+        ""
+    }
     fn origin(&self) -> PlaybackOrigin;
     fn count(&self) -> usize;
     fn for_each(&self, cb: impl FnMut(Playable, usize));
@@ -404,6 +430,9 @@ impl PlayableIter for Vector<Arc<Track>> {
 }
 
 impl PlayableIter for PlaylistTracks {
+    fn filter_query(&self) -> &str {
+        &self.query
+    }
     fn origin(&self) -> PlaybackOrigin {
         PlaybackOrigin::Playlist(self.link())
     }
@@ -575,6 +604,47 @@ mod paging_tests {
         widget.rebuild(&source);
         assert_eq!(widget.page.page, 0);
         assert!(widget.page.rows.is_empty());
+    }
+    #[test]
+    fn playlist_search_filters_all_pages_and_preserves_playback_positions() {
+        let state = AppState::default_with_config(Config::default());
+        let mut source = WithCtx {
+            ctx: state.common_ctx.clone(),
+            data: PlaylistTracks {
+                id: "playlist".into(),
+                name: "Playlist".into(),
+                tracks: tracks(750),
+                query: String::new(),
+            },
+        };
+        let mut widget = PagedTracks::new(
+            Display {
+                track: track::Display::empty(),
+            },
+            None,
+        );
+        widget.page.page = 4;
+        widget.rebuild(&source);
+        source.data.query = "  sOnG 733  ".into();
+        widget.rebuild(&source);
+        assert_eq!(widget.page.page, 0);
+        assert_eq!(widget.page.total, 1);
+        assert_eq!(widget.page.rows[0].position, 733);
+        assert_eq!(source.data.count(), 750);
+        let Playable::Track(song) = &widget.page.rows[0].item else {
+            panic!()
+        };
+        assert_eq!(song.id, source.data.tracks[733].id);
+        source.data.query = "ARTIST".into();
+        widget.rebuild(&source);
+        assert_eq!(widget.page.total, 750);
+        source.data.query = "does not exist".into();
+        widget.rebuild(&source);
+        assert_eq!(widget.page.total, 0);
+        source.data.query.clear();
+        widget.rebuild(&source);
+        assert_eq!(widget.page.total, 750);
+        assert_eq!(widget.page.rows[0].position, 0);
     }
     #[test]
     fn now_playing_reveals_its_page_and_matches_only_its_source() {

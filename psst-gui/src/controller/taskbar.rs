@@ -53,7 +53,7 @@ use windows::Win32::UI::{
 };
 const TRAY_MESSAGE: u32 = WM_APP + 74;
 const HOTKEY_ID: i32 = 0x5850;
-const SHOWN: druid::Selector = druid::Selector::new("app.desktop.shown");
+pub(crate) const SHOWN: druid::Selector = druid::Selector::new("app.desktop.shown");
 const TRAY_MUTE: druid::Selector = druid::Selector::new("app.desktop.tray-mute");
 const MENU_OPEN: usize = 1;
 const MENU_TOGGLE: usize = 2;
@@ -568,6 +568,7 @@ impl<W: Widget<AppState>> Controller<AppState, W> for TaskbarController {
                 return;
             }
             if command.is(SHOWN) {
+                self.hide_timer = druid::TimerToken::INVALID;
                 if let Some(toolbar) = &mut self.toolbar {
                     toolbar.sync();
                 }

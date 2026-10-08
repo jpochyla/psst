@@ -1,4 +1,4 @@
-use std::{cell::RefCell, cmp::Ordering, rc::Rc, sync::Arc};
+use std::{cell::RefCell, rc::Rc, sync::Arc};
 
 use druid::{
     im::Vector,
@@ -79,6 +79,7 @@ pub const ADD_TRACK: Selector<PlaylistAddTrack> = Selector::new("app.playlist.ad
 pub const REMOVE_TRACK: Selector<PlaylistRemoveTrack> = Selector::new("app.playlist.remove-track");
 pub const REORDER_TRACK: Selector<crate::data::PlaylistReorder> =
     Selector::new("app.playlist.reorder-track");
+const SET_SORT: Selector<(SortCriteria, SortOrder)> = Selector::new("app.playlist.set-sort");
 
 pub const FOLLOW_PLAYLIST: Selector<Playlist> = Selector::new("app.playlist.follow");
 pub const UNFOLLOW_PLAYLIST: Selector<PlaylistLink> = Selector::new("app.playlist.unfollow");
@@ -510,6 +511,93 @@ pub fn detail_widget() -> impl Widget<AppState> {
         .with_child(playlist_tracks)
 }
 
+pub fn playlist_toolbar() -> impl Widget<AppState> {
+    let search = TextBox::new()
+        .with_placeholder("Buscar canción o artista en esta playlist")
+        .expand_width()
+        .lens(AppState::playlist_detail.then(PlaylistDetail::query));
+    let clear = Button::new("Limpiar")
+        .on_click(|_, data: &mut AppState, _| data.playlist_detail.query.clear())
+        .disabled_if(|data, _| data.playlist_detail.query.is_empty());
+    let sort = Button::dynamic(|data: &AppState, _| {
+        format!("Orden: {} ▾", sort_label(data.config.sort_criteria))
+    })
+    .on_click(|ctx, data, _| {
+        let mut menu: Menu<AppState> = Menu::empty();
+        for criteria in [
+            SortCriteria::Title,
+            SortCriteria::Artist,
+            SortCriteria::Album,
+            SortCriteria::DateAdded,
+            SortCriteria::Duration,
+        ] {
+            menu = menu.entry(
+                MenuItem::new(sort_label(criteria))
+                    .selected(criteria == data.config.sort_criteria)
+                    .command(SET_SORT.with((criteria, data.config.sort_order))),
+            );
+        }
+        ctx.show_context_menu(
+            menu,
+            ctx.window_origin() + druid::Vec2::new(0.0, ctx.size().height),
+        );
+    });
+    let direction = Button::dynamic(|data: &AppState, _| {
+        match (data.config.sort_criteria, data.config.sort_order) {
+            (SortCriteria::DateAdded, SortOrder::Ascending) => "Más antiguas primero ↑",
+            (SortCriteria::DateAdded, SortOrder::Descending) => "Más recientes primero ↓",
+            (SortCriteria::Duration, SortOrder::Ascending) => "Menor duración ↑",
+            (SortCriteria::Duration, SortOrder::Descending) => "Mayor duración ↓",
+            (_, SortOrder::Ascending) => "A → Z ↑",
+            (_, SortOrder::Descending) => "Z → A ↓",
+        }
+        .to_string()
+    })
+    .on_click(|ctx, data, _| {
+        let order = if data.config.sort_order == SortOrder::Ascending {
+            SortOrder::Descending
+        } else {
+            SortOrder::Ascending
+        };
+        ctx.submit_command(SET_SORT.with((data.config.sort_criteria, order)));
+    });
+    Flex::column()
+        .with_child(
+            Flex::row()
+                .with_flex_child(search, 1.0)
+                .with_spacer(8.0)
+                .with_child(clear),
+        )
+        .with_spacer(8.0)
+        .with_child(
+            Flex::row()
+                .with_child(sort)
+                .with_spacer(8.0)
+                .with_child(direction)
+                .with_flex_spacer(1.0),
+        )
+        .expand_width()
+        .on_command(SET_SORT, |_, (criteria, order), data| {
+            data.config.sort_criteria = *criteria;
+            data.config.sort_order = *order;
+            if let Some(loaded) = data.playlist_detail.tracks.resolved().cloned() {
+                if let Ok(sorted) = sort_playlist(data, Ok(loaded.tracks)) {
+                    data.playlist_detail.tracks.resolved_mut().unwrap().tracks = sorted;
+                }
+            }
+        })
+}
+
+fn sort_label(criteria: SortCriteria) -> &'static str {
+    match criteria {
+        SortCriteria::Title => "Título",
+        SortCriteria::Artist => "Artista",
+        SortCriteria::Album => "Álbum",
+        SortCriteria::DateAdded => "Fecha de agregado",
+        SortCriteria::Duration => "Duración",
+    }
+}
+
 pub fn play_button() -> impl Widget<AppState> {
     Button::new("▶ Reproducir playlist")
         .on_click(|ctx, state: &mut AppState, _| {
@@ -551,6 +639,52 @@ mod playback_button_tests {
     use super::*;
 
     #[test]
+    fn sorting_uses_dates_not_playlist_positions_and_handles_both_directions() {
+        let mut state = AppState::default_with_config(crate::data::Config::default());
+        let tracks: Vector<Arc<Track>> = [
+            ("zebra", "Alpha", "Zulu", 120000, "2026-01-02T00:00:00Z"),
+            ("Alpha", "zebra", "Alpha", 240000, "2026-01-01T00:00:00Z"),
+        ]
+        .into_iter()
+        .enumerate()
+        .map(|(position, (name, artist, album, duration, date))| {
+            let mut track: Track = serde_json::from_value(serde_json::json!({
+                "name":name, "artists":[{"id":"artist","name":artist}],
+                "album":{"id":"album","name":album,"images":[]}, "duration_ms":duration,
+                "disc_number":1,"track_number":1,"explicit":false,"is_local":false,
+                "playlist_added_at":date,
+            }))
+            .unwrap();
+            track.track_pos = position;
+            Arc::new(track)
+        })
+        .collect();
+        for (criteria, first_position) in [
+            (SortCriteria::Title, 1),
+            (SortCriteria::Artist, 0),
+            (SortCriteria::Album, 1),
+            (SortCriteria::Duration, 0),
+            (SortCriteria::DateAdded, 1),
+        ] {
+            state.config.sort_criteria = criteria;
+            for order in [SortOrder::Ascending, SortOrder::Descending] {
+                state.config.sort_order = order;
+                let sorted = sort_playlist(&state, Ok(tracks.clone())).unwrap();
+                let expected = if order == SortOrder::Ascending {
+                    first_position
+                } else {
+                    1 - first_position
+                };
+                assert_eq!(sorted[0].track_pos, expected, "{criteria:?} {order:?}");
+                assert_eq!(
+                    sort_playlist(&state, Ok(sorted)).unwrap()[0].track_pos,
+                    expected
+                );
+            }
+        }
+    }
+
+    #[test]
     fn playlist_button_plays_all_loaded_pages_and_rejects_stale_or_empty_data() {
         let mut state = AppState::default_with_config(crate::data::Config::default());
         let link = PlaylistLink {
@@ -568,6 +702,7 @@ mod playback_button_tests {
         state.playlist_detail.tracks.resolve(
             link.clone(),
             PlaylistTracks {
+                query: String::new(),
                 id: link.id.clone(),
                 name: link.name.clone(),
                 tracks: (0..750).map(|_| track.clone()).collect(),
@@ -690,20 +825,36 @@ fn async_tracks_widget() -> impl Widget<AppState> {
         .lens(
             Ctx::make(
                 AppState::common_ctx,
-                AppState::playlist_detail.then(PlaylistDetail::tracks),
+                druid::lens::Map::new(
+                    |data: &AppState| {
+                        let mut tracks = data.playlist_detail.tracks.clone();
+                        if let Some(tracks) = tracks.resolved_mut() {
+                            tracks.query = data.playlist_detail.query.clone();
+                        }
+                        tracks
+                    },
+                    |_, _| {},
+                ),
             )
             .then(Ctx::in_promise()),
         )
         .on_command_async(
             LOAD_DETAIL,
-            |arg: (PlaylistLink, AppState)| {
-                let d = arg.0;
-                let data = arg.1;
-                sort_playlist(&data, WebApi::global().get_playlist_tracks(&d.id))
+            |arg: (PlaylistLink, AppState)| WebApi::global().get_playlist_tracks(&arg.0.id),
+            |_, data, d| {
+                if data
+                    .playlist_detail
+                    .tracks
+                    .deferred()
+                    .is_none_or(|link| link.id != d.0.id)
+                {
+                    data.playlist_detail.query.clear();
+                }
+                data.playlist_detail.tracks.defer(d.0);
             },
-            |_, data, d| data.playlist_detail.tracks.defer(d.0),
             |_, data, (d, r)| {
-                let tracks = r.map(|tracks| PlaylistTracks {
+                let tracks = sort_playlist(data, r).map(|tracks| PlaylistTracks {
+                    query: String::new(),
                     id: d.0.id.clone(),
                     name: d.0.name.clone(),
                     tracks,
@@ -741,12 +892,19 @@ fn sort_playlist(
         .into_iter()
         .sorted_by(|a, b| {
             let method = match sort_criteria {
-                SortCriteria::Title => a.name.cmp(&b.name),
-                SortCriteria::Artist => a.artist_name().cmp(&b.artist_name()),
-                SortCriteria::Album => a.album_name().cmp(&b.album_name()),
+                SortCriteria::Title => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
+                SortCriteria::Artist => a
+                    .artist_name()
+                    .to_lowercase()
+                    .cmp(&b.artist_name().to_lowercase()),
+                SortCriteria::Album => a
+                    .album_name()
+                    .to_lowercase()
+                    .cmp(&b.album_name().to_lowercase()),
                 SortCriteria::Duration => a.duration.cmp(&b.duration),
-                SortCriteria::DateAdded => Ordering::Equal,
-            };
+                SortCriteria::DateAdded => a.playlist_added_at.cmp(&b.playlist_added_at),
+            }
+            .then_with(|| a.track_pos.cmp(&b.track_pos));
 
             if sort_order == SortOrder::Descending {
                 method.reverse()
@@ -756,11 +914,7 @@ fn sort_playlist(
         })
         .collect();
 
-    if sort_criteria == SortCriteria::DateAdded && sort_order == SortOrder::Descending {
-        Ok(sorted_playlist.into_iter().rev().collect())
-    } else {
-        Ok(sorted_playlist)
-    }
+    Ok(sorted_playlist)
 }
 
 fn playlist_menu_ctx(playlist: &WithCtx<Playlist>) -> Menu<AppState> {

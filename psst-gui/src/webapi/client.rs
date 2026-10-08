@@ -2449,7 +2449,7 @@ impl WebApi {
             None,
         ));
         if let (Some(key), Some(snapshot)) = (&snapshot_key, &playlist.snapshot_id) {
-            if let Some(file) = self.cache.get("playlist-snapshots", key) {
+            if let Some(file) = self.cache.get("playlist-snapshots-v2", key) {
                 if let Ok((saved, items)) =
                     serde_json::from_reader::<_, (String, Vec<(usize, Arc<Track>)>)>(file)
                 {
@@ -2473,6 +2473,8 @@ impl WebApi {
         }
         #[derive(Clone, Deserialize)]
         struct PlaylistItem {
+            #[serde(default)]
+            added_at: Option<Arc<str>>,
             #[serde(default)]
             item: Option<OptionalTrack>,
             #[serde(default)]
@@ -2510,6 +2512,7 @@ impl WebApi {
                     None => return None,
                 };
                 Arc::make_mut(&mut track).track_pos = index;
+                Arc::make_mut(&mut track).playlist_added_at = item.added_at;
                 Some(track)
             })
             .collect();
@@ -2520,7 +2523,7 @@ impl WebApi {
                     .map(|track| (track.track_pos, track))
                     .collect();
                 self.cache.set(
-                    "playlist-snapshots",
+                    "playlist-snapshots-v2",
                     &key,
                     &serde_json::to_vec(&(snapshot, items))?,
                 );
@@ -3054,17 +3057,19 @@ mod efficiency_tests {
             .set("responses", &key, &serde_json::to_vec(&metadata).unwrap());
         let track: Track = serde_json::from_value(json!({
             "id":"7omij53d6AvXefx13NNyfn", "name":"Fixture song", "artists":[], "duration_ms":180000,
-            "disc_number":1,"track_number":1,"explicit":false,"is_local":false
+            "disc_number":1,"track_number":1,"explicit":false,"is_local":false,
+            "playlist_added_at":"2026-01-02T00:00:00Z"
         })).unwrap();
         let items = vec![(0usize, &track), (3usize, &track)];
         api.cache.set(
-            "playlist-snapshots",
+            "playlist-snapshots-v2",
             &key,
             &serde_json::to_vec(&("revision-a", items)).unwrap(),
         );
         let tracks = api.get_playlist_tracks(id).unwrap();
         assert_eq!(tracks.len(), 2);
         assert_eq!(tracks[1].track_pos, 3);
+        assert_eq!(tracks[1].playlist_added_at.as_deref(), Some("2026-01-02T00:00:00Z"));
         assert_eq!(tracks[0].id, tracks[1].id);
         let page = RequestBuilder::new(format!("v1/playlists/{id}/items"), Method::Get, None)
             .query("marker", "from_token")
