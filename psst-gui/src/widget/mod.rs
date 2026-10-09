@@ -9,6 +9,7 @@ mod overlay;
 mod promise;
 pub mod remote_image;
 mod theme;
+mod tooltip;
 mod utils;
 
 use std::{sync::Arc, time::Duration};
@@ -28,6 +29,7 @@ pub use overlay::Overlay;
 pub use promise::Async;
 pub use remote_image::RemoteImage;
 pub use theme::ThemeScope;
+pub use tooltip::Tooltip;
 pub use utils::{Border, Clip, FadeOut, Logger};
 
 use crate::{
@@ -36,6 +38,10 @@ use crate::{
 };
 
 pub trait MyWidgetExt<T: Data>: Widget<T> + Sized + 'static {
+    fn tooltip(self, text: impl Into<String>) -> Tooltip<Self> {
+        Tooltip::new(self, text)
+    }
+
     #[allow(dead_code)]
     fn log(self, label: &'static str) -> Logger<Self> {
         Logger::new(self).with_label(label)

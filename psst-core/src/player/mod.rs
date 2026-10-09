@@ -1,3 +1,4 @@
+mod download;
 pub mod file;
 pub mod item;
 pub mod queue;
@@ -54,6 +55,7 @@ pub struct Player {
     audio_output_sink: DefaultAudioSink,
     playback_mgr: PlaybackManager,
     consecutive_loading_failures: usize,
+    start_position: Duration,
 }
 
 impl Player {
@@ -78,6 +80,7 @@ impl Player {
             preload: PreloadState::None,
             queue: Queue::new(),
             consecutive_loading_failures: 0,
+            start_position: Duration::ZERO,
         }
     }
 
@@ -101,25 +104,92 @@ impl Player {
             | PlayerEvent::Pausing { .. }
             | PlayerEvent::Resuming { .. }
             | PlayerEvent::Stopped
-            | PlayerEvent::Blocked { .. } => {}
+            | PlayerEvent::Blocked { .. }
+            | PlayerEvent::QueueChanged { .. } => {}
         };
     }
 
     fn handle_command(&mut self, cmd: PlayerCommand) {
         match cmd {
             PlayerCommand::LoadQueue { items, position } => self.load_queue(items, position),
-            PlayerCommand::LoadAndPlay { item } => self.load_and_play(item),
+            PlayerCommand::ChangeAudioOutput { sink, resume } => {
+                self.audio_output_sink.stop();
+                self.audio_output_sink.close();
+                let position = match self.state {
+                    PlayerState::Playing { position, .. }
+                    | PlayerState::Paused { position, .. }
+                    | PlayerState::Ready { position, .. } => position,
+                    _ => self.start_position,
+                };
+                self.audio_output_sink = sink;
+                self.playback_mgr =
+                    PlaybackManager::new(self.audio_output_sink.clone(), self.sender.clone());
+                self.state = self
+                    .queue
+                    .get_current()
+                    .map(|item| PlayerState::Ready {
+                        item: *item,
+                        position,
+                    })
+                    .unwrap_or(PlayerState::Stopped);
+                if resume {
+                    self.resume();
+                }
+            }
+            PlayerCommand::RestoreQueue {
+                items,
+                position,
+                progress,
+                snapshot,
+            } => {
+                self.audio_output_sink.stop();
+                self.preload = PreloadState::None;
+                self.start_position = Duration::ZERO;
+                self.queue.fill(items, position);
+                if let Some(snapshot) = snapshot {
+                    self.queue.restore(snapshot);
+                }
+                if let Some(&item) = self.queue.get_current() {
+                    self.state = PlayerState::Ready {
+                        item,
+                        position: progress,
+                    };
+                } else {
+                    self.state = PlayerState::Stopped;
+                }
+                self.publish_queue();
+            }
+            PlayerCommand::LoadAndPlay { item } => {
+                self.start_position = Duration::ZERO;
+                self.load_and_play(item);
+            }
             PlayerCommand::Preload { item } => self.preload(item),
             PlayerCommand::Pause => self.pause(),
             PlayerCommand::Resume => self.resume(),
             PlayerCommand::PauseOrResume => self.pause_or_resume(),
             PlayerCommand::Previous => self.previous(),
             PlayerCommand::Next => self.next(),
+            PlayerCommand::SelectUpcoming { index, expected } => {
+                if self.queue.select_upcoming(index, expected) {
+                    self.start_position = Duration::ZERO;
+                    if let Some(&item) = self.queue.get_current() {
+                        self.load_and_play(item);
+                    }
+                } else {
+                    self.publish_queue();
+                }
+            }
             PlayerCommand::Stop => self.stop(),
             PlayerCommand::Seek { position } => self.seek(position),
             PlayerCommand::Configure { config } => self.configure(config),
-            PlayerCommand::SetQueueBehavior { behavior } => self.queue.set_behaviour(behavior),
-            PlayerCommand::AddToQueue { item } => self.queue.add(item),
+            PlayerCommand::SetQueueBehavior { behavior } => {
+                self.queue.set_behaviour(behavior);
+                self.publish_queue();
+            }
+            PlayerCommand::AddToQueue { item } => {
+                self.queue.add(item);
+                self.publish_queue();
+            }
             PlayerCommand::SetVolume { volume } => self.set_volume(volume),
         }
     }
@@ -179,7 +249,9 @@ impl Player {
 
     fn handle_position(&mut self, new_position: Duration, path: MediaPath) {
         match &mut self.state {
-            PlayerState::Playing { position, .. } | PlayerState::Paused { position, .. } => {
+            PlayerState::Playing { position, .. }
+            | PlayerState::Paused { position, .. }
+            | PlayerState::Ready { position, .. } => {
                 *position = new_position;
             }
             _ => {
@@ -205,6 +277,7 @@ impl Player {
     }
 
     fn load_queue(&mut self, items: Vec<PlaybackItem>, position: usize) {
+        self.start_position = Duration::ZERO;
         self.queue.fill(items, position);
         if let Some(&item) = self.queue.get_current() {
             self.load_and_play(item);
@@ -213,7 +286,15 @@ impl Player {
         }
     }
 
+    fn publish_queue(&self) {
+        let _ = self.sender.send(PlayerEvent::QueueChanged {
+            upcoming: self.queue.upcoming_ids(),
+            snapshot: self.queue.snapshot(),
+        });
+    }
+
     fn load_and_play(&mut self, item: PlaybackItem) {
+        self.publish_queue();
         // Make sure to stop the sink, so any current audio source is cleared and the
         // playback stopped.
         self.audio_output_sink.stop();
@@ -291,8 +372,8 @@ impl Player {
     fn play_loaded(&mut self, loaded_item: LoadedPlaybackItem) {
         log::info!("starting playback");
         let path = loaded_item.file.path();
-        let position = Duration::default();
-        self.playback_mgr.play(loaded_item);
+        let position = mem::take(&mut self.start_position);
+        self.playback_mgr.play_from(loaded_item, position);
         self.state = PlayerState::Playing { path, position };
         self.sender
             .send(PlayerEvent::Playing { path, position })
@@ -309,14 +390,16 @@ impl Player {
                     .unwrap();
                 self.state = PlayerState::Paused { path, position };
             }
-            _ => {
-                log::warn!("invalid state transition");
-            }
+            other => self.state = other,
         }
     }
 
     fn resume(&mut self) {
         match mem::replace(&mut self.state, PlayerState::Invalid) {
+            PlayerState::Ready { item, position } => {
+                self.start_position = position;
+                self.load_and_play(item);
+            }
             PlayerState::Playing { path, position } | PlayerState::Paused { path, position } => {
                 log::info!("resuming playback");
                 self.audio_output_sink.resume();
@@ -325,16 +408,14 @@ impl Player {
                     .unwrap();
                 self.state = PlayerState::Playing { path, position };
             }
-            _ => {
-                log::warn!("invalid state transition");
-            }
+            other => self.state = other,
         }
     }
 
     fn pause_or_resume(&mut self) {
         match &self.state {
             PlayerState::Playing { .. } => self.pause(),
-            PlayerState::Paused { .. } => self.resume(),
+            PlayerState::Paused { .. } | PlayerState::Ready { .. } => self.resume(),
             _ => {
                 // Do nothing.
             }
@@ -342,6 +423,7 @@ impl Player {
     }
 
     fn previous(&mut self) {
+        self.start_position = Duration::ZERO;
         if self.is_near_playback_start() {
             self.queue.skip_to_previous();
             if let Some(&item) = self.queue.get_current() {
@@ -355,6 +437,7 @@ impl Player {
     }
 
     fn next(&mut self) {
+        self.start_position = Duration::ZERO;
         self.queue.skip_to_next();
         if let Some(&item) = self.queue.get_current() {
             self.load_and_play(item);
@@ -364,26 +447,38 @@ impl Player {
     }
 
     fn stop(&mut self) {
+        self.start_position = Duration::ZERO;
         self.sender.send(PlayerEvent::Stopped).unwrap();
         self.audio_output_sink.stop();
         self.state = PlayerState::Stopped;
         self.queue.clear();
+        self.publish_queue();
         self.consecutive_loading_failures = 0;
     }
 
     fn seek(&mut self, position: Duration) {
+        if let PlayerState::Ready {
+            position: pending, ..
+        } = &mut self.state
+        {
+            *pending = position;
+            return;
+        }
         self.playback_mgr.seek(position);
     }
 
     fn configure(&mut self, config: PlaybackConfig) {
+        if self.config.bitrate != config.bitrate {
+            self.preload = PreloadState::None;
+        }
         self.config = config;
     }
 
     fn is_near_playback_start(&self) -> bool {
         match self.state {
-            PlayerState::Playing { position, .. } | PlayerState::Paused { position, .. } => {
-                position < PREVIOUS_TRACK_THRESHOLD
-            }
+            PlayerState::Playing { position, .. }
+            | PlayerState::Paused { position, .. }
+            | PlayerState::Ready { position, .. } => position < PREVIOUS_TRACK_THRESHOLD,
             _ => false,
         }
     }
@@ -398,6 +493,17 @@ impl Player {
 }
 
 pub enum PlayerCommand {
+    ChangeAudioOutput {
+        sink: DefaultAudioSink,
+        resume: bool,
+    },
+    /// Restore metadata and queue without fetching or starting any audio.
+    RestoreQueue {
+        items: Vec<PlaybackItem>,
+        position: usize,
+        progress: Duration,
+        snapshot: Option<queue::QueueSnapshot>,
+    },
     LoadQueue {
         items: Vec<PlaybackItem>,
         position: usize,
@@ -413,6 +519,10 @@ pub enum PlayerCommand {
     PauseOrResume,
     Previous,
     Next,
+    SelectUpcoming {
+        index: usize,
+        expected: crate::item_id::ItemId,
+    },
     Stop,
     Seek {
         position: Duration,
@@ -433,6 +543,10 @@ pub enum PlayerCommand {
 }
 
 pub enum PlayerEvent {
+    QueueChanged {
+        upcoming: Vec<crate::item_id::ItemId>,
+        snapshot: queue::QueueSnapshot,
+    },
     Command(PlayerCommand),
     /// Track has started loading.  `Loaded` follows.
     Loading {
@@ -483,6 +597,10 @@ pub enum PlayerEvent {
 }
 
 enum PlayerState {
+    Ready {
+        item: PlaybackItem,
+        position: Duration,
+    },
     Loading {
         item: PlaybackItem,
         _loading_handle: JoinHandle<()>,

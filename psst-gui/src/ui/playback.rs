@@ -104,8 +104,10 @@ fn playing_item_widget() -> impl Widget<NowPlaying> {
                     .with_child(detail)
                     .with_spacer(2.0)
                     .with_child(origin)
-                    .on_click(|ctx, now_playing, _| {
+                    .tooltip("Abrir el origen de esta canción")
+                    .on_left_click(|ctx, _, now_playing: &mut NowPlaying, _| {
                         ctx.submit_command(cmd::NAVIGATE.with(now_playing.origin.to_nav()));
+                        ctx.set_handled();
                     })
                     .context_menu(|now_playing| match &now_playing.item {
                         Playable::Track(track) => {
@@ -133,11 +135,17 @@ fn playing_item_widget() -> impl Widget<NowPlaying> {
                                 .contains_track(now_playing.item.track().unwrap())
                         },
                         |selector: &bool, _, _| {
-                            match selector {
+                            let icon: Box<dyn Widget<NowPlaying>> = match selector {
                                 true => &icons::CIRCLE_CHECK,
                                 false => &icons::CIRCLE_PLUS,
                             }
                             .scale(theme::ICON_SIZE_SMALL)
+                            .boxed();
+                            icon.tooltip(if *selector {
+                                "Quitar de canciones guardadas"
+                            } else {
+                                "Guardar canción"
+                            })
                             .boxed()
                         },
                     )
@@ -165,6 +173,7 @@ fn cover_widget(size: f64) -> impl Widget<NowPlaying> {
     })
     .fix_size(size, size)
     .clip(Size::new(size, size).to_rounded_rect(4.0))
+    .tooltip("Ampliar portada")
     .on_left_click(|ctx, _, _, _| {
         ctx.submit_command(SHOW_ARTWORK);
     })
@@ -185,27 +194,57 @@ fn playback_origin_icon(origin: &PlaybackOrigin) -> &'static SvgIcon {
 fn player_widget() -> impl Widget<Playback> {
     Flex::row()
         .with_child(
-            small_button_widget(&icons::SKIP_BACK).on_left_click(|ctx, _, _, _| {
-                ctx.submit_command(cmd::PLAY_PREVIOUS);
-            }),
+            small_button_widget(&icons::SKIP_BACK)
+                .tooltip("Canción anterior / volver al inicio")
+                .on_left_click(|ctx, _, _, _| {
+                    ctx.submit_command(cmd::PLAY_PREVIOUS);
+                }),
         )
         .with_default_spacer()
         .with_child(player_play_pause_widget())
         .with_default_spacer()
         .with_child(
-            small_button_widget(&icons::SKIP_FORWARD).on_left_click(|ctx, _, _, _| {
-                ctx.submit_command(cmd::PLAY_NEXT);
-            }),
+            small_button_widget(&icons::SKIP_FORWARD)
+                .tooltip("Siguiente canción")
+                .on_left_click(|ctx, _, _, _| {
+                    ctx.submit_command(cmd::PLAY_NEXT);
+                }),
         )
         .with_default_spacer()
         .with_child(queue_behavior_widget())
         .with_default_spacer()
         .with_child(Maybe::or_empty(durations_widget).lens(Playback::now_playing))
         .with_child(
+            small_button_widget(&icons::QUEUE)
+                .tooltip("Ver cola de canciones")
+                .on_left_click(|ctx, _, _, _| {
+                    ctx.submit_command(cmd::NAVIGATE.with(crate::data::Nav::Queue));
+                }),
+        )
+        .with_child(
             small_button_widget(&icons::MUSIC_NOTE)
+                .tooltip("Mostrar u ocultar letras")
                 .align_right()
                 .on_left_click(|ctx, _, _, _| {
                     ctx.submit_command(TOGGLE_LYRICS);
+                }),
+        )
+        .with_child(
+            small_button_widget(&icons::VIDEO)
+                .tooltip("Buscar videoclip en YouTube (abre el navegador)")
+                .on_left_click(|ctx, _, playback: &mut Playback, _| {
+                    if let Some(track) =
+                        playback.now_playing.as_ref().and_then(|np| np.item.track())
+                    {
+                        ctx.submit_command(cmd::OPEN_MUSIC_VIDEO.with(track.clone()));
+                    }
+                })
+                .disabled_if(|playback: &Playback, _| {
+                    playback
+                        .now_playing
+                        .as_ref()
+                        .and_then(|np| np.item.track())
+                        .is_none()
                 }),
         )
         .padding(theme::grid(2.0))
@@ -222,6 +261,7 @@ fn player_play_pause_widget() -> impl Widget<Playback> {
                 .link()
                 .circle()
                 .border(theme::GREY_600, 1.0)
+                .tooltip("Cancelar carga")
                 .on_left_click(|ctx, _, _, _| ctx.submit_command(cmd::PLAY_STOP))
                 .boxed(),
             PlaybackState::Playing => icons::PAUSE
@@ -230,6 +270,7 @@ fn player_play_pause_widget() -> impl Widget<Playback> {
                 .link()
                 .circle()
                 .border(theme::GREY_500, 1.0)
+                .tooltip("Pausar")
                 .on_left_click(|ctx, _, _, _| ctx.submit_command(cmd::PLAY_PAUSE))
                 .boxed(),
             PlaybackState::Paused => icons::PLAY
@@ -238,6 +279,7 @@ fn player_play_pause_widget() -> impl Widget<Playback> {
                 .link()
                 .circle()
                 .border(theme::GREY_500, 1.0)
+                .tooltip("Reanudar")
                 .on_left_click(|ctx, _, _, _| ctx.submit_command(cmd::PLAY_RESUME))
                 .boxed(),
             PlaybackState::Stopped => Empty.boxed(),
@@ -250,6 +292,12 @@ fn queue_behavior_widget() -> impl Widget<Playback> {
         |playback: &Playback, _| playback.queue_behavior,
         |behavior, _, _| {
             faded_button_widget(queue_behavior_icon(behavior))
+                .tooltip(match behavior {
+                    QueueBehavior::Sequential => "Orden normal. Activar reproducción aleatoria",
+                    QueueBehavior::Random => "Modo aleatorio. Repetir esta canción",
+                    QueueBehavior::LoopTrack => "Repetir canción. Repetir toda la cola",
+                    QueueBehavior::LoopAll => "Repetir cola. Volver al orden normal",
+                })
                 .on_left_click(|ctx, _, playback: &mut Playback, _| {
                     ctx.submit_command(
                         cmd::PLAY_QUEUE_BEHAVIOR
@@ -417,9 +465,7 @@ impl Widget<NowPlaying> for SeekBar {
                     ctx.set_active(true);
                 }
             }
-            Event::MouseUp(mouse)
-                if ctx.is_active() && mouse.button == MouseButton::Left =>
-            {
+            Event::MouseUp(mouse) if ctx.is_active() && mouse.button == MouseButton::Left => {
                 if ctx.is_hot() {
                     let fraction = mouse.pos.x / ctx.size().width;
                     ctx.submit_command(cmd::PLAY_SEEK.with(fraction));
@@ -576,15 +622,18 @@ fn paint_progress_bar(ctx: &mut PaintCtx, data: &NowPlaying, env: &Env) {
     let elapsed_frac = elapsed_time / total_time;
     let elapsed_width = bounds.width * elapsed_frac;
     let remaining_width = bounds.width - elapsed_width;
-    let elapsed = Size::new(elapsed_width, bounds.height).round();
-    let remaining = Size::new(remaining_width, bounds.height).round();
+    // Preserve the 8px seek hit area while painting a slim 2px line.
+    let bar_height = 2.0;
+    let bar_y = ((bounds.height - bar_height) * 0.5).round();
+    let elapsed = Size::new(elapsed_width, bar_height).round();
+    let remaining = Size::new(remaining_width, bar_height).round();
 
     ctx.fill(
-        Rect::from_origin_size(Point::ORIGIN, elapsed),
+        Rect::from_origin_size(Point::new(0.0, bar_y), elapsed),
         &elapsed_color,
     );
     ctx.fill(
-        Rect::from_origin_size(Point::new(elapsed.width, 0.0), remaining),
+        Rect::from_origin_size(Point::new(elapsed.width, bar_y), remaining),
         &remaining_color,
     );
 }

@@ -51,26 +51,47 @@ where
 }
 
 pub fn account_setup_widget() -> impl Widget<AppState> {
-    Flex::column()
-        .must_fill_main_axis(true)
+    let header = Flex::column()
         .cross_axis_alignment(CrossAxisAlignment::Start)
-        .with_spacer(theme::grid(2.0))
+        .with_child(Label::new("Xpotify").with_font(theme::UI_FONT_MEDIUM).with_text_size(30.0))
+        .with_spacer(6.0)
+        .with_child(Label::new("TU MÚSICA · SPOTIFY + IA").with_text_size(11.0).with_text_color(theme::BLUE_200))
+        .with_spacer(28.0)
+        .with_child(Label::new("Dale un nuevo orden\na tu música.").with_text_size(28.0).with_line_break_mode(LineBreaking::WordWrap))
+        .with_spacer(12.0)
+        .with_child(Label::new("Escucha tus canciones y transforma una playlist en colecciones por género, energía o estado de ánimo.").with_line_break_mode(LineBreaking::WordWrap).with_text_color(theme::PLACEHOLDER_COLOR));
+    let account = Flex::column()
+        .cross_axis_alignment(CrossAxisAlignment::Start)
         .with_child(
-            Label::new("Please insert your Spotify Premium credentials.")
+            Label::new("Conecta tu cuenta")
                 .with_font(theme::UI_FONT_MEDIUM)
-                .with_line_break_mode(LineBreaking::WordWrap),
+                .with_text_size(18.0),
         )
-        .with_spacer(theme::grid(2.0))
+        .with_spacer(8.0)
         .with_child(
-            Label::new(
-                "Psst connects only to the official servers, and does not store your password.",
-            )
-            .with_text_color(theme::PLACEHOLDER_COLOR)
-            .with_line_break_mode(LineBreaking::WordWrap),
+            Label::new("Autoriza tu biblioteca y después la reproducción en Spotify. Se abrirán dos pasos en tu navegador.")
+                .with_line_break_mode(LineBreaking::WordWrap)
+                .with_text_color(theme::PLACEHOLDER_COLOR),
         )
-        .with_spacer(theme::grid(6.0))
-        .with_child(account_tab_widget(AccountTab::FirstSetup).expand_width())
-        .padding(theme::grid(4.0))
+        .with_spacer(20.0)
+        .with_child(account_tab_widget(AccountTab::FirstSetup).expand_width());
+    let content = Flex::column()
+        .cross_axis_alignment(CrossAxisAlignment::Start)
+        .with_child(header)
+        .with_spacer(24.0)
+        .with_child(super::design::card(account).expand_width())
+        .with_spacer(16.0)
+        .with_child(Label::new("Spotify Premium para reproducir. Al usar IA, solo los metadatos musicales se envían a Google Gemini.").with_text_size(12.0).with_text_color(theme::PLACEHOLDER_COLOR).with_line_break_mode(LineBreaking::WordWrap))
+        .padding(28.0)
+        .scroll()
+        .vertical()
+        .expand();
+    Flex::column().with_flex_child(content, 1.0).with_child(
+        spotify_actions()
+            .padding((28.0, 12.0, 28.0, 16.0))
+            .background(theme::GREY_700)
+            .expand_width(),
+    )
 }
 
 pub fn preferences_widget() -> impl Widget<AppState> {
@@ -93,6 +114,7 @@ pub fn preferences_widget() -> impl Widget<AppState> {
                         account_tab_widget(AccountTab::InPreferences).boxed()
                     }
                     PreferencesTab::Cache => cache_tab_widget().boxed(),
+                    PreferencesTab::Logs => logs_tab_widget().boxed(),
                     PreferencesTab::About => about_tab_widget().boxed(),
                 },
             )
@@ -151,6 +173,12 @@ fn tabs_widget() -> impl Widget<AppState> {
         ))
         .with_default_spacer()
         .with_child(tab_link_widget(
+            "Logs",
+            &icons::STORAGE,
+            PreferencesTab::Logs,
+        ))
+        .with_default_spacer()
+        .with_child(tab_link_widget(
             "About",
             &icons::HEART,
             PreferencesTab::About,
@@ -172,6 +200,9 @@ fn tab_link_widget(
         .active(move |state: &AppState, _| tab == state.preferences.active)
         .on_left_click(move |_, _, state: &mut AppState, _| {
             state.preferences.active = tab;
+            if tab == PreferencesTab::Logs {
+                state.preferences.logs = crate::diagnostics::preview();
+            }
         })
         .env_scope(|env, _| {
             env.set(theme::LINK_ACTIVE_COLOR, env.get(theme::BACKGROUND_DARK));
@@ -183,13 +214,43 @@ fn general_tab_widget() -> impl Widget<AppState> {
         .cross_axis_alignment(CrossAxisAlignment::Start)
         .must_fill_main_axis(true);
 
+    #[cfg(windows)]
+    {
+        col = col
+            .with_child(Label::new("Windows").with_font(theme::UI_FONT_MEDIUM))
+            .with_child(
+                Checkbox::new("Iniciar con Windows")
+                    .lens(AppState::config.then(Config::start_with_windows)),
+            )
+            .with_child(
+                Checkbox::new("Al iniciar Windows, abrir en la bandeja")
+                    .lens(AppState::config.then(Config::start_in_tray)),
+            )
+            .with_child(
+                Checkbox::new("Activar atajo global Ctrl + Alt + P")
+                    .lens(AppState::config.then(Config::resume_hotkey)),
+            )
+            .with_child(
+                RadioGroup::column(vec![
+                    ("Atajo: reanudar la última canción", false),
+                    ("Atajo: reproducir la siguiente de la cola", true),
+                ])
+                .lens(AppState::config.then(Config::resume_hotkey_next)),
+            )
+            .with_spacer(theme::grid(3.0));
+    }
+
     // Theme
     col = col
         .with_child(Label::new("Theme").with_font(theme::UI_FONT_MEDIUM))
         .with_spacer(theme::grid(2.0))
         .with_child(
-            RadioGroup::column(vec![("Light", Theme::Light), ("Dark", Theme::Dark)])
-                .lens(AppState::config.then(Config::theme)),
+            RadioGroup::column(vec![
+                ("Sistema (predeterminado)", Theme::System),
+                ("Claro", Theme::Light),
+                ("Oscuro", Theme::Dark),
+            ])
+            .lens(AppState::config.then(Config::theme)),
         );
 
     col = col.with_spacer(theme::grid(1.5));
@@ -202,15 +263,21 @@ fn general_tab_widget() -> impl Widget<AppState> {
 
     col = col.with_spacer(theme::grid(3.0));
 
+    col = col.with_child(
+        Label::new("La calidad se aplica a la siguiente canción.")
+            .with_line_break_mode(LineBreaking::WordWrap),
+    );
+
     // Audio quality
     col = col
         .with_child(Label::new("Audio quality").with_font(theme::UI_FONT_MEDIUM))
         .with_spacer(theme::grid(2.0))
         .with_child(
             RadioGroup::column(vec![
-                ("Low (96kbit)", AudioQuality::Low),
-                ("Normal (160kbit)", AudioQuality::Normal),
-                ("High (320kbit)", AudioQuality::High),
+                ("Low (96 kb/s, mínimo compatible)", AudioQuality::Low),
+                ("Normal (96 kb/s)", AudioQuality::Normal),
+                ("High (160 kb/s)", AudioQuality::High),
+                ("Very high (320 kb/s)", AudioQuality::VeryHigh),
             ])
             .lens(AppState::config.then(Config::audio_quality)),
         );
@@ -353,9 +420,65 @@ enum AccountTab {
     InPreferences,
 }
 
+fn spotify_actions() -> impl Widget<AppState> {
+    Flex::column()
+        .cross_axis_alignment(CrossAxisAlignment::Start)
+        .with_child(ViewSwitcher::new(
+            |data: &AppState, _| data.config.has_credentials(),
+            |is_logged_in, _, _| {
+                if *is_logged_in {
+                    Button::new("Cerrar sesión")
+                        .on_left_click(|ctx, _, _, _| {
+                            ctx.submit_command(cmd::LOG_OUT);
+                        })
+                        .boxed()
+                } else {
+                    super::design::primary(
+                        Button::new("Continuar con Spotify")
+                            .on_click(|ctx, _data: &mut AppState, _| {
+                                ctx.submit_command(Authenticate::SPOTIFY_REQUEST);
+                            })
+                            .fix_height(44.0)
+                            .expand_width()
+                            .disabled_if(|data: &AppState, _| {
+                                data.preferences.auth.result.state()
+                                    == crate::data::PromiseState::Deferred
+                                    || data.config.webapi_client_id_value().is_none()
+                            }),
+                    )
+                    .boxed()
+                }
+            },
+        ))
+        .with_spacer(theme::grid(1.0))
+        .with_child(
+            Async::new(
+                || {
+                    Label::new("Esperando autorización en el navegador…")
+                        .with_line_break_mode(LineBreaking::WordWrap)
+                        .with_text_size(theme::TEXT_SIZE_SMALL)
+                },
+                // Spotify Success Arm: Show nothing
+                || SizedBox::empty().boxed(),
+                || {
+                    // Error arm remains the same
+                    Label::dynamic(|err: &String, _| err.to_owned())
+                        .with_line_break_mode(LineBreaking::WordWrap)
+                        .with_text_size(theme::TEXT_SIZE_SMALL)
+                        .with_text_color(theme::RED)
+                },
+            )
+            .lens(
+                AppState::preferences
+                    .then(Preferences::auth)
+                    .then(Authentication::result),
+            ),
+        )
+}
+
 fn account_tab_widget(tab: AccountTab) -> impl Widget<AppState> {
     let mut col = Flex::column().cross_axis_alignment(match tab {
-        AccountTab::FirstSetup => CrossAxisAlignment::Center,
+        AccountTab::FirstSetup => CrossAxisAlignment::Start,
         AccountTab::InPreferences => CrossAxisAlignment::Start,
     });
 
@@ -374,23 +497,26 @@ fn account_tab_widget(tab: AccountTab) -> impl Widget<AppState> {
             } else {
                 Flex::column()
                     .cross_axis_alignment(CrossAxisAlignment::Start)
-                    .with_child(
-                        Label::new("Spotify Developer Client ID").with_font(theme::UI_FONT_MEDIUM),
-                    )
+                    .with_child(Label::new("Client ID de Spotify").with_font(theme::UI_FONT_MEDIUM))
                     .with_spacer(theme::grid(1.0))
                     .with_child(
                         Label::new(
-                            "Register at developer.spotify.com/dashboard and create an app. \
-                             Set the redirect URI to http://127.0.0.1:8888/login",
+                            "En el Dashboard de Spotify, registra esta dirección de retorno:",
                         )
                         .with_text_color(theme::PLACEHOLDER_COLOR)
                         .with_line_break_mode(LineBreaking::WordWrap),
                     )
                     .with_spacer(theme::grid(1.0))
                     .with_child(
+                        Label::new("http://127.0.0.1:8888/login")
+                            .with_font(theme::UI_FONT_MONO)
+                            .with_line_break_mode(LineBreaking::WordWrap),
+                    )
+                    .with_spacer(12.0)
+                    .with_child(
                         TextBox::new()
-                            .with_placeholder("Paste your Client ID here")
-                            .fix_width(theme::grid(40.0))
+                            .with_placeholder("Pega el Client ID de tu aplicación")
+                            .expand_width()
                             .lens(AppState::config.then(Config::webapi_client_id).map(
                                 |opt: &Option<String>| opt.clone().unwrap_or_default(),
                                 |opt: &mut Option<String>, val: String| {
@@ -404,45 +530,19 @@ fn account_tab_widget(tab: AccountTab) -> impl Widget<AppState> {
         },
     ));
 
-    // Spotify Login/Logout button
-    col = col
-        .with_child(ViewSwitcher::new(
-            |data: &AppState, _| data.config.has_credentials(),
-            |is_logged_in, _, _| {
-                if *is_logged_in {
-                    Button::new("Log Out")
-                        .on_left_click(|ctx, _, _, _| {
-                            ctx.submit_command(cmd::LOG_OUT);
-                        })
-                        .boxed()
-                } else {
-                    Button::new("Log in with Spotify")
-                        .on_click(|ctx, _data: &mut AppState, _| {
-                            ctx.submit_command(Authenticate::SPOTIFY_REQUEST);
-                        })
-                        .boxed()
-                }
-            },
-        ))
-        .with_spacer(theme::grid(1.0))
-        .with_child(
-            Async::new(
-                || Label::new("Logging in...").with_text_size(theme::TEXT_SIZE_SMALL),
-                // Spotify Success Arm: Show nothing
-                || SizedBox::empty().boxed(),
-                || {
-                    // Error arm remains the same
-                    Label::dynamic(|err: &String, _| err.to_owned())
-                        .with_text_size(theme::TEXT_SIZE_SMALL)
-                        .with_text_color(druid::Color::RED)
-                },
-            )
-            .lens(
-                AppState::preferences
-                    .then(Preferences::auth)
-                    .then(Authentication::result),
-            ),
-        );
+    if matches!(tab, AccountTab::InPreferences) {
+        col = col.with_child(spotify_actions());
+    }
+    col = col.with_spacer(8.0).with_child(
+        Button::new("Abrir Spotify Developer Dashboard")
+            .on_click(|ctx, _: &mut AppState, _| {
+                ctx.submit_command(
+                    cmd::GO_TO_URL.with("https://developer.spotify.com/dashboard".to_owned()),
+                );
+            })
+            .fix_height(36.0)
+            .expand_width(),
+    );
 
     if matches!(tab, AccountTab::InPreferences) {
         col = col
@@ -600,121 +700,76 @@ impl Authenticate {
         Some(thread)
     }
 
-    // Helper method to simplify Spotify authentication flow.
-    // Performs two back-to-back OAuth flows:
-    // 1. Shannon session OAuth (official Spotify Client ID) - for playback
-    // 2. Web API OAuth (user-provided Client ID) - for Web API calls
+    // One PKCE authorization with the configured application covers Web API and playback.
     fn start_spotify_auth(&mut self, ctx: &mut EventCtx, data: &mut AppState) {
-        // Validate that a Web API Client ID has been provided
-        let webapi_client_id = match data.config.webapi_client_id_value() {
+        let client_id = match data.config.webapi_client_id_value() {
             Some(id) => id.to_string(),
             None => {
                 data.preferences.auth.result.reject(
                     (),
-                    "Please enter your Spotify Developer Client ID first.".to_string(),
+                    "Introduce el Client ID de tu aplicación de Spotify.".into(),
                 );
                 return;
             }
         };
-
-        // Set authentication to in-progress state
         data.preferences.auth.result.defer_default();
-
-        // Generate auth URL and store PKCE verifier for the first (session) OAuth
-        let (auth_url, pkce_verifier) = oauth::generate_session_auth_url(8888);
+        let (auth_url, pkce_verifier) = oauth::generate_webapi_auth_url(&client_id, 8888);
         let config = data.preferences.auth.session_config();
-
-        // Clone client ID for use in the spawned thread
-        let client_id = webapi_client_id.clone();
-
-        // Spawn authentication thread
         self.spotify_thread = Authenticate::spawn_auth_thread(
             ctx,
             move || {
-                // ── Step 1: Session OAuth (official Client ID) ──────────────
-                // Listen for authorization code
-                let code = oauth::get_authcode_listener(
+                let code = oauth::get_authcode_listener_with_state_and_ready(
                     SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8888),
                     Duration::from_secs(300),
+                    &auth_url,
+                    || open::that(&auth_url).map_err(|_| psst_core::error::Error::OAuthError("No se pudo abrir el navegador. Vuelve a intentar el inicio de sesión.".into())),
+                ).map_err(|e| e.to_string())?;
+                let token =
+                    oauth::exchange_webapi_code_for_token(&client_id, 8888, code, pkce_verifier)
+                        .map_err(|e| e.to_string())?;
+                // Library/playlist OAuth and desktop playback have different client identities.
+                // Reusable credentials minted with the developer client fail in Login5.
+                let (playback_url, playback_verifier) = oauth::generate_playback_auth_url();
+                let playback_code = oauth::get_authcode_listener_with_state_and_ready(
+                    SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8898),
+                    Duration::from_secs(300),
+                    &playback_url,
+                    || {
+                        open::that(&playback_url).map_err(|_| {
+                            psst_core::error::Error::OAuthError(
+                                "No se pudo abrir Spotify para autorizar la reproducci\u{00f3}n."
+                                    .into(),
+                            )
+                        })
+                    },
                 )
                 .map_err(|e| e.to_string())?;
-
-                // Exchange code for access token
-                let token = oauth::exchange_session_code_for_token(8888, code, pkce_verifier);
-
-                // Try to authenticate with token, with retries
-                let mut credentials = None;
-                let mut retries = 3;
-                while retries > 0 {
+                let playback_token = oauth::exchange_webapi_code_for_token(
+                    psst_core::system_info::CLIENT_ID,
+                    8898,
+                    playback_code,
+                    playback_verifier,
+                )
+                .map_err(|e| e.to_string())?;
+                for attempt in 0..3 {
                     match Authentication::authenticate_and_get_credentials(SessionConfig {
-                        login_creds: Credentials::from_access_token(token.clone()),
+                        login_creds: Credentials::from_access_token(
+                            playback_token.access_token.clone(),
+                        ),
                         ..config.clone()
                     }) {
-                        Ok(creds) => {
-                            credentials = Some(creds);
-                            break;
+                        Ok(credentials) => return Ok((credentials, Some(token))),
+                        Err(error) if attempt < 2 => {
+                            log::warn!("Spotify session authentication failed, retrying: {error}")
                         }
-                        Err(e) if retries > 1 => {
-                            log::warn!("authentication failed, retrying: {e:?}");
-                            retries -= 1;
-                        }
-                        Err(e) => return Err(e),
+                        Err(error) => return Err(error),
                     }
                 }
-                let credentials =
-                    credentials.ok_or_else(|| "Authentication retries exceeded".to_string())?;
-
-                // ── Step 2: Web API OAuth (user-provided Client ID) ────────
-                // This gives us a separate token for Web API calls, avoiding
-                // 429 rate-limit errors from Spotify's official Client ID.
-                log::info!("Session auth complete. Starting Web API OAuth flow...");
-                let (webapi_auth_url, webapi_pkce_verifier) =
-                    oauth::generate_webapi_auth_url(&client_id, 8888);
-
-                // Open browser for Web API OAuth
-                if open::that(&webapi_auth_url).is_err() {
-                    log::warn!("Failed to open browser for Web API OAuth (non-fatal)");
-                    return Ok((credentials, None));
-                }
-
-                // Listen for the callback
-                let socket_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8888);
-                match oauth::get_authcode_listener(socket_addr, Duration::from_secs(300)) {
-                    Ok(code) => {
-                        match oauth::exchange_webapi_code_for_token(
-                            &client_id,
-                            8888,
-                            code,
-                            webapi_pkce_verifier,
-                        ) {
-                            Ok(webapi_token) => {
-                                log::info!("Web API OAuth flow completed successfully");
-                                Ok((credentials, Some(webapi_token)))
-                            }
-                            Err(e) => {
-                                log::warn!("Web API token exchange failed (non-fatal): {e}");
-                                Ok((credentials, None))
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        log::warn!("Web API OAuth callback failed (non-fatal): {e}");
-                        Ok((credentials, None))
-                    }
-                }
+                Err("No se pudo iniciar la sesión de reproducción de Spotify.".into())
             },
             Self::SPOTIFY_RESPONSE,
             self.spotify_thread.take(),
         );
-
-        // Open browser with authorization URL (for the first/session OAuth)
-        if open::that(&auth_url).is_err() {
-            data.error_alert("Failed to open browser");
-            data.preferences
-                .auth
-                .result
-                .reject((), "Failed to open browser".to_string());
-        }
     }
 }
 
@@ -957,8 +1012,107 @@ fn about_tab_widget() -> impl Widget<AppState> {
         .cross_axis_alignment(CrossAxisAlignment::Start)
         .must_fill_main_axis(true)
         .with_child(Label::new("Build Info").with_font(theme::UI_FONT_MEDIUM))
+        .with_child(Label::new(concat!("Xpotify ", env!("CARGO_PKG_VERSION"))))
         .with_spacer(theme::grid(2.0))
         .with_child(commit_hash)
         .with_child(build_time)
         .with_child(remote_url)
+}
+
+struct LogsRefresh(druid::TimerToken);
+impl<W: Widget<AppState>> Controller<AppState, W> for LogsRefresh {
+    fn lifecycle(
+        &mut self,
+        child: &mut W,
+        ctx: &mut LifeCycleCtx,
+        event: &LifeCycle,
+        data: &AppState,
+        env: &Env,
+    ) {
+        if matches!(event, LifeCycle::WidgetAdded) {
+            self.0 = ctx.request_timer(Duration::from_secs(2));
+        }
+        child.lifecycle(ctx, event, data, env);
+    }
+    fn event(
+        &mut self,
+        child: &mut W,
+        ctx: &mut EventCtx,
+        event: &Event,
+        data: &mut AppState,
+        env: &Env,
+    ) {
+        if matches!(event, Event::Timer(token) if *token == self.0) {
+            data.preferences.logs = crate::diagnostics::preview();
+            self.0 = ctx.request_timer(Duration::from_secs(2));
+        }
+        child.event(ctx, event, data, env);
+    }
+}
+
+fn logs_tab_widget() -> impl Widget<AppState> {
+    const EXPORT: Selector<druid::FileInfo> = Selector::new("app.logs.export");
+    Flex::column()
+        .cross_axis_alignment(CrossAxisAlignment::Start)
+        .with_child(
+            Label::new("Errores, advertencias y eventos importantes")
+                .with_line_break_mode(LineBreaking::WordWrap),
+        )
+        .with_child(
+            Label::new("Historial persistente: hasta 6 MB. Vista de los últimos 64 KB.")
+                .with_line_break_mode(LineBreaking::WordWrap),
+        )
+        .with_spacer(12.0)
+        .with_child(
+            Flex::row()
+                .with_child(
+                    Button::new("Actualizar").on_click(|_, data: &mut AppState, _| {
+                        data.preferences.logs = crate::diagnostics::preview();
+                    }),
+                )
+                .with_spacer(12.0)
+                .with_child(
+                    Button::new("Limpiar logs").on_click(|_, data: &mut AppState, _| {
+                        data.preferences.log_status = match crate::diagnostics::clear() {
+                            Ok(()) => {
+                                "Logs limpiados. Los nuevos eventos seguirán apareciendo aquí."
+                                    .into()
+                            }
+                            Err(error) => format!("No se pudieron limpiar los logs: {error}"),
+                        };
+                        data.preferences.logs = crate::diagnostics::preview();
+                    }),
+                )
+                .with_spacer(12.0)
+                .with_child(Button::new("Exportar logs...").on_click(|ctx, _, _| {
+                    ctx.submit_command(
+                        druid::commands::SHOW_SAVE_PANEL.with(
+                            druid::FileDialogOptions::new()
+                                .default_name("xpotify-debug.log")
+                                .accept_command(EXPORT),
+                        ),
+                    );
+                })),
+        )
+        .with_child(
+            Label::dynamic(|data: &AppState, _| data.preferences.log_status.clone())
+                .with_line_break_mode(LineBreaking::WordWrap),
+        )
+        .with_spacer(12.0)
+        .with_child(
+            Label::dynamic(|data: &AppState, _| data.preferences.logs.clone())
+                .with_text_size(11.0)
+                .with_line_break_mode(LineBreaking::WordWrap)
+                .expand_width(),
+        )
+        .controller(LogsRefresh(druid::TimerToken::INVALID))
+        .on_command(EXPORT, |_, info, data| {
+            data.preferences.log_status = match crate::diagnostics::export(info.path()) {
+                Ok(()) => format!("Logs exportados: {}", info.path().display()),
+                Err(error) => {
+                    log::error!("Log export failed: {error}");
+                    format!("No se pudieron exportar: {error}")
+                }
+            };
+        })
 }

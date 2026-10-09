@@ -1,6 +1,12 @@
 [workspace]
 resolver = "2"
-members = ["psst-core", "psst-cli", "psst-gui"]
+members = ["psst-core", "psst-cli", "psst-gui", "vendor/librespot-connect"]
+exclude = ["vendor/librespot-playback"]
+
+[patch.crates-io]
+# Upstream 0.8.0 plus local queue observation/enqueue; no extra Web API requests.
+librespot-connect = { path = "vendor/librespot-connect" }
+librespot-playback = { path = "vendor/librespot-playback" }
 
 [profile.dev]
 opt-level = 1

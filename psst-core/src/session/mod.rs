@@ -1,8 +1,8 @@
 pub mod access_token;
 pub mod audio_key;
-pub mod mercury;
-pub mod login5;
 pub mod client_token;
+pub mod login5;
+pub mod mercury;
 pub mod token;
 
 use std::{
@@ -101,6 +101,11 @@ impl SessionService {
                     .ok_or(Error::SessionDisconnected)?
                     .clone(),
             )?;
+            self.config
+                .lock()
+                .as_mut()
+                .ok_or(Error::SessionDisconnected)?
+                .login_creds = connection.credentials;
             let worker = SessionWorker::run(connection.transport);
             connected.replace(worker);
         }
@@ -235,7 +240,15 @@ impl SessionHandle {
             .send(DispatchCmd::MercuryReq { callback, request })
             .ok()
             .ok_or(Error::SessionDisconnected)?;
-        let response = receiver.recv().ok().ok_or(Error::SessionDisconnected)?;
+        let response = receiver
+            .recv_timeout(std::time::Duration::from_secs(20))
+            .map_err(|_| Error::ConnectionFailed)?;
+        if !(200..300).contains(&response.status_code) {
+            return Err(Error::ConfigError(format!(
+                "Spotify metadata returned status {}",
+                response.status_code
+            )));
+        }
         let first_part = response
             .payload
             .into_iter()
@@ -254,7 +267,9 @@ impl SessionHandle {
             })
             .ok()
             .ok_or(Error::SessionDisconnected)?;
-        receiver.recv().ok().ok_or(Error::SessionDisconnected)?
+        receiver
+            .recv_timeout(std::time::Duration::from_secs(20))
+            .map_err(|_| Error::ConnectionFailed)?
     }
 
     pub fn get_country_code(&self) -> Option<String> {
@@ -262,7 +277,9 @@ impl SessionHandle {
         self.sender
             .send(DispatchCmd::CountryCodeReq { callback })
             .ok()?;
-        receiver.recv().ok()?
+        receiver
+            .recv_timeout(std::time::Duration::from_secs(5))
+            .ok()?
     }
 
     pub fn request_shutdown(&self) {

@@ -1,9 +1,11 @@
 mod after_delay;
 mod alert_cleanup;
+pub mod cache_hint;
 mod ex_click;
 mod ex_cursor;
 mod ex_scroll;
 mod input;
+pub mod native_connect;
 mod nav;
 mod on_command;
 mod on_command_async;
@@ -12,6 +14,8 @@ mod on_update;
 mod playback;
 mod session;
 mod sort;
+#[cfg(target_os = "windows")]
+pub mod taskbar;
 
 pub use after_delay::AfterDelay;
 pub use alert_cleanup::AlertCleanupController;

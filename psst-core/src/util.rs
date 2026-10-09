@@ -164,3 +164,32 @@ where
         self.stream.seek(pos)
     }
 }
+pub fn is_transient_network_error(error: &ureq::Error) -> bool {
+    match error {
+        ureq::Error::Timeout(_) | ureq::Error::ConnectionFailed | ureq::Error::HostNotFound => true,
+        ureq::Error::Io(error) => matches!(
+            error.kind(),
+            std::io::ErrorKind::TimedOut
+                | std::io::ErrorKind::ConnectionReset
+                | std::io::ErrorKind::ConnectionAborted
+                | std::io::ErrorKind::NotConnected
+                | std::io::ErrorKind::UnexpectedEof
+        ),
+        _ => false,
+    }
+}
+
+/// Only use for read requests: an interrupted write may already have been applied.
+pub fn retry_network_read<T>(
+    mut request: impl FnMut() -> Result<T, ureq::Error>,
+) -> Result<T, ureq::Error> {
+    for attempt in 0..3 {
+        match request() {
+            Err(error) if attempt < 2 && is_transient_network_error(&error) => {
+                std::thread::sleep(std::time::Duration::from_millis(250 << attempt));
+            }
+            result => return result,
+        }
+    }
+    unreachable!("bounded retry returns on final attempt")
+}

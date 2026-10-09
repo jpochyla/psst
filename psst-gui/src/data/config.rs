@@ -1,7 +1,7 @@
 use std::{
     env::{self, VarError},
     fs::{self, File, OpenOptions},
-    io::{BufReader, BufWriter},
+    io::{BufReader, BufWriter, Write},
     path::{Path, PathBuf},
 };
 
@@ -20,11 +20,12 @@ use psst_core::{
 use serde::{Deserialize, Serialize};
 
 use super::{Nav, Promise, QueueBehavior, SliderScrollScale};
-use crate::ui::theme;
 
 #[derive(Clone, Debug, Data, Lens)]
 pub struct Preferences {
     pub active: PreferencesTab,
+    pub logs: String,
+    pub log_status: String,
     #[data(ignore)]
     pub cache: Option<CacheHandle>,
     pub cache_size: Promise<u64, (), ()>,
@@ -50,6 +51,7 @@ pub enum PreferencesTab {
     General,
     Account,
     Cache,
+    Logs,
     About,
 }
 
@@ -112,11 +114,25 @@ pub struct Config {
     #[data(ignore)]
     credentials: Option<Credentials>,
     pub audio_quality: AudioQuality,
+    #[serde(default)]
+    pub audio_quality_version: u32,
+    pub native_connect: bool,
+    pub start_with_windows: bool,
+    pub start_in_tray: bool,
+    pub resume_hotkey: bool,
+    pub resume_hotkey_next: bool,
+    pub connect_device_id: String,
     pub theme: Theme,
     pub volume: f64,
     pub last_route: Option<Nav>,
+    pub last_playback: Option<super::resume::ResumeSnapshot>,
+    pub seen_releases: druid::im::Vector<String>,
+    pub playlist_folders: druid::im::Vector<String>,
+    pub playlist_folder_assignments: druid::im::HashMap<String, String>,
     pub queue_behavior: QueueBehavior,
     pub show_track_cover: bool,
+    pub show_now_playing: bool,
+    pub library_compact: bool,
     pub window_size: Size,
     pub slider_scroll_scale: SliderScrollScale,
     pub sort_order: SortOrder,
@@ -140,16 +156,29 @@ impl Default for Config {
         Self {
             credentials: Default::default(),
             audio_quality: Default::default(),
+            audio_quality_version: 1,
+            native_connect: true,
+            start_with_windows: false,
+            start_in_tray: false,
+            resume_hotkey: false,
+            resume_hotkey_next: false,
+            connect_device_id: format!("xpotify-{:032x}", rand::random::<u128>()),
             theme: Default::default(),
             volume: 1.0,
             last_route: Default::default(),
+            last_playback: None,
+            seen_releases: druid::im::Vector::new(),
+            playlist_folders: druid::im::Vector::new(),
+            playlist_folder_assignments: druid::im::HashMap::new(),
             queue_behavior: Default::default(),
             show_track_cover: Default::default(),
-            window_size: Size::new(theme::grid(80.0), theme::grid(100.0)),
+            show_now_playing: true,
+            library_compact: true,
+            window_size: Size::new(1120.0, 800.0),
             slider_scroll_scale: Default::default(),
             sort_order: Default::default(),
             sort_criteria: Default::default(),
-            paginated_limit: 500,
+            paginated_limit: 5000,
             seek_duration: 10,
             lastfm_session_key: None,
             lastfm_api_key: None,
@@ -192,13 +221,23 @@ impl Config {
         if let Ok(file) = File::open(&path) {
             log::info!("loading config: {:?}", path);
             let reader = BufReader::new(file);
-            Some(serde_json::from_reader(reader).expect("Failed to read config"))
+            let mut config: Config =
+                serde_json::from_reader(reader).expect("Failed to read config");
+            migrate_audio_quality(&mut config);
+            Some(config)
         } else {
             None
         }
     }
 
     pub fn save(&self) {
+        // Fixture windows must never replace the user's account or preferences.
+        #[cfg(debug_assertions)]
+        if std::env::args().any(|arg| arg.starts_with("--preview-ui=")) {
+            return;
+        }
+        static LOCK: parking_lot::Mutex<()> = parking_lot::Mutex::new(());
+        let _lock = LOCK.lock();
         let dir = Self::config_dir().expect("Failed to get config dir");
         let path = Self::config_path().expect("Failed to get config path");
         mkdir_if_not_exists(&dir).expect("Failed to create config dir");
@@ -208,10 +247,14 @@ impl Config {
         #[cfg(target_family = "unix")]
         options.mode(0o600);
 
-        let file = options.open(&path).expect("Failed to create config");
-        let writer = BufWriter::new(file);
-
-        serde_json::to_writer_pretty(writer, self).expect("Failed to write config");
+        let temporary = dir.join("config.json.tmp");
+        let file = options.open(&temporary).expect("Failed to create config");
+        let mut writer = BufWriter::new(file);
+        serde_json::to_writer_pretty(&mut writer, self).expect("Failed to write config");
+        writer.flush().expect("Failed to flush config");
+        writer.get_ref().sync_all().expect("Failed to sync config");
+        drop(writer);
+        fs::rename(temporary, &path).expect("Failed to replace config");
         log::info!("saved config: {:?}", path);
     }
 
@@ -241,7 +284,10 @@ impl Config {
     }
 
     pub fn webapi_client_id_value(&self) -> Option<&str> {
-        self.webapi_client_id.as_deref().filter(|s| !s.is_empty())
+        self.webapi_client_id
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
     }
 
     pub fn store_webapi_token(&mut self, token: WebApiToken) {
@@ -305,20 +351,33 @@ impl Config {
     }
 }
 
+fn migrate_audio_quality(config: &mut Config) {
+    if config.audio_quality_version == 0 {
+        config.audio_quality = match config.audio_quality {
+            AudioQuality::Low => AudioQuality::Normal,
+            AudioQuality::Normal => AudioQuality::High,
+            _ => AudioQuality::VeryHigh,
+        };
+        config.audio_quality_version = 1;
+    }
+}
+
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Data, Serialize, Deserialize, Default)]
 pub enum AudioQuality {
     Low,
     Normal,
-    #[default]
     High,
+    #[default]
+    VeryHigh,
 }
 
 impl AudioQuality {
     fn as_bitrate(self) -> usize {
         match self {
             AudioQuality::Low => 96,
-            AudioQuality::Normal => 160,
-            AudioQuality::High => 320,
+            AudioQuality::Normal => 96,
+            AudioQuality::High => 160,
+            AudioQuality::VeryHigh => 320,
         }
     }
 }
@@ -326,6 +385,7 @@ impl AudioQuality {
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Data, Serialize, Deserialize, Default)]
 pub enum Theme {
     #[default]
+    System,
     Light,
     Dark,
 }
@@ -357,4 +417,60 @@ fn get_dir_size(path: &Path) -> Option<u64> {
         };
         Some(acc + size)
     })
+}
+
+#[cfg(test)]
+mod audio_quality_tests {
+    use super::*;
+
+    #[test]
+    fn desktop_preferences_migrate_and_round_trip() {
+        let mut config: Config = serde_json::from_str("{}").unwrap();
+        assert!(
+            !config.start_with_windows
+                && !config.start_in_tray
+                && !config.resume_hotkey
+                && !config.resume_hotkey_next
+        );
+        config.start_with_windows = true;
+        config.start_in_tray = true;
+        config.resume_hotkey = true;
+        config.resume_hotkey_next = true;
+        let restored: Config =
+            serde_json::from_str(&serde_json::to_string(&config).unwrap()).unwrap();
+        assert!(
+            restored.start_with_windows
+                && restored.start_in_tray
+                && restored.resume_hotkey
+                && restored.resume_hotkey_next
+        );
+    }
+    #[test]
+    fn compact_library_defaults_for_existing_profiles_and_remembers_expansion() {
+        let migrated: Config = serde_json::from_value(serde_json::json!({"volume":0.4})).unwrap();
+        assert!(migrated.library_compact);
+        let mut expanded = migrated;
+        expanded.library_compact = false;
+        let saved = serde_json::to_string(&expanded).unwrap();
+        let restored: Config = serde_json::from_str(&saved).unwrap();
+        assert!(!restored.library_compact);
+        assert_eq!(restored.volume, 0.4);
+    }
+    #[test]
+    fn legacy_quality_names_keep_their_bitrate_after_migration() {
+        for (old, bitrate) in [("Low", 96), ("Normal", 160), ("High", 320)] {
+            let mut config: Config =
+                serde_json::from_str(&format!(r#"{{"audio_quality":"{old}"}}"#)).unwrap();
+            assert_eq!(config.audio_quality_version, 0);
+            migrate_audio_quality(&mut config);
+            assert_eq!(config.playback().bitrate, bitrate);
+            let encoded = serde_json::to_string(&config).unwrap();
+            let mut restored: Config = serde_json::from_str(&encoded).unwrap();
+            migrate_audio_quality(&mut restored);
+            assert_eq!(restored.playback().bitrate, bitrate);
+        }
+        assert_eq!(Config::default().playback().bitrate, 320);
+        assert_eq!(AudioQuality::High.as_bitrate(), 160);
+        assert_eq!(AudioQuality::VeryHigh.as_bitrate(), 320);
+    }
 }

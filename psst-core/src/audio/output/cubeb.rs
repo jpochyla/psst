@@ -5,6 +5,7 @@ use crossbeam_channel::{bounded, Receiver, Sender};
 use crate::{
     actor::{Act, Actor, ActorHandle},
     audio::{
+        meter::AudioMeter,
         output::{AudioOutput, AudioSink},
         source::{AudioSource, Empty},
     },
@@ -72,6 +73,7 @@ impl Stream {
             source: Box::new(Empty),
             state: CallbackState::Paused,
             buffer: vec![0.0; 1024 * 1024],
+            meter: AudioMeter::new(SAMPLE_RATE, STREAM_CHANNELS),
         };
 
         let params = cubeb::StreamParamsBuilder::new()
@@ -198,6 +200,7 @@ enum CallbackState {
 }
 
 struct StreamCallback {
+    meter: AudioMeter,
     callback_recv: Receiver<CallbackMsg>,
     source: Box<dyn AudioSource>,
     state: CallbackState,
@@ -227,6 +230,7 @@ impl StreamCallback {
             let n_output_frames = output.len();
             let n_output_samples = n_output_frames * STREAM_CHANNELS;
             let n_samples = self.source.write(&mut self.buffer[..n_output_samples]);
+            self.meter.process(&self.buffer[..n_samples]);
             let mut n_frames = 0;
             for (i, o) in self.buffer[..n_samples]
                 .chunks(STREAM_CHANNELS)

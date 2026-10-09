@@ -2,7 +2,7 @@ use std::{f64::consts::PI, time::Duration};
 
 use druid::{
     kurbo::Circle,
-    widget::{prelude::*, CrossAxisAlignment, Flex, Label, SizedBox},
+    widget::{prelude::*, Controller, CrossAxisAlignment, Flex, Label, SizedBox},
     Data, Point, Vec2, Widget, WidgetExt, WidgetPod,
 };
 use time_humanize::HumanTime;
@@ -110,15 +110,78 @@ pub fn error_widget() -> impl Widget<Error> {
         )
         .with_child(
             Label::dynamic(|err: &Error, _| err.to_string())
+                .with_line_break_mode(druid::widget::LineBreaking::WordWrap)
                 .with_text_size(theme::TEXT_SIZE_SMALL)
-                .with_text_color(theme::PLACEHOLDER_COLOR),
+                .with_text_color(theme::PLACEHOLDER_COLOR)
+                .expand_width(),
         );
     Flex::row()
         .with_child(icon)
         .with_default_spacer()
-        .with_child(error)
-        .padding((0.0, theme::grid(6.0)))
+        .with_flex_child(error, 1.0)
+        .with_default_spacer()
+        .with_child(
+            druid::widget::Button::new("Reintentar")
+                .on_click(|ctx, _: &mut Error, _| ctx.submit_command(crate::cmd::NAVIGATE_REFRESH))
+                .disabled_if(|error, _| error.retry_blocked()),
+        )
+        .padding((16.0, theme::grid(4.0)))
         .center()
+        .controller(ErrorCountdown {
+            timer: druid::TimerToken::INVALID,
+            display: None,
+        })
+}
+
+struct ErrorCountdown {
+    timer: druid::TimerToken,
+    display: Option<Error>,
+}
+impl<W: Widget<Error>> Controller<Error, W> for ErrorCountdown {
+    fn event(
+        &mut self,
+        child: &mut W,
+        ctx: &mut EventCtx,
+        event: &Event,
+        data: &mut Error,
+        env: &Env,
+    ) {
+        let display = self.display.get_or_insert_with(|| data.clone());
+        if matches!(event, Event::Timer(token) if *token == self.timer) {
+            display.refresh_countdown();
+            self.timer = if display.retry_blocked() {
+                ctx.request_timer(Duration::from_secs(1))
+            } else {
+                druid::TimerToken::INVALID
+            };
+            ctx.request_update();
+        }
+        child.event(ctx, event, display, env);
+    }
+    fn lifecycle(
+        &mut self,
+        child: &mut W,
+        ctx: &mut LifeCycleCtx,
+        event: &LifeCycle,
+        data: &Error,
+        env: &Env,
+    ) {
+        let display = self.display.get_or_insert_with(|| data.clone());
+        if matches!(event, LifeCycle::WidgetAdded) && display.retry_blocked() {
+            self.timer = ctx.request_timer(Duration::from_secs(1));
+        }
+        child.lifecycle(ctx, event, display, env);
+    }
+    fn update(&mut self, child: &mut W, ctx: &mut UpdateCtx, old: &Error, data: &Error, env: &Env) {
+        if !old.same(data) {
+            self.display = Some(data.clone());
+        }
+        let display = self.display.get_or_insert_with(|| data.clone());
+        if display.retry_blocked() && self.timer == druid::TimerToken::INVALID {
+            self.timer = ctx.request_timer(Duration::from_secs(1));
+        }
+        child.update(ctx, old, display, env);
+    }
 }
 
 pub fn as_minutes_and_seconds(dur: Duration) -> String {

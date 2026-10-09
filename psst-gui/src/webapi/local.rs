@@ -172,6 +172,7 @@ impl LocalTrackManager {
                     is_playable: Some(false),
                     popularity: local_track.popularity,
                     track_pos: 0,
+                    playlist_added_at: None,
                     lyrics: None,
                 }));
             }

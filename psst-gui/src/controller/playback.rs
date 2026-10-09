@@ -1,6 +1,6 @@
 use std::{
     thread::{self, JoinHandle},
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use crossbeam_channel::Sender;
@@ -9,6 +9,7 @@ use druid::{
     widget::{prelude::*, Controller},
     Code, ExtEventSink, InternalLifeCycle, KbKey, WindowHandle,
 };
+use psst_core::lastfm::Scrobbler;
 use psst_core::{
     audio::{normalize::NormalizationLevel, output::DefaultAudioOutput},
     cache::Cache,
@@ -17,7 +18,6 @@ use psst_core::{
     player::{item::PlaybackItem, PlaybackConfig, Player, PlayerCommand, PlayerEvent},
     session::SessionService,
 };
-use rustfm_scrobble::Scrobbler;
 use souvlaki::{
     MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback, MediaPosition, PlatformConfig,
 };
@@ -33,6 +33,8 @@ use crate::{
     ui::lyrics,
 };
 
+const AUDIO_FAILURE: druid::Selector<String> = druid::Selector::new("app.audio.failure");
+
 pub struct PlaybackController {
     sender: Option<Sender<PlayerEvent>>,
     thread: Option<JoinHandle<()>>,
@@ -41,6 +43,11 @@ pub struct PlaybackController {
     has_scrobbled: bool,
     scrobbler: Option<Scrobbler>,
     startup: bool,
+    last_resume_save: Instant,
+    #[cfg(feature = "cpal")]
+    audio_timer: druid::TimerToken,
+    #[cfg(feature = "cpal")]
+    audio_device: Option<String>,
 }
 fn init_scrobbler_instance(data: &AppState) -> Option<Scrobbler> {
     if data.config.lastfm_enable {
@@ -68,6 +75,64 @@ fn init_scrobbler_instance(data: &AppState) -> Option<Scrobbler> {
     None
 }
 
+#[cfg(feature = "cpal")]
+fn audio_transfer_should_resume(
+    old: Option<&str>,
+    new: Option<&str>,
+    available: &[String],
+    playing: bool,
+    failed: bool,
+) -> bool {
+    playing
+        && !failed
+        && new.is_some()
+        && old.is_some_and(|name| available.iter().any(|device| device == name))
+}
+
+#[cfg(all(test, feature = "cpal"))]
+mod audio_device_tests {
+    use super::audio_transfer_should_resume;
+    #[test]
+    fn disconnect_pauses_and_connect_preserves_user_pause() {
+        let outputs = vec!["Speakers".into(), "Headphones".into()];
+        assert!(audio_transfer_should_resume(
+            Some("Speakers"),
+            Some("Headphones"),
+            &outputs,
+            true,
+            false
+        ));
+        assert!(!audio_transfer_should_resume(
+            Some("Speakers"),
+            Some("Headphones"),
+            &outputs,
+            false,
+            false
+        ));
+        assert!(!audio_transfer_should_resume(
+            Some("Headphones"),
+            Some("Speakers"),
+            &["Speakers".into()],
+            true,
+            false
+        ));
+        assert!(!audio_transfer_should_resume(
+            Some("Headphones"),
+            None,
+            &[],
+            true,
+            false
+        ));
+        assert!(!audio_transfer_should_resume(
+            Some("Speakers"),
+            Some("Headphones"),
+            &outputs,
+            true,
+            true
+        ));
+    }
+}
+
 impl PlaybackController {
     pub fn new() -> Self {
         Self {
@@ -78,6 +143,11 @@ impl PlaybackController {
             has_scrobbled: false,
             scrobbler: None,
             startup: true,
+            last_resume_save: Instant::now(),
+            #[cfg(feature = "cpal")]
+            audio_timer: druid::TimerToken::INVALID,
+            #[cfg(feature = "cpal")]
+            audio_device: None,
         }
     }
 
@@ -88,19 +158,20 @@ impl PlaybackController {
         event_sink: ExtEventSink,
         widget_id: WidgetId,
         #[allow(unused_variables)] window: &WindowHandle,
-    ) {
-        let output = DefaultAudioOutput::open().unwrap();
-        let cache_dir = Config::cache_dir().unwrap();
+    ) -> Result<(), psst_core::error::Error> {
+        let output = DefaultAudioOutput::open()?;
+        let cache_dir = Config::cache_dir()
+            .ok_or_else(|| psst_core::error::Error::ConfigError("No cache directory".into()))?;
         let proxy_url = Config::proxy();
         let player = Player::new(
             session.clone(),
-            Cdn::new(session, proxy_url.as_deref()).unwrap(),
-            Cache::new(cache_dir).unwrap(),
+            Cdn::new(session, proxy_url.as_deref())?,
+            Cache::new(cache_dir)?,
             config,
             &output,
         );
 
-        self.media_controls = Self::create_media_controls(player.sender(), window)
+        self.media_controls = Self::create_media_controls(event_sink.clone(), window)
             .map_err(|err| log::error!("failed to connect to media control interface: {err:?}"))
             .ok();
 
@@ -109,12 +180,114 @@ impl PlaybackController {
             Self::service_events(player, event_sink, widget_id);
         }));
         self.output.replace(output);
+        Ok(())
+    }
+
+    #[cfg(feature = "cpal")]
+    fn check_audio_device(&mut self, ctx: &mut EventCtx, data: &mut AppState) {
+        if data.config.native_connect {
+            self.audio_timer = ctx.request_timer(Duration::from_secs(2));
+            return;
+        }
+        use psst_core::audio::output::AudioOutput;
+        let (current, available) = DefaultAudioOutput::devices();
+        let failed = self
+            .output
+            .as_ref()
+            .is_some_and(|output| output.has_failed());
+        let changed = current != self.audio_device;
+        let resume = audio_transfer_should_resume(
+            self.audio_device.as_deref(),
+            current.as_deref(),
+            &available,
+            data.playback.state == PlaybackState::Playing,
+            failed,
+        );
+        if changed || failed || self.output.is_none() {
+            if data.connect.selected.is_none() && (!resume || current.is_none()) {
+                self.pause();
+                if data.playback.now_playing.is_some() {
+                    data.playback.state = PlaybackState::Paused;
+                }
+            }
+            if current.is_some() {
+                if self.sender.is_some() {
+                    match DefaultAudioOutput::open() {
+                        Ok(output) => {
+                            self.send(PlayerEvent::Command(PlayerCommand::ChangeAudioOutput {
+                                sink: output.sink(),
+                                resume: resume && data.connect.selected.is_none(),
+                            }));
+                            self.output = Some(output);
+                            self.audio_device = current.clone();
+                            self.set_volume(data.playback.volume);
+                            if changed {
+                                data.info_alert(format!(
+                                    "Salida de audio: {}",
+                                    current.as_deref().unwrap_or_default()
+                                ));
+                            }
+                        }
+                        Err(error) => {
+                            if changed {
+                                data.error_alert(format!(
+                                    "No se pudo abrir la salida de audio: {error}"
+                                ));
+                            }
+                        }
+                    }
+                } else if self
+                    .open_audio_output_and_start_threads(
+                        data.session.clone(),
+                        data.config.playback(),
+                        ctx.get_external_handle(),
+                        ctx.widget_id(),
+                        ctx.window(),
+                    )
+                    .is_ok()
+                {
+                    self.audio_device = current.clone();
+                    self.set_volume(data.playback.volume);
+                    self.set_queue_behavior(data.playback.queue_behavior);
+                    if let Some(snapshot) = &data.config.last_playback {
+                        self.send(PlayerEvent::Command(PlayerCommand::RestoreQueue {
+                            items: data
+                                .playback
+                                .queue
+                                .iter()
+                                .map(|entry| PlaybackItem {
+                                    item_id: entry.item.id(),
+                                    norm_level: NormalizationLevel::Track,
+                                })
+                                .collect(),
+                            position: snapshot.position,
+                            progress: Duration::from_millis(snapshot.progress_ms),
+                            snapshot: snapshot.engine_queue.clone(),
+                        }));
+                    }
+                }
+            } else if changed && data.connect.selected.is_none() {
+                data.info_alert("Salida desconectada. Reproducción en pausa.");
+            }
+            // Keep the previous device when reopening failed, so the next timer retries.
+            if current.is_none() {
+                self.audio_device = None;
+            }
+        }
+        self.audio_timer = ctx.request_timer(Duration::from_secs(2));
     }
 
     fn service_events(mut player: Player, event_sink: ExtEventSink, widget_id: WidgetId) {
         for event in player.receiver() {
             // Forward events that affect the UI state to the UI thread.
             match &event {
+                PlayerEvent::QueueChanged { upcoming, snapshot } => {
+                    let _ = event_sink.submit_command(
+                        cmd::QUEUE_CHANGED,
+                        (upcoming.clone(), snapshot.clone()),
+                        widget_id,
+                    );
+                }
                 PlayerEvent::Loading { item } => {
                     event_sink
                         .submit_command(cmd::PLAYBACK_LOADING, item.item_id, widget_id)
@@ -161,7 +334,7 @@ impl PlaybackController {
     }
 
     fn create_media_controls(
-        sender: Sender<PlayerEvent>,
+        sink: ExtEventSink,
         #[allow(unused_variables)] window: &WindowHandle,
     ) -> Result<MediaControls, souvlaki::Error> {
         let hwnd = {
@@ -185,27 +358,30 @@ impl PlaybackController {
         })?;
 
         media_controls.attach(move |event| {
-            Self::handle_media_control_event(event, &sender);
+            Self::handle_media_control_event(event, &sink);
         })?;
 
         Ok(media_controls)
     }
 
-    fn handle_media_control_event(event: MediaControlEvent, sender: &Sender<PlayerEvent>) {
-        let cmd = match event {
-            MediaControlEvent::Play => PlayerEvent::Command(PlayerCommand::Resume),
-            MediaControlEvent::Pause => PlayerEvent::Command(PlayerCommand::Pause),
-            MediaControlEvent::Toggle => PlayerEvent::Command(PlayerCommand::PauseOrResume),
-            MediaControlEvent::Next => PlayerEvent::Command(PlayerCommand::Next),
-            MediaControlEvent::Previous => PlayerEvent::Command(PlayerCommand::Previous),
+    fn handle_media_control_event(event: MediaControlEvent, sink: &ExtEventSink) {
+        let selector = match event {
+            MediaControlEvent::Play => cmd::PLAY_RESUME,
+            MediaControlEvent::Pause => cmd::PLAY_PAUSE,
+            MediaControlEvent::Toggle => cmd::PLAY_TOGGLE,
+            MediaControlEvent::Next => cmd::PLAY_NEXT,
+            MediaControlEvent::Previous => cmd::PLAY_PREVIOUS,
             MediaControlEvent::SetPosition(MediaPosition(duration)) => {
-                PlayerEvent::Command(PlayerCommand::Seek { position: duration })
-            }
-            _ => {
+                let _ = sink.submit_command(
+                    cmd::SKIP_TO_POSITION,
+                    duration.as_millis() as u64,
+                    druid::Target::Global,
+                );
                 return;
             }
+            _ => return,
         };
-        sender.send(cmd).unwrap();
+        let _ = sink.submit_command(selector, (), druid::Target::Global);
     }
 
     fn update_media_control_playback(&mut self, playback: &Playback) {
@@ -250,7 +426,9 @@ impl PlaybackController {
                     duration,
                     cover_url,
                 })
-                .unwrap();
+                .unwrap_or_else(|error| {
+                    log::warn!("Could not update OS playback metadata: {error}")
+                });
         }
     }
 
@@ -422,9 +600,107 @@ where
         data: &mut AppState,
         env: &Env,
     ) {
+        #[cfg(feature = "cpal")]
+        if matches!(event, Event::Timer(token) if *token == self.audio_timer) {
+            self.check_audio_device(ctx, data);
+        }
+        if data.connect.selected.is_some()
+            || (data.config.native_connect
+                && matches!(event, Event::Command(command) if command.target() == druid::Target::Widget(ctx.widget_id())))
+        {
+            if let Event::Command(command) = event {
+                if command.is(cmd::PLAYBACK_LOADING)
+                    || command.is(cmd::PLAYBACK_PLAYING)
+                    || command.is(cmd::PLAYBACK_PROGRESS)
+                    || command.is(cmd::PLAYBACK_PAUSING)
+                    || command.is(cmd::PLAYBACK_RESUMING)
+                    || command.is(cmd::PLAYBACK_STOPPED)
+                    || command.is(cmd::QUEUE_CHANGED)
+                    || command.is(cmd::PLAYBACK_BLOCKED)
+                {
+                    ctx.set_handled();
+                    return;
+                }
+            }
+        }
+        #[cfg(feature = "cpal")]
+        if data.connect.selected.is_none()
+            && !data.config.native_connect
+            && (self.audio_device.is_none()
+                || self
+                    .output
+                    .as_ref()
+                    .is_none_or(|output| output.has_failed()))
+        {
+            if let Event::Command(command) = event {
+                if command.is(cmd::PLAY_TRACKS)
+                    || command.is(cmd::PLAY_RESUME)
+                    || command.is(cmd::PLAY_TOGGLE)
+                    || command.is(cmd::PLAY_NEXT)
+                    || command.is(cmd::PLAY_UPCOMING)
+                    || command.is(cmd::PLAY_PREVIOUS)
+                {
+                    data.error_alert(
+                        "Conecta una salida de audio. Xpotify la detectará automáticamente.",
+                    );
+                    ctx.set_handled();
+                    return;
+                }
+            }
+        }
         match event {
+            Event::Command(command) if command.is(AUDIO_FAILURE) => {
+                data.error_alert(format!(
+                    "Audio no disponible: {}. Se reintentará al conectar una salida.",
+                    command.get_unchecked(AUDIO_FAILURE)
+                ));
+                ctx.set_handled();
+            }
+            Event::Command(command) if command.is(cmd::SUSPEND_LOCAL_PLAYBACK) => {
+                self.stop();
+                ctx.set_handled();
+            }
+            Event::Command(command) if command.is(cmd::RESTORE_LOCAL_PLAYBACK) => {
+                data.capture_resume();
+                let nav = data.nav.clone();
+                data.restore_resume();
+                data.navigate(&nav);
+                if let Some(snapshot) = &data.config.last_playback {
+                    self.send(PlayerEvent::Command(PlayerCommand::RestoreQueue {
+                        items: data
+                            .playback
+                            .queue
+                            .iter()
+                            .map(|entry| PlaybackItem {
+                                item_id: entry.item.id(),
+                                norm_level: NormalizationLevel::Track,
+                            })
+                            .collect(),
+                        position: snapshot.position,
+                        progress: Duration::from_millis(snapshot.progress_ms),
+                        snapshot: snapshot.engine_queue.clone(),
+                    }));
+                }
+                data.playback.state = PlaybackState::Paused;
+                ctx.set_handled();
+            }
             Event::Command(cmd) if cmd.is(cmd::SET_FOCUS) => {
                 ctx.request_focus();
+            }
+            Event::Command(cmd) if cmd.is(cmd::QUEUE_CHANGED) => {
+                let (upcoming, snapshot) = cmd.get_unchecked(cmd::QUEUE_CHANGED);
+                data.engine_queue = Some(snapshot.clone());
+                let mut entries = std::collections::HashMap::new();
+                for entry in data.playback.queue.iter().chain(data.added_queue.iter()) {
+                    entries
+                        .entry(entry.item.id())
+                        .or_insert_with(|| entry.clone());
+                }
+                data.playback.up_next = upcoming
+                    .iter()
+                    .filter_map(|id| entries.get(id).cloned())
+                    .collect();
+                ctx.set_handled();
             }
             Event::Command(cmd) if cmd.is(cmd::PLAYBACK_LOADING) => {
                 let item = cmd.get_unchecked(cmd::PLAYBACK_LOADING);
@@ -447,6 +723,8 @@ where
 
                 if let Some(queued) = data.queued_entry(*item) {
                     data.start_playback(queued.item, queued.origin, progress.to_owned());
+                    data.capture_resume();
+                    data.config.save();
                     self.update_media_control_playback(&data.playback);
                     self.update_media_control_metadata(&data.playback);
                     if let Some(now_playing) = &data.playback.now_playing {
@@ -460,6 +738,11 @@ where
             Event::Command(cmd) if cmd.is(cmd::PLAYBACK_PROGRESS) => {
                 let progress = cmd.get_unchecked(cmd::PLAYBACK_PROGRESS);
                 data.progress_playback(progress.to_owned());
+                if self.last_resume_save.elapsed() >= Duration::from_secs(15) {
+                    data.capture_resume();
+                    data.config.save();
+                    self.last_resume_save = Instant::now();
+                }
 
                 self.report_scrobble(&data.playback);
                 self.update_media_control_playback(&data.playback);
@@ -467,6 +750,8 @@ where
             }
             Event::Command(cmd) if cmd.is(cmd::PLAYBACK_PAUSING) => {
                 data.pause_playback();
+                data.capture_resume();
+                data.config.save();
                 self.update_media_control_playback(&data.playback);
                 ctx.set_handled();
             }
@@ -486,6 +771,8 @@ where
             }
             Event::Command(cmd) if cmd.is(cmd::PLAY_TRACKS) => {
                 let payload = cmd.get_unchecked(cmd::PLAY_TRACKS);
+                data.added_queue.clear();
+                data.playback.up_next.clear();
                 data.playback.queue = payload
                     .items
                     .iter()
@@ -506,12 +793,24 @@ where
                 self.resume();
                 ctx.set_handled();
             }
+            Event::Command(command) if command.is(cmd::PLAY_TOGGLE) => {
+                self.pause_or_resume();
+                ctx.set_handled();
+            }
             Event::Command(cmd) if cmd.is(cmd::PLAY_PREVIOUS) => {
                 self.previous();
                 ctx.set_handled();
             }
             Event::Command(cmd) if cmd.is(cmd::PLAY_NEXT) => {
                 self.next();
+                ctx.set_handled();
+            }
+            Event::Command(command) if command.is(cmd::PLAY_UPCOMING) => {
+                let (index, expected) = *command.get_unchecked(cmd::PLAY_UPCOMING);
+                self.send(PlayerEvent::Command(PlayerCommand::SelectUpcoming {
+                    index,
+                    expected,
+                }));
                 ctx.set_handled();
             }
             Event::Command(cmd) if cmd.is(cmd::PLAY_STOP) => {
@@ -539,21 +838,59 @@ where
                         now_playing.item.duration().as_secs_f64() * fraction,
                     );
                     self.seek(position);
+                    if data.playback.state == PlaybackState::Paused {
+                        data.progress_playback(position);
+                    }
+                }
+                ctx.set_handled();
+            }
+            Event::Command(command) if command.is(cmd::OPEN_MUSIC_VIDEO) => {
+                let track = command.get_unchecked(cmd::OPEN_MUSIC_VIDEO);
+                match open::that_detached(crate::ui::video::search_url(track)) {
+                    Ok(()) => {
+                        if data.playback.state == PlaybackState::Playing {
+                            self.pause();
+                        }
+                    }
+                    Err(_) => {
+                        data.error_alert("No se pudo abrir el navegador para buscar el videoclip.")
+                    }
                 }
                 ctx.set_handled();
             }
             Event::Command(cmd) if cmd.is(cmd::SKIP_TO_POSITION) => {
                 let location = cmd.get_unchecked(cmd::SKIP_TO_POSITION);
-                self.seek(Duration::from_millis(*location));
+                let position = Duration::from_millis(*location);
+                self.seek(position);
+                if data.playback.state == PlaybackState::Paused {
+                    data.progress_playback(position);
+                }
                 ctx.set_handled();
             }
             // Keyboard shortcuts.
             Event::KeyDown(key) if key.code == Code::Space => {
-                self.pause_or_resume();
+                if data.connect.selected.is_some() {
+                    ctx.submit_command(cmd::PLAY_TOGGLE);
+                } else {
+                    self.pause_or_resume();
+                }
                 ctx.set_handled();
             }
             Event::KeyDown(key) if key.code == Code::ArrowRight => {
-                if key.mods.shift() {
+                if data.connect.selected.is_some() {
+                    if key.mods.shift() {
+                        ctx.submit_command(cmd::PLAY_NEXT);
+                    } else if let Some(np) = &data.playback.now_playing {
+                        ctx.submit_command(
+                            cmd::SKIP_TO_POSITION.with(
+                                (np.progress
+                                    + Duration::from_secs(data.config.seek_duration as u64))
+                                .min(np.item.duration())
+                                .as_millis() as u64,
+                            ),
+                        );
+                    }
+                } else if key.mods.shift() {
                     self.next();
                 } else {
                     self.seek_relative(data, true);
@@ -561,7 +898,21 @@ where
                 ctx.set_handled();
             }
             Event::KeyDown(key) if key.code == Code::ArrowLeft => {
-                if key.mods.shift() {
+                if data.connect.selected.is_some() {
+                    if key.mods.shift() {
+                        ctx.submit_command(cmd::PLAY_PREVIOUS);
+                    } else if let Some(np) = &data.playback.now_playing {
+                        ctx.submit_command(
+                            cmd::SKIP_TO_POSITION.with(
+                                np.progress
+                                    .saturating_sub(Duration::from_secs(
+                                        data.config.seek_duration as u64,
+                                    ))
+                                    .as_millis() as u64,
+                            ),
+                        );
+                    }
+                } else if key.mods.shift() {
                     self.previous();
                 } else {
                     self.seek_relative(data, false);
@@ -590,17 +941,45 @@ where
     ) {
         match event {
             LifeCycle::WidgetAdded => {
-                self.open_audio_output_and_start_threads(
+                let result = self.open_audio_output_and_start_threads(
                     data.session.clone(),
                     data.config.playback(),
                     ctx.get_external_handle(),
                     ctx.widget_id(),
                     ctx.window(),
                 );
+                if let Err(error) = result {
+                    ctx.submit_command(AUDIO_FAILURE.with(error.to_string()).to(ctx.widget_id()));
+                }
+                #[cfg(feature = "cpal")]
+                {
+                    self.audio_device = DefaultAudioOutput::devices().0;
+                    self.audio_timer = ctx.request_timer(Duration::from_secs(2));
+                }
 
                 // Initialize values loaded from the config.
                 self.set_volume(data.playback.volume);
                 self.set_queue_behavior(data.playback.queue_behavior);
+
+                if let Some(snapshot) = &data.config.last_playback {
+                    if let Some(now_playing) = &data.playback.now_playing {
+                        let items = data
+                            .playback
+                            .queue
+                            .iter()
+                            .map(|entry| PlaybackItem {
+                                item_id: entry.item.id(),
+                                norm_level: NormalizationLevel::Track,
+                            })
+                            .collect();
+                        self.send(PlayerEvent::Command(PlayerCommand::RestoreQueue {
+                            items,
+                            position: snapshot.position,
+                            progress: now_playing.progress,
+                            snapshot: snapshot.engine_queue.clone(),
+                        }));
+                    }
+                }
 
                 // Request focus so we can receive keyboard events.
                 ctx.submit_command(cmd::SET_FOCUS.to(ctx.widget_id()));
@@ -627,8 +1006,18 @@ where
         data: &AppState,
         env: &Env,
     ) {
+        if old_data.config.audio_quality != data.config.audio_quality {
+            self.send(PlayerEvent::Command(PlayerCommand::Configure {
+                config: data.config.playback(),
+            }));
+        }
         if !old_data.playback.volume.same(&data.playback.volume) {
             self.set_volume(data.playback.volume);
+        }
+
+        if data.connect.selected.is_some() && !old_data.playback.same(&data.playback) {
+            self.update_media_control_playback(&data.playback);
+            self.update_media_control_metadata(&data.playback);
         }
 
         let lastfm_changed = old_data.config.lastfm_api_key != data.config.lastfm_api_key

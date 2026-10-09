@@ -149,11 +149,17 @@ pub fn playable_widget(track: &Track, display: Display) -> impl Widget<PlayRow<A
             true => ViewSwitcher::new(
                 |row: &PlayRow<Arc<Track>>, _| row.ctx.library.contains_track(&row.item),
                 |selector: &bool, _, _| {
-                    match selector {
+                    let icon: Box<dyn Widget<PlayRow<Arc<Track>>>> = match selector {
                         true => &icons::CIRCLE_CHECK,
                         false => &icons::CIRCLE_PLUS,
                     }
                     .scale(theme::ICON_SIZE_SMALL)
+                    .boxed();
+                    icon.tooltip(if *selector {
+                        "Quitar de canciones guardadas"
+                    } else {
+                        "Guardar canción"
+                    })
                     .boxed()
                 },
             )
@@ -192,9 +198,7 @@ pub fn playable_widget(track: &Track, display: Display) -> impl Widget<PlayRow<A
                 return *target_id == row.item.id;
             }
             // Otherwise check if it's playing or is the current track
-            row.is_playing || row.ctx.now_playing.as_ref().is_some_and(|playable| {
-                matches!(playable, Playable::Track(track) if track.id == row.item.id)
-            })
+            row.is_playing
         })
         .rounded(theme::BUTTON_BORDER_RADIUS)
         .context_menu(track_row_menu)
@@ -232,7 +236,31 @@ fn popularity_stars(popularity: u32) -> String {
 }
 
 fn track_row_menu(row: &PlayRow<Arc<Track>>) -> Menu<AppState> {
-    track_menu(&row.item, &row.ctx.library, &row.origin)
+    let mut menu = track_menu(&row.item, &row.ctx.library, &row.origin);
+    if let PlaybackOrigin::Playlist(link) = row.origin.as_ref() {
+        if row
+            .ctx
+            .library
+            .writable_playlists()
+            .iter()
+            .any(|p| p.id == link.id)
+        {
+            for (title, down) in [
+                ("Mover arriba en la playlist", false),
+                ("Mover abajo en la playlist", true),
+            ] {
+                menu = menu.entry(MenuItem::new(title).command(playlist::REORDER_TRACK.with(
+                    crate::data::PlaylistReorder {
+                        link: link.clone(),
+                        track_id: row.item.id,
+                        position: row.item.track_pos,
+                        down,
+                    },
+                )));
+            }
+        }
+    }
+    menu
 }
 
 pub fn track_menu(
@@ -240,7 +268,37 @@ pub fn track_menu(
     library: &Library,
     origin: &PlaybackOrigin,
 ) -> Menu<AppState> {
+    track_menu_with_play(
+        track,
+        library,
+        origin,
+        cmd::PLAY_TRACKS.with(crate::data::PlaybackPayload {
+            origin: origin.clone(),
+            items: druid::im::vector![Playable::Track(track.clone())],
+            position: 0,
+        }),
+    )
+}
+
+pub fn track_menu_with_play(
+    track: &Arc<Track>,
+    library: &Library,
+    origin: &PlaybackOrigin,
+    play: druid::Command,
+) -> Menu<AppState> {
     let mut menu = Menu::empty();
+    menu = menu.entry(MenuItem::new("Reproducir").command(play));
+    if track.id.0.id_type == ItemIdType::Track {
+        menu = menu.entry(
+            MenuItem::new("Descargar para la caché de audio")
+                .command(cmd::DOWNLOAD_TRACK.with(track.clone())),
+        );
+    }
+
+    menu = menu.entry(
+        MenuItem::new("Buscar videoclip en YouTube")
+            .command(cmd::OPEN_MUSIC_VIDEO.with(track.clone())),
+    );
 
     for artist_link in &track.artists {
         let more_than_one_artist = track.artists.len() > 1;
@@ -372,7 +430,19 @@ pub fn track_menu(
     let mut playlist_menu = Menu::new(
         LocalizedString::new("menu-item-add-to-playlist").with_placeholder("Add to Playlist"),
     );
-    for playlist in library.writable_playlists() {
+    let targets = library.writable_playlists();
+    if targets.is_empty() {
+        let message = if library.playlists.is_deferred(&()) || library.user_profile.is_deferred(&())
+        {
+            "La biblioteca se está cargando..."
+        } else if !library.playlists.is_resolved() || !library.user_profile.is_resolved() {
+            "Biblioteca no disponible: abre el selector"
+        } else {
+            "No hay playlists editables"
+        };
+        playlist_menu = playlist_menu.entry(MenuItem::new(message).enabled(false));
+    }
+    for playlist in targets {
         playlist_menu = playlist_menu.entry(
             MenuItem::new(
                 LocalizedString::new("menu-item-save-to-playlist")
@@ -384,6 +454,10 @@ pub fn track_menu(
             })),
         );
     }
+    playlist_menu = playlist_menu.separator().entry(
+        MenuItem::new("Buscar playlist o pegar enlace...")
+            .command(super::playlist_picker::OPEN.with(track.id)),
+    );
     menu = menu.entry(playlist_menu);
 
     menu

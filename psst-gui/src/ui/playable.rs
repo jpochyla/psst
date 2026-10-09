@@ -5,16 +5,18 @@ use druid::{
     kurbo::Line,
     lens::Map,
     piet::StrokeStyle,
-    widget::{Controller, ControllerHost, List, ListIter, Painter, ViewSwitcher},
-    Data, Env, Event, EventCtx, Lens, RenderContext, Selector, Widget, WidgetExt,
+    widget::{
+        Button, Controller, ControllerHost, Flex, Label, List, ListIter, Painter, ViewSwitcher,
+    },
+    BoxConstraints, Data, Env, Event, EventCtx, LayoutCtx, Lens, LifeCycle, LifeCycleCtx, PaintCtx,
+    Point, RenderContext, Selector, Size, UpdateCtx, Widget, WidgetExt, WidgetPod,
 };
 
 use crate::{
     cmd,
     data::{
-        CommonCtx, FindQuery, MatchFindQuery, Playable, PlaybackOrigin,
-        PlaybackPayload, PlaylistTracks, Recommendations, SavedTracks, SearchResults, ShowEpisodes,
-        Track, WithCtx,
+        CommonCtx, FindQuery, MatchFindQuery, Playable, PlaybackOrigin, PlaybackPayload,
+        PlaylistTracks, Recommendations, SavedTracks, SearchResults, ShowEpisodes, Track, WithCtx,
     },
     ui::theme,
 };
@@ -34,7 +36,7 @@ pub fn list_widget<T>(display: Display) -> impl Widget<WithCtx<T>>
 where
     T: PlayableIter + Data,
 {
-    ControllerHost::new(List::new(move || playable_widget(display)), PlayController)
+    ControllerHost::new(PagedTracks::new(display, None), PlayController)
 }
 
 pub fn list_widget_with_find<T>(
@@ -44,15 +46,282 @@ pub fn list_widget_with_find<T>(
 where
     T: PlayableIter + Data,
 {
-    ControllerHost::new(
-        List::new(move || Findable::new(playable_widget(display), selector)),
-        PlayController,
-    )
+    ControllerHost::new(PagedTracks::new(display, Some(selector)), PlayController)
+}
+
+const PAGE_SIZE: usize = 100;
+
+#[derive(Clone, Data, Lens)]
+struct TrackPage {
+    rows: Vector<PlayRow<Playable>>,
+    page: usize,
+    total: usize,
+}
+
+fn page_bar() -> impl Widget<TrackPage> {
+    Flex::row()
+        .with_child(
+            Button::new("Anterior")
+                .on_click(|ctx, data: &mut TrackPage, _| {
+                    data.page = data.page.saturating_sub(1);
+                    ctx.request_update();
+                })
+                .disabled_if(|data, _| data.page == 0),
+        )
+        .with_flex_child(
+            Label::dynamic(|data: &TrackPage, _| {
+                if data.total == 0 {
+                    return "No hay canciones que coincidan".to_string();
+                }
+                format!(
+                    "Página {} / {} · {} canciones",
+                    data.page + 1,
+                    data.total.div_ceil(PAGE_SIZE).max(1),
+                    data.total
+                )
+            })
+            .center(),
+            1.0,
+        )
+        .with_child(
+            Button::new("Siguiente")
+                .on_click(|ctx, data: &mut TrackPage, _| {
+                    data.page += 1;
+                    ctx.request_update();
+                })
+                .disabled_if(|data, _| (data.page + 1) * PAGE_SIZE >= data.total),
+        )
+        .padding((0.0, 10.0))
+}
+
+struct PagedTracks<T: Data> {
+    child: WidgetPod<TrackPage, Box<dyn Widget<TrackPage>>>,
+    page: TrackPage,
+    query: Option<FindQuery>,
+    selector: Option<Selector<Find>>,
+    last_playing: Option<Playable>,
+    last_filter: String,
+    marker: std::marker::PhantomData<T>,
+}
+
+impl<T: Data + PlayableIter> PagedTracks<T> {
+    fn new(display: Display, selector: Option<Selector<Find>>) -> Self {
+        let list = List::new(move || {
+            let row = playable_widget(display).controller(RevealPlaying::default());
+            if let Some(selector) = selector {
+                Findable::new(row, selector).boxed()
+            } else {
+                row.boxed()
+            }
+        })
+        .lens(TrackPage::rows);
+        Self {
+            child: WidgetPod::new(
+                Flex::column()
+                    .with_child(page_bar())
+                    .with_child(list)
+                    .with_child(page_bar())
+                    .boxed(),
+            ),
+            page: TrackPage {
+                rows: Vector::new(),
+                page: 0,
+                total: 0,
+            },
+            query: None,
+            selector,
+            last_playing: None,
+            last_filter: String::new(),
+            marker: std::marker::PhantomData,
+        }
+    }
+
+    fn rebuild(&mut self, data: &WithCtx<T>) {
+        let filter = data.data.filter_query().trim();
+        if self.last_filter != filter {
+            self.page.page = 0;
+            self.last_filter = filter.to_string();
+        }
+        let filter = FindQuery::new(filter);
+        let origin = Arc::new(data.data.origin());
+        let mut matches = Vector::new();
+        data.data.for_each(|item, position| {
+            let row = PlayRow {
+                is_playing: data.ctx.is_playing_at(&item, &origin),
+                item,
+                position,
+                origin: origin.clone(),
+                ctx: data.ctx.clone(),
+            };
+            let matches_filter = filter.is_empty()
+                || match &row.item {
+                    Playable::Track(track) => {
+                        filter.matches_str(&track.name)
+                            || track
+                                .artists
+                                .iter()
+                                .any(|artist| filter.matches_str(&artist.name))
+                    }
+                    Playable::Episode(_) => true,
+                };
+            if matches_filter
+                && self
+                    .query
+                    .as_ref()
+                    .is_none_or(|q| q.is_empty() || row.matches_query(q))
+            {
+                matches.push_back(row);
+            }
+        });
+        if !self.last_playing.same(&data.ctx.now_playing) {
+            if let Some(index) = matches.iter().position(|row| row.is_playing) {
+                self.page.page = index / PAGE_SIZE;
+            }
+            self.last_playing = data.ctx.now_playing.clone();
+        }
+        self.page.total = matches.len();
+        self.page.page = self
+            .page
+            .page
+            .min(matches.len().saturating_sub(1) / PAGE_SIZE);
+        self.page.rows = matches
+            .iter()
+            .skip(self.page.page * PAGE_SIZE)
+            .take(PAGE_SIZE)
+            .cloned()
+            .collect();
+    }
+}
+
+impl<T: Data + PlayableIter> Widget<WithCtx<T>> for PagedTracks<T> {
+    fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut WithCtx<T>, env: &Env) {
+        if let (Some(selector), Event::Command(command)) = (self.selector, event) {
+            if let Some(find) = command.get(selector) {
+                self.query = Some(find.query.clone());
+                self.page.page = 0;
+                self.rebuild(data);
+                ctx.request_update();
+            }
+        }
+        let old_page = self.page.page;
+        self.child.event(ctx, event, &mut self.page, env);
+        if old_page != self.page.page {
+            self.rebuild(data);
+            ctx.request_update();
+            ctx.scroll_area_to_view(druid::Rect::from_origin_size(
+                Point::ORIGIN,
+                Size::new(1.0, 1.0),
+            ));
+        }
+    }
+    fn lifecycle(
+        &mut self,
+        ctx: &mut LifeCycleCtx,
+        event: &LifeCycle,
+        data: &WithCtx<T>,
+        env: &Env,
+    ) {
+        if matches!(event, LifeCycle::WidgetAdded) {
+            self.rebuild(data);
+        }
+        self.child.lifecycle(ctx, event, &self.page, env);
+    }
+    fn update(&mut self, ctx: &mut UpdateCtx, _: &WithCtx<T>, data: &WithCtx<T>, env: &Env) {
+        self.rebuild(data);
+        self.child.update(ctx, &self.page, env);
+    }
+    fn layout(
+        &mut self,
+        ctx: &mut LayoutCtx,
+        bc: &BoxConstraints,
+        _: &WithCtx<T>,
+        env: &Env,
+    ) -> Size {
+        let size = self.child.layout(ctx, bc, &self.page, env);
+        self.child.set_origin(ctx, Point::ORIGIN);
+        size
+    }
+    fn paint(&mut self, ctx: &mut PaintCtx, _: &WithCtx<T>, env: &Env) {
+        self.child.paint(ctx, &self.page, env);
+    }
+}
+
+#[derive(Default)]
+struct RevealPlaying {
+    pending: bool,
+}
+pub(crate) const REVEAL_PLAYING: Selector = Selector::new("app.playable.reveal-playing");
+pub struct KeepCurrentVisible;
+impl<W: Widget<crate::data::AppState>> Controller<crate::data::AppState, W> for KeepCurrentVisible {
+    fn lifecycle(
+        &mut self,
+        child: &mut W,
+        ctx: &mut LifeCycleCtx,
+        event: &LifeCycle,
+        data: &crate::data::AppState,
+        env: &Env,
+    ) {
+        child.lifecycle(ctx, event, data, env);
+        if matches!(event, LifeCycle::Size(_)) {
+            ctx.submit_command(REVEAL_PLAYING);
+        }
+    }
+}
+impl<W: Widget<PlayRow<Playable>>> Controller<PlayRow<Playable>, W> for RevealPlaying {
+    fn event(
+        &mut self,
+        child: &mut W,
+        ctx: &mut EventCtx,
+        event: &Event,
+        data: &mut PlayRow<Playable>,
+        env: &Env,
+    ) {
+        if matches!(event, Event::Command(command) if command.is(REVEAL_PLAYING)) && data.is_playing
+        {
+            self.pending = true;
+            ctx.request_anim_frame();
+        }
+        if matches!(event, Event::AnimFrame(_)) && self.pending {
+            self.pending = false;
+            if data.is_playing {
+                ctx.scroll_to_view();
+            }
+        }
+        child.event(ctx, event, data, env);
+    }
+    fn lifecycle(
+        &mut self,
+        child: &mut W,
+        ctx: &mut LifeCycleCtx,
+        event: &LifeCycle,
+        data: &PlayRow<Playable>,
+        env: &Env,
+    ) {
+        child.lifecycle(ctx, event, data, env);
+        if matches!(event, LifeCycle::WidgetAdded | LifeCycle::Size(_)) && data.is_playing {
+            self.pending = true;
+            ctx.request_anim_frame();
+        }
+    }
+    fn update(
+        &mut self,
+        child: &mut W,
+        ctx: &mut UpdateCtx,
+        old: &PlayRow<Playable>,
+        data: &PlayRow<Playable>,
+        env: &Env,
+    ) {
+        child.update(ctx, old, data, env);
+        if !old.is_playing && data.is_playing {
+            self.pending = true;
+            ctx.request_anim_frame();
+        }
+    }
 }
 
 fn playable_widget(display: Display) -> impl Widget<PlayRow<Playable>> {
     ViewSwitcher::new(
-        |row: &PlayRow<Playable>, _| mem::discriminant(&row.item),
+        |row: &PlayRow<Playable>, _| (mem::discriminant(&row.item), row.item.id().to_base62()),
         move |_, row: &PlayRow<Playable>, _| match row.item.clone() {
             // TODO: Do the lenses some other way.
             Playable::Track(track) => track::playable_widget(&track, display.track)
@@ -114,6 +383,9 @@ impl<T> PlayRow<T> {
 }
 
 impl MatchFindQuery for PlayRow<Playable> {
+    fn find_result_key(&self) -> usize {
+        self.position
+    }
     fn matches_query(&self, q: &FindQuery) -> bool {
         match &self.item {
             Playable::Track(track) => {
@@ -131,6 +403,9 @@ impl MatchFindQuery for PlayRow<Playable> {
 }
 
 pub trait PlayableIter {
+    fn filter_query(&self) -> &str {
+        ""
+    }
     fn origin(&self) -> PlaybackOrigin;
     fn count(&self) -> usize;
     fn for_each(&self, cb: impl FnMut(Playable, usize));
@@ -155,6 +430,9 @@ impl PlayableIter for Vector<Arc<Track>> {
 }
 
 impl PlayableIter for PlaylistTracks {
+    fn filter_query(&self) -> &str {
+        &self.query
+    }
     fn origin(&self) -> PlaybackOrigin {
         PlaybackOrigin::Playlist(self.link())
     }
@@ -243,7 +521,7 @@ where
         self.data.for_each(|item, position| {
             cb(
                 &PlayRow {
-                    is_playing: self.ctx.is_playing(&item),
+                    is_playing: self.ctx.is_playing_at(&item, &origin),
                     ctx: self.ctx.to_owned(),
                     origin: origin.clone(),
                     item,
@@ -259,7 +537,7 @@ where
         self.data.for_each(|item, position| {
             cb(
                 &mut PlayRow {
-                    is_playing: self.ctx.is_playing(&item),
+                    is_playing: self.ctx.is_playing_at(&item, &origin),
                     ctx: self.ctx.to_owned(),
                     origin: origin.clone(),
                     item,
@@ -276,6 +554,127 @@ where
 }
 
 struct PlayController;
+
+#[cfg(test)]
+mod paging_tests {
+    use super::*;
+    use crate::data::{AppState, Config, PlaylistLink, TrackId};
+    use psst_core::item_id::{ItemId, ItemIdType};
+
+    fn tracks(count: usize) -> Vector<Arc<Track>> {
+        (0..count)
+            .map(|index| {
+                let mut track: Track = serde_json::from_value(serde_json::json!({
+                    "id":"5lfWrciYtohtIMVDVZd0Rf", "name":format!("Song {index}"),
+                    "artists":[{"id":"example","name":"Artist"}], "duration_ms":240000,
+                    "disc_number":1,"track_number":1,"explicit":false,"is_local":false
+                }))
+                .unwrap();
+                track.id = TrackId(ItemId::new(index as u128 + 1, ItemIdType::Track));
+                Arc::new(track)
+            })
+            .collect()
+    }
+    fn page() -> PagedTracks<Vector<Arc<Track>>> {
+        PagedTracks::new(
+            Display {
+                track: track::Display::empty(),
+            },
+            None,
+        )
+    }
+    #[test]
+    fn pages_and_search_keep_original_playback_positions() {
+        let state = AppState::default_with_config(Config::default());
+        let source = WithCtx {
+            ctx: state.common_ctx.clone(),
+            data: tracks(750),
+        };
+        let mut widget = page();
+        widget.page.page = 2;
+        widget.rebuild(&source);
+        assert_eq!(widget.page.rows.len(), 100);
+        assert_eq!(widget.page.rows.front().unwrap().position, 200);
+        assert_eq!(source.data.count(), 750);
+        widget.query = Some(FindQuery::new("Song 733"));
+        widget.rebuild(&source);
+        assert_eq!(widget.page.rows.len(), 1);
+        assert_eq!(widget.page.rows.front().unwrap().position, 733);
+        widget.query = Some(FindQuery::new("no such song"));
+        widget.rebuild(&source);
+        assert_eq!(widget.page.page, 0);
+        assert!(widget.page.rows.is_empty());
+    }
+    #[test]
+    fn playlist_search_filters_all_pages_and_preserves_playback_positions() {
+        let state = AppState::default_with_config(Config::default());
+        let mut source = WithCtx {
+            ctx: state.common_ctx.clone(),
+            data: PlaylistTracks {
+                id: "playlist".into(),
+                name: "Playlist".into(),
+                tracks: tracks(750),
+                query: String::new(),
+            },
+        };
+        let mut widget = PagedTracks::new(
+            Display {
+                track: track::Display::empty(),
+            },
+            None,
+        );
+        widget.page.page = 4;
+        widget.rebuild(&source);
+        source.data.query = "  sOnG 733  ".into();
+        widget.rebuild(&source);
+        assert_eq!(widget.page.page, 0);
+        assert_eq!(widget.page.total, 1);
+        assert_eq!(widget.page.rows[0].position, 733);
+        assert_eq!(source.data.count(), 750);
+        let Playable::Track(song) = &widget.page.rows[0].item else {
+            panic!()
+        };
+        assert_eq!(song.id, source.data.tracks[733].id);
+        source.data.query = "ARTIST".into();
+        widget.rebuild(&source);
+        assert_eq!(widget.page.total, 750);
+        source.data.query = "does not exist".into();
+        widget.rebuild(&source);
+        assert_eq!(widget.page.total, 0);
+        source.data.query.clear();
+        widget.rebuild(&source);
+        assert_eq!(widget.page.total, 750);
+        assert_eq!(widget.page.rows[0].position, 0);
+    }
+    #[test]
+    fn now_playing_reveals_its_page_and_matches_only_its_source() {
+        let mut state = AppState::default_with_config(Config::default());
+        let tracks = tracks(750);
+        state.start_playback(
+            Playable::Track(tracks[612].clone()),
+            PlaybackOrigin::Home,
+            std::time::Duration::ZERO,
+        );
+        let source = WithCtx {
+            ctx: state.common_ctx.clone(),
+            data: tracks,
+        };
+        let mut widget = page();
+        widget.rebuild(&source);
+        assert_eq!(widget.page.page, 6);
+        assert!(widget.page.rows[12].is_playing);
+        let another = PlaybackOrigin::Playlist(PlaylistLink {
+            id: "other".into(),
+            name: "Other".into(),
+        });
+        assert!(!source
+            .ctx
+            .is_playing_at(&widget.page.rows[12].item, &another));
+        // Independent metadata objects from a restored snapshot still match by Spotify ID.
+        let same = Playable::Track(Arc::new(source.data[612].as_ref().clone()));
+        assert!(source.ctx.is_playing_at(&same, &PlaybackOrigin::Home));
+    }
+}
 
 impl<T, W> Controller<WithCtx<T>, W> for PlayController
 where

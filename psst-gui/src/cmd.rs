@@ -35,6 +35,13 @@ pub const NAVIGATE: Selector<Nav> = Selector::new("app.navigates");
 pub const NAVIGATE_BACK: Selector<usize> = Selector::new("app.navigate-back");
 pub const NAVIGATE_REFRESH: Selector = Selector::new("app.navigate-refresh");
 pub const TOGGLE_LYRICS: Selector = Selector::new("app.toggle-lyrics");
+pub const OPEN_MUSIC_VIDEO: Selector<Arc<Track>> = Selector::new("app.open-music-video");
+pub const SUSPEND_LOCAL_PLAYBACK: Selector = Selector::new("app.suspend-local-playback");
+pub const RESTORE_LOCAL_PLAYBACK: Selector = Selector::new("app.restore-local-playback");
+pub const PLAY_TOGGLE: Selector = Selector::new("app.play-toggle");
+
+pub const QUEUE_CHANGED: Selector<(Vec<ItemId>, psst_core::player::queue::QueueSnapshot)> =
+    Selector::new("app.queue-changed");
 
 // Playback state
 pub const PLAYBACK_LOADING: Selector<ItemId> = Selector::new("app.playback-loading");
@@ -52,6 +59,8 @@ pub const PLAY_PREVIOUS: Selector = Selector::new("app.play-previous");
 pub const PLAY_PAUSE: Selector = Selector::new("app.play-pause");
 pub const PLAY_RESUME: Selector = Selector::new("app.play-resume");
 pub const PLAY_NEXT: Selector = Selector::new("app.play-next");
+pub const PLAY_UPCOMING: Selector<(usize, ItemId)> = Selector::new("app.play-upcoming");
+pub const DOWNLOAD_TRACK: Selector<Arc<Track>> = Selector::new("app.download-track");
 pub const PLAY_STOP: Selector = Selector::new("app.play-stop");
 pub const ADD_TO_QUEUE: Selector<(QueueEntry, PlaybackItem)> = Selector::new("app.add-to-queue");
 pub const PLAY_QUEUE_BEHAVIOR: Selector<QueueBehavior> = Selector::new("app.play-queue-behavior");

@@ -73,18 +73,20 @@ impl Cdn {
         );
         let access_token = self.login5.get_access_token(&self.session)?;
         let client_token = self.client_token_provider.get()?;
-        let mut response = self
-            .agent
-            .get(&locations_uri)
-            .header(
-                "Authorization",
-                &format!("Bearer {}", access_token.access_token),
-            )
-            .header("client-token", &client_token)
-            .call()?;
+        let bytes = crate::util::retry_network_read(|| {
+            let mut response = self
+                .agent
+                .get(&locations_uri)
+                .header(
+                    "Authorization",
+                    &format!("Bearer {}", access_token.access_token),
+                )
+                .header("client-token", &client_token)
+                .call()?;
 
-        // Parse the protobuf StorageResolveResponse.
-        let bytes = response.body_mut().read_to_vec()?;
+            // Parse the protobuf StorageResolveResponse.
+            response.body_mut().read_to_vec()
+        })?;
         let msg = StorageResolveResponse::parse_from_bytes(&bytes)
             .map_err(|e| Error::AudioFetchingError(Box::new(e)))?;
 
@@ -105,11 +107,12 @@ impl Cdn {
         offset: u64,
         length: u64,
     ) -> Result<(u64, impl Read), Error> {
-        let response = self
-            .agent
-            .get(uri)
-            .header("Range", &range_header(offset, length))
-            .call()?;
+        let response = crate::util::retry_network_read(|| {
+            self.agent
+                .get(uri)
+                .header("Range", &range_header(offset, length))
+                .call()
+        })?;
         let total_length = parse_total_content_length(&response);
         let data_reader = response.into_body().into_reader();
         Ok((total_length, data_reader))

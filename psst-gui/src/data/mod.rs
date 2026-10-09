@@ -1,14 +1,17 @@
 mod album;
 mod artist;
 pub mod config;
+pub mod connect;
 mod ctx;
 mod find;
 mod id;
 mod nav;
+pub mod news;
 mod playback;
 mod playlist;
 mod promise;
 mod recommend;
+pub mod resume;
 mod search;
 mod show;
 mod slider_scroll_scale;
@@ -47,7 +50,7 @@ pub use crate::data::{
     },
     playlist::{
         Playlist, PlaylistAddTrack, PlaylistDetail, PlaylistLink, PlaylistRemoveTrack,
-        PlaylistTracks,
+        PlaylistReorder, PlaylistTracks,
     },
     promise::{Promise, PromiseState},
     recommend::{
@@ -57,7 +60,7 @@ pub use crate::data::{
     search::{Search, SearchResults, SearchTopic},
     show::{Episode, EpisodeId, EpisodeLink, Show, ShowDetail, ShowEpisodes, ShowLink},
     slider_scroll_scale::SliderScrollScale,
-    track::{AudioAnalysis, Track, TrackId, TrackLines},
+    track::{AudioAnalysis, Lyrics, Track, TrackId, TrackLines},
     user::{PublicUser, UserProfile},
     utils::{Cached, Float64, Image, Page},
 };
@@ -67,6 +70,7 @@ pub const ALERT_DURATION: Duration = Duration::from_secs(5);
 
 #[derive(Clone, Data, Lens)]
 pub struct AppState {
+    pub splitify: crate::splitify::SplitState,
     #[data(ignore)]
     pub session: SessionService,
     pub nav: Nav,
@@ -84,9 +88,23 @@ pub struct AppState {
     pub common_ctx: Arc<CommonCtx>,
     pub home_detail: HomeDetail,
     pub alerts: Vector<Alert>,
+    pub cache_notice: String,
+    pub selected_folder: Option<String>,
+    pub queue_panel_open: bool,
+    pub queue_page: usize,
+    pub folder_name: String,
+    pub editing_folder: Option<String>,
+    pub playlist_picker_track: Option<TrackId>,
+    pub playlist_picker_filter: String,
+    pub playlist_picker_url: String,
+    pub playlist_picker_status: String,
     pub finder: Finder,
     pub added_queue: Vector<QueueEntry>,
-    pub lyrics: Promise<Vector<TrackLines>>,
+    #[data(ignore)]
+    pub engine_queue: Option<psst_core::player::queue::QueueSnapshot>,
+    pub lyrics: Promise<Lyrics, String>,
+    pub connect: connect::ConnectState,
+    pub news: news::NewsState,
     pub credits: Option<TrackCredits>,
 }
 
@@ -97,10 +115,14 @@ impl AppState {
             saved_albums: Promise::Empty,
             saved_tracks: Promise::Empty,
             saved_shows: Promise::Empty,
+            track_overrides: Default::default(),
+            album_overrides: Default::default(),
+            show_overrides: Default::default(),
             playlists: Promise::Empty,
         });
         let common_ctx = Arc::new(CommonCtx {
             now_playing: None,
+            playing_origin: None,
             library: Arc::clone(&library),
             show_track_cover: config.show_track_cover,
             nav: Nav::Home,
@@ -110,15 +132,20 @@ impl AppState {
             now_playing: None,
             queue_behavior: config.queue_behavior,
             queue: Vector::new(),
+            up_next: Vector::new(),
             volume: config.volume,
+            lyrics_follow: true,
         };
-        Self {
+        let mut state = Self {
+            splitify: crate::splitify::SplitState::default(),
             session: SessionService::empty(),
             nav: Nav::Home,
             history: Vector::new(),
             config,
             preferences: Preferences {
                 active: PreferencesTab::General,
+                logs: String::new(),
+                log_status: String::new(),
                 cache: None,
                 cache_size: Promise::Empty,
                 auth: Authentication::new(),
@@ -126,6 +153,9 @@ impl AppState {
             },
             playback,
             added_queue: Vector::new(),
+            queue_panel_open: false,
+            queue_page: 0,
+            engine_queue: None,
             search: Search {
                 input: "".into(),
                 topic: None,
@@ -156,6 +186,7 @@ impl AppState {
                 overview: Promise::Empty,
             },
             playlist_detail: PlaylistDetail {
+                query: String::new(),
                 playlist: Promise::Empty,
                 tracks: Promise::Empty,
             },
@@ -166,10 +197,22 @@ impl AppState {
             library,
             common_ctx,
             alerts: Vector::new(),
+            cache_notice: String::new(),
+            selected_folder: None,
+            folder_name: String::new(),
+            editing_folder: None,
+            playlist_picker_track: None,
+            playlist_picker_filter: String::new(),
+            playlist_picker_url: String::new(),
+            playlist_picker_status: String::new(),
             finder: Finder::new(),
             lyrics: Promise::Empty,
+            connect: connect::ConnectState::default(),
+            news: news::NewsState::default(),
             credits: None,
-        }
+        };
+        state.restore_resume();
+        state
     }
 }
 
@@ -201,20 +244,52 @@ impl AppState {
         }
     }
 
-    pub fn refresh_all(&mut self) {
-        self.album_detail.album = Promise::Empty;
-        self.artist_detail.overview = Promise::Empty;
-        self.artist_detail.albums = Promise::Empty;
-        self.artist_detail.artist = Promise::Empty;
-        self.playlist_detail.playlist = Promise::Empty;
-        self.playlist_detail.tracks = Promise::Empty;
-        self.show_detail.episodes = Promise::Empty;
-        self.show_detail.show = Promise::Empty;
-    }
-
-    pub fn refresh_playlist(&mut self) {
-        self.playlist_detail.tracks = Promise::Empty;
-        self.playlist_detail.playlist = Promise::Empty;
+    pub fn refresh_current_route(&mut self) {
+        match self.nav.clone() {
+            Nav::SavedTracks => self.with_library_mut(|library| {
+                library.saved_tracks.clear();
+                library.track_overrides.clear();
+            }),
+            Nav::SavedAlbums => self.with_library_mut(|library| {
+                library.saved_albums.clear();
+                library.album_overrides.clear();
+            }),
+            Nav::Shows => self.with_library_mut(|library| {
+                library.saved_shows.clear();
+                library.show_overrides.clear();
+            }),
+            Nav::AlbumDetail(_, _) => self.album_detail.album.clear(),
+            Nav::ArtistDetail(_) => {
+                self.artist_detail.artist.clear();
+                self.artist_detail.albums.clear();
+                self.artist_detail.overview.clear();
+            }
+            Nav::PlaylistDetail(_) => {
+                self.playlist_detail.playlist.clear();
+                self.playlist_detail.tracks.clear();
+            }
+            Nav::ShowDetail(_) => {
+                self.show_detail.show.clear();
+                self.show_detail.episodes.clear();
+            }
+            Nav::SearchResults(_) => self.search.results.clear(),
+            Nav::Recommendations(_) => self.recommend.results.clear(),
+            Nav::Notifications => self.news.feed.clear(),
+            Nav::Lyrics => self.lyrics.clear(),
+            Nav::Home => {
+                self.home_detail.made_for_you.clear();
+                self.home_detail.user_top_mixes.clear();
+                self.home_detail.best_of_artists.clear();
+                self.home_detail.recommended_stations.clear();
+                self.home_detail.your_shows.clear();
+                self.home_detail.shows_that_you_might_like.clear();
+                self.home_detail.uniquely_yours.clear();
+                self.home_detail.jump_back_in.clear();
+                self.home_detail.user_top_tracks.clear();
+                self.home_detail.user_top_artists.clear();
+            }
+            Nav::Queue | Nav::Devices => {}
+        }
     }
 }
 
@@ -253,6 +328,7 @@ impl AppState {
 
     pub fn start_playback(&mut self, item: Playable, origin: PlaybackOrigin, progress: Duration) {
         self.common_ctx_mut().now_playing.replace(item.clone());
+        self.common_ctx_mut().playing_origin = Some(origin.clone());
         self.playback.state = PlaybackState::Playing;
         self.playback.now_playing.replace(NowPlaying {
             item,
@@ -327,6 +403,7 @@ impl AppState {
     }
 
     pub fn error_alert(&mut self, message: impl Display) {
+        log::error!("{message}");
         self.add_alert(message, AlertStyle::Error);
     }
 
@@ -348,17 +425,23 @@ pub struct Library {
     pub saved_albums: Promise<SavedAlbums>,
     pub saved_tracks: Promise<SavedTracks>,
     pub saved_shows: Promise<Shows>,
+    pub track_overrides: druid::im::HashMap<TrackId, bool>,
+    pub album_overrides: druid::im::HashMap<Arc<str>, bool>,
+    pub show_overrides: druid::im::HashMap<Arc<str>, bool>,
 }
 
 impl Library {
     pub fn add_track(&mut self, track: Arc<Track>) {
+        self.track_overrides.insert(track.id, true);
         if let Some(saved) = self.saved_tracks.resolved_mut() {
-            saved.set.insert(track.id);
-            saved.tracks.push_front(track);
+            if saved.set.insert(track.id).is_none() {
+                saved.tracks.push_front(track);
+            }
         }
     }
 
     pub fn remove_track(&mut self, track_id: &TrackId) {
+        self.track_overrides.insert(*track_id, false);
         if let Some(saved) = self.saved_tracks.resolved_mut() {
             saved.set.remove(track_id);
             saved.tracks.retain(|t| &t.id != track_id);
@@ -366,6 +449,9 @@ impl Library {
     }
 
     pub fn contains_track(&self, track: &Track) -> bool {
+        if let Some(saved) = self.track_overrides.get(&track.id) {
+            return *saved;
+        }
         if let Some(saved) = self.saved_tracks.resolved() {
             saved.set.contains(&track.id)
         } else {
@@ -374,13 +460,16 @@ impl Library {
     }
 
     pub fn add_album(&mut self, album: Arc<Album>) {
+        self.album_overrides.insert(album.id.clone(), true);
         if let Some(saved) = self.saved_albums.resolved_mut() {
-            saved.set.insert(album.id.clone());
-            saved.albums.push_front(album);
+            if saved.set.insert(album.id.clone()).is_none() {
+                saved.albums.push_front(album);
+            }
         }
     }
 
     pub fn remove_album(&mut self, album_id: &str) {
+        self.album_overrides.insert(album_id.into(), false);
         if let Some(saved) = self.saved_albums.resolved_mut() {
             saved.set.remove(album_id);
             saved.albums.retain(|a| a.id.as_ref() != album_id);
@@ -388,6 +477,9 @@ impl Library {
     }
 
     pub fn contains_album(&self, album: &Album) -> bool {
+        if let Some(saved) = self.album_overrides.get(&album.id) {
+            return *saved;
+        }
         if let Some(saved) = self.saved_albums.resolved() {
             saved.set.contains(&album.id)
         } else {
@@ -396,13 +488,16 @@ impl Library {
     }
 
     pub fn add_show(&mut self, show: Arc<Show>) {
+        self.show_overrides.insert(show.id.clone(), true);
         if let Some(saved) = self.saved_shows.resolved_mut() {
-            saved.set.insert(show.id.clone());
-            saved.shows.push_front(show);
+            if saved.set.insert(show.id.clone()).is_none() {
+                saved.shows.push_front(show);
+            }
         }
     }
 
     pub fn remove_show(&mut self, show_id: &str) {
+        self.show_overrides.insert(show_id.into(), false);
         if let Some(saved) = self.saved_shows.resolved_mut() {
             saved.set.remove(show_id);
             saved.shows.retain(|a| a.id.as_ref() != show_id);
@@ -410,6 +505,9 @@ impl Library {
     }
 
     pub fn contains_show(&self, show: &Show) -> bool {
+        if let Some(saved) = self.show_overrides.get(&show.id) {
+            return *saved;
+        }
         if let Some(saved) = self.saved_shows.resolved() {
             saved.set.contains(&show.id)
         } else {
@@ -498,6 +596,9 @@ impl Default for Library {
             saved_albums: Promise::Empty,
             saved_tracks: Promise::Empty,
             saved_shows: Promise::Empty,
+            track_overrides: Default::default(),
+            album_overrides: Default::default(),
+            show_overrides: Default::default(),
         }
     }
 }
@@ -544,14 +645,25 @@ impl Shows {
 #[derive(Clone, Data)]
 pub struct CommonCtx {
     pub now_playing: Option<Playable>,
+    pub playing_origin: Option<PlaybackOrigin>,
     pub library: Arc<Library>,
     pub show_track_cover: bool,
     pub nav: Nav,
 }
 
 impl CommonCtx {
-    pub fn is_playing(&self, item: &Playable) -> bool {
-        matches!(&self.now_playing, Some(i) if i.same(item))
+    pub fn is_playing_at(&self, item: &Playable, origin: &PlaybackOrigin) -> bool {
+        let source_matches = match (&self.playing_origin, origin) {
+            (Some(PlaybackOrigin::Playlist(a)), PlaybackOrigin::Playlist(b)) => a.id == b.id,
+            (Some(PlaybackOrigin::Album(a)), PlaybackOrigin::Album(b)) => a.id == b.id,
+            (Some(a), b) => a.same(b),
+            _ => false,
+        };
+        source_matches
+            && self
+                .now_playing
+                .as_ref()
+                .is_some_and(|current| current.id() == item.id())
     }
 }
 
@@ -600,4 +712,51 @@ impl Alert {
 pub enum AlertStyle {
     Error,
     Info,
+}
+
+#[cfg(test)]
+mod refresh_tests {
+    use super::*;
+    #[test]
+    fn refreshing_saved_tracks_preserves_other_views() {
+        let mut state = AppState::default_with_config(Config::default());
+        state.with_library_mut(|library| {
+            library
+                .saved_tracks
+                .resolve((), SavedTracks::new(Vector::new()));
+            library
+                .saved_albums
+                .resolve((), SavedAlbums::new(Vector::new()));
+        });
+        state.nav = Nav::SavedTracks;
+        state.refresh_current_route();
+        assert!(!state.library.saved_tracks.is_resolved());
+        assert!(state.library.saved_albums.is_resolved());
+    }
+}
+
+#[cfg(test)]
+mod library_status_tests {
+    use super::*;
+    #[test]
+    fn confirmed_save_is_visible_without_prefetching_all_saved_tracks() {
+        let track: Track = serde_json::from_value(serde_json::json!({
+            "id":"7omij53d6AvXefx13NNyfn", "name":"Fixture", "artists":[], "duration_ms":180000,
+            "disc_number":1,"track_number":1,"explicit":false,"is_local":false
+        }))
+        .unwrap();
+        let mut library = Library::default();
+        assert!(!library.contains_track(&track));
+        library.add_track(Arc::new(track.clone()));
+        assert!(library.contains_track(&track));
+        assert!(!library.saved_tracks.is_resolved());
+        library.remove_track(&track.id);
+        assert!(!library.contains_track(&track));
+        library
+            .saved_tracks
+            .resolve((), SavedTracks::new(Vector::new()));
+        library.add_track(Arc::new(track.clone()));
+        library.add_track(Arc::new(track));
+        assert_eq!(library.saved_tracks.resolved().unwrap().tracks.len(), 1);
+    }
 }
