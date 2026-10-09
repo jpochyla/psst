@@ -1,4 +1,23 @@
-# Local validation - Windows - 2026-10-06
+# Local validation - Windows
+
+## Artist cards and two-week news window, Windows (2026-10-09)
+
+- News now shows one responsive card per artist, with release covers, type/date, unread counts, and links to the artist and individual albums. Artist IDs separate performers who share a display name. Artists and releases retain the feed's newest-first order.
+- The query filters releases to the last 14 days before grouping and stops discography pagination at the same cutoff. The empty-state text describes the two-week window.
+- 69 offline GUI tests passed; date-window coverage includes the exact 14-day boundary, older releases, missing dates and future dates. Grouping coverage preserves order/read status and separates identical artist names by ID.
+- Explicit read-only validation returned 77 releases in 51 artist groups for 199 followed artists, with zero failures. All release dates passed the two-week filter.
+- Reviewed dark fixtures at 1120 x 800 and 1600 x 900, and light at 900 x 700: the grid reflows to a single column, long titles wrap, and each artist retains all its recent releases. The installed application displayed the real two-column card feed with 77 releases and no lookup failures. Playback remained paused.
+- Final Windows Release build used ThinLTO with 16 codegen units (41 MiB executable). The root executable was updated and reopened; `target`, `dist`, and `build` were verified absent.
+
+## Followed artist news correction, Windows (2026-10-09)
+
+- News now reads albums and singles through the same first-party discography operations as the artist page. The old Web API artist-album cooldown no longer suppresses these separate queries; partner HTTP 429 deadlines remain enforced.
+- Spotify's real discography date contains `isoString` and `year`, without separate month/day fields. Parsing the complete ISO date fixes the January 1 fallback that incorrectly excluded current releases. Year-only responses still retain their fallback.
+- Each raw discography page is cached for six hours and preserved across restarts and temporary failures. DATE_DESC pagination stops once dates precede the 90-day cutoff. GraphQL errors and missing sections cannot overwrite valid cached pages. Failed queries have a distinct empty-state message.
+- 67 offline GUI tests passed, with two live tests excluded by default. Regression coverage includes ISO dates, cutoff boundaries, pagination exhaustion, cache persistence, stale data during partner cooldowns, and separate Web API/partner quota keys.
+- Explicit read-only validation with the configured account returned 199 followed artists, 300 releases (the existing display cap), and zero failed artists. No configuration save or playback command was issued by the live test.
+- Final optimized Windows executable (31 MiB) started successfully. The actual News view displayed 300 releases for 199 followed artists; application logs confirmed 330 recent releases found with zero failures before the existing 300-row cap. Playback remained paused. `target`, `dist`, and `build` were verified absent after compilation.
+- Windows build/launch scripts now use the root `Xpotify.exe`. Successful builds copy the executable before removing project-owned `target`, `dist`, and `build` directories. Absolute paths are checked and junctions are rejected before cleanup. Explicit package creation still retains its requested archives.
 
 ## Compact library and Connect readiness, Windows 0.4.5
 

@@ -30,7 +30,8 @@ jobs:
         with:
           name: Xpotify-${{ runner.os }}-${{ runner.arch }}
           path: |
-            dist/Xpotify.exe
+            Xpotify.exe
+            Xpotify.exe.sha256
             dist/*.zip
             dist/*.tar.gz
             dist/*.sha256

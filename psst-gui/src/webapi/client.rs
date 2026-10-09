@@ -60,6 +60,15 @@ fn trusted_api_destination(url: &url::Url) -> bool {
         )
 }
 
+fn news_page_complete(page: &[Arc<Album>], cutoff: Date, offset: usize, total: i64) -> bool {
+    page.is_empty()
+        || offset + 50 >= total.max(0) as usize
+        || page
+            .last()
+            .and_then(|album| album.release_date)
+            .is_some_and(|date| date < cutoff)
+}
+
 impl WebApi {
     pub fn get_devices(&self) -> Result<Vector<data::connect::Device>, Error> {
         #[derive(Deserialize)]
@@ -113,11 +122,8 @@ impl WebApi {
                 break;
             }
         }
-        #[derive(Deserialize)]
-        struct Albums {
-            items: Vec<Arc<Album>>,
-        }
-        let cutoff = time::OffsetDateTime::now_utc().date() - time::Duration::days(90);
+        let today = time::OffsetDateTime::now_utc().date();
+        let cutoff = today - time::Duration::days(data::news::RECENT_DAYS);
         let mut releases = Vec::new();
         let mut seen = std::collections::HashSet::new();
         let mut failed = 0;
@@ -128,17 +134,7 @@ impl WebApi {
                 let workers: Vec<_> = batch
                     .iter()
                     .map(|artist| {
-                        scope.spawn(move || {
-                            let request = RequestBuilder::new(
-                                format!("v1/artists/{}/albums", artist.id),
-                                Method::Get,
-                                None,
-                            )
-                            .query("include_groups", "album,single")
-                            .query("limit", "20")
-                            .query("market", "from_token");
-                            (artist, self.news_albums::<Albums>(&artist.id, &request))
-                        })
+                        scope.spawn(move || (artist, self.news_albums(&artist.id, cutoff)))
                     })
                     .collect();
                 workers
@@ -149,21 +145,24 @@ impl WebApi {
             for (artist, result) in results {
                 match result {
                     Ok(albums) => {
-                        for album in albums.items {
-                            if album.release_date.is_some_and(|date| {
-                                date >= cutoff && date <= time::OffsetDateTime::now_utc().date()
-                            }) && seen.insert(album.id.clone())
+                        for album in albums {
+                            if data::news::is_recent(album.release_date, today)
+                                && seen.insert(album.id.clone())
                             {
                                 releases.push(data::news::Release {
                                     date: album.release_date.unwrap().to_string(),
                                     album,
                                     artist: artist.name.to_string(),
+                                    artist_id: artist.id.to_string(),
                                     unread: true,
                                 });
                             }
                         }
                     }
-                    Err(_) => failed += 1,
+                    Err(error) => {
+                        log::warn!("Release lookup failed for {}: {error}", artist.id);
+                        failed += 1;
+                    }
                 }
             }
             log::info!(
@@ -179,68 +178,113 @@ impl WebApi {
             releases: releases.into_iter().take(300).collect(),
             followed_count: followed.len(),
             failed_count: failed,
-            notice: self.news_quota_until.lock().and_then(|until| until.duration_since(SystemTime::now()).ok()).map(|delay| format!("Spotify ha limitado las consultas de lanzamientos. Vuelve a actualizar dentro de aproximadamente {} horas. Se muestran los datos disponibles en cach\u{00e9}.", delay.as_secs().div_ceil(3600))).unwrap_or_default(),
+            notice: if failed > 0 {
+                "No se pudo completar la consulta de todos los artistas. Los resultados pueden estar incompletos; vuelve a actualizar m\u{00e1}s tarde.".into()
+            } else {
+                String::new()
+            },
         })
     }
 
-    fn news_albums<T: DeserializeOwned>(
-        &self,
-        id: &str,
-        request: &RequestBuilder,
-    ) -> Result<T, Error> {
+    // Use the same first-party discography as the artist view, rather than
+    // issuing hundreds of Web API artist-album requests. Keep each page for
+    // six hours and retain stale pages during temporary errors or cooldowns.
+    fn news_albums(&self, id: &str, cutoff: Date) -> Result<Vec<Arc<Album>>, Error> {
         if id.len() != 22 || !id.chars().all(|c| c.is_ascii_alphanumeric()) {
             return Err(Error::WebApiError("Invalid artist ID".into()));
         }
-        let cached = || {
-            self.cache
-                .get("artist-releases", id)
-                .and_then(|file| serde_json::from_reader(file).ok())
-        };
-        let quota_active = self
-            .news_quota_until
-            .lock()
-            .is_some_and(|until| until > SystemTime::now());
-        let fresh = self
-            .cache
-            .get("artist-releases", id)
-            .and_then(|file| file.metadata().ok())
-            .and_then(|metadata| metadata.modified().ok())
-            .and_then(|modified| modified.elapsed().ok())
-            .is_some_and(|age| age < Duration::from_secs(6 * 3600));
-        if quota_active || fresh {
-            if let Some(value) = cached() {
-                return Ok(value);
-            }
-            if quota_active {
-                return Err(Error::WebApiError(
-                    "Spotify HTTP 429: release quota exhausted".into(),
-                ));
+        let mut albums = Vec::new();
+        for (operation, default_type) in [
+            ("queryArtistDiscographyAlbums", AlbumType::Album),
+            ("queryArtistDiscographySingles", AlbumType::Single),
+        ] {
+            let mut offset = 0;
+            loop {
+                let request = Self::news_request(id, operation, offset);
+                let key = format!("{id}-{operation}-{offset}");
+                let cached = self.cache.get("news-discography", &key).and_then(|file| {
+                    let fresh = file
+                        .metadata()
+                        .ok()
+                        .and_then(|m| m.modified().ok())
+                        .and_then(|t| t.elapsed().ok())
+                        .is_some_and(|age| age < Duration::from_secs(6 * 3600));
+                    serde_json::from_reader::<_, serde_json::Value>(file)
+                        .ok()
+                        .filter(|value| Self::news_section(value.clone(), operation).is_ok())
+                        .map(|value| (value, fresh))
+                });
+                let value = if let Some((value, true)) = &cached {
+                    value.clone()
+                } else {
+                    match self.request_json(&request) {
+                        Ok(value) => {
+                            // GraphQL can report errors with HTTP 200. Never
+                            // replace a good page with an error response.
+                            Self::news_section(value.clone(), operation)?;
+                            self.cache
+                                .set("news-discography", &key, &serde_json::to_vec(&value)?);
+                            value
+                        }
+                        Err(error) if Self::temporary_api_error(&error) => {
+                            cached.map(|(value, _)| value).ok_or(error)?
+                        }
+                        Err(error) => return Err(error),
+                    }
+                };
+                let section = Self::news_section(value, operation)?;
+                let page: Vec<_> = section
+                    .items
+                    .iter()
+                    .filter_map(|holder| holder.releases.items.first())
+                    .map(|release| Arc::new(release.to_album(default_type.clone())))
+                    .collect();
+                let stop = news_page_complete(&page, cutoff, offset, section.total_count);
+                albums.extend(page);
+                if stop {
+                    break;
+                }
+                offset += 50;
             }
         }
-        let mut response = match self.request(request) {
-            Ok(response) => response,
-            Err(error @ Error::RateLimited { retry_at, .. }) => {
-                *self.news_quota_until.lock() =
-                    UNIX_EPOCH.checked_add(Duration::from_secs(retry_at));
-                self.cache.set(
-                    "artist-releases",
-                    "quota-until",
-                    retry_at.to_string().as_bytes(),
-                );
-                return cached().ok_or(error);
-            }
-            Err(error) if Self::temporary_api_error(&error) => return cached().ok_or(error),
-            Err(error) => return Err(error),
+        Ok(albums)
+    }
+
+    fn news_section(
+        value: serde_json::Value,
+        operation: &str,
+    ) -> Result<DiscographySection, Error> {
+        if value
+            .get("errors")
+            .and_then(|errors| errors.as_array())
+            .is_some_and(|errors| !errors.is_empty())
+        {
+            return Err(Error::WebApiError(
+                "Spotify no pudo cargar la discograf\u{00ed}a del artista".into(),
+            ));
+        }
+        let response: DiscographyResponse = serde_json::from_value(value)?;
+        let section = if operation == "queryArtistDiscographyAlbums" {
+            response.data.artist_union.discography.albums
+        } else {
+            response.data.artist_union.discography.singles
         };
-        let value: serde_json::Value = response
-            .body_mut()
-            .with_config()
-            .limit(2 * 1024 * 1024)
-            .read_json()?;
-        let parsed = serde_json::from_value(value.clone())?;
-        self.cache
-            .set("artist-releases", id, &serde_json::to_vec(&value)?);
-        Ok(parsed)
+        section.ok_or_else(|| {
+            Error::WebApiError(
+                "Spotify no devolvi\u{00f3} la discograf\u{00ed}a del artista".into(),
+            )
+        })
+    }
+
+    fn news_request(id: &str, operation: &str, offset: usize) -> RequestBuilder {
+        RequestBuilder::new("pathfinder/v2/query", Method::Post, Some(json!({
+            "operationName": operation,
+            "variables": {"uri": format!("spotify:artist:{id}"), "offset": offset, "limit": 50, "order": "DATE_DESC"},
+            "extensions": {"persistedQuery": {"version": 1, "sha256Hash": DISCOGRAPHY_HASH}}
+        })))
+            .set_base_uri("api-partner.spotify.com")
+            .header("User-Agent", Self::user_agent())
+            .partner_auth()
     }
 
     pub fn remote_playback(&self) -> Result<Option<data::connect::RemotePlayback>, Error> {
@@ -369,6 +413,123 @@ impl WebApi {
 mod credential_destination_tests {
     use super::*;
     #[test]
+    fn discography_uses_complete_iso_date_instead_of_january_first() {
+        let date: ReleaseDate = serde_json::from_value(json!({
+            "year": 2026, "isoString": "2026-10-02T00:00:00Z", "precision": "DAY"
+        }))
+        .unwrap();
+        assert_eq!(
+            date.to_date().0,
+            Date::from_calendar_date(2026, Month::October, 2).ok()
+        );
+        let year: ReleaseDate =
+            serde_json::from_value(json!({"year": 2026, "precision": "YEAR"})).unwrap();
+        assert_eq!(
+            year.to_date().0,
+            Date::from_calendar_date(2026, Month::January, 1).ok()
+        );
+        let invalid: ReleaseDate =
+            serde_json::from_value(json!({"isoString":"2026-02-31T00:00:00Z"})).unwrap();
+        assert!(invalid.to_date().0.is_none());
+    }
+
+    #[test]
+    fn news_pages_survive_restart_and_partner_cooldown_and_stop_at_cutoff() {
+        let path =
+            std::env::temp_dir().join(format!("xpotify-news-test-{}", rand::random::<u64>()));
+        let id = "5lfWrciYtohtIMVDVZd0Rf";
+        let cutoff = Date::from_calendar_date(2026, Month::July, 11).unwrap();
+        let api = WebApi::new(None, Some(path.clone()), 5000);
+        // A total above 50 must not trigger a second page once DATE_DESC
+        // reaches a release older than the cutoff (including the boundary).
+        for (operation, section) in [
+            ("queryArtistDiscographyAlbums", "albums"),
+            ("queryArtistDiscographySingles", "singles"),
+        ] {
+            let value = json!({"data":{"artistUnion":{"discography":{
+                section: {"totalCount": 120, "items":[
+                    {"releases":{"items":[{"id":"recent", "name":"Recent", "date":{"year":2026,"month":7,"day":11,"precision":"DAY"}}]}},
+                    {"releases":{"items":[{"id":"old", "name":"Old", "date":{"year":2026,"month":7,"day":10,"precision":"DAY"}}]}}
+                ]}
+            }}}});
+            let key = format!("{id}-{operation}-0");
+            api.cache.set(
+                "news-discography",
+                &key,
+                &serde_json::to_vec(&value).unwrap(),
+            );
+        }
+        let albums = api.news_albums(id, cutoff).unwrap();
+        assert_eq!(albums.len(), 4);
+        assert!(!news_page_complete(&albums[..1], cutoff, 0, 120));
+        assert!(news_page_complete(&albums[..1], cutoff, 0, 1));
+        assert!(news_page_complete(&[], cutoff, 0, 120));
+        for entry in std::fs::read_dir(path.join("news-discography")).unwrap() {
+            std::fs::OpenOptions::new()
+                .write(true)
+                .open(entry.unwrap().path())
+                .unwrap()
+                .set_times(std::fs::FileTimes::new().set_modified(UNIX_EPOCH))
+                .unwrap();
+        }
+        let request = WebApi::news_request(id, "queryArtistDiscographyAlbums", 0);
+        let until = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs()
+            + 86400;
+        api.cache.set(
+            "request-limits",
+            &api.rate_limit_key(&request),
+            &serde_json::to_vec(&until).unwrap(),
+        );
+        let restarted = WebApi::new(None, Some(path.clone()), 5000);
+        let start = Instant::now();
+        assert_eq!(restarted.news_albums(id, cutoff).unwrap().len(), 4);
+        assert!(start.elapsed() < Duration::from_secs(1));
+        assert!(matches!(
+            restarted.request(&request),
+            Err(Error::RateLimited { .. })
+        ));
+        std::fs::remove_dir_all(path).unwrap();
+    }
+
+    #[test]
+    #[ignore = "Reads the configured Spotify account and performs live read-only release queries"]
+    fn live_followed_artist_news() {
+        let mut config = data::Config::load().expect("Configured Spotify account");
+        let api = WebApi::new(
+            data::Config::proxy().as_deref(),
+            data::Config::cache_dir(),
+            5000,
+        );
+        api.set_session(SessionService::with_config(config.session()));
+        let token = config.get_or_refresh_webapi_token().expect("Web API token");
+        api.set_webapi_credentials(
+            config.webapi_client_id_value().map(String::from),
+            Some(token),
+        );
+        let feed = api.followed_artist_news().expect("Release feed");
+        eprintln!(
+            "Live news: {} followed artists, {} releases, {} artist cards, {} failed artists",
+            feed.followed_count,
+            feed.releases.len(),
+            data::news::group_by_artist(&feed.releases).len(),
+            feed.failed_count
+        );
+        assert!(feed.followed_count > 0);
+        let today = time::OffsetDateTime::now_utc().date();
+        assert!(feed
+            .releases
+            .iter()
+            .all(|release| data::news::is_recent(release.album.release_date, today)));
+        assert!(
+            feed.failed_count < feed.followed_count,
+            "All artists failed"
+        );
+    }
+
+    #[test]
     fn cooldown_survives_restart_and_refresh_and_preserves_stale_data() {
         let path = std::env::temp_dir().join(format!(
             "xpotify-quota-test-{}-{}",
@@ -458,16 +619,28 @@ mod credential_destination_tests {
         )));
     }
     #[test]
-    fn exhausted_release_quota_returns_without_network_or_sleep() {
+    fn news_uses_artist_discography_and_ignores_old_webapi_release_cooldown() {
         let api = WebApi::new(None, None, 5000);
-        *api.news_quota_until.lock() = Some(SystemTime::now() + Duration::from_secs(86400));
-        let request = RequestBuilder::new("v1/artists/example/albums", Method::Get, None);
-        let start = std::time::Instant::now();
-        let result = api.news_albums::<serde_json::Value>("5lfWrciYtohtIMVDVZd0Rf", &request);
-        assert!(result.unwrap_err().to_string().contains("429"));
-        assert!(start.elapsed() < Duration::from_secs(1));
+        let request = WebApi::news_request(
+            "5lfWrciYtohtIMVDVZd0Rf",
+            "queryArtistDiscographySingles",
+            50,
+        );
+        assert_eq!(request.base_uri, "api-partner.spotify.com");
+        assert!(request.partner_auth);
+        assert_ne!(
+            api.rate_limit_key(&request),
+            api.rate_limit_key(&RequestBuilder::new(
+                "v1/artists/example/albums",
+                Method::Get,
+                None
+            ))
+        );
+        let body = request.body.unwrap();
+        assert_eq!(body["variables"]["offset"], 50);
+        assert_eq!(body["variables"]["order"], "DATE_DESC");
         assert!(api
-            .news_albums::<serde_json::Value>("../escape", &request)
+            .news_albums("../escape", time::OffsetDateTime::now_utc().date())
             .is_err());
     }
     #[test]
@@ -519,7 +692,6 @@ pub struct WebApi {
     local_track_manager: Mutex<LocalTrackManager>,
     paginated_limit: usize,
     webapi_token: Mutex<Option<WebApiToken>>,
-    news_quota_until: Mutex<Option<SystemTime>>,
     response_origins: Mutex<HashMap<String, SystemTime>>,
     request_gate: Dispatcher,
     response_load: Loads,
@@ -547,15 +719,10 @@ impl WebApi {
             agent = agent.proxy(proxy);
         }
         let cache = WebApiCache::new(cache_base);
-        let news_quota_until = cache
-            .get("artist-releases", "quota-until")
-            .and_then(|file| serde_json::from_reader::<_, u64>(file).ok())
-            .and_then(|seconds| UNIX_EPOCH.checked_add(Duration::from_secs(seconds)));
         let client_token_provider = ClientTokenProvider::new_shared(proxy_url);
         Self {
             agent: agent.build().into(),
             cache,
-            news_quota_until: Mutex::new(news_quota_until),
             response_origins: Mutex::new(HashMap::new()),
             request_gate: Dispatcher::default(),
             response_load: Loads::default(),
@@ -1737,6 +1904,8 @@ struct CoverArt {
 
 #[derive(Deserialize)]
 struct ReleaseDate {
+    #[serde(rename = "isoString", default)]
+    iso_string: Option<String>,
     #[serde(default)]
     year: Option<i32>,
     #[serde(default)]
@@ -1811,13 +1980,26 @@ impl ReleaseDate {
         };
         // Only the year is required; month/day default to 1 so we can still form
         // a valid `Date` even when precision is coarser than a full day.
-        let date = self.year.and_then(|year| {
-            let month = self
-                .month
-                .and_then(|month| Month::try_from(month).ok())
-                .unwrap_or(Month::January);
-            let day = self.day.filter(|day| *day >= 1).unwrap_or(1);
+        let iso_date = self.iso_string.as_deref().and_then(|iso| {
+            let date = iso.split('T').next()?;
+            let mut parts = date.split('-');
+            let year = parts.next()?.parse::<i32>().ok()?;
+            let month = Month::try_from(parts.next()?.parse::<u8>().ok()?).ok()?;
+            let day = parts.next()?.parse::<u8>().ok()?;
+            if parts.next().is_some() {
+                return None;
+            }
             Date::from_calendar_date(year, month, day).ok()
+        });
+        let date = iso_date.or_else(|| {
+            self.year.and_then(|year| {
+                let month = self
+                    .month
+                    .and_then(|month| Month::try_from(month).ok())
+                    .unwrap_or(Month::January);
+                let day = self.day.filter(|day| *day >= 1).unwrap_or(1);
+                Date::from_calendar_date(year, month, day).ok()
+            })
         });
         (date, precision)
     }
@@ -3069,7 +3251,10 @@ mod efficiency_tests {
         let tracks = api.get_playlist_tracks(id).unwrap();
         assert_eq!(tracks.len(), 2);
         assert_eq!(tracks[1].track_pos, 3);
-        assert_eq!(tracks[1].playlist_added_at.as_deref(), Some("2026-01-02T00:00:00Z"));
+        assert_eq!(
+            tracks[1].playlist_added_at.as_deref(),
+            Some("2026-01-02T00:00:00Z")
+        );
         assert_eq!(tracks[0].id, tracks[1].id);
         let page = RequestBuilder::new(format!("v1/playlists/{id}/items"), Method::Get, None)
             .query("marker", "from_token")

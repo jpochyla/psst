@@ -36,7 +36,7 @@ The fork roadmap and its remaining limits are tracked in [ROADMAP.md](ROADMAP.md
 
 ## Run on this machine
 
-Double-click `Xpotify.lnk` for the green app shortcut, or `Start-Xpotify.cmd`. The launcher starts `dist/Xpotify.exe` from this repository, loading `.env.local` from the project directory. To rebuild: `powershell -File scripts/Build-Native.ps1`. Rust stable and Visual Studio C++ Build Tools / Windows SDK are required for compilation. The running application requires neither Node nor a web server.
+Double-click `Xpotify.lnk` for the green app shortcut, or `Start-Xpotify.cmd`. The launcher starts `Xpotify.exe` from this repository, loading `.env.local` from the project directory. To rebuild: `powershell -File scripts/Build-Native.ps1`. After a successful build, only `Xpotify.exe` remains as a build artifact; the script removes `target`, `dist` and `build`. Explicit packaging still produces its requested archives. Rust stable and Visual Studio C++ Build Tools / Windows SDK are required for compilation. The running application requires neither Node nor a web server.
 
 The default theme is **System**. On Windows it follows AppsUseLightTheme and updates when that setting changes. Preferences can override it with Light or Dark. The system option falls back to light on other platforms.
 
@@ -71,7 +71,7 @@ TZ="America/Caracas"
 
 Only musical metadata is sent to Gemini. Classification handles batches of 150 tracks and rejects invented IDs and missing tracks. Creation uses batches of 100 tracks. The web editor's SQLite history, text import and Last.fm enrichment have not been ported.
 
-Debug builds include local UI previews: `dist/Xpotify.exe --preview-ui=login`, `--preview-ui=editor`, `--preview-ui=editor-empty`, `--preview-ui=player`, `--preview-ui=queue` and `--preview-ui=queue-empty`; add `--light` or `--dark` for dark fixtures. Preview commands cannot issue remote writes and never replace normal startup data.
+Debug builds include local UI previews: `Xpotify.exe --preview-ui=login`, `--preview-ui=editor`, `--preview-ui=editor-empty`, `--preview-ui=player`, `--preview-ui=queue` and `--preview-ui=queue-empty`; add `--light` or `--dark` for dark fixtures. Preview commands cannot issue remote writes and never replace normal startup data.
 
 See `SECURITY-REVIEW.md` for the security review and remaining dependency risks; `VALIDATION.md` records actual checks. Upstream MIT licensing is preserved in `LICENSE.md`.
 
@@ -101,7 +101,7 @@ Click an upcoming queue song to play it while preserving the native queue traver
 
 Timed lyrics automatically follow the active line, with a fixed **Seguir letra** switch; plain lyrics have no fabricated synchronization. Preferences now expose **Very high (320 kb/s)** separately from High (160) and Normal (96). Low uses the engine's supported 96 kb/s minimum. Existing profiles retain their bitrate when the old quality names migrate; the choice applies to subsequent loads, subject to available track formats.
 
-The bell opens releases from followed artists: recent albums/singles from the last 90 days, cover images, unread indicators and a local **Marcar como leídas** action. It scans each artist's latest 20 releases and displays up to 300 unique releases. Spotify announcements and its complete official notifications inbox are not available in this view. Responses are cached for six hours; a Spotify release quota response preserves the cooldown across restarts and displays a clear notice instead of waiting indefinitely. Cached releases remain usable when available.
+The bell opens albums and singles from the last 14 days, grouped into responsive artist cards. Artists and their releases appear newest first, with artwork, release dates and unread counts. Artist headings open the artist page; each release opens its album. The local **Marcar como leídas** action updates the indicators. The feed uses the same first-party discography operations as the artist page, pages only through recent releases, and displays up to 300 unique releases. Spotify announcements and its complete official notifications inbox are not available in this view. Pages are cached for six hours; temporary failures and active partner cooldowns can use existing cached pages.
 
 For local visual review, `--preview-ui=news --dark` or `--light` uses synthetic releases and blocks remote actions.
 

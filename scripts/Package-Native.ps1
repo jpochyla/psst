@@ -3,8 +3,9 @@ $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 if (-not $SkipBuild) { & (Join-Path $PSScriptRoot 'Build-Native.ps1') -Release }
 $outputRoot = [IO.Path]::GetFullPath((Join-Path $projectRoot 'dist'))
-$executable = Join-Path $outputRoot 'Xpotify.exe'
+$executable = Join-Path $projectRoot 'Xpotify.exe'
 if (-not (Test-Path -LiteralPath $executable)) { throw 'Compila Xpotify antes de empaquetarlo.' }
+New-Item -ItemType Directory -Path $outputRoot -Force | Out-Null
 $stageRoot = [IO.Path]::GetFullPath((Join-Path $outputRoot ('package-' + [guid]::NewGuid().ToString('N'))))
 if (-not $stageRoot.StartsWith($outputRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) {
     throw 'La carpeta temporal debe permanecer dentro de dist.'

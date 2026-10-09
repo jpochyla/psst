@@ -254,7 +254,7 @@ pub fn run_if_requested() -> bool {
                     "id":format!("preview{index}"),"name":name,"album_type":"single","images":[],"artists":[{"id":"preview","name":"Artista seguido"}],
                     "release_date":"2026-10-01","release_date_precision":"day"
                 })).expect("news preview");
-                crate::data::news::Release { album:Arc::new(album),artist:"Artista seguido".into(),date:"2026-10-01".into(),unread:true }
+                crate::data::news::Release { album:Arc::new(album),artist:if index < 2 { "Artista seguido".into() } else { "Otro artista con un nombre largo".into() },artist_id:if index < 2 { "artist-a".into() } else { "artist-b".into() },date:"2026-10-01".into(),unread:true }
             }).collect();
             state.news.feed.resolve(
                 (),
