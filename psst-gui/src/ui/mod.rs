@@ -93,10 +93,22 @@ pub fn preferences_window() -> WindowDesc<AppState> {
 }
 
 pub fn account_setup_window() -> WindowDesc<AppState> {
+    let win_size = (theme::grid(50.0), theme::grid(45.0));
+
+    // On Windows, the window size includes the titlebar, so without this offset
+    // the login button gets clipped off the bottom of the window.
+    let win_size = if cfg!(target_os = "windows") {
+        const WINDOWS_TITLEBAR_OFFSET: f64 = 56.0;
+        (win_size.0, win_size.1 + WINDOWS_TITLEBAR_OFFSET)
+    } else {
+        win_size
+    };
+
     let win = WindowDesc::new(account_setup_widget())
         .title("Login")
-        .window_size((theme::grid(50.0), theme::grid(45.0)))
-        .resizable(false)
+        .window_size(win_size)
+        .with_min_size(win_size)
+        .resizable(true)
         .show_title(false)
         .transparent_titlebar(true);
     if cfg!(target_os = "macos") {

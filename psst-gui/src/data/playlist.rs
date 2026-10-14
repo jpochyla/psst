@@ -95,7 +95,8 @@ where
         total: Option<usize>,
     }
 
-    Ok(PlaylistTracksRef::deserialize(deserializer)?.total)
+    // `tracks` can also be explicitly `null`.
+    Ok(Option::<PlaylistTracksRef>::deserialize(deserializer)?.and_then(|tracks| tracks.total))
 }
 
 fn deserialize_description<'de, D>(deserializer: D) -> Result<Arc<str>, D::Error>
