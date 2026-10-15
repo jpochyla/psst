@@ -31,7 +31,7 @@ use protobuf::{Enum, Message, MessageField, SpecialFields};
 const DEVICE_ID: &str = "Psst";
 
 // URI of access-point resolve endpoint.
-const AP_RESOLVE_ENDPOINT: &str = "http://apresolve.spotify.com";
+const AP_RESOLVE_ENDPOINT: &str = "https://apresolve.spotify.com";
 
 // Access-point used in case the resolving fails.
 const AP_FALLBACK: &str = "ap.spotify.com:443";
@@ -137,11 +137,12 @@ impl Transport {
     pub fn resolve_ap(proxy_url: Option<&str>) -> Result<Vec<String>, Error> {
         #[derive(Deserialize)]
         struct APResolveData {
+            #[serde(alias = "accesspoint")]
             ap_list: Vec<String>,
         }
 
         Self::resolve_json_list(
-            AP_RESOLVE_ENDPOINT,
+            &format!("{AP_RESOLVE_ENDPOINT}/?type=accesspoint"),
             proxy_url,
             |data: &APResolveData| &data.ap_list,
             "AP",
@@ -192,8 +193,12 @@ impl Transport {
             if let Err(err) = stream.set_write_timeout(Some(NET_IO_TIMEOUT)) {
                 log::warn!("failed to set TCP write timeout: {err:?}");
             }
+            let _ = stream.set_read_timeout(Some(NET_IO_TIMEOUT));
             log::info!("successfully connected to AP: {ap}");
-            return Self::exchange_keys(stream);
+            match Self::exchange_keys(stream) {
+                Ok(transport) => return Ok(transport),
+                Err(error) => { log::warn!("Handshake failed for {ap}: {error}"); }
+            }
         }
         log::error!("failed to connect to any access point");
         Err(Error::ConnectionFailed)
@@ -273,7 +278,17 @@ impl Transport {
             .diffie_hellman
             .gs
             .as_ref()
-            .expect("Missing data");
+            .ok_or(Error::UnexpectedResponse)?;
+
+        let dh_challenge = apresp
+            .challenge
+            .login_crypto_challenge
+            .diffie_hellman
+            .get_or_default();
+        if dh_challenge.server_signature_key() != 0 {
+            return Err(Error::ConnectionFailed);
+        }
+        verify_server_key(remote_key, dh_challenge.gs_signature())?;
 
         let (challenge, send_key, recv_key) = compute_keys(
             &local_keys.shared_secret(remote_key),
@@ -336,11 +351,44 @@ impl Transport {
 
 fn read_packet(stream: &mut TcpStream) -> io::Result<Vec<u8>> {
     let size = stream.read_u32::<BE>()?;
+    if !(4..=65536).contains(&size) {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "Invalid handshake packet length",
+        ));
+    }
     let mut buf = vec![0_u8; size as usize];
     let (size_buf, data_buf) = buf.split_at_mut(4);
     size_buf.copy_from_slice(&size.to_be_bytes());
     stream.read_exact(data_buf)?;
     Ok(buf)
+}
+
+mod server_key;
+
+fn verify_server_key(key: &[u8], signature: &[u8]) -> Result<(), Error> {
+    use ring::signature::{RsaPublicKeyComponents, RSA_PKCS1_2048_8192_SHA1_FOR_LEGACY_USE_ONLY};
+    let public = RsaPublicKeyComponents {
+        n: &server_key::SERVER_KEY[..],
+        e: &[1, 0, 1][..],
+    };
+    public
+        .verify(
+            &RSA_PKCS1_2048_8192_SHA1_FOR_LEGACY_USE_ONLY,
+            key,
+            signature,
+        )
+        .map_err(|_| Error::ConnectionFailed)
+}
+
+#[cfg(test)]
+mod server_identity_tests {
+    use super::*;
+    #[test]
+    fn rejects_unsigned_server_keys() {
+        assert!(verify_server_key(&[1; 96], &[0; 256]).is_err());
+        assert!(verify_server_key(&[1; 96], &[]).is_err());
+    }
 }
 
 fn make_packet(prefix: &[u8], data: &[u8]) -> Vec<u8> {
@@ -358,10 +406,14 @@ fn client_hello(public_key: Vec<u8>, nonce: Vec<u8>) -> Vec<u8> {
 
     let hello = ClientHello {
         build_info: MessageField::some(BuildInfo {
-            platform: Some(Platform::PLATFORM_LINUX_X86.into()),
-            product: Some(Product::PRODUCT_PARTNER.into()),
+            platform: Some(match std::env::consts::OS {
+                "windows" => Platform::PLATFORM_WIN32_X86_64,
+                "macos" => Platform::PLATFORM_OSX_X86_64,
+                _ => Platform::PLATFORM_LINUX_X86_64,
+            }.into()),
+            product: Some(Product::PRODUCT_CLIENT.into()),
             product_flags: vec![],
-            version: Some(109_800_078),
+            version: Some(124_200_290),
             special_fields: SpecialFields::new(),
         }),
         cryptosuites_supported: vec![Cryptosuite::CRYPTO_SUITE_SHANNON.into()],

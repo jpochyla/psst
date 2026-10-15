@@ -11,8 +11,11 @@ use super::RecommendationsRequest;
 
 #[derive(Copy, Clone, Debug, Data, PartialEq, Eq, Hash)]
 pub enum Route {
+    Devices,
+    Notifications,
     Home,
     Lyrics,
+    Queue,
     SavedTracks,
     SavedAlbums,
     Shows,
@@ -28,7 +31,10 @@ pub enum Route {
 pub enum Nav {
     #[default]
     Home,
+    Devices,
+    Notifications,
     Lyrics,
+    Queue,
     SavedTracks,
     SavedAlbums,
     Shows,
@@ -43,8 +49,11 @@ pub enum Nav {
 impl Nav {
     pub fn route(&self) -> Route {
         match self {
+            Nav::Devices => Route::Devices,
+            Nav::Notifications => Route::Notifications,
             Nav::Home => Route::Home,
             Nav::Lyrics => Route::Lyrics,
+            Nav::Queue => Route::Queue,
             Nav::SavedTracks => Route::SavedTracks,
             Nav::SavedAlbums => Route::SavedAlbums,
             Nav::Shows => Route::Shows,
@@ -59,33 +68,39 @@ impl Nav {
 
     pub fn title(&self) -> String {
         match self {
-            Nav::Home => "Home".to_string(),
-            Nav::Lyrics => "Lyrics".to_string(),
-            Nav::SavedTracks => "Saved Tracks".to_string(),
-            Nav::SavedAlbums => "Saved Albums".to_string(),
+            Nav::Devices => "Conectar a un dispositivo".into(),
+            Nav::Notifications => "Novedades".into(),
+            Nav::Home => "Inicio".to_string(),
+            Nav::Lyrics => "Letra".to_string(),
+            Nav::Queue => "Cola de reproducci\u{00f3}n".to_string(),
+            Nav::SavedTracks => "Tus canciones".to_string(),
+            Nav::SavedAlbums => "Tus álbumes".to_string(),
             Nav::Shows => "Podcasts".to_string(),
             Nav::SearchResults(query) => query.to_string(),
             Nav::AlbumDetail(link, _) => link.name.to_string(),
             Nav::ArtistDetail(link) => link.name.to_string(),
             Nav::PlaylistDetail(link) => link.name.to_string(),
             Nav::ShowDetail(link) => link.name.to_string(),
-            Nav::Recommendations(_) => "Recommended".to_string(),
+            Nav::Recommendations(_) => "Recomendaciones".to_string(),
         }
     }
 
     pub fn full_title(&self) -> String {
         match self {
-            Nav::Home => "Home".to_string(),
-            Nav::Lyrics => "Lyrics".to_string(),
-            Nav::SavedTracks => "Saved Tracks".to_string(),
-            Nav::SavedAlbums => "Saved Albums".to_string(),
-            Nav::Shows => "Saved Shows".to_string(),
+            Nav::Devices => "Dispositivos Spotify Connect".into(),
+            Nav::Notifications => "Novedades de artistas seguidos".into(),
+            Nav::Home => "Inicio".to_string(),
+            Nav::Lyrics => "Letra".to_string(),
+            Nav::Queue => "Cola de reproducci\u{00f3}n".to_string(),
+            Nav::SavedTracks => "Tus canciones".to_string(),
+            Nav::SavedAlbums => "Tus álbumes".to_string(),
+            Nav::Shows => "Tus podcasts".to_string(),
             Nav::SearchResults(query) => format!("Search \"{query}\""),
             Nav::AlbumDetail(link, _) => format!("Album \"{}\"", link.name),
             Nav::ArtistDetail(link) => format!("Artist \"{}\"", link.name),
             Nav::PlaylistDetail(link) => format!("Playlist \"{}\"", link.name),
             Nav::ShowDetail(link) => format!("Show \"{}\"", link.name),
-            Nav::Recommendations(_) => "Recommended".to_string(),
+            Nav::Recommendations(_) => "Recomendaciones".to_string(),
         }
     }
 }

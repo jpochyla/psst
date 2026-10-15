@@ -1,6 +1,6 @@
 use druid::{
     kurbo::Circle,
-    widget::{CrossAxisAlignment, Either, Flex, Label, LabelText, LineBreaking, List, Scroll},
+    widget::{CrossAxisAlignment, Either, Flex, Label, LabelText, LineBreaking, Scroll},
     Data, Insets, LensExt, LocalizedString, Menu, MenuItem, Selector, Size, UnitPoint, Widget,
     WidgetExt,
 };
@@ -52,7 +52,7 @@ fn async_artist_info() -> impl Widget<AppState> {
     Async::new(
         utils::spinner_widget,
         || artist_info_widget().lens(Ctx::map(Cached::data.then(ArtistOverview::info))),
-        || Empty,
+        utils::error_widget,
     )
     .lens(
         Ctx::make(
@@ -92,7 +92,8 @@ pub fn artist_widget(horizontal: bool) -> impl Widget<Artist> {
                     .with_font(theme::UI_FONT_MEDIUM)
                     .align_horizontal(UnitPoint::CENTER)
                     .align_vertical(UnitPoint::TOP)
-                    .fix_size(theme::grid(16.0), theme::grid(8.0))
+                    .fix_size(theme::grid(16.0), theme::grid(10.0))
+                    .clip(Size::new(theme::grid(16.0), theme::grid(10.0)).to_rect())
                     .lens(Artist::name),
             )
     } else {
@@ -192,16 +193,24 @@ fn albums_widget() -> impl Widget<WithCtx<ArtistAlbums>> {
     Flex::column()
         .cross_axis_alignment(CrossAxisAlignment::Start)
         .with_child(header_widget("Albums"))
-        .with_child(List::new(|| album::album_widget(false)).lens(Ctx::map(ArtistAlbums::albums)))
+        .with_child(
+            super::grid::with_context(|| album::album_widget(true).boxed())
+                .lens(Ctx::map(ArtistAlbums::albums)),
+        )
         .with_child(header_widget("Singles"))
-        .with_child(List::new(|| album::album_widget(false)).lens(Ctx::map(ArtistAlbums::singles)))
+        .with_child(
+            super::grid::with_context(|| album::album_widget(true).boxed())
+                .lens(Ctx::map(ArtistAlbums::singles)),
+        )
         .with_child(header_widget("Compilations"))
         .with_child(
-            List::new(|| album::album_widget(false)).lens(Ctx::map(ArtistAlbums::compilations)),
+            super::grid::with_context(|| album::album_widget(true).boxed())
+                .lens(Ctx::map(ArtistAlbums::compilations)),
         )
         .with_child(header_widget("Appears On"))
         .with_child(
-            List::new(|| album::album_widget(false)).lens(Ctx::map(ArtistAlbums::appears_on)),
+            super::grid::with_context(|| album::album_widget(true).boxed())
+                .lens(Ctx::map(ArtistAlbums::appears_on)),
         )
 }
 
@@ -209,7 +218,7 @@ fn related_widget() -> impl Widget<Cached<ArtistOverview>> {
     Flex::column()
         .cross_axis_alignment(CrossAxisAlignment::Start)
         .with_child(header_widget("Related Artists"))
-        .with_child(List::new(|| artist_widget(false)))
+        .with_child(super::grid::widget(|| artist_widget(true).boxed()))
         .lens(Cached::data.then(ArtistOverview::related))
 }
 
@@ -255,7 +264,12 @@ fn artist_info_menu(artist: &ArtistInfo) -> Menu<AppState> {
 }
 
 fn artist_menu(artist: &ArtistLink) -> Menu<AppState> {
-    let mut menu = Menu::empty();
+    let mut menu = Menu::empty().entry(MenuItem::new("Wikipedia").command(cmd::GO_TO_URL.with(
+        format!(
+            "https://en.wikipedia.org/w/index.php?search={}",
+            urlencoding::encode(&artist.name)
+        ),
+    )));
 
     menu = menu.entry(
         MenuItem::new(

@@ -53,7 +53,7 @@ impl LocalItemRegistry {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum ItemIdType {
     Track,
     Podcast,
@@ -61,7 +61,7 @@ pub enum ItemIdType {
     Unknown,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct ItemId {
     pub id: u128,
     pub id_type: ItemIdType,

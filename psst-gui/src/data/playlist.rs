@@ -8,6 +8,7 @@ use crate::data::{user::PublicUser, Image, Promise, Track, TrackId};
 
 #[derive(Clone, Debug, Data, Lens)]
 pub struct PlaylistDetail {
+    pub query: String,
     pub playlist: Promise<Playlist, PlaylistLink>,
     pub tracks: Promise<PlaylistTracks, PlaylistLink>,
 }
@@ -24,25 +25,63 @@ pub struct PlaylistRemoveTrack {
     pub track_uri: Arc<str>,
 }
 
-#[derive(Clone, Debug, Data, Lens, Deserialize)]
+#[derive(Clone, Debug, Data)]
+pub struct PlaylistReorder {
+    pub link: PlaylistLink,
+    pub track_id: TrackId,
+    pub position: usize,
+    pub down: bool,
+}
+
+#[derive(Clone, Debug, Data, Lens)]
 pub struct Playlist {
     pub id: Arc<str>,
     pub name: Arc<str>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub images: Option<Vector<Image>>,
-    #[serde(deserialize_with = "deserialize_description")]
     pub description: Arc<str>,
-    // Spotify returns both a `tracks` object (with `total`) and, more recently,
-    // a separate `items` key on playlist objects. Matching both (rename + alias)
-    // makes serde error with "duplicate field `items`", so read only `tracks`.
-    #[serde(rename = "tracks")]
-    #[serde(deserialize_with = "deserialize_track_count")]
-    #[serde(default)]
     pub track_count: Option<usize>,
     pub owner: PublicUser,
     pub collaborative: bool,
-    #[serde(rename = "public")]
     pub public: Option<bool>,
+    pub snapshot_id: Option<Arc<str>>,
+}
+
+impl<'de> Deserialize<'de> for Playlist {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        #[derive(Deserialize)]
+        struct Count {
+            total: Option<usize>,
+        }
+        #[derive(Deserialize)]
+        struct Payload {
+            id: Arc<str>,
+            name: Arc<str>,
+            images: Option<Vector<Image>>,
+            #[serde(deserialize_with = "deserialize_description")]
+            description: Arc<str>,
+            items: Option<Count>,
+            tracks: Option<Count>,
+            owner: PublicUser,
+            collaborative: bool,
+            public: Option<bool>,
+            snapshot_id: Option<Arc<str>>,
+        }
+        let p = Payload::deserialize(deserializer)?;
+        Ok(Self {
+            id: p.id,
+            name: p.name,
+            images: p.images,
+            description: p.description,
+            track_count: p
+                .items
+                .and_then(|c| c.total)
+                .or_else(|| p.tracks.and_then(|c| c.total)),
+            owner: p.owner,
+            collaborative: p.collaborative,
+            public: p.public,
+            snapshot_id: p.snapshot_id,
+        })
+    }
 }
 
 impl Playlist {
@@ -66,6 +105,7 @@ impl Playlist {
 
 #[derive(Clone, Debug, Data, Lens)]
 pub struct PlaylistTracks {
+    pub query: String,
     pub id: Arc<str>,
     pub name: Arc<str>,
     pub tracks: Vector<Arc<Track>>,
@@ -86,22 +126,35 @@ pub struct PlaylistLink {
     pub name: Arc<str>,
 }
 
-fn deserialize_track_count<'de, D>(deserializer: D) -> Result<Option<usize>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    #[derive(Deserialize)]
-    struct PlaylistTracksRef {
-        total: Option<usize>,
-    }
-
-    Ok(PlaylistTracksRef::deserialize(deserializer)?.total)
-}
-
 fn deserialize_description<'de, D>(deserializer: D) -> Result<Arc<str>, D::Error>
 where
     D: Deserializer<'de>,
 {
     let description: String = String::deserialize(deserializer)?;
     Ok(sanitize_html_string(&description))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn playlist_counts_support_current_legacy_and_combined_payloads() {
+        let base = serde_json::json!({"id":"p", "name":"Playlist", "description":"", "owner":{"id":"u", "display_name":"User"}, "collaborative":false, "public":false});
+        for (items, tracks, expected) in [
+            (Some(42), None, Some(42)),
+            (None, Some(12), Some(12)),
+            (Some(42), Some(12), Some(42)),
+            (None, None, None),
+        ] {
+            let mut value = base.clone();
+            if let Some(total) = items {
+                value["items"] = serde_json::json!({"total":total});
+            }
+            if let Some(total) = tracks {
+                value["tracks"] = serde_json::json!({"total":total});
+            }
+            let playlist: Playlist = serde_json::from_value(value).unwrap();
+            assert_eq!(playlist.track_count, expected);
+        }
+    }
 }

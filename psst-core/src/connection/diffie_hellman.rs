@@ -1,5 +1,4 @@
-use num_bigint::{BigUint, ToBigUint};
-use rand::Rng;
+use num_bigint::BigUint;
 
 pub struct DHLocalKeys {
     private_key: BigUint,
@@ -8,7 +7,9 @@ pub struct DHLocalKeys {
 
 impl DHLocalKeys {
     pub fn random() -> DHLocalKeys {
-        let private_key = rand::rng().random::<u32>().to_biguint().unwrap();
+        // Spotify uses a legacy 768-bit DH group. A 32-bit exponent exposes
+        // session keys to brute force; use cryptographically random 760 bits.
+        let private_key = BigUint::from_bytes_be(&rand::random::<[u8; 95]>());
         let public_key = dh_generator().modpow(&private_key, &dh_prime());
         DHLocalKeys {
             private_key,
@@ -24,6 +25,19 @@ impl DHLocalKeys {
         let remote_key = BigUint::from_bytes_be(remote_key);
         let shared_key = remote_key.modpow(&self.private_key, &dh_prime());
         shared_key.to_bytes_be()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn secrets_have_sufficient_entropy_and_agree() {
+        let first = DHLocalKeys::random();
+        let second = DHLocalKeys::random();
+        assert!(first.private_key.bits() > 512);
+        assert!(second.private_key.bits() > 512);
+        assert_eq!(first.shared_secret(&second.public_key()), second.shared_secret(&first.public_key()));
     }
 }
 

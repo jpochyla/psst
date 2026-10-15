@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::data::{AlbumLink, ArtistLink};
 
-#[derive(Clone, Debug, Data, Lens, Deserialize)]
+#[derive(Clone, Debug, Data, Lens, Deserialize, Serialize)]
 pub struct Track {
     #[serde(default)]
     pub id: TrackId,
@@ -16,6 +16,7 @@ pub struct Track {
     pub artists: Vector<ArtistLink>,
     #[serde(rename = "duration_ms")]
     #[serde(deserialize_with = "super::utils::deserialize_millis")]
+    #[serde(serialize_with = "super::utils::serialize_millis")]
     pub duration: Duration,
     pub disc_number: usize,
     pub track_number: usize,
@@ -28,13 +29,15 @@ pub struct Track {
     pub popularity: Option<u32>,
     #[serde(skip)]
     pub track_pos: usize,
+    #[serde(default)]
+    pub playlist_added_at: Option<Arc<str>>,
     pub lyrics: Option<Arc<[TrackLines]>>,
 }
 
 impl Track {
-    pub fn lens_artist_name() -> impl Lens<Self, Arc<str>> {
+    pub fn lens_artist_names() -> impl Lens<Self, Arc<str>> {
         Map::new(
-            |track: &Self| track.artist_name(),
+            |track: &Self| track.artist_names().into(),
             |_, _| {
                 // Immutable.
             },
@@ -82,6 +85,12 @@ pub struct TrackLines {
     pub start_time_ms: String,
     pub words: String,
     pub end_time_ms: String,
+}
+
+#[derive(Clone, Debug, Data, Lens)]
+pub struct Lyrics {
+    pub lines: druid::im::Vector<TrackLines>,
+    pub notice: String,
 }
 
 #[derive(Clone, Copy, Default, PartialEq, Eq, Debug, Hash, Deserialize, Serialize)]

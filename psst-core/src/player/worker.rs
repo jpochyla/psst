@@ -45,13 +45,14 @@ impl PlaybackManager {
         }
     }
 
-    pub fn play(&mut self, loaded: LoadedPlaybackItem) {
+    pub fn play_from(&mut self, loaded: LoadedPlaybackItem, start_position: Duration) {
         let path = loaded.file.path();
         let source = DecoderSource::new(
             loaded.file,
             loaded.source,
             loaded.norm_factor,
             self.event_send.clone(),
+            start_position,
         );
         self.current = Some((path, source.actor.sender()));
         if source.sample_rate() == self.sink.sample_rate()
@@ -111,6 +112,7 @@ impl DecoderSource {
         decoder: AudioDecoder,
         norm_factor: f32,
         event_send: Sender<PlayerEvent>,
+        start_position: Duration,
     ) -> Self {
         const REPORT_PRECISION: Duration = Duration::from_millis(900);
 
@@ -130,7 +132,8 @@ impl DecoderSource {
         // We keep track of the current play-head position by sharing an atomic sample
         // counter with the decoding worker.  Worker is setting this on seek, we are
         // incrementing on reading from the ring-buffer.
-        let position = Arc::new(AtomicU64::new(0));
+        let initial_samples = (start_position.as_secs_f64() * signal_spec.rate as f64 * signal_spec.channels.count() as f64) as u64;
+        let position = Arc::new(AtomicU64::new(initial_samples));
 
         // Because the `n_frames` count that Symphonia gives us can be a bit unreliable,
         // we track the total number of samples in this stream in this atomic, set when
@@ -144,7 +147,11 @@ impl DecoderSource {
             let total_samples = Arc::clone(&total_samples);
             move |this| Worker::new(this, decoder, buffer, position, total_samples)
         });
-        let _ = actor.send(Msg::Read);
+        if start_position.is_zero() {
+            let _ = actor.send(Msg::Read);
+        } else {
+            let _ = actor.send(Msg::Seek(start_position));
+        }
 
         Self {
             file,
@@ -338,6 +345,9 @@ impl Worker {
             }
             Err(err) => {
                 log::error!("failed to seek: {err}");
+                if !self.is_reading {
+                    self.this.send(Msg::Read)?;
+                }
             }
         }
         Ok(Act::Continue)

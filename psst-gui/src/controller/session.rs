@@ -3,7 +3,7 @@ use druid::widget::{prelude::*, Controller};
 use crate::{
     cmd,
     data::AppState,
-    ui::{home, playlist, user},
+    ui::{playlist, user},
 };
 
 pub struct SessionController;
@@ -19,8 +19,10 @@ impl SessionController {
 
         // Reload the global, usually visible data.
         ctx.submit_command(playlist::LOAD_LIST);
-        ctx.submit_command(home::LOAD_MADE_FOR_YOU);
         ctx.submit_command(user::LOAD_PROFILE);
+        if data.playback.now_playing.is_some() {
+            ctx.submit_command(cmd::NAVIGATE.with(data.nav.clone()));
+        }
     }
 }
 

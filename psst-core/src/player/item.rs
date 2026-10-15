@@ -25,13 +25,33 @@ pub struct LoadedPlaybackItem {
     pub norm_factor: f32,
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct PlaybackItem {
     pub item_id: ItemId,
     pub norm_level: NormalizationLevel,
 }
 
 impl PlaybackItem {
+    /// Save the complete encrypted media file; no decoded audio leaves the player.
+    pub fn download(
+        &self,
+        session: &SessionService,
+        cdn: CdnHandle,
+        cache: CacheHandle,
+        config: &PlaybackConfig,
+    ) -> Result<(), Error> {
+        if self.item_id.id_type != ItemIdType::Track {
+            return Err(Error::ConfigError(
+                "Only Spotify tracks can be downloaded".into(),
+            ));
+        }
+        let path = load_media_path(self.item_id, session, &cache, config)?;
+        load_audio_key(&path, session, &cache)?;
+        if cache.audio_file_path(path.file_id).exists() {
+            return Ok(());
+        }
+        super::download::encrypted_file(path.file_id, &cdn, &cache)
+    }
     pub fn load(
         &self,
         session: &SessionService,
