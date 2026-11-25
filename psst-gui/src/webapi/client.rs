@@ -38,11 +38,11 @@ use ureq::{
 use crate::{
     cmd,
     data::{
-        self, utils::sanitize_html_string, Album, AlbumType, Artist, ArtistAlbums, ArtistInfo,
-        ArtistLink, ArtistOverview, ArtistStats, Cached, DatePrecision, Episode, EpisodeId,
-        EpisodeLink, Image, MixedView, Nav, Page, Playlist, PublicUser, Range, Recommendations,
-        RecommendationsRequest, SearchResults, SearchTopic, Show, SpotifyUrl, Track, TrackLines,
-        UserProfile,
+        self, utils::sanitize_html_string, Album, AlbumLink, AlbumType, Artist, ArtistAlbums,
+        ArtistInfo, ArtistLink, ArtistOverview, ArtistStats, Cached, DatePrecision, Episode,
+        EpisodeId, EpisodeLink, Image, MixedView, Nav, Page, Playlist, PublicUser, Range,
+        Recommendations, RecommendationsRequest, SearchResults, SearchTopic, Show, SpotifyUrl,
+        Track, TrackId, TrackLines, UserProfile,
     },
     error::Error,
     ui::credits::TrackCredits,
@@ -948,6 +948,23 @@ struct ReleaseArtists {
     items: Vec<ReleaseArtist>,
 }
 
+impl ReleaseArtists {
+    fn to_links(&self) -> Vector<ArtistLink> {
+        self.items
+            .iter()
+            .map(|artist| ArtistLink {
+                id: uri_id(&artist.uri),
+                name: artist.profile.name.clone(),
+            })
+            .collect()
+    }
+}
+
+/// The bare ID at the end of a `spotify:kind:id` URI.
+fn uri_id(uri: &str) -> Arc<str> {
+    uri.rsplit(':').next().unwrap_or_default().into()
+}
+
 #[derive(Deserialize)]
 struct ReleaseArtist {
     uri: String,
@@ -978,15 +995,7 @@ impl Release {
             name: self.name.clone(),
             album_type,
             images: self.cover_art.sources.clone(),
-            artists: self
-                .artists
-                .items
-                .iter()
-                .map(|artist| ArtistLink {
-                    id: artist.uri.rsplit(':').next().unwrap_or_default().into(),
-                    name: artist.profile.name.clone(),
-                })
-                .collect(),
+            artists: self.artists.to_links(),
             copyrights: Vector::new(),
             label: "".into(),
             tracks: Vector::new(),
@@ -1594,8 +1603,242 @@ impl WebApi {
     }
 }
 
+// `fetchPlaylist` response.  Spotify-generated playlists leave many fields
+// unset, so everything the UI can do without is optional.
+#[derive(Deserialize)]
+struct FetchPlaylistResponse {
+    data: FetchPlaylistData,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct FetchPlaylistData {
+    playlist_v2: PartnerPlaylist,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PartnerPlaylist {
+    uri: String,
+    #[serde(default)]
+    name: Arc<str>,
+    description: Option<String>,
+    #[serde(default)]
+    images: PartnerImages,
+    owner_v2: Option<PartnerOwner>,
+    #[serde(default)]
+    collaborative: bool,
+    #[serde(default)]
+    content: PartnerContent,
+}
+
+#[derive(Default, Deserialize)]
+struct PartnerImages {
+    #[serde(default)]
+    items: Vec<CoverArt>,
+}
+
+#[derive(Deserialize)]
+struct PartnerOwner {
+    data: PartnerOwnerData,
+}
+
+#[derive(Deserialize)]
+struct PartnerOwnerData {
+    #[serde(default)]
+    username: Arc<str>,
+    #[serde(default)]
+    name: Arc<str>,
+}
+
+#[derive(Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PartnerContent {
+    #[serde(default)]
+    total_count: usize,
+    #[serde(default)]
+    items: Vec<PartnerContentItem>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PartnerContentItem {
+    item_v2: Option<PartnerItem>,
+}
+
+// Episodes and local files fall into `Unsupported` instead of failing the page.
+#[derive(Deserialize)]
+#[serde(tag = "__typename")]
+enum PartnerItem {
+    #[serde(rename = "TrackResponseWrapper")]
+    Track { data: Box<PartnerTrack> },
+    #[serde(other)]
+    Unsupported,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PartnerTrack {
+    uri: String,
+    #[serde(default)]
+    name: Arc<str>,
+    track_duration: Option<PartnerDuration>,
+    album_of_track: Option<PartnerAlbum>,
+    #[serde(default)]
+    artists: ReleaseArtists,
+    #[serde(default)]
+    disc_number: usize,
+    #[serde(default)]
+    track_number: usize,
+    playability: Option<PartnerPlayability>,
+    content_rating: Option<PartnerContentRating>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PartnerDuration {
+    total_milliseconds: u64,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PartnerAlbum {
+    uri: String,
+    #[serde(default)]
+    name: Arc<str>,
+    #[serde(default)]
+    cover_art: CoverArt,
+}
+
+#[derive(Deserialize)]
+struct PartnerPlayability {
+    #[serde(default)]
+    playable: bool,
+}
+
+#[derive(Deserialize)]
+struct PartnerContentRating {
+    #[serde(default)]
+    label: String,
+}
+
+impl PartnerPlaylist {
+    fn to_playlist(&self) -> Playlist {
+        Playlist {
+            id: uri_id(&self.uri),
+            name: self.name.clone(),
+            images: Some(
+                self.images
+                    .items
+                    .iter()
+                    .flat_map(|image| image.sources.iter().cloned())
+                    .collect(),
+            ),
+            description: sanitize_html_string(self.description.as_deref().unwrap_or_default()),
+            track_count: Some(self.content.total_count),
+            owner: self.owner_v2.as_ref().map_or_else(
+                || PublicUser {
+                    id: "".into(),
+                    display_name: "".into(),
+                },
+                |owner| PublicUser {
+                    id: owner.data.username.clone(),
+                    display_name: owner.data.name.clone(),
+                },
+            ),
+            collaborative: self.collaborative,
+            public: None,
+        }
+    }
+}
+
+impl PartnerTrack {
+    fn to_track(&self, track_pos: usize) -> Option<Track> {
+        Some(Track {
+            id: TrackId::try_from(uri_id(&self.uri).to_string()).ok()?,
+            name: self.name.clone(),
+            album: self.album_of_track.as_ref().map(|album| AlbumLink {
+                id: uri_id(&album.uri),
+                name: album.name.clone(),
+                images: album.cover_art.sources.clone(),
+            }),
+            artists: self.artists.to_links(),
+            duration: Duration::from_millis(
+                self.track_duration
+                    .as_ref()
+                    .map_or(0, |d| d.total_milliseconds),
+            ),
+            disc_number: self.disc_number,
+            track_number: self.track_number,
+            explicit: self
+                .content_rating
+                .as_ref()
+                .is_some_and(|rating| rating.label != "NONE"),
+            is_local: false,
+            local_path: None,
+            is_playable: self.playability.as_ref().map(|p| p.playable),
+            popularity: None,
+            track_pos,
+            lyrics: None,
+        })
+    }
+}
+
 /// Playlist endpoints.
 impl WebApi {
+    /// Read one page of a playlist through pathfinder.  Development-mode apps
+    /// get a 404 for Spotify-generated playlists and a 403 for other users'
+    /// playlists on the Web API, but pathfinder serves both.
+    fn fetch_playlist(
+        &self,
+        id: &str,
+        offset: usize,
+        limit: usize,
+    ) -> Result<PartnerPlaylist, Error> {
+        let json = json!({
+            "operationName": "fetchPlaylist",
+            "variables": {
+                "uri": format!("spotify:playlist:{id}"),
+                "offset": offset,
+                "limit": limit,
+            },
+            "extensions": {
+                "persistedQuery": {
+                    "version": 1,
+                    "sha256Hash": "73a3b3470804983e4d55d83cd6cc99715019228fd999d51429cc69473a18789d"
+                }
+            },
+        });
+        let request =
+            &RequestBuilder::new("pathfinder/v2/query".to_string(), Method::Post, Some(json))
+                .set_base_uri("api-partner.spotify.com")
+                .header("User-Agent", Self::user_agent())
+                .partner_auth();
+        let response: FetchPlaylistResponse = self.load(request)?;
+        Ok(response.data.playlist_v2)
+    }
+
+    fn fetch_playlist_tracks(&self, id: &str) -> Result<Vector<Arc<Track>>, Error> {
+        const PAGE: usize = 100;
+
+        let mut tracks = Vector::new();
+        let mut offset = 0;
+        loop {
+            let playlist = self.fetch_playlist(id, offset, PAGE)?;
+            for item in &playlist.content.items {
+                if let Some(PartnerItem::Track { data }) = &item.item_v2 {
+                    tracks.extend(data.to_track(tracks.len()).map(Arc::new));
+                }
+            }
+            offset += PAGE;
+            if playlist.content.items.is_empty()
+                || offset >= playlist.content.total_count.min(self.paginated_limit)
+            {
+                break Ok(tracks);
+            }
+        }
+    }
+
     // https://developer.spotify.com/documentation/web-api/reference/get-a-list-of-current-users-playlists
     pub fn get_playlists(&self) -> Result<Vector<Playlist>, Error> {
         let request = &RequestBuilder::new("v1/me/playlists", Method::Get, None);
@@ -1620,8 +1863,10 @@ impl WebApi {
     // https://developer.spotify.com/documentation/web-api/reference/get-playlist
     pub fn get_playlist(&self, id: &str) -> Result<Playlist, Error> {
         let request = &RequestBuilder::new(format!("v1/playlists/{id}"), Method::Get, None);
-        let result: Playlist = self.load(request)?;
-        Ok(result)
+        match self.load(request) {
+            Err(Error::WebApiStatus(403 | 404)) => Ok(self.fetch_playlist(id, 0, 1)?.to_playlist()),
+            result => result,
+        }
     }
 
     // https://developer.spotify.com/documentation/web-api/reference/get-playlist-items
@@ -1648,7 +1893,10 @@ impl WebApi {
             .query("marker", "from_token")
             .query("additional_types", "track");
 
-        let result: Vector<PlaylistItem> = self.load_all_pages(request)?;
+        let result: Vector<PlaylistItem> = match self.load_all_pages(request) {
+            Err(Error::WebApiStatus(403 | 404)) => return self.fetch_playlist_tracks(id),
+            result => result?,
+        };
 
         let local_track_manager = self.local_track_manager.lock();
 
