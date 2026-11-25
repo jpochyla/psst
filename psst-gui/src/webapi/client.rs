@@ -1360,7 +1360,8 @@ impl WebApi {
             Method::Get,
             None,
         )
-        .set_base_uri("spclient.wg.spotify.com");
+        .set_base_uri("spclient.wg.spotify.com")
+        .partner_auth();
         let result: TrackCredits = self.load(request)?;
         Ok(result)
     }
@@ -1386,6 +1387,7 @@ impl WebApi {
             None,
         )
         .set_base_uri("spclient.wg.spotify.com")
+        .partner_auth()
         .query("format", "json")
         .query("vocalRemoval", "false")
         .query("market", "from_token")
