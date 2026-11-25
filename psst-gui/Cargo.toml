@@ -63,7 +63,6 @@ name = "Psst"
 identifier = "com.jpochyla.psst"
 icon = ["assets/logo.icns"]
 version = "0.1.0"
-osx_minimum_system_version = "11.0"
 resources = []
 copyright = "Copyright (c) Jan Pochyla 2024. All rights reserved."
 category = "Music"
@@ -71,3 +70,6 @@ short_description = "Fast and native Spotify client"
 long_description = """
 Small and efficient graphical music player for the Spotify network.
 """
+
+[package.metadata.bundle.osx]
+minimum_system_version = "11.0"
