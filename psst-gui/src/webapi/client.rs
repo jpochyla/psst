@@ -1864,7 +1864,7 @@ impl WebApi {
         }
 
         let request = &RequestBuilder::new(format!("v1/playlists/{id}/items"), Method::Get, None)
-            .query("marker", "from_token")
+            .query("market", "from_token")
             .query("additional_types", "track");
 
         let result: Vector<PlaylistItem> = match self.load_all_pages(request) {
@@ -1949,7 +1949,7 @@ impl WebApi {
             .query("q", encoded_query)
             .query("type", &type_query_param)
             .query("limit", limit.to_string())
-            .query("marker", "from_token");
+            .query("market", "from_token");
 
         let result: ApiSearchResults = self.load(request)?;
 
@@ -2004,7 +2004,7 @@ impl WebApi {
             .join(", ");
 
         let mut request = RequestBuilder::new("v1/recommendations", Method::Get, None)
-            .query("marker", "from_token")
+            .query("market", "from_token")
             .query("limit", "100")
             .query("seed_artists", &seed_artists)
             .query("seed_tracks", &seed_tracks);
