@@ -73,7 +73,10 @@ impl WebApi {
         cache_base: Option<PathBuf>,
         paginated_limit: usize,
     ) -> Self {
-        let mut agent = Agent::config_builder().timeout_global(Some(Duration::from_secs(5)));
+        // Statuses are checked in `with_retry`, which needs to see 429s.
+        let mut agent = Agent::config_builder()
+            .timeout_global(Some(Duration::from_secs(5)))
+            .http_status_as_error(false);
         if let Some(proxy_url) = proxy_url {
             let proxy = ureq::Proxy::new(proxy_url).ok();
             agent = agent.proxy(proxy);
@@ -240,21 +243,31 @@ impl WebApi {
     }
 
     fn with_retry(f: impl Fn() -> Result<Response<Body>, Error>) -> Result<Response<Body>, Error> {
+        const MAX_RETRIES: u32 = 4;
+        // Spotify can ask to wait for hours; don't block a worker that long.
+        const MAX_RETRY_AFTER_SECS: u64 = 30;
+
+        let mut attempt = 0;
         loop {
             let response = f()?;
-            match response.status() {
-                StatusCode::TOO_MANY_REQUESTS => {
-                    let retry_after_secs = response
-                        .headers()
-                        .get("Retry-After")
-                        .and_then(|secs| secs.to_str().ok());
-                    let secs = retry_after_secs.unwrap_or("2").parse::<u64>().unwrap_or(2);
+            let status = response.status();
+            if status == StatusCode::TOO_MANY_REQUESTS && attempt < MAX_RETRIES {
+                let secs = response
+                    .headers()
+                    .get("Retry-After")
+                    .and_then(|secs| secs.to_str().ok()?.trim().parse::<u64>().ok())
+                    .unwrap_or(1 << attempt);
+                if secs <= MAX_RETRY_AFTER_SECS {
+                    log::warn!("rate limited by Spotify, retrying in {secs}s");
                     thread::sleep(Duration::from_secs(secs));
-                }
-                _ => {
-                    break Ok(response);
+                    attempt += 1;
+                    continue;
                 }
             }
+            if !status.is_success() {
+                return Err(Error::WebApiStatus(status.as_u16()));
+            }
+            return Ok(response);
         }
     }
 
@@ -1672,7 +1685,7 @@ impl WebApi {
             Method::Post,
             Some(json!({"uris": [track_uri]})),
         );
-        self.request(request).map(|_| ())
+        self.send_empty_json(request)
     }
 
     // https://developer.spotify.com/documentation/web-api/reference/remove-playlist-items
@@ -1686,7 +1699,7 @@ impl WebApi {
             Method::Delete,
             Some(json!({ "items": [{ "uri": track_uri }] })),
         );
-        self.request(request).map(|_| ())
+        self.send_empty_json(request)
     }
 }
 
@@ -1849,7 +1862,7 @@ impl WebApi {
             .set_protocol(protocol)
             .set_base_uri(base_uri);
 
-        let response = self.request(&request)?;
+        let response = Self::with_retry(|| self.request(&request))?;
         let mut body = Vec::new();
         response.into_body().into_reader().read_to_end(&mut body)?;
 
