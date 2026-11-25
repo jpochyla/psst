@@ -1,7 +1,9 @@
 use crate::error::Error;
 use oauth2::{
-    basic::BasicClient, reqwest::http_client, AuthUrl, AuthorizationCode, ClientId, CsrfToken,
-    PkceCodeChallenge, PkceCodeVerifier, RedirectUrl, RefreshToken, Scope, TokenResponse, TokenUrl,
+    basic::{BasicClient, BasicErrorResponseType, BasicTokenResponse},
+    reqwest::http_client,
+    AuthUrl, AuthorizationCode, ClientId, CsrfToken, PkceCodeChallenge, PkceCodeVerifier,
+    RedirectUrl, RefreshToken, RequestTokenError, Scope, TokenResponse, TokenUrl,
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -246,13 +248,35 @@ pub struct WebApiToken {
 
 impl WebApiToken {
     pub fn is_expired(&self) -> bool {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs();
         // Consider expired 60 seconds early to avoid edge cases
-        now + 60 >= self.expires_at
+        unix_now() + 60 >= self.expires_at
     }
+
+    fn from_response(response: &BasicTokenResponse, previous_refresh_token: Option<&str>) -> Self {
+        let expires_in = response
+            .expires_in()
+            .unwrap_or(Duration::from_secs(3600))
+            .as_secs();
+        // Spotify mostly omits (or blanks) the refresh token on refresh, in
+        // which case the previous one stays valid.
+        let refresh_token = response
+            .refresh_token()
+            .map(|t| t.secret().to_string())
+            .filter(|t| !t.is_empty())
+            .or_else(|| previous_refresh_token.map(String::from));
+        Self {
+            access_token: response.access_token().secret().to_string(),
+            refresh_token,
+            expires_at: unix_now() + expires_in,
+        }
+    }
+}
+
+fn unix_now() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs()
 }
 
 /// Generate the authorization URL for any OAuth flow.
@@ -295,26 +319,12 @@ pub fn exchange_webapi_code_for_token(
         .request(http_client)
         .map_err(|e| Error::OAuthError(format!("Failed to exchange Web API code: {e}")))?;
 
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs();
-
-    let expires_in = token_response
-        .expires_in()
-        .unwrap_or(Duration::from_secs(3600))
-        .as_secs();
-
-    Ok(WebApiToken {
-        access_token: token_response.access_token().secret().to_string(),
-        refresh_token: token_response
-            .refresh_token()
-            .map(|t| t.secret().to_string()),
-        expires_at: now + expires_in,
-    })
+    Ok(WebApiToken::from_response(&token_response, None))
 }
 
 /// Refresh a Web API token using a refresh token (no browser interaction needed).
+/// Fails with `Error::OAuthInvalidGrant` once Spotify stops accepting the
+/// refresh token (they expire 6 months after login).
 pub fn refresh_webapi_token(
     client_id: &str,
     refresh_token_str: &str,
@@ -328,28 +338,17 @@ pub fn refresh_webapi_token(
     let token_response = client
         .exchange_refresh_token(&refresh_token)
         .request(http_client)
-        .map_err(|e| Error::OAuthError(format!("Failed to refresh Web API token: {e}")))?;
+        .map_err(|e| match e {
+            RequestTokenError::ServerResponse(resp)
+                if *resp.error() == BasicErrorResponseType::InvalidGrant =>
+            {
+                Error::OAuthInvalidGrant
+            }
+            e => Error::OAuthError(format!("Failed to refresh Web API token: {e}")),
+        })?;
 
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs();
-
-    let expires_in = token_response
-        .expires_in()
-        .unwrap_or(Duration::from_secs(3600))
-        .as_secs();
-
-    // Spotify may or may not return a new refresh token on refresh.
-    // If it doesn't, we keep the old one.
-    let new_refresh_token = token_response
-        .refresh_token()
-        .map(|t| t.secret().to_string())
-        .unwrap_or_else(|| refresh_token_str.to_string());
-
-    Ok(WebApiToken {
-        access_token: token_response.access_token().secret().to_string(),
-        refresh_token: Some(new_refresh_token),
-        expires_at: now + expires_in,
-    })
+    Ok(WebApiToken::from_response(
+        &token_response,
+        Some(refresh_token_str),
+    ))
 }

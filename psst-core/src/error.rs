@@ -24,6 +24,7 @@ pub enum Error {
     RecvTimeoutError(RecvTimeoutError),
     JoinError,
     OAuthError(String),
+    OAuthInvalidGrant,
 }
 
 impl error::Error for Error {}
@@ -67,6 +68,7 @@ impl fmt::Display for Error {
             Self::RecvTimeoutError(err) => write!(f, "Channel receive timeout: {err}"),
             Self::JoinError => write!(f, "Failed to join thread"),
             Self::OAuthError(msg) => write!(f, "OAuth error: {msg}"),
+            Self::OAuthInvalidGrant => write!(f, "Spotify login expired, please log in again"),
         }
     }
 }

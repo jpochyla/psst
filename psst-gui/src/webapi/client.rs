@@ -11,7 +11,7 @@ use std::{
 use druid::{
     im::Vector,
     image::{self, ImageFormat},
-    Data, ImageBuf,
+    Data, ExtEventSink, ImageBuf, Target,
 };
 
 use itertools::Itertools;
@@ -36,6 +36,7 @@ use ureq::{
 };
 
 use crate::{
+    cmd,
     data::{
         self, utils::sanitize_html_string, Album, AlbumType, Artist, ArtistAlbums, ArtistInfo,
         ArtistLink, ArtistOverview, ArtistStats, Cached, DatePrecision, Episode, EpisodeId,
@@ -62,6 +63,8 @@ pub struct WebApi {
     session: Mutex<Option<SessionService>>,
     login5: Login5,
     client_token_provider: ClientTokenProviderHandle,
+    // Hands refreshed tokens to the GUI thread, which owns the config.
+    event_sink: OnceLock<ExtEventSink>,
 }
 
 impl WebApi {
@@ -86,6 +89,7 @@ impl WebApi {
             session: Mutex::new(None),
             login5: Login5::new(Some(Arc::clone(&client_token_provider)), proxy_url),
             client_token_provider,
+            event_sink: OnceLock::new(),
         }
     }
 
@@ -108,6 +112,18 @@ impl WebApi {
     pub fn set_webapi_credentials(&self, client_id: Option<String>, token: Option<WebApiToken>) {
         *self.webapi_client_id.lock() = client_id;
         *self.webapi_token.lock() = token;
+    }
+
+    pub fn set_event_sink(&self, sink: ExtEventSink) {
+        let _ = self.event_sink.set(sink);
+    }
+
+    /// Store a refreshed token in the config, or clear it to ask for a new
+    /// login.
+    fn persist_webapi_token(&self, token: Option<WebApiToken>) {
+        if let Some(sink) = self.event_sink.get() {
+            let _ = sink.submit_command(cmd::STORE_WEBAPI_TOKEN, token, Target::Global);
+        }
     }
 
     /// Install the authenticated core session, used to mint the first-party
@@ -151,12 +167,15 @@ impl WebApi {
                 match oauth::refresh_webapi_token(client_id, refresh_token) {
                     Ok(new_token) => {
                         let access_token = new_token.access_token.clone();
-                        // NOTE: only updates the in-memory cache. The durable
-                        // copy in config.json is refreshed by Config on the
-                        // next save; if Spotify rotates the refresh token and
-                        // the process exits before then, the user must re-login.
+                        self.persist_webapi_token(Some(new_token.clone()));
                         *token_guard = Some(new_token);
                         return Ok(access_token);
+                    }
+                    Err(e @ psst_core::error::Error::OAuthInvalidGrant) => {
+                        drop(client_id_guard);
+                        *token_guard = None;
+                        self.persist_webapi_token(None);
+                        return Err(Error::WebApiError(e.to_string()));
                     }
                     Err(e) => {
                         log::error!("Failed to refresh Web API token: {e}");
