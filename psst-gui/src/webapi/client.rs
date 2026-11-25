@@ -38,10 +38,10 @@ use ureq::{
 use crate::{
     data::{
         self, utils::sanitize_html_string, Album, AlbumType, Artist, ArtistAlbums, ArtistInfo,
-        ArtistLink, ArtistOverview, ArtistStats, AudioAnalysis, Cached, DatePrecision, Episode,
-        EpisodeId, EpisodeLink, Image, MixedView, Nav, Page, Playlist, PublicUser, Range,
-        Recommendations, RecommendationsRequest, SearchResults, SearchTopic, Show, SpotifyUrl,
-        Track, TrackLines, UserProfile,
+        ArtistLink, ArtistOverview, ArtistStats, Cached, DatePrecision, Episode, EpisodeId,
+        EpisodeLink, Image, MixedView, Nav, Page, Playlist, PublicUser, Range, Recommendations,
+        RecommendationsRequest, SearchResults, SearchTopic, Show, SpotifyUrl, Track, TrackLines,
+        UserProfile,
     },
     error::Error,
     ui::credits::TrackCredits,
@@ -1796,17 +1796,6 @@ impl WebApi {
     }
 }
 
-/// Track endpoints.
-impl WebApi {
-    // https://developer.spotify.com/documentation/web-api/reference/get-audio-analysis/
-    pub fn _get_audio_analysis(&self, track_id: &str) -> Result<AudioAnalysis, Error> {
-        let request =
-            &RequestBuilder::new(format!("v1/audio-analysis/{track_id}"), Method::Get, None);
-        let result = self.load_cached(request, "audio-analysis", track_id)?;
-        Ok(result.data)
-    }
-}
-
 /// Image endpoints.
 impl WebApi {
     pub fn get_cached_image(&self, uri: &Arc<str>) -> Option<ImageBuf> {
@@ -1960,11 +1949,6 @@ impl RequestBuilder {
     }
     fn get_method(&self) -> &Method {
         &self.method
-    }
-    #[allow(dead_code)]
-    fn set_method(mut self, method: Method) -> Self {
-        self.method = method;
-        self
     }
     fn set_base_uri(mut self, url: impl Display) -> Self {
         self.base_uri = url.to_string();

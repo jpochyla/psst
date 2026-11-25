@@ -13,7 +13,44 @@ use std::{
 };
 use url::Url;
 
-use crate::session::access_token::WEBAPI_SCOPES;
+use crate::system_info::CLIENT_ID;
+
+// Scopes for the session login through Spotify's own client ID.
+const SESSION_SCOPES: &[&str] = &[
+    "streaming",
+    "user-read-email",
+    "user-read-private",
+    "playlist-read-private",
+    "playlist-read-collaborative",
+    "playlist-modify-public",
+    "playlist-modify-private",
+    "user-follow-modify",
+    "user-follow-read",
+    "user-library-read",
+    "user-library-modify",
+    "user-top-read",
+    "user-read-recently-played",
+];
+
+// Scopes for Web API calls through the user's own client ID.
+const WEBAPI_SCOPES: &[&str] = &[
+    "streaming",
+    "user-read-email",
+    "user-read-private",
+    "user-library-read",
+    "user-library-modify",
+    "user-read-playback-state",
+    "user-modify-playback-state",
+    "playlist-read-private",
+    "playlist-read-collaborative",
+    "playlist-modify-public",
+    "playlist-modify-private",
+    "user-follow-read",
+    "user-follow-modify",
+    "user-top-read",
+    "user-read-currently-playing",
+    "user-read-recently-played",
+];
 
 pub fn listen_for_callback_parameter(
     socket_address: SocketAddr,
@@ -179,9 +216,7 @@ fn create_oauth_client(client_id: &str, redirect_port: u16) -> BasicClient {
 }
 
 pub fn generate_session_auth_url(redirect_port: u16) -> (String, PkceCodeVerifier) {
-    let client_id = crate::session::access_token::CLIENT_ID;
-    let scopes = get_scopes();
-    generate_auth_url(client_id, redirect_port, &scopes)
+    generate_auth_url(CLIENT_ID, redirect_port, SESSION_SCOPES)
 }
 
 pub fn exchange_session_code_for_token(
@@ -189,8 +224,7 @@ pub fn exchange_session_code_for_token(
     code: AuthorizationCode,
     pkce_verifier: PkceCodeVerifier,
 ) -> String {
-    let client_id = crate::session::access_token::CLIENT_ID;
-    let client = create_oauth_client(client_id, redirect_port);
+    let client = create_oauth_client(CLIENT_ID, redirect_port);
 
     let token_response = client
         .exchange_code(code)
@@ -199,13 +233,6 @@ pub fn exchange_session_code_for_token(
         .expect("Failed to exchange code for token");
 
     token_response.access_token().secret().to_string()
-}
-
-fn get_scopes() -> Vec<Scope> {
-    crate::session::access_token::ACCESS_SCOPES
-        .split(',')
-        .map(|s| Scope::new(s.trim().to_string()))
-        .collect()
 }
 
 /// Token for Web API calls, serializable to/from disk.
@@ -228,26 +255,19 @@ impl WebApiToken {
     }
 }
 
-fn get_webapi_scopes() -> Vec<Scope> {
-    WEBAPI_SCOPES
-        .iter()
-        .map(|s| Scope::new(s.to_string()))
-        .collect()
-}
-
 /// Generate the authorization URL for any OAuth flow.
 /// Returns `(auth_url, pkce_verifier)`.
-pub fn generate_auth_url(
+fn generate_auth_url(
     client_id: &str,
     redirect_port: u16,
-    scopes: &[Scope],
+    scopes: &[&str],
 ) -> (String, PkceCodeVerifier) {
     let client = create_oauth_client(client_id, redirect_port);
     let (pkce_challenge, pkce_verifier) = PkceCodeChallenge::new_random_sha256();
 
     let (auth_url, _) = client
         .authorize_url(CsrfToken::new_random)
-        .add_scopes(scopes.iter().cloned())
+        .add_scopes(scopes.iter().map(|s| Scope::new(s.to_string())))
         .set_pkce_challenge(pkce_challenge)
         .url();
 
@@ -257,8 +277,7 @@ pub fn generate_auth_url(
 /// Generate the authorization URL specifically for the Web API OAuth flow.
 /// Returns `(auth_url, pkce_verifier)`.
 pub fn generate_webapi_auth_url(client_id: &str, redirect_port: u16) -> (String, PkceCodeVerifier) {
-    let scopes = get_webapi_scopes();
-    generate_auth_url(client_id, redirect_port, &scopes)
+    generate_auth_url(client_id, redirect_port, WEBAPI_SCOPES)
 }
 
 /// Exchange an authorization code for a full WebApiToken (including refresh token).
