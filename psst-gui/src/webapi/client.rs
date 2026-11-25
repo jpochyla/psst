@@ -191,21 +191,26 @@ impl WebApi {
     fn request(&self, request: &RequestBuilder) -> Result<Response<Body>, Error> {
         // `api-partner.spotify.com` rejects the Web API OAuth token, so those
         // requests carry the first-party Login5 bearer + client-token instead.
-        let (token, client_token) = if request.partner_auth {
+        // Credentials are only ever sent to Spotify, not to e.g. image CDNs.
+        let (token, client_token) = if !request.base_uri.ends_with(".spotify.com") {
+            (None, None)
+        } else if request.partner_auth {
             let (bearer, client_token) = self.partner_token()?;
-            (bearer, Some(client_token))
+            (Some(bearer), Some(client_token))
         } else {
-            (self.access_token()?, None)
+            (Some(self.access_token()?), None)
         };
         let url = request.build();
 
         fn configure_request<B>(
-            req_builder: ureq::RequestBuilder<B>,
-            token: &str,
+            mut req: ureq::RequestBuilder<B>,
+            token: Option<&str>,
             client_token: Option<&str>,
             headers: &HashMap<String, String>,
         ) -> ureq::RequestBuilder<B> {
-            let mut req = req_builder.header("Authorization", &format!("Bearer {token}"));
+            if let Some(token) = token {
+                req = req.header("Authorization", &format!("Bearer {token}"));
+            }
             if let Some(client_token) = client_token {
                 req = req.header("client-token", client_token);
             }
@@ -214,19 +219,20 @@ impl WebApi {
             )
         }
 
+        let token = token.as_deref();
         let ct = client_token.as_deref();
         let headers = request.get_headers();
         match request.get_method() {
-            Method::Get => configure_request(self.agent.get(&url), &token, ct, headers)
+            Method::Get => configure_request(self.agent.get(&url), token, ct, headers)
                 .call()
                 .map_err(|err| Error::WebApiError(err.to_string())),
-            Method::Post => configure_request(self.agent.post(&url), &token, ct, headers)
+            Method::Post => configure_request(self.agent.post(&url), token, ct, headers)
                 .send_json(request.get_body())
                 .map_err(|err| Error::WebApiError(err.to_string())),
-            Method::Put => configure_request(self.agent.put(&url), &token, ct, headers)
+            Method::Put => configure_request(self.agent.put(&url), token, ct, headers)
                 .send_json(request.get_body())
                 .map_err(|err| Error::WebApiError(err.to_string())),
-            Method::Delete => configure_request(self.agent.delete(&url), &token, ct, headers)
+            Method::Delete => configure_request(self.agent.delete(&url), token, ct, headers)
                 .force_send_body()
                 .send_json(request.get_body())
                 .map_err(|err| Error::WebApiError(err.to_string())),
@@ -1486,27 +1492,20 @@ impl WebApi {
 
 /// View endpoints.
 impl WebApi {
-    pub fn get_user_info(&self) -> Result<(String, String), Error> {
-        #[derive(Deserialize, Clone, Data)]
-        struct User {
-            region: String,
-            timezone: String,
-        }
-        let token = self.access_token()?;
-
-        let request = &RequestBuilder::new("json".to_string(), Method::Get, None)
-            .set_protocol("http")
-            .set_base_uri("ip-api.com")
-            .query("fields", "260")
-            .header("Authorization", format!("Bearer {token}"));
-
-        let result: Cached<User> = self.load_cached(request, "user-info", "usrinfo")?;
-
-        Ok((result.data.region, result.data.timezone))
+    /// Country (from the session) and IANA time zone for the home sections.
+    fn get_user_info(&self) -> (String, String) {
+        let country = self
+            .session
+            .lock()
+            .as_ref()
+            .and_then(|session| session.connected().ok()?.get_country_code())
+            .unwrap_or_else(|| "US".to_string());
+        let time_zone = iana_time_zone::get_timezone().unwrap_or_else(|_| "UTC".to_string());
+        (country, time_zone)
     }
 
     pub fn get_section(&self, section_uri: &str) -> Result<MixedView, Error> {
-        let (country, time_zone) = self.get_user_info()?;
+        let (country, time_zone) = self.get_user_info();
         let access_token = self.access_token()?;
 
         let json = json!({
