@@ -47,6 +47,7 @@ pub const PLAYBACK_PAUSING: Selector = Selector::new("app.playback-pausing");
 pub const PLAYBACK_RESUMING: Selector = Selector::new("app.playback-resuming");
 pub const PLAYBACK_BLOCKED: Selector = Selector::new("app.playback-blocked");
 pub const PLAYBACK_STOPPED: Selector = Selector::new("app.playback-stopped");
+pub const PLAYBACK_LOAD_FAILED: Selector<String> = Selector::new("app.playback-load-failed");
 
 // Playback control
 pub const PLAY: Selector<usize> = Selector::new("app.play-index");

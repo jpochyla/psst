@@ -136,7 +136,11 @@ impl Player {
                 }
                 Err(err) => {
                     self.consecutive_loading_failures += 1;
-                    if self.consecutive_loading_failures < STOP_AFTER_CONSECUTIVE_LOADING_FAILURES {
+                    // A refused audio key would fail every following track too.
+                    if !matches!(err, Error::AudioKeyRejected)
+                        && self.consecutive_loading_failures
+                            < STOP_AFTER_CONSECUTIVE_LOADING_FAILURES
+                    {
                         log::error!("skipping, error while loading: {err}");
                         self.next();
                     } else {

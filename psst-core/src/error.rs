@@ -25,6 +25,7 @@ pub enum Error {
     JoinError,
     OAuthError(String),
     OAuthInvalidGrant,
+    AudioKeyRejected,
 }
 
 impl error::Error for Error {}
@@ -69,6 +70,7 @@ impl fmt::Display for Error {
             Self::JoinError => write!(f, "Failed to join thread"),
             Self::OAuthError(msg) => write!(f, "OAuth error: {msg}"),
             Self::OAuthInvalidGrant => write!(f, "Spotify login expired, please log in again"),
+            Self::AudioKeyRejected => write!(f, "Spotify refused the audio key for this track"),
         }
     }
 }

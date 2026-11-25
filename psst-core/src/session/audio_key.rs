@@ -69,7 +69,7 @@ impl AudioKeyDispatcher {
 
         if let Some(tx) = self.pending.remove(&seq) {
             log::error!("audio key error");
-            if tx.send(Err(Error::UnexpectedResponse)).is_err() {
+            if tx.send(Err(Error::AudioKeyRejected)).is_err() {
                 log::warn!("missing receiver for audio key error, seq: {seq}");
             }
         } else {
