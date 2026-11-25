@@ -45,7 +45,7 @@ pub struct ShowEpisodes {
     pub episodes: Vector<Arc<Episode>>,
 }
 
-#[derive(Clone, Debug, Data, Lens, Eq, PartialEq, Hash, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Data, Lens, Eq, PartialEq, Hash, Deserialize, Serialize)]
 pub struct ShowLink {
     pub id: Arc<str>,
     pub name: Arc<str>,
@@ -61,6 +61,8 @@ impl ShowLink {
 pub struct Episode {
     pub id: EpisodeId,
     pub name: Arc<str>,
+    // Missing from a show's own episode list.
+    #[serde(default)]
     pub show: ShowLink,
     pub images: Vector<Image>,
     pub description: Arc<str>,
@@ -95,12 +97,6 @@ impl Episode {
             .map(|date| date.format(format).expect("Invalid format"))
             .unwrap_or_else(|| '-'.to_string())
     }
-}
-
-#[derive(Clone, Debug, Data, Lens, Deserialize)]
-pub struct EpisodeLink {
-    pub id: EpisodeId,
-    pub name: Arc<str>,
 }
 
 #[derive(Clone, Debug, Data, Lens, Deserialize)]
