@@ -225,16 +225,16 @@ pub fn exchange_session_code_for_token(
     redirect_port: u16,
     code: AuthorizationCode,
     pkce_verifier: PkceCodeVerifier,
-) -> String {
+) -> Result<String, Error> {
     let client = create_oauth_client(CLIENT_ID, redirect_port);
 
     let token_response = client
         .exchange_code(code)
         .set_pkce_verifier(pkce_verifier)
         .request(http_client)
-        .expect("Failed to exchange code for token");
+        .map_err(|e| Error::OAuthError(format!("Failed to exchange session code: {e}")))?;
 
-    token_response.access_token().secret().to_string()
+    Ok(token_response.access_token().secret().to_string())
 }
 
 /// Token for Web API calls, serializable to/from disk.
