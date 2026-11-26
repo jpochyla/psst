@@ -8,8 +8,8 @@ use druid::{
 use crate::{
     cmd,
     data::{
-        AppState, Artist, ArtistAlbums, ArtistDetail, ArtistInfo, ArtistLink, ArtistOverview,
-        Cached, Ctx, Nav, WithCtx,
+        AppState, Artist, ArtistAlbums, ArtistAlbumsSection, ArtistDetail, ArtistInfo, ArtistLink,
+        ArtistOverview, Cached, Ctx, Nav, WithCtx,
     },
     ui::utils::{stat_row, InfoLayout},
     webapi::WebApi,
@@ -189,28 +189,39 @@ fn artist_info_widget() -> impl Widget<WithCtx<ArtistInfo>> {
 }
 
 fn albums_widget() -> impl Widget<WithCtx<ArtistAlbums>> {
+    // `ArtistAlbums` iterates over its non-empty sections only, so an
+    // artist without e.g. any singles does not get a "Singles" header.
+    List::new(catalogue_section_widget)
+}
+
+fn catalogue_section_widget() -> impl Widget<WithCtx<ArtistAlbumsSection>> {
     Flex::column()
         .cross_axis_alignment(CrossAxisAlignment::Start)
-        .with_child(header_widget("Albums"))
-        .with_child(List::new(|| album::album_widget(false)).lens(Ctx::map(ArtistAlbums::albums)))
-        .with_child(header_widget("Singles"))
-        .with_child(List::new(|| album::album_widget(false)).lens(Ctx::map(ArtistAlbums::singles)))
-        .with_child(header_widget("Compilations"))
         .with_child(
-            List::new(|| album::album_widget(false)).lens(Ctx::map(ArtistAlbums::compilations)),
+            Label::new(|section: &WithCtx<ArtistAlbumsSection>, _: &_| {
+                section.data.title.to_string()
+            })
+            .with_font(theme::UI_FONT_MEDIUM)
+            .with_text_color(theme::PLACEHOLDER_COLOR)
+            .with_text_size(theme::TEXT_SIZE_SMALL)
+            .padding(Insets::new(0.0, theme::grid(2.0), 0.0, theme::grid(1.0))),
         )
-        .with_child(header_widget("Appears On"))
         .with_child(
-            List::new(|| album::album_widget(false)).lens(Ctx::map(ArtistAlbums::appears_on)),
+            List::new(|| album::album_widget(false)).lens(Ctx::map(ArtistAlbumsSection::albums)),
         )
 }
 
 fn related_widget() -> impl Widget<Cached<ArtistOverview>> {
-    Flex::column()
-        .cross_axis_alignment(CrossAxisAlignment::Start)
-        .with_child(header_widget("Related Artists"))
-        .with_child(List::new(|| artist_widget(false)))
-        .lens(Cached::data.then(ArtistOverview::related))
+    Either::new(
+        |overview: &Cached<ArtistOverview>, _| overview.data.related.is_empty(),
+        Empty,
+        Flex::column()
+            .cross_axis_alignment(CrossAxisAlignment::Start)
+            .with_child(header_widget("Related Artists"))
+            .with_child(
+                List::new(|| artist_widget(false)).lens(Cached::data.then(ArtistOverview::related)),
+            ),
+    )
 }
 
 fn header_widget<T: Data>(text: impl Into<LabelText<T>>) -> impl Widget<T> {

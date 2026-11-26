@@ -35,7 +35,8 @@ use psst_core::{item_id::ItemId, session::SessionService};
 pub use crate::data::{
     album::{Album, AlbumDetail, AlbumLink, AlbumType, DatePrecision},
     artist::{
-        Artist, ArtistAlbums, ArtistDetail, ArtistInfo, ArtistLink, ArtistOverview, ArtistStats,
+        Artist, ArtistAlbums, ArtistAlbumsSection, ArtistDetail, ArtistInfo, ArtistLink,
+        ArtistOverview, ArtistStats,
     },
     config::{AudioQuality, Authentication, Config, Preferences, PreferencesTab, Theme},
     ctx::Ctx,
