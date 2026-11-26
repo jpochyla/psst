@@ -97,7 +97,7 @@ jobs:
 
       - name: Install cargo-bundle
         if: runner.os == 'macOS' && !steps.cache-tools.outputs.cache-hit
-        run: cargo install cargo-bundle
+        run: cargo install cargo-bundle --version 0.12.0 --locked --force
 
       - name: Install create-dmg
         if: runner.os == 'macOS'
