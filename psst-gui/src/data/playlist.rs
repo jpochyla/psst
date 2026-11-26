@@ -34,8 +34,8 @@ pub struct Playlist {
     pub description: Arc<str>,
     // Spotify returns both a `tracks` object (with `total`) and, more recently,
     // a separate `items` key on playlist objects. Matching both (rename + alias)
-    // makes serde error with "duplicate field `items`", so read only `tracks`.
-    #[serde(rename = "tracks")]
+    // makes serde error with "duplicate field `items`", so read only `items`.
+    #[serde(rename = "items")]
     #[serde(deserialize_with = "deserialize_track_count")]
     #[serde(default)]
     pub track_count: Option<usize>,
