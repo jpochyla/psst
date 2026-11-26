@@ -3982,6 +3982,7 @@ dependencies = [
  "druid-enums",
  "druid-shell",
  "env_logger",
+ "iana-time-zone",
  "image 0.25.6",
  "infer",
  "itertools 0.14.0",

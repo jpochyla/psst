@@ -43,6 +43,11 @@ impl<T: Data> Cached<T> {
 
 #[derive(Deserialize)]
 pub struct Page<T: Clone> {
+    // Unavailable items come back as `null`.
+    #[serde(
+        deserialize_with = "deserialize_skip_nulls",
+        bound(deserialize = "T: Deserialize<'de>")
+    )]
     pub items: Vector<T>,
     pub limit: usize,
     pub offset: usize,
@@ -166,6 +171,15 @@ where
 {
     let page = Page::<T>::deserialize(deserializer)?;
     Ok(page.items)
+}
+
+fn deserialize_skip_nulls<'de, D, T>(deserializer: D) -> Result<Vector<T>, D::Error>
+where
+    D: Deserializer<'de>,
+    T: Clone + Deserialize<'de>,
+{
+    let items = Vec::<Option<T>>::deserialize(deserializer)?;
+    Ok(items.into_iter().flatten().collect())
 }
 
 pub fn deserialize_null_arc_str<'de, D>(deserializer: D) -> Result<Arc<str>, D::Error>

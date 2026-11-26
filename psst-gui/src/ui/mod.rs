@@ -68,20 +68,20 @@ pub fn main_window(config: &Config) -> WindowDesc<AppState> {
     }
 }
 
-pub fn preferences_window() -> WindowDesc<AppState> {
-    let win_size = (theme::grid(50.0), theme::grid(55.0));
-
-    // On Windows, the window size includes the titlebar.
-    let win_size = if cfg!(target_os = "windows") {
-        const WINDOWS_TITLEBAR_OFFSET: f64 = 56.0;
-        (win_size.0, win_size.1 + WINDOWS_TITLEBAR_OFFSET)
+/// On Windows, the window size includes the titlebar.
+fn with_titlebar(width: f64, height: f64) -> (f64, f64) {
+    const WINDOWS_TITLEBAR_OFFSET: f64 = 56.0;
+    if cfg!(target_os = "windows") {
+        (width, height + WINDOWS_TITLEBAR_OFFSET)
     } else {
-        win_size
-    };
+        (width, height)
+    }
+}
 
+pub fn preferences_window() -> WindowDesc<AppState> {
     let win = WindowDesc::new(preferences_widget())
         .title("Preferences")
-        .window_size(win_size)
+        .window_size(with_titlebar(theme::grid(50.0), theme::grid(55.0)))
         .resizable(false)
         .show_title(false)
         .transparent_titlebar(true);
@@ -95,7 +95,7 @@ pub fn preferences_window() -> WindowDesc<AppState> {
 pub fn account_setup_window() -> WindowDesc<AppState> {
     let win = WindowDesc::new(account_setup_widget())
         .title("Login")
-        .window_size((theme::grid(50.0), theme::grid(45.0)))
+        .window_size(with_titlebar(theme::grid(50.0), theme::grid(45.0)))
         .resizable(false)
         .show_title(false)
         .transparent_titlebar(true);

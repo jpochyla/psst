@@ -152,6 +152,13 @@ impl PlaybackController {
                         .submit_command(cmd::PLAYBACK_STOPPED, (), widget_id)
                         .unwrap();
                 }
+                PlayerEvent::Loaded {
+                    result: Err(err), ..
+                } => {
+                    event_sink
+                        .submit_command(cmd::PLAYBACK_LOAD_FAILED, err.to_string(), widget_id)
+                        .unwrap();
+                }
                 _ => {}
             }
 
@@ -477,6 +484,10 @@ where
             }
             Event::Command(cmd) if cmd.is(cmd::PLAYBACK_BLOCKED) => {
                 data.block_playback();
+                ctx.set_handled();
+            }
+            Event::Command(cmd) if cmd.is(cmd::PLAYBACK_LOAD_FAILED) => {
+                data.error_alert(cmd.get_unchecked(cmd::PLAYBACK_LOAD_FAILED));
                 ctx.set_handled();
             }
             Event::Command(cmd) if cmd.is(cmd::PLAYBACK_STOPPED) => {

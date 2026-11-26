@@ -640,7 +640,8 @@ impl Authenticate {
                 .map_err(|e| e.to_string())?;
 
                 // Exchange code for access token
-                let token = oauth::exchange_session_code_for_token(8888, code, pkce_verifier);
+                let token = oauth::exchange_session_code_for_token(8888, code, pkce_verifier)
+                    .map_err(|e| e.to_string())?;
 
                 // Try to authenticate with token, with retries
                 let mut credentials = None;
@@ -670,38 +671,26 @@ impl Authenticate {
                 log::info!("Session auth complete. Starting Web API OAuth flow...");
                 let (webapi_auth_url, webapi_pkce_verifier) =
                     oauth::generate_webapi_auth_url(&client_id, 8888);
-
-                // Open browser for Web API OAuth
-                if open::that(&webapi_auth_url).is_err() {
-                    log::warn!("Failed to open browser for Web API OAuth (non-fatal)");
-                    return Ok((credentials, None));
-                }
-
-                // Listen for the callback
-                let socket_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8888);
-                match oauth::get_authcode_listener(socket_addr, Duration::from_secs(300)) {
-                    Ok(code) => {
-                        match oauth::exchange_webapi_code_for_token(
-                            &client_id,
-                            8888,
-                            code,
-                            webapi_pkce_verifier,
-                        ) {
-                            Ok(webapi_token) => {
-                                log::info!("Web API OAuth flow completed successfully");
-                                Ok((credentials, Some(webapi_token)))
-                            }
-                            Err(e) => {
-                                log::warn!("Web API token exchange failed (non-fatal): {e}");
-                                Ok((credentials, None))
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        log::warn!("Web API OAuth callback failed (non-fatal): {e}");
-                        Ok((credentials, None))
-                    }
-                }
+                open::that(&webapi_auth_url).map_err(|e| e.to_string())?;
+                let webapi_token = oauth::get_authcode_listener(
+                    SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8888),
+                    Duration::from_secs(300),
+                )
+                .and_then(|code| {
+                    oauth::exchange_webapi_code_for_token(
+                        &client_id,
+                        8888,
+                        code,
+                        webapi_pkce_verifier,
+                    )
+                })
+                .map_err(|e| {
+                    format!(
+                        "Web API login failed ({e}). Check that the app has Web API enabled and \
+                         http://127.0.0.1:8888/login as its redirect URI."
+                    )
+                })?;
+                Ok((credentials, webapi_token))
             },
             Self::SPOTIFY_RESPONSE,
             self.spotify_thread.take(),
@@ -722,7 +711,7 @@ impl Authenticate {
     pub const SPOTIFY_REQUEST: Selector =
         Selector::new("app.preferences.spotify.authenticate-request");
     pub const SPOTIFY_RESPONSE: Selector<
-        Result<(Credentials, Option<psst_core::oauth::WebApiToken>), String>,
+        Result<(Credentials, psst_core::oauth::WebApiToken), String>,
     > = Selector::new("app.preferences.spotify.authenticate-response");
 
     // Selector for initializing fields
@@ -760,6 +749,7 @@ impl<W: Widget<AppState>> Controller<AppState, W> for Authenticate {
             Event::Command(cmd) if cmd.is(cmd::LOG_OUT) => {
                 data.config.clear_credentials();
                 data.config.clear_webapi_token();
+                crate::webapi::WebApi::global().set_webapi_credentials(None, None);
                 data.config.save();
                 data.session.shutdown();
                 ctx.submit_command(cmd::CLOSE_ALL_WINDOWS);
@@ -824,15 +814,11 @@ impl<W: Widget<AppState>> Controller<AppState, W> for Authenticate {
                             proxy_url: Config::proxy(),
                         });
                         data.config.store_credentials(credentials.clone());
-                        // Store Web API token if we got one
-                        if let Some(token) = webapi_token {
-                            data.config.store_webapi_token(token.clone());
-                            // Seed the global WebApi with the new credentials
-                            crate::webapi::WebApi::global().set_webapi_credentials(
-                                data.config.webapi_client_id_value().map(String::from),
-                                Some(token.clone()),
-                            );
-                        }
+                        data.config.store_webapi_token(webapi_token.clone());
+                        crate::webapi::WebApi::global().set_webapi_credentials(
+                            data.config.webapi_client_id_value().map(String::from),
+                            Some(webapi_token.clone()),
+                        );
                         data.config.save();
                         data.preferences.auth.result.resolve((), ());
                         // Handle UI flow based on tab type

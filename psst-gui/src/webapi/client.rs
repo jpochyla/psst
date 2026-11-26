@@ -11,7 +11,7 @@ use std::{
 use druid::{
     im::Vector,
     image::{self, ImageFormat},
-    Data, ImageBuf,
+    Data, ExtEventSink, ImageBuf, Target,
 };
 
 use itertools::Itertools;
@@ -36,12 +36,13 @@ use ureq::{
 };
 
 use crate::{
+    cmd,
     data::{
-        self, utils::sanitize_html_string, Album, AlbumType, Artist, ArtistAlbums, ArtistInfo,
-        ArtistLink, ArtistOverview, ArtistStats, AudioAnalysis, Cached, DatePrecision, Episode,
-        EpisodeId, EpisodeLink, Image, MixedView, Nav, Page, Playlist, PublicUser, Range,
-        Recommendations, RecommendationsRequest, SearchResults, SearchTopic, Show, SpotifyUrl,
-        Track, TrackLines, UserProfile,
+        self, utils::sanitize_html_string, Album, AlbumLink, AlbumType, Artist, ArtistAlbums,
+        ArtistInfo, ArtistLink, ArtistOverview, ArtistStats, Cached, DatePrecision, Episode, Image,
+        MixedView, Nav, Page, Playlist, PublicUser, Range, Recommendations, RecommendationsRequest,
+        SearchResults, SearchTopic, Show, ShowLink, SpotifyUrl, Track, TrackId, TrackLines,
+        UserProfile,
     },
     error::Error,
     ui::credits::TrackCredits,
@@ -62,6 +63,8 @@ pub struct WebApi {
     session: Mutex<Option<SessionService>>,
     login5: Login5,
     client_token_provider: ClientTokenProviderHandle,
+    // Hands refreshed tokens to the GUI thread, which owns the config.
+    event_sink: OnceLock<ExtEventSink>,
 }
 
 impl WebApi {
@@ -70,7 +73,10 @@ impl WebApi {
         cache_base: Option<PathBuf>,
         paginated_limit: usize,
     ) -> Self {
-        let mut agent = Agent::config_builder().timeout_global(Some(Duration::from_secs(5)));
+        // Statuses are checked in `with_retry`, which needs to see 429s.
+        let mut agent = Agent::config_builder()
+            .timeout_global(Some(Duration::from_secs(5)))
+            .http_status_as_error(false);
         if let Some(proxy_url) = proxy_url {
             let proxy = ureq::Proxy::new(proxy_url).ok();
             agent = agent.proxy(proxy);
@@ -86,6 +92,7 @@ impl WebApi {
             session: Mutex::new(None),
             login5: Login5::new(Some(Arc::clone(&client_token_provider)), proxy_url),
             client_token_provider,
+            event_sink: OnceLock::new(),
         }
     }
 
@@ -108,6 +115,18 @@ impl WebApi {
     pub fn set_webapi_credentials(&self, client_id: Option<String>, token: Option<WebApiToken>) {
         *self.webapi_client_id.lock() = client_id;
         *self.webapi_token.lock() = token;
+    }
+
+    pub fn set_event_sink(&self, sink: ExtEventSink) {
+        let _ = self.event_sink.set(sink);
+    }
+
+    /// Store a refreshed token in the config, or clear it to ask for a new
+    /// login.
+    fn persist_webapi_token(&self, token: Option<WebApiToken>) {
+        if let Some(sink) = self.event_sink.get() {
+            let _ = sink.submit_command(cmd::STORE_WEBAPI_TOKEN, token, Target::Global);
+        }
     }
 
     /// Install the authenticated core session, used to mint the first-party
@@ -151,12 +170,15 @@ impl WebApi {
                 match oauth::refresh_webapi_token(client_id, refresh_token) {
                     Ok(new_token) => {
                         let access_token = new_token.access_token.clone();
-                        // NOTE: only updates the in-memory cache. The durable
-                        // copy in config.json is refreshed by Config on the
-                        // next save; if Spotify rotates the refresh token and
-                        // the process exits before then, the user must re-login.
+                        self.persist_webapi_token(Some(new_token.clone()));
                         *token_guard = Some(new_token);
                         return Ok(access_token);
+                    }
+                    Err(e @ psst_core::error::Error::OAuthInvalidGrant) => {
+                        drop(client_id_guard);
+                        *token_guard = None;
+                        self.persist_webapi_token(None);
+                        return Err(Error::WebApiError(e.to_string()));
                     }
                     Err(e) => {
                         log::error!("Failed to refresh Web API token: {e}");
@@ -172,21 +194,26 @@ impl WebApi {
     fn request(&self, request: &RequestBuilder) -> Result<Response<Body>, Error> {
         // `api-partner.spotify.com` rejects the Web API OAuth token, so those
         // requests carry the first-party Login5 bearer + client-token instead.
-        let (token, client_token) = if request.partner_auth {
+        // Credentials are only ever sent to Spotify, not to e.g. image CDNs.
+        let (token, client_token) = if !request.base_uri.ends_with(".spotify.com") {
+            (None, None)
+        } else if request.partner_auth {
             let (bearer, client_token) = self.partner_token()?;
-            (bearer, Some(client_token))
+            (Some(bearer), Some(client_token))
         } else {
-            (self.access_token()?, None)
+            (Some(self.access_token()?), None)
         };
         let url = request.build();
 
         fn configure_request<B>(
-            req_builder: ureq::RequestBuilder<B>,
-            token: &str,
+            mut req: ureq::RequestBuilder<B>,
+            token: Option<&str>,
             client_token: Option<&str>,
             headers: &HashMap<String, String>,
         ) -> ureq::RequestBuilder<B> {
-            let mut req = req_builder.header("Authorization", &format!("Bearer {token}"));
+            if let Some(token) = token {
+                req = req.header("Authorization", &format!("Bearer {token}"));
+            }
             if let Some(client_token) = client_token {
                 req = req.header("client-token", client_token);
             }
@@ -195,19 +222,20 @@ impl WebApi {
             )
         }
 
+        let token = token.as_deref();
         let ct = client_token.as_deref();
         let headers = request.get_headers();
         match request.get_method() {
-            Method::Get => configure_request(self.agent.get(&url), &token, ct, headers)
+            Method::Get => configure_request(self.agent.get(&url), token, ct, headers)
                 .call()
                 .map_err(|err| Error::WebApiError(err.to_string())),
-            Method::Post => configure_request(self.agent.post(&url), &token, ct, headers)
+            Method::Post => configure_request(self.agent.post(&url), token, ct, headers)
                 .send_json(request.get_body())
                 .map_err(|err| Error::WebApiError(err.to_string())),
-            Method::Put => configure_request(self.agent.put(&url), &token, ct, headers)
+            Method::Put => configure_request(self.agent.put(&url), token, ct, headers)
                 .send_json(request.get_body())
                 .map_err(|err| Error::WebApiError(err.to_string())),
-            Method::Delete => configure_request(self.agent.delete(&url), &token, ct, headers)
+            Method::Delete => configure_request(self.agent.delete(&url), token, ct, headers)
                 .force_send_body()
                 .send_json(request.get_body())
                 .map_err(|err| Error::WebApiError(err.to_string())),
@@ -215,21 +243,31 @@ impl WebApi {
     }
 
     fn with_retry(f: impl Fn() -> Result<Response<Body>, Error>) -> Result<Response<Body>, Error> {
+        const MAX_RETRIES: u32 = 4;
+        // Spotify can ask to wait for hours; don't block a worker that long.
+        const MAX_RETRY_AFTER_SECS: u64 = 30;
+
+        let mut attempt = 0;
         loop {
             let response = f()?;
-            match response.status() {
-                StatusCode::TOO_MANY_REQUESTS => {
-                    let retry_after_secs = response
-                        .headers()
-                        .get("Retry-After")
-                        .and_then(|secs| secs.to_str().ok());
-                    let secs = retry_after_secs.unwrap_or("2").parse::<u64>().unwrap_or(2);
+            let status = response.status();
+            if status == StatusCode::TOO_MANY_REQUESTS && attempt < MAX_RETRIES {
+                let secs = response
+                    .headers()
+                    .get("Retry-After")
+                    .and_then(|secs| secs.to_str().ok()?.trim().parse::<u64>().ok())
+                    .unwrap_or(1 << attempt);
+                if secs <= MAX_RETRY_AFTER_SECS {
+                    log::warn!("rate limited by Spotify, retrying in {secs}s");
                     thread::sleep(Duration::from_secs(secs));
-                }
-                _ => {
-                    break Ok(response);
+                    attempt += 1;
+                    continue;
                 }
             }
+            if !status.is_success() {
+                return Err(Error::WebApiStatus(status.as_u16()));
+            }
+            return Ok(response);
         }
     }
 
@@ -910,6 +948,23 @@ struct ReleaseArtists {
     items: Vec<ReleaseArtist>,
 }
 
+impl ReleaseArtists {
+    fn to_links(&self) -> Vector<ArtistLink> {
+        self.items
+            .iter()
+            .map(|artist| ArtistLink {
+                id: uri_id(&artist.uri),
+                name: artist.profile.name.clone(),
+            })
+            .collect()
+    }
+}
+
+/// The bare ID at the end of a `spotify:kind:id` URI.
+fn uri_id(uri: &str) -> Arc<str> {
+    uri.rsplit(':').next().unwrap_or_default().into()
+}
+
 #[derive(Deserialize)]
 struct ReleaseArtist {
     uri: String,
@@ -940,15 +995,7 @@ impl Release {
             name: self.name.clone(),
             album_type,
             images: self.cover_art.sources.clone(),
-            artists: self
-                .artists
-                .items
-                .iter()
-                .map(|artist| ArtistLink {
-                    id: artist.uri.rsplit(':').next().unwrap_or_default().into(),
-                    name: artist.profile.name.clone(),
-                })
-                .collect(),
+            artists: self.artists.to_links(),
             copyrights: Vector::new(),
             label: "".into(),
             tracks: Vector::new(),
@@ -1281,42 +1328,16 @@ impl WebApi {
         Ok(result)
     }
 
-    // https://developer.spotify.com/documentation/web-api/reference/get-multiple-episodes
-    pub fn get_episodes(
-        &self,
-        ids: impl IntoIterator<Item = EpisodeId>,
-    ) -> Result<Vector<Arc<Episode>>, Error> {
-        #[derive(Deserialize)]
-        struct Episodes {
-            episodes: Vector<Arc<Episode>>,
-        }
-
-        let request = &RequestBuilder::new("v1/episodes", Method::Get, None)
-            .query("ids", ids.into_iter().map(|id| id.0.to_base62()).join(","))
-            .query("market", "from_token");
-        let result: Episodes = self.load(request)?;
-        Ok(result.episodes)
-    }
-
     // https://developer.spotify.com/documentation/web-api/reference/get-a-shows-episodes
-    pub fn get_show_episodes(&self, id: &str) -> Result<Vector<Arc<Episode>>, Error> {
-        let request = &RequestBuilder::new(format!("v1/shows/{id}/episodes"), Method::Get, None)
-            .query("market", "from_token");
-
-        let mut results = Vector::new();
-        self.for_all_pages(request, |page: Page<Option<EpisodeLink>>| {
-            if !page.items.is_empty() {
-                let ids = page
-                    .items
-                    .into_iter()
-                    .filter_map(|link| link.map(|link| link.id));
-                let episodes = self.get_episodes(ids)?;
-                results.append(episodes);
-            }
-            Ok(())
-        })?;
-
-        Ok(results)
+    pub fn get_show_episodes(&self, link: &ShowLink) -> Result<Vector<Arc<Episode>>, Error> {
+        let request =
+            &RequestBuilder::new(format!("v1/shows/{}/episodes", link.id), Method::Get, None)
+                .query("market", "from_token");
+        let mut episodes: Vector<Arc<Episode>> = self.load_all_pages(request)?;
+        for episode in episodes.iter_mut() {
+            Arc::make_mut(episode).show = link.clone();
+        }
+        Ok(episodes)
     }
 }
 
@@ -1335,7 +1356,8 @@ impl WebApi {
             Method::Get,
             None,
         )
-        .set_base_uri("spclient.wg.spotify.com");
+        .set_base_uri("spclient.wg.spotify.com")
+        .partner_auth();
         let result: TrackCredits = self.load(request)?;
         Ok(result)
     }
@@ -1361,6 +1383,7 @@ impl WebApi {
             None,
         )
         .set_base_uri("spclient.wg.spotify.com")
+        .partner_auth()
         .query("format", "json")
         .query("vocalRemoval", "false")
         .query("market", "from_token")
@@ -1467,27 +1490,20 @@ impl WebApi {
 
 /// View endpoints.
 impl WebApi {
-    pub fn get_user_info(&self) -> Result<(String, String), Error> {
-        #[derive(Deserialize, Clone, Data)]
-        struct User {
-            region: String,
-            timezone: String,
-        }
-        let token = self.access_token()?;
-
-        let request = &RequestBuilder::new("json".to_string(), Method::Get, None)
-            .set_protocol("http")
-            .set_base_uri("ip-api.com")
-            .query("fields", "260")
-            .header("Authorization", format!("Bearer {token}"));
-
-        let result: Cached<User> = self.load_cached(request, "user-info", "usrinfo")?;
-
-        Ok((result.data.region, result.data.timezone))
+    /// Country (from the session) and IANA time zone for the home sections.
+    fn get_user_info(&self) -> (String, String) {
+        let country = self
+            .session
+            .lock()
+            .as_ref()
+            .and_then(|session| session.connected().ok()?.get_country_code())
+            .unwrap_or_else(|| "US".to_string());
+        let time_zone = iana_time_zone::get_timezone().unwrap_or_else(|_| "UTC".to_string());
+        (country, time_zone)
     }
 
     pub fn get_section(&self, section_uri: &str) -> Result<MixedView, Error> {
-        let (country, time_zone) = self.get_user_info()?;
+        let (country, time_zone) = self.get_user_info();
         let access_token = self.access_token()?;
 
         let json = json!({
@@ -1561,8 +1577,242 @@ impl WebApi {
     }
 }
 
+// `fetchPlaylist` response.  Spotify-generated playlists leave many fields
+// unset, so everything the UI can do without is optional.
+#[derive(Deserialize)]
+struct FetchPlaylistResponse {
+    data: FetchPlaylistData,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct FetchPlaylistData {
+    playlist_v2: PartnerPlaylist,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PartnerPlaylist {
+    uri: String,
+    #[serde(default)]
+    name: Arc<str>,
+    description: Option<String>,
+    #[serde(default)]
+    images: PartnerImages,
+    owner_v2: Option<PartnerOwner>,
+    #[serde(default)]
+    collaborative: bool,
+    #[serde(default)]
+    content: PartnerContent,
+}
+
+#[derive(Default, Deserialize)]
+struct PartnerImages {
+    #[serde(default)]
+    items: Vec<CoverArt>,
+}
+
+#[derive(Deserialize)]
+struct PartnerOwner {
+    data: PartnerOwnerData,
+}
+
+#[derive(Deserialize)]
+struct PartnerOwnerData {
+    #[serde(default)]
+    username: Arc<str>,
+    #[serde(default)]
+    name: Arc<str>,
+}
+
+#[derive(Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PartnerContent {
+    #[serde(default)]
+    total_count: usize,
+    #[serde(default)]
+    items: Vec<PartnerContentItem>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PartnerContentItem {
+    item_v2: Option<PartnerItem>,
+}
+
+// Episodes and local files fall into `Unsupported` instead of failing the page.
+#[derive(Deserialize)]
+#[serde(tag = "__typename")]
+enum PartnerItem {
+    #[serde(rename = "TrackResponseWrapper")]
+    Track { data: Box<PartnerTrack> },
+    #[serde(other)]
+    Unsupported,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PartnerTrack {
+    uri: String,
+    #[serde(default)]
+    name: Arc<str>,
+    track_duration: Option<PartnerDuration>,
+    album_of_track: Option<PartnerAlbum>,
+    #[serde(default)]
+    artists: ReleaseArtists,
+    #[serde(default)]
+    disc_number: usize,
+    #[serde(default)]
+    track_number: usize,
+    playability: Option<PartnerPlayability>,
+    content_rating: Option<PartnerContentRating>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PartnerDuration {
+    total_milliseconds: u64,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PartnerAlbum {
+    uri: String,
+    #[serde(default)]
+    name: Arc<str>,
+    #[serde(default)]
+    cover_art: CoverArt,
+}
+
+#[derive(Deserialize)]
+struct PartnerPlayability {
+    #[serde(default)]
+    playable: bool,
+}
+
+#[derive(Deserialize)]
+struct PartnerContentRating {
+    #[serde(default)]
+    label: String,
+}
+
+impl PartnerPlaylist {
+    fn to_playlist(&self) -> Playlist {
+        Playlist {
+            id: uri_id(&self.uri),
+            name: self.name.clone(),
+            images: Some(
+                self.images
+                    .items
+                    .iter()
+                    .flat_map(|image| image.sources.iter().cloned())
+                    .collect(),
+            ),
+            description: sanitize_html_string(self.description.as_deref().unwrap_or_default()),
+            track_count: Some(self.content.total_count),
+            owner: self.owner_v2.as_ref().map_or_else(
+                || PublicUser {
+                    id: "".into(),
+                    display_name: "".into(),
+                },
+                |owner| PublicUser {
+                    id: owner.data.username.clone(),
+                    display_name: owner.data.name.clone(),
+                },
+            ),
+            collaborative: self.collaborative,
+            public: None,
+        }
+    }
+}
+
+impl PartnerTrack {
+    fn to_track(&self, track_pos: usize) -> Option<Track> {
+        Some(Track {
+            id: TrackId::try_from(uri_id(&self.uri).to_string()).ok()?,
+            name: self.name.clone(),
+            album: self.album_of_track.as_ref().map(|album| AlbumLink {
+                id: uri_id(&album.uri),
+                name: album.name.clone(),
+                images: album.cover_art.sources.clone(),
+            }),
+            artists: self.artists.to_links(),
+            duration: Duration::from_millis(
+                self.track_duration
+                    .as_ref()
+                    .map_or(0, |d| d.total_milliseconds),
+            ),
+            disc_number: self.disc_number,
+            track_number: self.track_number,
+            explicit: self
+                .content_rating
+                .as_ref()
+                .is_some_and(|rating| rating.label != "NONE"),
+            is_local: false,
+            local_path: None,
+            is_playable: self.playability.as_ref().map(|p| p.playable),
+            popularity: None,
+            track_pos,
+            lyrics: None,
+        })
+    }
+}
+
 /// Playlist endpoints.
 impl WebApi {
+    /// Read one page of a playlist through pathfinder.  Development-mode apps
+    /// get a 404 for Spotify-generated playlists and a 403 for other users'
+    /// playlists on the Web API, but pathfinder serves both.
+    fn fetch_playlist(
+        &self,
+        id: &str,
+        offset: usize,
+        limit: usize,
+    ) -> Result<PartnerPlaylist, Error> {
+        let json = json!({
+            "operationName": "fetchPlaylist",
+            "variables": {
+                "uri": format!("spotify:playlist:{id}"),
+                "offset": offset,
+                "limit": limit,
+            },
+            "extensions": {
+                "persistedQuery": {
+                    "version": 1,
+                    "sha256Hash": "73a3b3470804983e4d55d83cd6cc99715019228fd999d51429cc69473a18789d"
+                }
+            },
+        });
+        let request =
+            &RequestBuilder::new("pathfinder/v2/query".to_string(), Method::Post, Some(json))
+                .set_base_uri("api-partner.spotify.com")
+                .header("User-Agent", Self::user_agent())
+                .partner_auth();
+        let response: FetchPlaylistResponse = self.load(request)?;
+        Ok(response.data.playlist_v2)
+    }
+
+    fn fetch_playlist_tracks(&self, id: &str) -> Result<Vector<Arc<Track>>, Error> {
+        const PAGE: usize = 100;
+
+        let mut tracks = Vector::new();
+        let mut offset = 0;
+        loop {
+            let playlist = self.fetch_playlist(id, offset, PAGE)?;
+            for item in &playlist.content.items {
+                if let Some(PartnerItem::Track { data }) = &item.item_v2 {
+                    tracks.extend(data.to_track(tracks.len()).map(Arc::new));
+                }
+            }
+            offset += PAGE;
+            if playlist.content.items.is_empty()
+                || offset >= playlist.content.total_count.min(self.paginated_limit)
+            {
+                break Ok(tracks);
+            }
+        }
+    }
+
     // https://developer.spotify.com/documentation/web-api/reference/get-a-list-of-current-users-playlists
     pub fn get_playlists(&self) -> Result<Vector<Playlist>, Error> {
         let request = &RequestBuilder::new("v1/me/playlists", Method::Get, None);
@@ -1587,8 +1837,10 @@ impl WebApi {
     // https://developer.spotify.com/documentation/web-api/reference/get-playlist
     pub fn get_playlist(&self, id: &str) -> Result<Playlist, Error> {
         let request = &RequestBuilder::new(format!("v1/playlists/{id}"), Method::Get, None);
-        let result: Playlist = self.load(request)?;
-        Ok(result)
+        match self.load(request) {
+            Err(Error::WebApiStatus(403 | 404)) => Ok(self.fetch_playlist(id, 0, 1)?.to_playlist()),
+            result => result,
+        }
     }
 
     // https://developer.spotify.com/documentation/web-api/reference/get-playlist-items
@@ -1612,10 +1864,13 @@ impl WebApi {
         }
 
         let request = &RequestBuilder::new(format!("v1/playlists/{id}/items"), Method::Get, None)
-            .query("marker", "from_token")
+            .query("market", "from_token")
             .query("additional_types", "track");
 
-        let result: Vector<PlaylistItem> = self.load_all_pages(request)?;
+        let result: Vector<PlaylistItem> = match self.load_all_pages(request) {
+            Err(Error::WebApiStatus(403 | 404)) => return self.fetch_playlist_tracks(id),
+            result => result?,
+        };
 
         let local_track_manager = self.local_track_manager.lock();
 
@@ -1652,7 +1907,7 @@ impl WebApi {
             Method::Post,
             Some(json!({"uris": [track_uri]})),
         );
-        self.request(request).map(|_| ())
+        self.send_empty_json(request)
     }
 
     // https://developer.spotify.com/documentation/web-api/reference/remove-playlist-items
@@ -1666,7 +1921,7 @@ impl WebApi {
             Method::Delete,
             Some(json!({ "items": [{ "uri": track_uri }] })),
         );
-        self.request(request).map(|_| ())
+        self.send_empty_json(request)
     }
 }
 
@@ -1684,8 +1939,7 @@ impl WebApi {
             artists: Option<Page<Artist>>,
             albums: Option<Page<Arc<Album>>>,
             tracks: Option<Page<Arc<Track>>>,
-            // Spotify returns `null` items for region-blocked/removed playlists.
-            playlists: Option<Page<Option<Playlist>>>,
+            playlists: Option<Page<Playlist>>,
             shows: Option<Page<Arc<Show>>>,
         }
 
@@ -1695,16 +1949,14 @@ impl WebApi {
             .query("q", encoded_query)
             .query("type", &type_query_param)
             .query("limit", limit.to_string())
-            .query("marker", "from_token");
+            .query("market", "from_token");
 
         let result: ApiSearchResults = self.load(request)?;
 
         let artists = result.artists.map_or_else(Vector::new, |page| page.items);
         let albums = result.albums.map_or_else(Vector::new, |page| page.items);
         let tracks = result.tracks.map_or_else(Vector::new, |page| page.items);
-        let playlists = result
-            .playlists
-            .map_or_else(Vector::new, |p| p.items.into_iter().flatten().collect());
+        let playlists = result.playlists.map_or_else(Vector::new, |page| page.items);
         let shows = result.shows.map_or_else(Vector::new, |page| page.items);
         let topic = (topics.len() == 1).then_some(topics[0]);
 
@@ -1752,7 +2004,7 @@ impl WebApi {
             .join(", ");
 
         let mut request = RequestBuilder::new("v1/recommendations", Method::Get, None)
-            .query("marker", "from_token")
+            .query("market", "from_token")
             .query("limit", "100")
             .query("seed_artists", &seed_artists)
             .query("seed_tracks", &seed_tracks);
@@ -1796,17 +2048,6 @@ impl WebApi {
     }
 }
 
-/// Track endpoints.
-impl WebApi {
-    // https://developer.spotify.com/documentation/web-api/reference/get-audio-analysis/
-    pub fn _get_audio_analysis(&self, track_id: &str) -> Result<AudioAnalysis, Error> {
-        let request =
-            &RequestBuilder::new(format!("v1/audio-analysis/{track_id}"), Method::Get, None);
-        let result = self.load_cached(request, "audio-analysis", track_id)?;
-        Ok(result.data)
-    }
-}
-
 /// Image endpoints.
 impl WebApi {
     pub fn get_cached_image(&self, uri: &Arc<str>) -> Option<ImageBuf> {
@@ -1840,7 +2081,7 @@ impl WebApi {
             .set_protocol(protocol)
             .set_base_uri(base_uri);
 
-        let response = self.request(&request)?;
+        let response = Self::with_retry(|| self.request(&request))?;
         let mut body = Vec::new();
         response.into_body().into_reader().read_to_end(&mut body)?;
 
@@ -1960,11 +2201,6 @@ impl RequestBuilder {
     }
     fn get_method(&self) -> &Method {
         &self.method
-    }
-    #[allow(dead_code)]
-    fn set_method(mut self, method: Method) -> Self {
-        self.method = method;
-        self
     }
     fn set_base_uri(mut self, url: impl Display) -> Self {
         self.base_uri = url.to_string();

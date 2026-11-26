@@ -180,6 +180,16 @@ impl AppDelegate<AppState> for Delegate {
         } else if let Some(text) = cmd.get(cmd::GO_TO_URL) {
             let _ = open::that(text);
             Handled::Yes
+        } else if let Some(token) = cmd.get(cmd::STORE_WEBAPI_TOKEN) {
+            if let Some(token) = token {
+                data.config.store_webapi_token(token.clone());
+            } else {
+                data.config.clear_webapi_token();
+                ctx.submit_command(cmd::CLOSE_ALL_WINDOWS);
+                ctx.submit_command(cmd::SHOW_ACCOUNT_SETUP);
+            }
+            data.config.save();
+            Handled::Yes
         } else if let Handled::Yes = self.command_image(ctx, target, cmd, data) {
             Handled::Yes
         } else if let Some(link) = cmd.get(UNFOLLOW_PLAYLIST_CONFIRM) {
