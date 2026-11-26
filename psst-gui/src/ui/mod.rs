@@ -95,7 +95,7 @@ pub fn preferences_window() -> WindowDesc<AppState> {
 pub fn account_setup_window() -> WindowDesc<AppState> {
     let win = WindowDesc::new(account_setup_widget())
         .title("Login")
-        .window_size((theme::grid(50.0), theme::grid(45.0)))
+        .window_size((theme::grid(50.0), theme::grid(50.0)))
         .resizable(false)
         .show_title(false)
         .transparent_titlebar(true);
