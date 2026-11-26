@@ -1,6 +1,6 @@
 use crate::data::Track;
 use druid::{Selector, WidgetId};
-use psst_core::{item_id::ItemId, player::item::PlaybackItem};
+use psst_core::{item_id::ItemId, oauth::WebApiToken, player::item::PlaybackItem};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -29,6 +29,7 @@ pub const FIND_IN_SAVED_TRACKS: Selector<Find> = Selector::new("find-in-saved-tr
 // Session
 pub const SESSION_CONNECT: Selector = Selector::new("app.session-connect");
 pub const LOG_OUT: Selector = Selector::new("app.log-out");
+pub const STORE_WEBAPI_TOKEN: Selector<WebApiToken> = Selector::new("app.store-webapi-token");
 
 // Navigation
 pub const NAVIGATE: Selector<Nav> = Selector::new("app.navigates");
