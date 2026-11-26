@@ -9,6 +9,8 @@ pub fn grid(m: f64) -> f64 {
 }
 
 pub const GRID: f64 = 8.0;
+/// Keep scrollbar hit areas clear of titles, durations and row menus.
+pub const SCROLL_CONTENT_INSETS: Insets = Insets::new(8.0, 8.0, 24.0, 8.0);
 
 pub const GREY_000: Key<Color> = Key::new("app.grey_000");
 pub const GREY_100: Key<Color> = Key::new("app.grey_100");
@@ -43,14 +45,15 @@ pub const LINK_ACTIVE_COLOR: Key<Color> = Key::new("app.link-active-color");
 pub const LINK_COLD_COLOR: Key<Color> = Key::new("app.link-cold-color");
 
 pub fn setup(env: &mut Env, state: &AppState) {
-    match state.config.theme {
+    match super::system_theme::resolve(state.config.theme) {
         Theme::Light => setup_light_theme(env),
         Theme::Dark => setup_dark_theme(env),
+        Theme::System => unreachable!("system theme is resolved"),
     };
 
     env.set(WINDOW_BACKGROUND_COLOR, env.get(GREY_700));
     env.set(TEXT_COLOR, env.get(GREY_100));
-    env.set(ICON_COLOR, env.get(GREY_400));
+    env.set(ICON_COLOR, env.get(GREY_300));
     env.set(PLACEHOLDER_COLOR, env.get(GREY_300));
     env.set(PRIMARY_LIGHT, env.get(BLUE_100));
     env.set(PRIMARY_DARK, env.get(BLUE_200));
@@ -59,8 +62,13 @@ pub fn setup(env: &mut Env, state: &AppState) {
     env.set(BACKGROUND_DARK, env.get(GREY_600));
     env.set(FOREGROUND_LIGHT, env.get(GREY_100));
     env.set(FOREGROUND_DARK, env.get(GREY_000));
+    env.set(DISABLED_BUTTON_LIGHT, env.get(GREY_600));
+    env.set(DISABLED_BUTTON_DARK, env.get(GREY_500));
+    env.set(DISABLED_TEXT_COLOR, env.get(GREY_300));
+    env.set(DISABLED_FOREGROUND_LIGHT, env.get(GREY_400));
+    env.set(DISABLED_FOREGROUND_DARK, env.get(GREY_500));
 
-    match state.config.theme {
+    match super::system_theme::resolve(state.config.theme) {
         Theme::Light => {
             env.set(BUTTON_LIGHT, env.get(GREY_700));
             env.set(BUTTON_DARK, env.get(GREY_600));
@@ -69,10 +77,16 @@ pub fn setup(env: &mut Env, state: &AppState) {
             env.set(BUTTON_LIGHT, env.get(GREY_600));
             env.set(BUTTON_DARK, env.get(GREY_700));
         }
+        Theme::System => unreachable!("system theme is resolved"),
     }
 
-    env.set(BORDER_LIGHT, env.get(GREY_400));
-    env.set(BORDER_DARK, env.get(GREY_500));
+    let outline = if super::system_theme::resolve(state.config.theme) == Theme::Dark {
+        Color::rgb8(0x2a, 0x30, 0x38)
+    } else {
+        Color::rgb8(0xdd, 0xe1, 0xe6)
+    };
+    env.set(BORDER_LIGHT, outline);
+    env.set(BORDER_DARK, outline);
 
     env.set(SELECTED_TEXT_BACKGROUND_COLOR, env.get(BLUE_200));
     env.set(SELECTION_TEXT_COLOR, env.get(GREY_700));
@@ -80,7 +94,7 @@ pub fn setup(env: &mut Env, state: &AppState) {
     env.set(CURSOR_COLOR, env.get(GREY_000));
 
     env.set(PROGRESS_BAR_RADIUS, 4.0);
-    env.set(BUTTON_BORDER_RADIUS, 4.0);
+    env.set(BUTTON_BORDER_RADIUS, 12.0);
     env.set(BUTTON_BORDER_WIDTH, 1.0);
 
     env.set(
@@ -97,7 +111,7 @@ pub fn setup(env: &mut Env, state: &AppState) {
         UI_FONT_MONO,
         FontDescriptor::new(FontFamily::MONOSPACE).with_size(13.0),
     );
-    env.set(TEXT_SIZE_SMALL, 11.0);
+    env.set(TEXT_SIZE_SMALL, 12.0);
     env.set(TEXT_SIZE_NORMAL, 13.0);
     env.set(TEXT_SIZE_LARGE, 16.0);
 
@@ -105,7 +119,7 @@ pub fn setup(env: &mut Env, state: &AppState) {
     env.set(WIDE_WIDGET_WIDTH, grid(12.0));
     env.set(BORDERED_WIDGET_HEIGHT, grid(4.0));
 
-    env.set(TEXTBOX_BORDER_RADIUS, 4.0);
+    env.set(TEXTBOX_BORDER_RADIUS, 8.0);
     env.set(TEXTBOX_BORDER_WIDTH, 1.0);
     env.set(TEXTBOX_INSETS, Insets::uniform_xy(grid(1.2), grid(1.0)));
 
@@ -129,16 +143,17 @@ pub fn setup(env: &mut Env, state: &AppState) {
 }
 
 fn setup_light_theme(env: &mut Env) {
+    // Palette adapted from Spotifast (MIT, Carmine Paolino). See LICENSE-Spotifast.md.
     env.set(GREY_000, Color::grey8(0x00));
     env.set(GREY_100, Color::grey8(0x33));
     env.set(GREY_200, Color::grey8(0x4f));
-    env.set(GREY_300, Color::grey8(0x82));
+    env.set(GREY_300, Color::rgb8(0x53, 0x5b, 0x66));
     env.set(GREY_400, Color::grey8(0xbd));
-    env.set(GREY_500, Color::from_rgba32_u32(0xe5e6e7ff));
-    env.set(GREY_600, Color::from_rgba32_u32(0xf5f6f7ff));
-    env.set(GREY_700, Color::from_rgba32_u32(0xffffffff));
-    env.set(BLUE_100, Color::rgb8(0x5c, 0xc4, 0xff));
-    env.set(BLUE_200, Color::rgb8(0x00, 0x8d, 0xdd));
+    env.set(GREY_500, Color::rgb8(0xee, 0xf0, 0xf3));
+    env.set(GREY_600, Color::rgb8(0xff, 0xff, 0xff));
+    env.set(GREY_700, Color::rgb8(0xf8, 0xf9, 0xfb));
+    env.set(BLUE_100, Color::rgb8(0x12, 0x8f, 0x40));
+    env.set(BLUE_200, Color::rgb8(0x15, 0xa6, 0x4a));
 
     env.set(RED, Color::rgba8(0xEB, 0x57, 0x57, 0xFF));
 
@@ -149,15 +164,15 @@ fn setup_light_theme(env: &mut Env) {
 
 fn setup_dark_theme(env: &mut Env) {
     env.set(GREY_000, Color::grey8(0xff));
-    env.set(GREY_100, Color::grey8(0xf2));
+    env.set(GREY_100, Color::rgb8(0xf2, 0xf4, 0xf6));
     env.set(GREY_200, Color::grey8(0xe0));
-    env.set(GREY_300, Color::grey8(0xbd));
-    env.set(GREY_400, Color::grey8(0x82));
-    env.set(GREY_500, Color::grey8(0x4f));
-    env.set(GREY_600, Color::grey8(0x33));
-    env.set(GREY_700, Color::grey8(0x28));
-    env.set(BLUE_100, Color::rgb8(0x00, 0x8d, 0xdd));
-    env.set(BLUE_200, Color::rgb8(0x5c, 0xc4, 0xff));
+    env.set(GREY_300, Color::rgb8(0xa9, 0xb1, 0xbc));
+    env.set(GREY_400, Color::rgb8(0x6e, 0x77, 0x84));
+    env.set(GREY_500, Color::rgb8(0x1d, 0x21, 0x27));
+    env.set(GREY_600, Color::rgb8(0x15, 0x18, 0x1c));
+    env.set(GREY_700, Color::rgb8(0x0f, 0x11, 0x14));
+    env.set(BLUE_100, Color::rgb8(0x3c, 0xe8, 0x7a));
+    env.set(BLUE_200, Color::rgb8(0x1e, 0xd7, 0x60));
 
     env.set(RED, Color::rgba8(0xEB, 0x57, 0x57, 0xFF));
 

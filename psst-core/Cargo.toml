@@ -6,7 +6,6 @@ edition = "2021"
 
 
 [build-dependencies]
-gix-config = "0.45.1"
 time = { version = "0.3.36", features = ["local-offset"] }
 
 [dependencies]
@@ -18,7 +17,7 @@ git-version = { version = "0.3.9" }
 log = { version = "0.4.22" }
 num-bigint = { version = "0.4.6", features = ["rand"] }
 num-traits = { version = "0.2.19" }
-oauth2 = { version = "4.4.2" }
+oauth2 = { version = "5.0.0", default-features = false }
 parking_lot = { version = "0.12.3" }
 librespot-protocol = "0.7.1"
 protobuf = "3"
@@ -30,7 +29,7 @@ serde = { version = "1.0.210", features = ["derive"] }
 serde_json = { version = "1.0.132" }
 socks = { version = "0.3.4" }
 tempfile = { version = "3.13.0" }
-rustfm-scrobble = "1.1.1"
+md5 = "0.7.0"
 ureq = { version = "3.0.11", features = ["json"] }
 url = { version = "2.5.2" }
 
@@ -40,6 +39,7 @@ ctr = { version = "0.9.2" }
 hmac = { version = "0.12.1" }
 sha-1 = { version = "0.10.1" }
 shannon = { version = "0.2.0" }
+ring = "0.17.14"
 
 # Audio
 audio_thread_priority = "0.33.0"

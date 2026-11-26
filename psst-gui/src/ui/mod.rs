@@ -1,3 +1,8 @@
+mod download;
+mod folders;
+mod grid;
+mod now_playing;
+mod sound_shadow;
 use crate::data::config::SortCriteria;
 use crate::data::Track;
 use crate::error::Error;
@@ -33,34 +38,52 @@ use std::time::Duration;
 
 pub mod album;
 pub mod artist;
+pub mod connect;
 pub mod credits;
+pub mod design;
 pub mod episode;
 pub mod find;
 pub mod home;
 pub mod library;
 pub mod lyrics;
 pub mod menu;
+pub mod news;
 pub mod playable;
 pub mod playback;
 pub mod playlist;
+pub mod playlist_picker;
 pub mod preferences;
+#[cfg(debug_assertions)]
+mod preview;
+pub mod queue;
+mod sidebar;
+#[cfg(debug_assertions)]
+pub use preview::run_if_requested;
 pub mod recommend;
 pub mod search;
 pub mod show;
+pub mod system_theme;
 pub mod theme;
 pub mod track;
 pub mod user;
 pub mod utils;
+pub mod video;
 
 pub const DOWNLOAD_ARTWORK: Selector<(String, String)> = Selector::new("app.artwork.download");
 
 pub fn main_window(config: &Config) -> WindowDesc<AppState> {
     let win = WindowDesc::new(root_widget())
         .title(compute_main_window_title)
-        .with_min_size((theme::grid(65.0), theme::grid(50.0)))
+        .with_min_size((900.0, 620.0))
         .window_size(config.window_size)
         .show_title(false)
         .transparent_titlebar(true);
+    #[cfg(windows)]
+    let win = if crate::controller::taskbar::startup_in_tray(config) {
+        win.set_window_state(druid_shell::WindowState::Minimized)
+    } else {
+        win
+    };
     if cfg!(target_os = "macos") {
         win.menu(menu::main_menu)
     } else {
@@ -94,9 +117,10 @@ pub fn preferences_window() -> WindowDesc<AppState> {
 
 pub fn account_setup_window() -> WindowDesc<AppState> {
     let win = WindowDesc::new(account_setup_widget())
-        .title("Login")
-        .window_size((theme::grid(50.0), theme::grid(45.0)))
-        .resizable(false)
+        .title("Xpotify \u{00b7} Login")
+        .window_size((520.0, 760.0))
+        .with_min_size((440.0, 520.0))
+        .resizable(true)
         .show_title(false)
         .transparent_titlebar(true);
     if cfg!(target_os = "macos") {
@@ -213,13 +237,14 @@ pub fn artwork_widget() -> impl Widget<AppState> {
 }
 
 fn root_widget() -> impl Widget<AppState> {
-    let playlists = Scroll::new(playlist::list_widget())
+    let playlists = Scroll::new(playlist::list_widget().padding_right(16.0))
         .vertical()
         .expand_height();
 
     let playlists = Flex::column()
         .must_fill_main_axis(true)
         .with_child(sidebar_menu_widget())
+        .with_child(folders::toolbar())
         .with_default_spacer()
         .with_flex_child(playlists, 1.0)
         .padding(if cfg!(target_os = "macos") {
@@ -230,63 +255,138 @@ fn root_widget() -> impl Widget<AppState> {
         });
 
     let controls = Flex::column()
-        .with_default_spacer()
-        .with_child(volume_slider())
-        .with_default_spacer()
         .with_child(user::user_widget())
         .center()
-        .fix_height(88.0)
+        .fix_height(56.0)
         .background(Border::Top.with_color(theme::GREY_500));
 
-    let sidebar = Flex::column()
+    let expanded_sidebar = Flex::column()
         .with_flex_child(playlists, 1.0)
         .with_child(controls)
         .background(theme::BACKGROUND_DARK);
 
+    let sidebar = playlist::list_controller(Either::new(
+        |state: &AppState, _| state.config.library_compact,
+        sidebar::compact(),
+        expanded_sidebar,
+    ));
+
     let topbar = Flex::row()
         .must_fill_main_axis(true)
-        .with_child(topbar_back_button_widget())
         .with_flex_child(topbar_title_widget(), 1.0)
+        .with_child(
+            Label::dynamic(|state: &AppState, _| state.cache_notice.clone())
+                .with_text_size(10.0)
+                .with_text_color(theme::PLACEHOLDER_COLOR)
+                .padding((8.0, 0.0)),
+        )
+        .with_child(
+            druid::widget::Button::new("Actualizar")
+                .on_click(|ctx, _: &mut AppState, _| ctx.submit_command(cmd::NAVIGATE_REFRESH))
+                .padding((8.0, 2.0)),
+        )
+        .with_child(
+            druid::widget::Button::new("Panel")
+                .on_click(|_, state: &mut AppState, _| {
+                    state.config.show_now_playing = !state.config.show_now_playing
+                })
+                .tooltip("Mostrar u ocultar el panel de reproduccion"),
+        )
         .with_child(topbar_sort_widget())
         .background(Border::Bottom.with_color(theme::BACKGROUND_DARK));
 
     let main = Flex::column()
         .cross_axis_alignment(CrossAxisAlignment::Start)
         .with_child(topbar)
-        .with_flex_child(Overlay::bottom(route_widget(), alert_widget()), 1.0)
-        .with_child(playback::panel_widget())
+        .with_flex_child(
+            druid::widget::Either::new(
+                |state: &AppState, _| state.config.show_now_playing,
+                Split::columns(
+                    Overlay::bottom(route_widget(), alert_widget()),
+                    druid::widget::Either::new(
+                        |state: &AppState, _| state.queue_panel_open,
+                        queue::widget(),
+                        now_playing::widget(),
+                    ),
+                )
+                .split_point(0.62)
+                .bar_size(1.0)
+                .min_bar_area(8.0)
+                .min_size(300.0, 260.0)
+                .solid_bar(true),
+                Overlay::bottom(route_widget(), alert_widget()),
+            ),
+            1.0,
+        )
         .background(theme::BACKGROUND_LIGHT);
 
-    let split = Split::columns(sidebar, main)
-        .split_point(0.2)
-        .bar_size(1.0)
-        .min_size(150.0, 300.0)
-        .min_bar_area(1.0)
-        .solid_bar(true);
+    let split = Flex::row()
+        .with_child(sidebar.fix_width(sidebar::WIDTH))
+        .with_flex_child(main, 1.0)
+        .env_scope(|env, state: &AppState| {
+            env.set(
+                sidebar::WIDTH,
+                if state.config.library_compact {
+                    72.0
+                } else {
+                    260.0
+                },
+            );
+        });
 
-    ThemeScope::new(split)
-        .controller(SessionController)
-        .controller(NavController)
-        .controller(SortController)
-        .on_command_async(
-            cmd::LOAD_TRACK_CREDITS,
-            |track: Arc<Track>| {
-                log::debug!("fetching credits for track: {}", track.name);
-                WebApi::global().get_track_credits(&track.id.0.to_base62())
-            },
-            |_, data: &mut AppState, _| {
-                data.credits = None;
-            },
-            |_ctx, data, (_track, result): (Arc<Track>, Result<TrackCredits, Error>)| match result {
-                Ok(credits) => {
-                    data.credits = Some(credits);
-                }
-                Err(err) => {
-                    log::error!("Failed to fetch credits for {}: {:?}", _track.name, err);
-                    data.error_alert(format!("Failed to fetch track credits: {err}"));
-                }
-            },
-        )
+    let shell = Flex::column()
+        .with_child(global_navigation_widget())
+        .with_flex_child(split, 1.0)
+        .with_child(
+            sound_shadow::SoundShadow::new(
+                Flex::row()
+                    .with_flex_child(playback::panel_widget(), 1.0)
+                    .with_child(volume_slider().fix_width(180.0).center().fix_height(88.0)),
+            )
+            .background(theme::BACKGROUND_DARK),
+        );
+
+    #[cfg(target_os = "windows")]
+    let shell = shell.controller(crate::controller::taskbar::TaskbarController::default());
+
+    let shell = user::profile_controller(
+        shell.controller(crate::controller::native_connect::NativeConnectController::default()),
+    );
+
+    folders::controller(crate::controller::cache_hint::widget(connect::controller(
+        news::controller(
+            ThemeScope::new(download::controller(library::mutation_controller(shell)))
+                .controller(playable::KeepCurrentVisible)
+                .controller(SessionController)
+                .controller(NavController)
+                .controller(SortController)
+                .on_command_async(
+                    cmd::LOAD_TRACK_CREDITS,
+                    |track: Arc<Track>| {
+                        log::debug!("fetching credits for track: {}", track.name);
+                        WebApi::global().get_track_credits(&track.id.0.to_base62())
+                    },
+                    |_, data: &mut AppState, _| {
+                        data.credits = None;
+                    },
+                    |_ctx, data, (_track, result): (Arc<Track>, Result<TrackCredits, Error>)| {
+                        match result {
+                            Ok(credits) => {
+                                data.credits = Some(credits);
+                            }
+                            Err(err) => {
+                                log::error!(
+                                    "Failed to fetch credits for {}: {:?}",
+                                    _track.name,
+                                    err
+                                );
+                                data.error_alert(format!("Failed to fetch track credits: {err}"));
+                            }
+                        }
+                    },
+                ),
+        ),
+    )))
     // .debug_invalidation()
     // .debug_widget_id()
     // .debug_paint_layout()
@@ -336,53 +436,73 @@ fn route_widget() -> impl Widget<AppState> {
     ViewDispatcher::new(
         |state: &AppState, _| state.nav.route(),
         |route: &Route, _, _| match route {
-            Route::Home => Scroll::new(home::home_widget().padding(theme::grid(1.0)))
+            Route::Devices => connect::widget().boxed(),
+            Route::Notifications => news::widget().boxed(),
+            Route::Queue => queue::widget().boxed(),
+            Route::Home => Scroll::new(home::home_widget().padding(theme::SCROLL_CONTENT_INSETS))
                 .vertical()
                 .boxed(),
-            Route::Lyrics => Scroll::new(lyrics::lyrics_widget().padding(theme::grid(1.0)))
-                .vertical()
-                .boxed(),
+            Route::Lyrics => lyrics::lyrics_widget().boxed(),
             Route::SavedTracks => Flex::column()
                 .with_child(
                     find::finder_widget(cmd::FIND_IN_SAVED_TRACKS, "Find in Saved Tracks...")
                         .lens(AppState::finder),
                 )
                 .with_flex_child(
-                    Scroll::new(library::saved_tracks_widget().padding(theme::grid(1.0)))
-                        .vertical(),
+                    Scroll::new(
+                        library::saved_tracks_widget().padding(theme::SCROLL_CONTENT_INSETS),
+                    )
+                    .vertical(),
                     1.0,
                 )
                 .boxed(),
             Route::SavedAlbums => {
-                Scroll::new(library::saved_albums_widget().padding(theme::grid(1.0)))
+                Scroll::new(library::saved_albums_widget().padding(theme::SCROLL_CONTENT_INSETS))
                     .vertical()
                     .boxed()
             }
-            Route::Shows => Scroll::new(library::saved_shows_widget().padding(theme::grid(1.0)))
-                .vertical()
+            Route::Shows => {
+                Scroll::new(library::saved_shows_widget().padding(theme::SCROLL_CONTENT_INSETS))
+                    .vertical()
+                    .boxed()
+            }
+            Route::SearchResults => search::results_widget()
+                .padding(theme::SCROLL_CONTENT_INSETS)
                 .boxed(),
-            Route::SearchResults => search::results_widget().padding(theme::grid(1.0)).boxed(),
-            Route::AlbumDetail => Scroll::new(album::detail_widget().padding(theme::grid(1.0)))
-                .vertical()
-                .boxed(),
-            Route::ArtistDetail => Scroll::new(artist::detail_widget().padding(theme::grid(1.0)))
-                .vertical()
-                .boxed(),
+            Route::AlbumDetail => {
+                Scroll::new(album::detail_widget().padding(theme::SCROLL_CONTENT_INSETS))
+                    .vertical()
+                    .boxed()
+            }
+            Route::ArtistDetail => {
+                Scroll::new(artist::detail_widget().padding(theme::SCROLL_CONTENT_INSETS))
+                    .vertical()
+                    .boxed()
+            }
             Route::PlaylistDetail => Flex::column()
+                .with_child(
+                    playlist::play_button()
+                        .padding((8.0, 8.0, 24.0, 8.0))
+                        .align_left(),
+                )
+                .with_child(playlist::playlist_toolbar().padding((8.0, 0.0, 24.0, 8.0)))
                 .with_child(
                     find::finder_widget(cmd::FIND_IN_PLAYLIST, "Find in Playlist...")
                         .lens(AppState::finder),
                 )
                 .with_flex_child(
-                    Scroll::new(playlist::detail_widget().padding(theme::grid(1.0))).vertical(),
+                    Scroll::new(playlist::detail_widget().padding(theme::SCROLL_CONTENT_INSETS))
+                        .vertical(),
                     1.0,
                 )
                 .boxed(),
-            Route::ShowDetail => Scroll::new(show::detail_widget().padding(theme::grid(1.0)))
-                .vertical()
-                .boxed(),
+            Route::ShowDetail => {
+                Scroll::new(show::detail_widget().padding(theme::SCROLL_CONTENT_INSETS))
+                    .vertical()
+                    .boxed()
+            }
             Route::Recommendations => {
-                Scroll::new(recommend::results_widget().padding(theme::grid(1.0)))
+                Scroll::new(recommend::results_widget().padding(theme::SCROLL_CONTENT_INSETS))
                     .vertical()
                     .boxed()
             }
@@ -394,14 +514,36 @@ fn route_widget() -> impl Widget<AppState> {
 fn sidebar_menu_widget() -> impl Widget<AppState> {
     Flex::column()
         .with_default_spacer()
-        .with_child(sidebar_link_widget("Home", Some(&icons::HOME), Nav::Home))
+        .with_child(
+            Flex::row()
+                .with_flex_child(
+                    Label::new("Tu biblioteca")
+                        .with_font(theme::UI_FONT_MEDIUM)
+                        .with_text_size(18.0)
+                        .align_left(),
+                    1.0,
+                )
+                .with_child(sidebar::toggle(false))
+                .padding((16.0, 8.0)),
+        )
+        .with_child(
+            design::primary(
+                druid::widget::Button::new("Organizar con IA")
+                    .on_click(|ctx, _: &mut AppState, _| {
+                        ctx.submit_command(crate::splitify::OPEN.with(String::new()));
+                    })
+                    .fix_height(40.0)
+                    .expand_width(),
+            )
+            .padding((12.0, 10.0)),
+        )
         .with_child(sidebar_link_widget(
-            "Tracks",
+            "Canciones",
             Some(&icons::MUSIC_NOTE),
             Nav::SavedTracks,
         ))
         .with_child(sidebar_link_widget(
-            "Albums",
+            "Álbumes",
             Some(&icons::ALBUM),
             Nav::SavedAlbums,
         ))
@@ -410,7 +552,78 @@ fn sidebar_menu_widget() -> impl Widget<AppState> {
             Some(&icons::PODCAST),
             Nav::Shows,
         ))
-        .with_child(search::input_widget().padding((theme::grid(1.0), theme::grid(1.0))))
+        .with_child(sidebar_link_widget("Cola", Some(&icons::QUEUE), Nav::Queue))
+}
+
+fn global_navigation_widget() -> impl Widget<AppState> {
+    let home = icons::HOME
+        .scale((24.0, 24.0))
+        .padding(12.0)
+        .link()
+        .circle()
+        .tooltip("Inicio")
+        .on_left_click(|ctx, _, _: &mut AppState, _| {
+            ctx.submit_command(cmd::NAVIGATE.with(Nav::Home))
+        });
+    let bell = Flex::row()
+        .with_child(icons::BELL.scale((22.0, 22.0)))
+        .with_child(
+            Label::dynamic(|state: &AppState, _| {
+                state
+                    .news
+                    .feed
+                    .resolved()
+                    .map(|feed| {
+                        feed.releases
+                            .iter()
+                            .filter(|release| release.unread)
+                            .count()
+                    })
+                    .filter(|count| *count > 0)
+                    .map(|count| format!(" {count}"))
+                    .unwrap_or_default()
+            })
+            .with_text_size(11.0),
+        )
+        .padding(12.0)
+        .link()
+        .rounded(24.0)
+        .tooltip("Novedades de artistas seguidos")
+        .on_left_click(|ctx, _, _, _| ctx.submit_command(cmd::NAVIGATE.with(Nav::Notifications)));
+    let devices = icons::DEVICES
+        .scale((24.0, 24.0))
+        .padding(12.0)
+        .link()
+        .circle()
+        .tooltip("Conectar a un teléfono, altavoz u otro dispositivo")
+        .on_left_click(|ctx, _, _: &mut AppState, _| {
+            ctx.submit_command(cmd::NAVIGATE.with(Nav::Devices))
+        });
+    Flex::row()
+        .with_child(
+            Label::new("Xpotify")
+                .with_font(theme::UI_FONT_MEDIUM)
+                .with_text_size(20.0)
+                .fix_width(126.0),
+        )
+        .with_child(topbar_back_button_widget())
+        .with_child(home)
+        .with_spacer(12.0)
+        .with_flex_child(
+            Flex::row()
+                .with_child(icons::SEARCH.scale((22.0, 22.0)))
+                .with_spacer(10.0)
+                .with_flex_child(search::input_widget(), 1.0)
+                .padding((16.0, 8.0))
+                .background(theme::BACKGROUND_LIGHT)
+                .rounded(24.0),
+            1.0,
+        )
+        .with_spacer(12.0)
+        .with_child(devices)
+        .with_child(bell)
+        .padding((16.0, 8.0))
+        .background(theme::BACKGROUND_DARK)
 }
 
 fn sidebar_link_widget(
@@ -434,10 +647,15 @@ fn sidebar_link_widget(
         .link()
         .env_scope({
             let link_nav = link_nav.clone();
-            move |env, nav: &Nav| {
+            move |env, state: &AppState| {
+                let active = if matches!(link_nav, Nav::Queue) {
+                    state.queue_panel_open && state.config.show_now_playing
+                } else {
+                    link_nav == state.nav
+                };
                 env.set(
                     theme::LINK_COLD_COLOR,
-                    if &link_nav == nav {
+                    if active {
                         env.get(theme::MENU_BUTTON_BG_ACTIVE)
                     } else {
                         env.get(theme::MENU_BUTTON_BG_INACTIVE)
@@ -445,7 +663,7 @@ fn sidebar_link_widget(
                 );
                 env.set(
                     theme::TEXT_COLOR,
-                    if &link_nav == nav {
+                    if active {
                         env.get(theme::MENU_BUTTON_FG_ACTIVE)
                     } else {
                         env.get(theme::MENU_BUTTON_FG_INACTIVE)
@@ -456,7 +674,6 @@ fn sidebar_link_widget(
         .on_left_click(move |ctx, _, _, _| {
             ctx.submit_command(cmd::NAVIGATE.with(link_nav.clone()));
         })
-        .lens(AppState::nav)
 }
 
 fn volume_slider() -> impl Widget<AppState> {
@@ -473,7 +690,8 @@ fn volume_slider() -> impl Widget<AppState> {
                     env.set(theme::FOREGROUND_LIGHT, env.get(theme::GREY_400));
                     env.set(theme::FOREGROUND_DARK, env.get(theme::GREY_400));
                 })
-                .with_cursor(Cursor::Pointer),
+                .with_cursor(Cursor::Pointer)
+                .tooltip("Ajustar volumen"),
             1.0,
         )
         .with_default_spacer()
@@ -505,7 +723,8 @@ fn topbar_sort_widget() -> impl Widget<AppState> {
         .on_left_click(|ctx, _, _, _| {
             ctx.submit_command(cmd::TOGGLE_SORT_ORDER);
         })
-        .context_menu(sorting_menu);
+        .context_menu(sorting_menu)
+        .tooltip("Cambiar orden. Clic derecho: elegir criterio");
 
     let descending_icon = down_icon
         .padding(theme::grid(1.0))
@@ -514,7 +733,8 @@ fn topbar_sort_widget() -> impl Widget<AppState> {
         .on_left_click(|ctx, _, _, _| {
             ctx.submit_command(cmd::TOGGLE_SORT_ORDER);
         })
-        .context_menu(sorting_menu);
+        .context_menu(sorting_menu)
+        .tooltip("Cambiar orden. Clic derecho: elegir criterio");
     let enabled = Either::new(
         |data: &AppState, _| {
             // check if the current nav is PlaylistDetail
@@ -551,7 +771,8 @@ fn topbar_back_button_widget() -> impl Widget<AppState> {
         .on_left_click(|ctx, _, _, _| {
             ctx.submit_command(cmd::NAVIGATE_BACK.with(1));
         })
-        .context_menu(history_menu);
+        .context_menu(history_menu)
+        .tooltip("Volver. Clic derecho: ver historial");
     Either::new(
         |history: &Vector<Nav>, _| history.is_empty(),
         disabled,
@@ -618,9 +839,12 @@ fn route_icon_widget() -> impl Widget<Nav> {
         |nav: &Nav, _, _| {
             let icon = |icon: &SvgIcon| icon.scale(theme::ICON_SIZE_MEDIUM);
             match &nav {
+                Nav::Devices => icon(&icons::DEVICES).boxed(),
+                Nav::Notifications => icon(&icons::BELL).boxed(),
                 Nav::Home | Nav::Lyrics | Nav::SavedTracks | Nav::SavedAlbums | Nav::Shows => {
                     Empty.boxed()
                 }
+                Nav::Queue => icon(&icons::QUEUE).boxed(),
                 Nav::SearchResults(_) | Nav::Recommendations(_) => icon(&icons::SEARCH).boxed(),
                 Nav::AlbumDetail(_, _) => icon(&icons::ALBUM).boxed(),
                 Nav::ArtistDetail(_) => icon(&icons::ARTIST).boxed(),
@@ -647,6 +871,6 @@ fn compute_main_window_title(data: &AppState, _env: &Env) -> String {
             Playable::Episode(episode) => episode.name.to_string(),
         }
     } else {
-        "Psst".to_owned()
+        "Xpotify".to_owned()
     }
 }

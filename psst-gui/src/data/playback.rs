@@ -15,7 +15,9 @@ pub struct Playback {
     pub now_playing: Option<NowPlaying>,
     pub queue_behavior: QueueBehavior,
     pub queue: Vector<QueueEntry>,
+    pub up_next: Vector<QueueEntry>,
     pub volume: f64,
+    pub lyrics_follow: bool,
 }
 
 #[derive(Clone, Debug, Data, Lens)]

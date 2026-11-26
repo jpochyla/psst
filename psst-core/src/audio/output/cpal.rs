@@ -1,10 +1,15 @@
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use crossbeam_channel::{bounded, Receiver, Sender};
 use num_traits::Pow;
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
 
 use crate::{
     actor::{Act, Actor, ActorHandle},
     audio::{
+        meter::AudioMeter,
         output::{AudioOutput, AudioSink},
         source::{AudioSource, Empty},
     },
@@ -14,6 +19,7 @@ use crate::{
 pub struct CpalOutput {
     _handle: ActorHandle<StreamMsg>,
     sink: CpalSink,
+    failed: Arc<AtomicBool>,
 }
 
 impl CpalOutput {
@@ -32,12 +38,34 @@ impl CpalOutput {
         let supported = Self::preferred_output_config(&device)?;
 
         let (callback_send, callback_recv) = bounded(16);
+        let (opened_send, opened_recv) = bounded(1);
+        let failed = Arc::new(AtomicBool::new(false));
 
         let handle = Stream::spawn_with_default_cap("audio_output", {
             let config = supported.config();
-            // TODO: Support additional sample formats.
-            move |this| Stream::open(device, config, callback_recv, this).unwrap()
+            let failed = failed.clone();
+            move |this| match Stream::open(device.clone(), config, callback_recv, this, failed) {
+                Ok(stream) => {
+                    let _ = opened_send.send(Ok(()));
+                    stream
+                }
+                Err(error) => {
+                    let _ = opened_send.send(Err(error));
+                    Stream {
+                        stream: None,
+                        _device: device,
+                    }
+                }
+            }
         });
+        match opened_recv.recv() {
+            Ok(Ok(())) => {}
+            result => {
+                let _ = handle.send(StreamMsg::Close);
+                handle.join();
+                return Err(result.unwrap_or(Err(Error::ConnectionFailed)).unwrap_err());
+            }
+        }
         let sink = CpalSink {
             channel_count: supported.channels(),
             sample_rate: supported.sample_rate(),
@@ -48,7 +76,24 @@ impl CpalOutput {
         Ok(Self {
             _handle: handle,
             sink,
+            failed,
         })
+    }
+
+    pub fn has_failed(&self) -> bool {
+        self.failed.load(Ordering::Acquire)
+    }
+
+    pub fn devices() -> (Option<String>, Vec<String>) {
+        let host = cpal::default_host();
+        let default = host
+            .default_output_device()
+            .and_then(|device| device.name().ok());
+        let available = host
+            .output_devices()
+            .map(|devices| devices.filter_map(|device| device.name().ok()).collect())
+            .unwrap_or_default();
+        (default, available)
     }
 
     fn preferred_output_config(
@@ -90,13 +135,21 @@ pub struct CpalSink {
 
 impl CpalSink {
     fn send_to_callback(&self, msg: CallbackMsg) {
-        if self.callback_send.send(msg).is_err() {
+        if self
+            .callback_send
+            .send_timeout(msg, std::time::Duration::from_millis(250))
+            .is_err()
+        {
             log::error!("output stream actor is dead");
         }
     }
 
     fn send_to_stream(&self, msg: StreamMsg) {
-        if self.stream_send.send(msg).is_err() {
+        if self
+            .stream_send
+            .send_timeout(msg, std::time::Duration::from_millis(250))
+            .is_err()
+        {
             log::error!("output stream actor is dead");
         }
     }
@@ -140,7 +193,7 @@ impl AudioSink for CpalSink {
 }
 
 struct Stream {
-    stream: cpal::Stream,
+    stream: Option<cpal::Stream>,
     _device: cpal::Device,
 }
 
@@ -150,6 +203,7 @@ impl Stream {
         config: cpal::StreamConfig,
         callback_recv: Receiver<CallbackMsg>,
         stream_send: Sender<StreamMsg>,
+        failed: Arc<AtomicBool>,
     ) -> Result<Self, Error> {
         let mut callback = StreamCallback {
             callback_recv,
@@ -157,6 +211,7 @@ impl Stream {
             source: Box::new(Empty),
             volume: 1.0, // We start with the full volume.
             state: CallbackState::Paused,
+            meter: AudioMeter::new(config.sample_rate.0, config.channels as usize),
         };
 
         log::info!("opening output stream: {config:?}");
@@ -165,7 +220,8 @@ impl Stream {
             move |output, _| {
                 callback.write_samples(output);
             },
-            |err| {
+            move |err| {
+                failed.store(true, Ordering::Release);
                 log::error!("audio output error: {err}");
             },
             None,
@@ -173,7 +229,7 @@ impl Stream {
 
         Ok(Self {
             _device: device,
-            stream,
+            stream: Some(stream),
         })
     }
 }
@@ -183,24 +239,27 @@ impl Actor for Stream {
     type Error = Error;
 
     fn handle(&mut self, msg: Self::Message) -> Result<Act<Self>, Self::Error> {
+        let Some(stream) = &self.stream else {
+            return Ok(Act::Shutdown);
+        };
         match msg {
             StreamMsg::Pause => {
                 log::debug!("pausing audio output stream");
-                if let Err(err) = self.stream.pause() {
+                if let Err(err) = stream.pause() {
                     log::error!("failed to stop stream: {err}");
                 }
                 Ok(Act::Continue)
             }
             StreamMsg::Resume => {
                 log::debug!("resuming audio output stream");
-                if let Err(err) = self.stream.play() {
+                if let Err(err) = stream.play() {
                     log::error!("failed to start stream: {err}");
                 }
                 Ok(Act::Continue)
             }
             StreamMsg::Close => {
                 log::debug!("closing audio output stream");
-                let _ = self.stream.pause();
+                let _ = stream.pause();
                 Ok(Act::Shutdown)
             }
         }
@@ -226,6 +285,7 @@ enum CallbackState {
 }
 
 struct StreamCallback {
+    meter: AudioMeter,
     #[allow(unused)]
     stream_send: Sender<StreamMsg>,
     callback_recv: Receiver<CallbackMsg>,
@@ -258,6 +318,8 @@ impl StreamCallback {
             // Write out as many samples as possible from the audio source to the
             // output buffer.
             let written = self.source.write(output);
+
+            self.meter.process(&output[..written]);
 
             // Apply scaled global volume level.
             let scaled_volume = self.volume.pow(4);

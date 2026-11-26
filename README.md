@@ -1,4 +1,26 @@
-# Psst
+# Xpotify + Splitify
+
+[Descargar Xpotify para Windows x64](https://github.com/angelopol/xpotify/releases/latest) · [Uso y configuración](SPLITIFY.md) · [Estado de funciones](ROADMAP.md)
+
+Cliente nativo basado en Psst, con organización de playlists mediante Gemini, letras sincronizadas, cola interactiva y controles de reproducción en la vista previa de la barra de tareas de Windows. La versión 0.3.0 incorpora un receptor Spotify Connect nativo para controlar la PC desde otros dispositivos, conservando caché, carga bajo demanda y reutilización de playlists por `snapshot_id`. El motor nativo no reporta escuchas al historial de Spotify; esta limitación se mantiene por elección del usuario.
+
+## Integración local con Splitify
+
+En **0.4.5**, la biblioteca se abre como una barra compacta de portadas, con tooltips y un botón para expandirla. La app recuerda esa elección. Las filas horizontales reservan espacio para el scroll y Connect conserva la última selección mientras se conecta.
+
+En **0.4.4**, la cola muestra páginas de 50 canciones, con botones para avanzar y volver tanto en el panel del reproductor como en la vista completa. Cambiar de página no consulta la API de Spotify.
+
+En **0.4.3**, la sombra llega hasta el volumen y la línea de progreso mide 2 píxeles, conservando un área de clic cómoda.
+
+En **0.4.2**, el reproductor incorpora una sombra de bloques verdes que responde al audio local y se desvanece al pausar.
+
+En **0.4.1** se amplía el margen del scroll, Letras/Cola/Videoclip comparten una fila y las playlists tienen un botón de reproducción visible al desplazarse. El enlace Source de la aplicación apunta a este repositorio.
+
+La versión **0.4.0** adapta mejoras de Spotifast: cola del motor con orden aleatorio real, filas virtualizadas para listas largas, colores y separadores compactos, consultas HTTP acotadas y caché por petición. Consulta [qué se incorporó y sus límites](SPOTIFAST-INTEGRATION.md).
+
+Esta versión añade un editor nativo de playlists con `gemini-3.5-flash-lite`. Pulsa **Organizar con IA** o haz clic derecho en una playlist y elige **Dividir con Splitify IA**. Configura `GEMINI_API_KEY` y `SPOTIFY_CLIENT_ID` en `.env.local`; añade `http://127.0.0.1:8888/login` como redirect URI en Spotify Developer Dashboard. La autorización de reproducción nativa utiliza por separado `http://127.0.0.1:8898/login`. La IA propone una vista previa editable y el botón de creación genera playlists privadas. La reproducción sigue usando el cliente nativo.
+
+Consulta [la revisión de seguridad](SECURITY-REVIEW.md): se corrigieron fugas de tokens en el código heredado y se actualizaron dependencias. La rama `main` del repositorio Splitify conserva la aplicación web; la integración nativa vive en este repositorio xpotify, rama `splitify-integration`. Ejecuta `Start-Xpotify.cmd`; consulta [uso y configuración](SPLITIFY.md).
 
 A fast Spotify client with a native GUI written in Rust, without Electron.
 Psst is still very early in development, lacking in features, stability, and general user experience.
@@ -31,7 +53,7 @@ Unofficial builds of Psst are also available through the [AUR](https://aur.archl
 
 ## Building
 
-On all platforms, the **latest [Rust](https://rustup.rs/) stable** (at least 1.65.0) is required.
+On all platforms, the **latest [Rust](https://rustup.rs/) stable** (at least 1.89.0 for the current lockfile) is required.
 For platform-specific requirements, see the dropdowns below.
 
 <details>
@@ -111,6 +133,8 @@ cargo bundle --release
 
 ## Roadmap
 
+Native fork status: see [ROADMAP.md](ROADMAP.md) for implementation details, validation and platform/API limits. Windows is the tested platform. Playlist folders are local; Spotify's public API does not expose its folders. Native listen reporting remains pending.
+
 - [x] Vorbis track playback
 - [x] Browsing saved albums and tracks
 - [x] Save / unsave albums and tracks
@@ -124,39 +148,39 @@ cargo bundle --release
 - [x] Genre playlists and "For You" content
 - [x] Dark theme
 - [x] Credits support
-- [ ] Resilience to network errors (automatically retry timed-out requests)
-- [ ] Managing playlists
+- [x] Resilience to network errors (bounded retries for read requests)
+- [x] Managing playlists
   - Follow/unfollow
   - Add/remove tracks
   - Reorder tracks
   - Rename playlist
-  - Playlist folders
+  - Local playlist folders (not synchronized with Spotify folders)
 - [x] Playback queue
-- [ ] React to audio output device events
+- [x] React to default audio output device events (CPAL; physical headphone checks pending)
   - Pause after disconnecting headphones
   - Transfer playback after connecting headphones
-- [ ] Better caching
+- [x] Better caching
   - Cache as many WebAPI responses as possible
   - Visualize cache utilization
     - Total cache usage in the config dialog
     - Show time origin of cached data, allow to refresh
-- [ ] Trivia on the artist page, Wikipedia links
-- [ ] Downloading encrypted tracks
+- [x] Artist biography/statistics and Wikipedia links
+- [x] Downloading encrypted tracks into the playback cache
 - [ ] Reporting played tracks to Spotify servers
-- [ ] OS-specific application bundles
+- [ ] OS-specific application bundles (Windows ZIP tested; macOS/Linux packaging scripts await platform validation)
 - UI
-  - [ ] Rethink the current design, consider a two-pane layout
+  - [x] Rethink the current design, consider a two-pane layout
     - Left pane for browsing
     - Right pane for current playback
-  - [ ] Detect light/dark OS theme
-  - [ ] Robust error states, ideally with a retry button
-  - [ ] Correct playback highlight
+  - [x] Detect light/dark OS theme (Windows; other platforms need validation)
+  - [x] Robust error states, with a retry button
+  - [x] Correct playback highlight
     - Highlight now-playing track only in the correct album/playlist
     - Keep highlighted track in viewport
-  - [ ] Paging or virtualized lists for albums and tracks
-  - [ ] Grid for albums and artists
-  - [ ] Robust active/inactive menu visualization
-  - [ ] Save playback state
+  - [x] Paging for albums, tracks and queue entries
+  - [x] Grid for albums and artists
+  - [x] Robust active/inactive navigation and disabled controls
+  - [x] Save playback state, including shuffle order and manual queue additions
 
 ## Development
 
@@ -169,7 +193,7 @@ Here's the basic project structure:
 
 ## Privacy Policy
 
-Psst connects only to the official Spotify servers and does not call home.
+Spotify credentials are sent only to the official Spotify API hosts. Cover images are fetched without credentials from approved HTTPS CDNs. The optional Last.fm feature connects to Last.fm; Splitify sends compact song metadata to Google Gemini only when generating a preview. No Spotify tokens are sent to Gemini. See SECURITY-REVIEW.md for the corrected inherited token leaks and remaining limitations.
 Caches of various things are stored locally and can be deleted anytime.
 User credentials are not stored at all; instead, a re-usable authentication token from Spotify is used.
 
@@ -178,9 +202,17 @@ User credentials are not stored at all; instead, a re-usable authentication toke
 This project would not exist without the following:
 
 - Big thank you to [`librespot`](https://github.com/librespot-org/librespot), the Open Source Spotify client library for Rust. Most of `psst-core` is directly inspired by the ideas and code of `librespot`, although with a few differences:
-  - Spotify Connect (remote control) is not supported yet.
+  - This fork integrates native Spotify Connect using librespot 0.8.0 and the native audio output. The original engine remains available with Connect disabled. Native listen reporting is not implemented.
   - Psst is completely synchronous, without `tokio` or other `async` runtime, although it will probably change in the future.
   - Psst is using HTTPS-based CDN audio file retrieval, similar to the official Web client or [`librespot-java`](https://github.com/librespot-org/librespot-java), instead of the channel-based approach in `librespot`.
 - [`druid`](https://github.com/linebender/druid) native GUI library for Rust.
 - [`ncspot`](https://github.com/hrkfdn/ncspot) cross-platform ncurses Spotify client written in Rust, using `librespot`.
 - ...and of course other libraries and projects.
+
+
+### Diagnostico e inicio en Windows
+
+- **Ajustes > Logs** muestra errores, advertencias y eventos importantes, se actualiza cada dos segundos y permite exportar el historial a un `.log`. Se conservan tres archivos de aproximadamente 2 MB en la carpeta de configuracion de Psst, subcarpeta `logs`; la vista muestra los ultimos 64 KB. Los secretos reconocidos y las URLs se ocultan antes de guardar.
+- La calidad de audio elegida se aplica a las siguientes cargas; la cancion actual continua sin reiniciar el receptor. Se descarta cualquier precarga hecha con la calidad anterior.
+- **Ajustes > General > Windows** permite iniciar con Windows y abrir en la bandeja. Un doble clic en el icono recupera la ventana. El inicio automatico usa `--autostart`; abrir la app normalmente sigue mostrando la ventana.
+- El atajo global opcional **Ctrl + Alt + P** funciona mientras Xpotify esta abierto, incluso en la bandeja. Puede reanudar la ultima cancion desde su posicion guardada o reproducir la siguiente de la cola. Si no hay siguiente cancion o el atajo esta ocupado, la app muestra un aviso.

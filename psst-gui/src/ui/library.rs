@@ -1,9 +1,6 @@
 use std::sync::Arc;
 
-use druid::{
-    widget::{Flex, List},
-    LensExt, Selector, Widget, WidgetExt,
-};
+use druid::{widget::Flex, LensExt, Selector, Widget, WidgetExt};
 
 use crate::{
     cmd,
@@ -71,44 +68,15 @@ pub fn saved_tracks_widget() -> impl Widget<AppState> {
             });
         },
     )
-    .on_command_async(
-        SAVE_TRACK,
-        |t| WebApi::global().save_track(&t.id.0.to_base62()),
-        |_, data, t| {
-            data.with_library_mut(|library| {
-                library.add_track(t);
-            });
-        },
-        |_, data, (_, r)| {
-            if let Err(err) = r {
-                data.error_alert(err);
-            } else {
-                data.info_alert("Track added to library.")
-            }
-        },
-    )
-    .on_command_async(
-        UNSAVE_TRACK,
-        |i| WebApi::global().unsave_track(&i.0.to_base62()),
-        |_, data, i| {
-            data.with_library_mut(|library| {
-                library.remove_track(&i);
-            });
-        },
-        |_, data, (_, r)| {
-            if let Err(err) = r {
-                data.error_alert(err);
-            } else {
-                data.info_alert("Track removed from library.")
-            }
-        },
-    )
 }
 
 pub fn saved_albums_widget() -> impl Widget<AppState> {
     Async::new(
         utils::spinner_widget,
-        || List::new(|| album::album_widget(false)).lens(Ctx::map(SavedAlbums::albums)),
+        || {
+            super::grid::with_context(|| album::album_widget(true).boxed())
+                .lens(Ctx::map(SavedAlbums::albums))
+        },
         utils::error_widget,
     )
     .lens(
@@ -132,42 +100,87 @@ pub fn saved_albums_widget() -> impl Widget<AppState> {
             });
         },
     )
-    .on_command_async(
-        SAVE_ALBUM,
-        |a| WebApi::global().save_album(&a.id),
-        |_, data, a| {
-            data.with_library_mut(move |library| {
-                library.add_album(a);
-            });
-        },
-        |_, data, (_, r)| {
-            if let Err(err) = r {
-                data.error_alert(err);
-            } else {
-                data.info_alert("Album added to library.");
-            }
-        },
-    )
-    .on_command_async(
-        UNSAVE_ALBUM,
-        |l| WebApi::global().unsave_album(&l.id),
-        |_, data, l| {
-            data.with_library_mut(|library| {
-                library.remove_album(&l.id);
-            });
-        },
-        |_, data, (_, r)| {
-            if let Err(err) = r {
-                data.error_alert(err);
-            } else {
-                data.info_alert("Album removed from library.");
-            }
-        },
-    )
 }
 
 pub fn saved_shows_widget() -> impl Widget<AppState> {
     Flex::column()
         .with_child(your_shows())
         .with_child(shows_that_you_might_like())
+}
+
+// These commands must be available from every browsing/playback route.
+pub fn mutation_controller(widget: impl Widget<AppState> + 'static) -> impl Widget<AppState> {
+    widget
+        .on_command_async(
+            SAVE_TRACK,
+            |track| WebApi::global().save_track(&track.id.0.to_base62()),
+            |_, _, _| {},
+            |_, data, (track, result)| match result {
+                Ok(()) => {
+                    data.with_library_mut(|library| library.add_track(track));
+                    data.info_alert("Track added to library.");
+                }
+                Err(error) => data.error_alert(error),
+            },
+        )
+        .on_command_async(
+            UNSAVE_TRACK,
+            |id| WebApi::global().unsave_track(&id.0.to_base62()),
+            |_, _, _| {},
+            |_, data, (id, result)| match result {
+                Ok(()) => {
+                    data.with_library_mut(|library| library.remove_track(&id));
+                    data.info_alert("Track removed from library.");
+                }
+                Err(error) => data.error_alert(error),
+            },
+        )
+        .on_command_async(
+            SAVE_ALBUM,
+            |album| WebApi::global().save_album(&album.id),
+            |_, _, _| {},
+            |_, data, (album, result)| match result {
+                Ok(()) => {
+                    data.with_library_mut(|library| library.add_album(album));
+                    data.info_alert("Album added to library.");
+                }
+                Err(error) => data.error_alert(error),
+            },
+        )
+        .on_command_async(
+            UNSAVE_ALBUM,
+            |album| WebApi::global().unsave_album(&album.id),
+            |_, _, _| {},
+            |_, data, (album, result)| match result {
+                Ok(()) => {
+                    data.with_library_mut(|library| library.remove_album(&album.id));
+                    data.info_alert("Album removed from library.");
+                }
+                Err(error) => data.error_alert(error),
+            },
+        )
+        .on_command_async(
+            SAVE_SHOW,
+            |show| WebApi::global().save_show(&show.id),
+            |_, _, _| {},
+            |_, data, (show, result)| match result {
+                Ok(()) => {
+                    data.with_library_mut(|library| library.add_show(show));
+                    data.info_alert("Show added to library.");
+                }
+                Err(error) => data.error_alert(error),
+            },
+        )
+        .on_command_async(
+            UNSAVE_SHOW,
+            |show| WebApi::global().unsave_show(&show.id),
+            |_, _, _| {},
+            |_, data, (show, result)| match result {
+                Ok(()) => {
+                    data.with_library_mut(|library| library.remove_show(&show.id));
+                    data.info_alert("Show removed from library.");
+                }
+                Err(error) => data.error_alert(error),
+            },
+        )
 }

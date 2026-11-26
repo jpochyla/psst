@@ -53,6 +53,10 @@ fn edit_menu() -> Menu<AppState> {
 fn view_menu() -> Menu<AppState> {
     Menu::new(LocalizedString::new("menu-view-menu").with_placeholder("View"))
         .entry(
+            MenuItem::new("Splitify · Organizar con IA")
+                .command(crate::splitify::OPEN.with(String::new())),
+        )
+        .entry(
             MenuItem::new(LocalizedString::new("menu-item-home").with_placeholder("Home"))
                 .command(cmd::NAVIGATE.with(Nav::Home))
                 .hotkey(SysMods::Cmd, "1"),

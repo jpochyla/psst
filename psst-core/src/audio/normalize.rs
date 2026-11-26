@@ -5,7 +5,7 @@ use std::{
 
 use byteorder::{ReadBytesExt, LE};
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum NormalizationLevel {
     None,
     Track,

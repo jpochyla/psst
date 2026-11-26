@@ -76,4 +76,5 @@ impl FindQuery {
 
 pub trait MatchFindQuery {
     fn matches_query(&self, query: &FindQuery) -> bool;
+    fn find_result_key(&self) -> usize;
 }

@@ -4,6 +4,8 @@ use druid::widget::prelude::*;
 pub struct ThemeScope<W> {
     inner: W,
     cached_env: Option<Env>,
+    resolved_theme: Option<crate::data::Theme>,
+    theme_timer: druid::TimerToken,
 }
 
 impl<W> ThemeScope<W> {
@@ -11,10 +13,13 @@ impl<W> ThemeScope<W> {
         Self {
             inner,
             cached_env: None,
+            resolved_theme: None,
+            theme_timer: druid::TimerToken::INVALID,
         }
     }
 
     fn set_env(&mut self, data: &AppState, outer_env: &Env) {
+        self.resolved_theme = Some(crate::ui::system_theme::resolve(data.config.theme));
         let mut themed_env = outer_env.clone();
         theme::setup(&mut themed_env, data);
         self.cached_env.replace(themed_env);
@@ -23,6 +28,17 @@ impl<W> ThemeScope<W> {
 
 impl<W: Widget<AppState>> Widget<AppState> for ThemeScope<W> {
     fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut AppState, env: &Env) {
+        if matches!(event, Event::WindowConnected) {
+            self.theme_timer = ctx.request_timer(std::time::Duration::from_secs(2));
+        }
+        if matches!(event, Event::Timer(token) if *token == self.theme_timer) {
+            if self.resolved_theme != Some(crate::ui::system_theme::resolve(data.config.theme)) {
+                self.set_env(data, env);
+                ctx.request_layout();
+                ctx.request_paint();
+            }
+            self.theme_timer = ctx.request_timer(std::time::Duration::from_secs(2));
+        }
         self.inner
             .event(ctx, event, data, self.cached_env.as_ref().unwrap_or(env))
     }

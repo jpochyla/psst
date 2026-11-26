@@ -5,7 +5,7 @@ use druid::widget::{Either, Flex, Label, Scroll};
 use druid::{widget::List, LensExt, Selector, Widget, WidgetExt};
 
 use crate::data::{Artist, Ctx, HomeDetail, MixedView, Show, Shows, Track, WithCtx};
-use crate::ui::library::{LOAD_SHOWS, SAVE_SHOW, UNSAVE_SHOW};
+use crate::ui::library::LOAD_SHOWS;
 use crate::widget::Empty;
 use crate::{
     data::AppState,
@@ -23,6 +23,35 @@ pub const LOAD_MADE_FOR_YOU: Selector = Selector::new("app.home.load-made-for-yo
 
 pub fn home_widget() -> impl Widget<AppState> {
     Flex::column()
+        .with_child(
+            super::design::card(
+                Flex::column()
+                    .cross_axis_alignment(druid::widget::CrossAxisAlignment::Start)
+                    .with_child(
+                        Label::new("Redescubre tu biblioteca.")
+                            .with_font(theme::UI_FONT_MEDIUM)
+                            .with_text_size(26.0),
+                    )
+                    .with_spacer(10.0)
+                    .with_child(
+                        Label::new(
+                            "Convierte una playlist en nuevas colecciones para cada momento.",
+                        )
+                        .with_line_break_mode(druid::widget::LineBreaking::WordWrap)
+                        .with_text_color(theme::PLACEHOLDER_COLOR),
+                    )
+                    .with_spacer(20.0)
+                    .with_child(super::design::primary(
+                        druid::widget::Button::new("Organizar una playlist")
+                            .on_click(|ctx, _: &mut AppState, _| {
+                                ctx.submit_command(crate::splitify::OPEN.with(String::new()));
+                            })
+                            .fix_height(40.0),
+                    )),
+            )
+            .expand_width()
+            .padding((0.0, 16.0, 0.0, 24.0)),
+        )
         .with_child(made_for_you())
         .with_child(jump_back_in())
         .with_child(user_top_mixes())
@@ -31,9 +60,9 @@ pub fn home_widget() -> impl Widget<AppState> {
         .with_child(uniquely_yours())
         .with_child(your_shows())
         .with_child(shows_that_you_might_like())
-        .with_child(simple_title_label("Your top artists"))
+        .with_child(simple_title_label("Tus artistas más escuchados"))
         .with_child(user_top_artists_widget())
-        .with_child(simple_title_label("Your top tracks"))
+        .with_child(simple_title_label("Tus canciones más escuchadas"))
         .with_child(user_top_tracks_widget())
 }
 
@@ -92,9 +121,7 @@ fn uniquely_yours_results_widget() -> impl Widget<WithCtx<MixedView>> {
                     .align_left()
                     .padding((theme::grid(1.5), theme::grid(1.5))),
             )
-            .with_child(
-                Scroll::new(Flex::row().with_child(playlist_results_widget())).align_left(),
-            ),
+            .with_child(horizontal_strip(playlist_results_widget()).align_left()),
     )
 }
 
@@ -189,38 +216,6 @@ pub fn your_shows() -> impl Widget<AppState> {
                 });
             },
         )
-        .on_command_async(
-            SAVE_SHOW,
-            |a| WebApi::global().save_show(&a.id),
-            |_, data, s| {
-                data.with_library_mut(move |library| {
-                    library.add_show(s);
-                });
-            },
-            |_, data, (_, r)| {
-                if let Err(err) = r {
-                    data.error_alert(err);
-                } else {
-                    data.info_alert("Show added to library.");
-                }
-            },
-        )
-        .on_command_async(
-            UNSAVE_SHOW,
-            |l| WebApi::global().unsave_show(&l.id),
-            |_, data, l| {
-                data.with_library_mut(|library| {
-                    library.remove_show(&l.id);
-                });
-            },
-            |_, data, (_, r)| {
-                if let Err(err) = r {
-                    data.error_alert(err);
-                } else {
-                    data.info_alert("Show removed from library.");
-                }
-            },
-        )
 }
 
 fn jump_back_in() -> impl Widget<AppState> {
@@ -267,7 +262,7 @@ pub fn loaded_results_widget() -> impl Widget<WithCtx<MixedView>> {
         },
         Empty,
         Flex::column().with_child(title_label()).with_child(
-            Scroll::new(
+            horizontal_strip(
                 Flex::row()
                     .with_child(playlist_results_widget())
                     .with_child(album_results_widget())
@@ -277,6 +272,11 @@ pub fn loaded_results_widget() -> impl Widget<WithCtx<MixedView>> {
             .align_left(),
         ),
     )
+}
+
+/// Reserve space inside the viewport: Scroll paints its thumb over its child.
+fn horizontal_strip<T: druid::Data>(child: impl Widget<T> + 'static) -> impl Widget<T> {
+    Scroll::new(child.padding((0.0, 0.0, 0.0, theme::grid(2.0)))).horizontal()
 }
 
 fn title_label() -> impl Widget<WithCtx<MixedView>> {
@@ -301,7 +301,7 @@ fn artist_results_widget() -> impl Widget<WithCtx<MixedView>> {
     Either::new(
         |artists: &Vector<Artist>, _| artists.is_empty(),
         Empty,
-        Scroll::new(List::new(|| artist::artist_widget(true)).horizontal())
+        List::new(|| artist::artist_widget(true))
             .horizontal()
             .align_left(),
     )
@@ -313,7 +313,7 @@ fn album_results_widget() -> impl Widget<WithCtx<MixedView>> {
         |playlists: &WithCtx<MixedView>, _| playlists.data.albums.is_empty(),
         Empty,
         Flex::column().with_child(
-            Scroll::new(List::new(|| album::album_widget(true)).horizontal())
+            List::new(|| album::album_widget(true))
                 .horizontal()
                 .align_left()
                 .lens(Ctx::map(MixedView::albums)),
@@ -326,7 +326,7 @@ fn playlist_results_widget() -> impl Widget<WithCtx<MixedView>> {
         |playlists: &WithCtx<MixedView>, _| playlists.data.playlists.is_empty(),
         Empty,
         Flex::column().with_child(
-            Scroll::new(List::new(|| playlist::playlist_widget(true)).horizontal())
+            List::new(|| playlist::playlist_widget(true))
                 .horizontal()
                 .align_left()
                 .lens(Ctx::map(MixedView::playlists)),
@@ -339,7 +339,9 @@ fn show_results_widget() -> impl Widget<WithCtx<MixedView>> {
         |shows: &WithCtx<Vector<Arc<Show>>>, _| shows.data.is_empty(),
         Empty,
         Flex::column().with_child(
-            Scroll::new(List::new(|| show::show_widget(true)).horizontal()).align_left(),
+            List::new(|| show::show_widget(true))
+                .horizontal()
+                .align_left(),
         ),
     )
     .lens(Ctx::map(MixedView::shows))
@@ -348,7 +350,7 @@ fn show_results_widget() -> impl Widget<WithCtx<MixedView>> {
 fn user_top_artists_widget() -> impl Widget<AppState> {
     Async::new(
         spinner_widget,
-        || Scroll::new(List::new(|| artist::artist_widget(true)).horizontal()).horizontal(),
+        || horizontal_strip(List::new(|| artist::artist_widget(true)).horizontal()),
         error_widget,
     )
     .lens(AppState::home_detail.then(HomeDetail::user_top_artists))

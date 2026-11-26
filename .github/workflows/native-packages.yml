@@ -1,0 +1,56 @@
+name: Xpotify native packages
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+permissions:
+  contents: read
+jobs:
+  package:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev libssl-dev libasound2-dev
+      - name: Build Windows package
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./scripts/Package-Native.ps1
+      - name: Build Linux package
+        if: runner.os == 'Linux'
+        run: bash scripts/Package-Native.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Xpotify-${{ runner.os }}-${{ runner.arch }}
+          path: |
+            Xpotify.exe
+            Xpotify.exe.sha256
+            dist/*.zip
+            dist/*.tar.gz
+            dist/*.sha256
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: assets
+          merge-multiple: true
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          ls -l assets
+          gh release create "$TAG" assets/* --title "Xpotify ${TAG#v}" --notes-file "docs/release-notes/$TAG.md" --latest

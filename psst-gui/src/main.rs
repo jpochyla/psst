@@ -1,17 +1,20 @@
-#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+#![cfg_attr(target_os = "windows", windows_subsystem = "windows")]
 #![allow(clippy::new_without_default, clippy::type_complexity)]
 
 mod cmd;
 mod controller;
 mod data;
 mod delegate;
+mod diagnostics;
 mod error;
+#[cfg(windows)]
+mod single_instance;
+mod splitify;
 mod ui;
 mod webapi;
 mod widget;
 
 use druid::AppLauncher;
-use env_logger::{Builder, Env};
 use webapi::WebApi;
 
 use psst_core::cache::Cache;
@@ -21,20 +24,37 @@ use crate::{
     delegate::Delegate,
 };
 
-const ENV_LOG: &str = "PSST_LOG";
-const ENV_LOG_STYLE: &str = "PSST_LOG_STYLE";
-
 fn main() {
-    // Setup logging from the env variables, with defaults.
-    Builder::from_env(
-        Env::new()
-            .filter_or(ENV_LOG, "info")
-            .write_style(ENV_LOG_STYLE),
-    )
-    .init();
+    #[cfg(windows)]
+    let mut instance = if cfg!(debug_assertions)
+        && std::env::args().any(|arg| arg.starts_with("--preview-ui="))
+    {
+        None
+    } else {
+        match single_instance::SingleInstance::acquire().expect("Acquire Xpotify instance lock") {
+            Some(instance) => Some(instance),
+            None => return,
+        }
+    };
+    #[cfg(target_os = "windows")]
+    unsafe {
+        let _ = windows::Win32::UI::Shell::SetCurrentProcessExplicitAppUserModelID(
+            windows::core::w!("com.angelopol.xpotify"),
+        );
+    }
+    let _ = dotenvy::from_filename(".env.local");
+    diagnostics::init();
+
+    #[cfg(debug_assertions)]
+    if ui::run_if_requested() {
+        return;
+    }
 
     // Load configuration
-    let config = Config::load().unwrap_or_default();
+    let mut config = Config::load().unwrap_or_default();
+    if config.webapi_client_id_value().is_none() {
+        config.webapi_client_id = std::env::var("SPOTIFY_CLIENT_ID").ok();
+    }
 
     let paginated_limit = config.paginated_limit;
     let mut state = AppState::default_with_config(config.clone());
@@ -102,6 +122,13 @@ fn main() {
         delegate = Delegate::with_preferences(window.id);
         launcher = AppLauncher::with_window(window).configure_env(ui::theme::setup);
     };
+
+    #[cfg(windows)]
+    if let Some(instance) = &mut instance {
+        instance
+            .listen(launcher.get_external_handle())
+            .expect("Listen for Xpotify activation");
+    }
 
     launcher
         .delegate(delegate)

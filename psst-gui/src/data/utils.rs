@@ -133,6 +133,13 @@ where
     Ok(duration)
 }
 
+pub fn serialize_millis<S: serde::Serializer>(
+    value: &Duration,
+    serializer: S,
+) -> Result<S::Ok, S::Error> {
+    serializer.serialize_u64(value.as_millis().min(u64::MAX as u128) as u64)
+}
+
 pub fn deserialize_date<'de, D>(deserializer: D) -> Result<Date, D::Error>
 where
     D: Deserializer<'de>,

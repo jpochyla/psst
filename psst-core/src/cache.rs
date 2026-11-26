@@ -128,7 +128,14 @@ impl Cache {
 
     pub fn save_audio_file(&self, file_id: FileId, from_path: PathBuf) -> Result<(), Error> {
         log::debug!("saving audio file to cache: {file_id:?}");
-        fs::copy(from_path, self.audio_file_path(file_id))?;
+        let destination = self.audio_file_path(file_id);
+        let temporary = destination.with_extension(format!("tmp-{}", rand::random::<u64>()));
+        let result =
+            fs::copy(from_path, &temporary).and_then(|_| fs::rename(&temporary, destination));
+        if result.is_err() {
+            let _ = fs::remove_file(temporary);
+        }
+        result?;
         Ok(())
     }
 }

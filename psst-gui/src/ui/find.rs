@@ -14,12 +14,15 @@ use crate::{
 #[derive(Clone)]
 pub struct Find {
     sender: WidgetId,
-    query: FindQuery,
+    pub(crate) query: FindQuery,
+    epoch: u64,
 }
 
 #[derive(Clone)]
 struct Report {
     sender: WidgetId,
+    epoch: u64,
+    key: usize,
 }
 
 const FIND: Selector = Selector::new("find");
@@ -57,7 +60,11 @@ where
     fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut T, env: &Env) {
         match event {
             Event::Command(cmd) if cmd.is(self.selector) => {
-                let Find { sender, query } = cmd.get_unchecked(self.selector);
+                let Find {
+                    sender,
+                    query,
+                    epoch,
+                } = cmd.get_unchecked(self.selector);
                 self.set_state(
                     ctx,
                     if query.is_empty() {
@@ -69,6 +76,8 @@ where
                 if self.is_matching {
                     let report = Report {
                         sender: ctx.widget_id(),
+                        epoch: *epoch,
+                        key: data.find_result_key(),
                     };
                     ctx.submit_command(REPORT_MATCH.with(report).to(*sender));
                 }
@@ -131,13 +140,15 @@ pub fn finder_widget(selector: Selector<Find>, label: &'static str) -> impl Widg
         .padding(theme::grid(0.5))
         .link()
         .rounded(theme::BUTTON_BORDER_RADIUS)
-        .on_left_click(|_, _, data: &mut Finder, _| data.focus_previous());
+        .on_left_click(|_, _, data: &mut Finder, _| data.focus_previous())
+        .tooltip("Resultado anterior");
 
     let next = Label::new("›")
         .padding(theme::grid(0.5))
         .link()
         .rounded(theme::BUTTON_BORDER_RADIUS)
-        .on_left_click(|_, _, data: &mut Finder, _| data.focus_next());
+        .on_left_click(|_, _, data: &mut Finder, _| data.focus_next())
+        .tooltip("Siguiente resultado");
 
     let results_with_controls = Either::new(
         |data, _| data.results > 0,
@@ -157,13 +168,27 @@ pub fn finder_widget(selector: Selector<Find>, label: &'static str) -> impl Widg
         .padding(theme::grid(1.0))
         .background(theme::GREY_600);
 
-    Either::new(|data, _| data.show, finder, Empty)
-        .controller(FinderController { selector, input_id })
+    Either::new(|data, _| data.show, finder, Empty).controller(FinderController {
+        selector,
+        input_id,
+        epoch: 0,
+        reports: std::collections::HashSet::new(),
+        last_query: String::new(),
+    })
 }
 
 struct FinderController {
     selector: Selector<Find>,
     input_id: WidgetId,
+    epoch: u64,
+    reports: std::collections::HashSet<usize>,
+    last_query: String,
+}
+
+impl FinderController {
+    fn register_report(&mut self, report: &Report) -> bool {
+        report.epoch == self.epoch && self.reports.insert(report.key)
+    }
 }
 
 impl<W> Controller<Finder, W> for FinderController
@@ -180,16 +205,26 @@ where
     ) {
         match event {
             Event::Command(cmd) if cmd.is(FIND) => {
+                if self.last_query != data.query {
+                    data.focused_result = 0;
+                    self.last_query = data.query.clone();
+                }
+                self.epoch = self.epoch.wrapping_add(1);
+                self.reports.clear();
                 data.reset_matches();
                 ctx.submit_command(self.selector.with(Find {
                     sender: ctx.widget_id(),
                     query: FindQuery::new(&data.query),
+                    epoch: self.epoch,
                 }));
                 ctx.set_handled();
             }
             Event::Command(cmd) if cmd.is(REPORT_MATCH) => {
-                if data.report_match() == data.focused_result {
-                    ctx.submit_command(FOCUS_MATCH.to(cmd.get_unchecked(REPORT_MATCH).sender));
+                let report = cmd.get_unchecked(REPORT_MATCH);
+                if self.register_report(report)
+                    && data.report_match().saturating_sub(1) == data.focused_result
+                {
+                    ctx.submit_command(FOCUS_MATCH.to(report.sender));
                 }
                 ctx.set_handled();
             }
@@ -202,6 +237,7 @@ where
                 ctx.set_handled();
             }
             Event::KeyDown(k_e) if k_e.key == KbKey::Escape => {
+                data.reset();
                 data.show = false;
             }
             _ => {}
@@ -222,5 +258,29 @@ where
             ctx.submit_command(FIND.to(ctx.widget_id()));
         }
         child.update(ctx, old_data, data, env)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn recycled_rows_and_late_queries_do_not_inflate_match_count() {
+        let mut controller = FinderController {
+            selector: Selector::new("test.find"),
+            input_id: WidgetId::next(),
+            epoch: 7,
+            reports: std::collections::HashSet::new(),
+            last_query: "Song 733".into(),
+        };
+        let report = |epoch, key| Report {
+            sender: WidgetId::next(),
+            epoch,
+            key,
+        };
+        assert!(!controller.register_report(&report(6, 733)));
+        assert!(controller.register_report(&report(7, 733)));
+        assert!(!controller.register_report(&report(7, 733)));
+        assert!(controller.register_report(&report(7, 734)));
     }
 }
