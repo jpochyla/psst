@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     fmt::Display,
     io::{self, Read},
     path::PathBuf,
@@ -37,11 +37,11 @@ use ureq::{
 
 use crate::{
     data::{
-        self, utils::sanitize_html_string, Album, AlbumType, Artist, ArtistAlbums, ArtistInfo,
-        ArtistLink, ArtistOverview, ArtistStats, AudioAnalysis, Cached, DatePrecision, Episode,
-        EpisodeId, EpisodeLink, Image, MixedView, Nav, Page, Playlist, PublicUser, Range,
+        self, utils::sanitize_html_string, Album, AlbumLink, AlbumType, Artist, ArtistAlbums,
+        ArtistInfo, ArtistLink, ArtistOverview, ArtistStats, AudioAnalysis, Cached, DatePrecision,
+        Episode, EpisodeId, EpisodeLink, Image, MixedView, Nav, Page, Playlist, PublicUser, Range,
         Recommendations, RecommendationsRequest, SearchResults, SearchTopic, Show, SpotifyUrl,
-        Track, TrackLines, UserProfile,
+        Track, TrackId, TrackLines, UserProfile,
     },
     error::Error,
     ui::credits::TrackCredits,
@@ -55,6 +55,10 @@ pub struct WebApi {
     cache: WebApiCache,
     local_track_manager: Mutex<LocalTrackManager>,
     paginated_limit: usize,
+    // Playlists the Web API answered with a 404.  The detail page loads
+    // metadata and tracks separately, and both would otherwise pay for the same
+    // 404 on every visit before reaching `api-partner`.
+    partner_playlists: Mutex<HashSet<Arc<str>>>,
     webapi_token: Mutex<Option<WebApiToken>>,
     webapi_client_id: Mutex<Option<String>>,
     // First-party session credentials, used for `api-partner.spotify.com`
@@ -81,6 +85,7 @@ impl WebApi {
             cache: WebApiCache::new(cache_base),
             local_track_manager: Mutex::new(LocalTrackManager::new()),
             paginated_limit,
+            partner_playlists: Mutex::new(HashSet::new()),
             webapi_token: Mutex::new(None),
             webapi_client_id: Mutex::new(None),
             session: Mutex::new(None),
@@ -200,17 +205,17 @@ impl WebApi {
         match request.get_method() {
             Method::Get => configure_request(self.agent.get(&url), &token, ct, headers)
                 .call()
-                .map_err(|err| Error::WebApiError(err.to_string())),
+                .map_err(Error::from),
             Method::Post => configure_request(self.agent.post(&url), &token, ct, headers)
                 .send_json(request.get_body())
-                .map_err(|err| Error::WebApiError(err.to_string())),
+                .map_err(Error::from),
             Method::Put => configure_request(self.agent.put(&url), &token, ct, headers)
                 .send_json(request.get_body())
-                .map_err(|err| Error::WebApiError(err.to_string())),
+                .map_err(Error::from),
             Method::Delete => configure_request(self.agent.delete(&url), &token, ct, headers)
                 .force_send_body()
                 .send_json(request.get_body())
-                .map_err(|err| Error::WebApiError(err.to_string())),
+                .map_err(Error::from),
         }
     }
 
@@ -1561,6 +1566,217 @@ impl WebApi {
     }
 }
 
+/// Persisted-query hash for the pathfinder `fetchPlaylist` operation, extracted
+/// from the web player bundle.
+const FETCH_PLAYLIST_HASH: &str =
+    "73a3b3470804983e4d55d83cd6cc99715019228fd999d51429cc69473a18789d";
+
+// Shape of the `fetchPlaylist` response.  Playlists we reach through this path
+// are mostly Spotify-generated, and they leave a lot of the editorial fields
+// unset, so anything the UI can live without is optional.
+#[derive(Deserialize)]
+struct FetchPlaylistResponse {
+    data: FetchPlaylistData,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct FetchPlaylistData {
+    playlist_v2: PartnerPlaylist,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PartnerPlaylist {
+    uri: String,
+    #[serde(default)]
+    name: Arc<str>,
+    description: Option<String>,
+    #[serde(default)]
+    images: PartnerImages,
+    owner_v2: Option<PartnerOwner>,
+    #[serde(default)]
+    collaborative: bool,
+    #[serde(default)]
+    content: PartnerContent,
+}
+
+#[derive(Default, Deserialize)]
+struct PartnerImages {
+    #[serde(default)]
+    items: Vec<PartnerImageItem>,
+}
+
+#[derive(Deserialize)]
+struct PartnerImageItem {
+    #[serde(default)]
+    sources: Vector<Image>,
+}
+
+#[derive(Deserialize)]
+struct PartnerOwner {
+    data: PartnerOwnerData,
+}
+
+#[derive(Deserialize)]
+struct PartnerOwnerData {
+    #[serde(default)]
+    username: Arc<str>,
+    #[serde(default)]
+    name: Arc<str>,
+}
+
+#[derive(Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PartnerContent {
+    #[serde(default)]
+    total_count: usize,
+    #[serde(default)]
+    items: Vec<PartnerContentItem>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PartnerContentItem {
+    item_v2: Option<PartnerItem>,
+}
+
+// Playlists can hold episodes and local files as well as tracks.  Matching on
+// `__typename` lets the ones we can't play fall into `Unsupported` instead of
+// failing the whole page.
+#[derive(Deserialize)]
+#[serde(tag = "__typename")]
+enum PartnerItem {
+    #[serde(rename = "TrackResponseWrapper")]
+    Track { data: Box<PartnerTrack> },
+    #[serde(other)]
+    Unsupported,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PartnerTrack {
+    uri: String,
+    #[serde(default)]
+    name: Arc<str>,
+    #[serde(default)]
+    track_duration: PartnerDuration,
+    album_of_track: Option<PartnerAlbum>,
+    // Same `{ uri, profile { name } }` shape the discography responses use.
+    #[serde(default)]
+    artists: ReleaseArtists,
+    #[serde(default)]
+    disc_number: usize,
+    #[serde(default)]
+    track_number: usize,
+    playability: Option<PartnerPlayability>,
+    content_rating: Option<PartnerContentRating>,
+}
+
+#[derive(Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PartnerDuration {
+    #[serde(default)]
+    total_milliseconds: u64,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PartnerAlbum {
+    uri: String,
+    #[serde(default)]
+    name: Arc<str>,
+    #[serde(default)]
+    cover_art: CoverArt,
+}
+
+#[derive(Deserialize)]
+struct PartnerPlayability {
+    #[serde(default)]
+    playable: bool,
+}
+
+#[derive(Deserialize)]
+struct PartnerContentRating {
+    #[serde(default)]
+    label: String,
+}
+
+impl PartnerPlaylist {
+    fn to_playlist(&self) -> Playlist {
+        Playlist {
+            id: uri_id(&self.uri),
+            name: self.name.clone(),
+            images: Some(
+                self.images
+                    .items
+                    .iter()
+                    .flat_map(|item| item.sources.iter().cloned())
+                    .collect(),
+            ),
+            description: sanitize_html_string(self.description.as_deref().unwrap_or_default()),
+            track_count: Some(self.content.total_count),
+            owner: PublicUser {
+                id: self
+                    .owner_v2
+                    .as_ref()
+                    .map(|owner| owner.data.username.clone())
+                    .unwrap_or_default(),
+                display_name: self
+                    .owner_v2
+                    .as_ref()
+                    .map(|owner| owner.data.name.clone())
+                    .unwrap_or_default(),
+            },
+            collaborative: self.collaborative,
+            // `fetchPlaylist` carries no public/private flag.
+            public: None,
+        }
+    }
+}
+
+impl PartnerTrack {
+    fn to_track(&self, track_pos: usize) -> Option<Track> {
+        Some(Track {
+            id: TrackId::try_from(uri_id(&self.uri).to_string()).ok()?,
+            name: self.name.clone(),
+            album: self.album_of_track.as_ref().map(|album| AlbumLink {
+                id: uri_id(&album.uri),
+                name: album.name.clone(),
+                images: album.cover_art.sources.clone(),
+            }),
+            artists: self
+                .artists
+                .items
+                .iter()
+                .map(|artist| ArtistLink {
+                    id: uri_id(&artist.uri),
+                    name: artist.profile.name.clone(),
+                })
+                .collect(),
+            duration: Duration::from_millis(self.track_duration.total_milliseconds),
+            disc_number: self.disc_number,
+            track_number: self.track_number,
+            explicit: self
+                .content_rating
+                .as_ref()
+                .is_some_and(|rating| rating.label != "NONE"),
+            is_local: false,
+            local_path: None,
+            is_playable: self.playability.as_ref().map(|play| play.playable),
+            // `fetchPlaylist` returns neither popularity nor lyrics.
+            popularity: None,
+            track_pos,
+            lyrics: None,
+        })
+    }
+}
+
+/// Take the bare ID off the tail of a `spotify:kind:id` URI.
+fn uri_id(uri: &str) -> Arc<str> {
+    uri.rsplit(':').next().unwrap_or_default().into()
+}
+
 /// Playlist endpoints.
 impl WebApi {
     // https://developer.spotify.com/documentation/web-api/reference/get-a-list-of-current-users-playlists
@@ -1584,11 +1800,96 @@ impl WebApi {
         Ok(())
     }
 
+    /// Fetch one page of a playlist through `api-partner`.  Spotify's own
+    /// generated playlists (Daily Mix, Discover Weekly, Release Radar, ...) are
+    /// no longer exposed to third-party clients on the Web API and 404 there,
+    /// but pathfinder still serves them.
+    fn fetch_playlist(
+        &self,
+        id: &str,
+        offset: usize,
+        limit: usize,
+    ) -> Result<PartnerPlaylist, Error> {
+        let json = json!({
+            "operationName": "fetchPlaylist",
+            "variables": {
+                "uri": format!("spotify:playlist:{id}"),
+                "offset": offset,
+                "limit": limit,
+            },
+            "extensions": {
+                "persistedQuery": { "version": 1, "sha256Hash": FETCH_PLAYLIST_HASH }
+            },
+        });
+        let request =
+            &RequestBuilder::new("pathfinder/v2/query".to_string(), Method::Post, Some(json))
+                .set_base_uri("api-partner.spotify.com")
+                .header("User-Agent", Self::user_agent())
+                .partner_auth();
+
+        let response: FetchPlaylistResponse = self.load(request)?;
+        Ok(response.data.playlist_v2)
+    }
+
+    /// Whether a previous request already found this playlist missing from the
+    /// Web API, so it can be requested from `api-partner` directly.
+    fn is_partner_playlist(&self, id: &str) -> bool {
+        self.partner_playlists.lock().contains(id)
+    }
+
+    fn mark_partner_playlist(&self, id: &str) {
+        self.partner_playlists.lock().insert(Arc::from(id));
+    }
+
+    fn get_partner_playlist_tracks(&self, id: &str) -> Result<Vector<Arc<Track>>, Error> {
+        const PAGE: usize = 100;
+
+        let mut tracks = Vector::new();
+        let mut offset = 0;
+        loop {
+            let playlist = self.fetch_playlist(id, offset, PAGE)?;
+            if playlist.content.items.is_empty() {
+                break;
+            }
+            for item in &playlist.content.items {
+                if let Some(PartnerItem::Track { data }) = &item.item_v2 {
+                    if let Some(track) = data.to_track(tracks.len()) {
+                        tracks.push_back(Arc::new(track));
+                    }
+                }
+            }
+
+            offset += PAGE;
+            if offset >= playlist.content.total_count.min(self.paginated_limit) {
+                break;
+            }
+        }
+        Ok(tracks)
+    }
+
     // https://developer.spotify.com/documentation/web-api/reference/get-playlist
     pub fn get_playlist(&self, id: &str) -> Result<Playlist, Error> {
+        // Only the metadata is wanted here, so ask for the smallest page of
+        // tracks pathfinder will give us.
+        if self.is_partner_playlist(id) {
+            return Ok(self.fetch_playlist(id, 0, 1)?.to_playlist());
+        }
         let request = &RequestBuilder::new(format!("v1/playlists/{id}"), Method::Get, None);
-        let result: Playlist = self.load(request)?;
-        Ok(result)
+        match self.load(request) {
+            Err(Error::WebApiStatus(404)) => match self.fetch_playlist(id, 0, 1) {
+                Ok(playlist) => {
+                    self.mark_partner_playlist(id);
+                    Ok(playlist.to_playlist())
+                }
+                // Neither source has it, so the playlist is genuinely gone.
+                // Report that instead of how the second attempt failed.
+                Err(err) => {
+                    log::warn!("playlist {id} missing from api-partner as well: {err}");
+                    Err(Error::WebApiStatus(404))
+                }
+            },
+            result => result,
+        }
     }
 
     // https://developer.spotify.com/documentation/web-api/reference/get-playlist-items
@@ -1611,11 +1912,31 @@ impl WebApi {
             Json(serde_json::Value),
         }
 
+        if self.is_partner_playlist(id) {
+            return self.get_partner_playlist_tracks(id);
+        }
+
         let request = &RequestBuilder::new(format!("v1/playlists/{id}/items"), Method::Get, None)
             .query("marker", "from_token")
             .query("additional_types", "track");
 
-        let result: Vector<PlaylistItem> = self.load_all_pages(request)?;
+        let result: Vector<PlaylistItem> = match self.load_all_pages(request) {
+            Err(Error::WebApiStatus(404)) => {
+                return match self.get_partner_playlist_tracks(id) {
+                    Ok(tracks) => {
+                        self.mark_partner_playlist(id);
+                        Ok(tracks)
+                    }
+                    // Neither source has it, so the playlist is genuinely gone.
+                    // Report that instead of how the second attempt failed.
+                    Err(err) => {
+                        log::warn!("playlist {id} missing from api-partner as well: {err}");
+                        Err(Error::WebApiStatus(404))
+                    }
+                };
+            }
+            result => result?,
+        };
 
         let local_track_manager = self.local_track_manager.lock();
 
@@ -1873,7 +2194,10 @@ impl From<io::Error> for Error {
 
 impl From<ureq::Error> for Error {
     fn from(err: ureq::Error) -> Self {
-        Error::WebApiError(err.to_string())
+        match err {
+            ureq::Error::StatusCode(code) => Error::WebApiStatus(code),
+            err => Error::WebApiError(err.to_string()),
+        }
     }
 }
 
