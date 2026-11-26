@@ -39,9 +39,9 @@ use crate::{
     data::{
         self, utils::sanitize_html_string, Album, AlbumType, Artist, ArtistAlbums, ArtistInfo,
         ArtistLink, ArtistOverview, ArtistStats, AudioAnalysis, Cached, DatePrecision, Episode,
-        EpisodeId, EpisodeLink, Image, MixedView, Nav, Page, Playlist, PublicUser, Range,
-        Recommendations, RecommendationsRequest, SearchResults, SearchTopic, Show, SpotifyUrl,
-        Track, TrackLines, UserProfile,
+        Image, MixedView, Nav, Page, Playlist, PublicUser, Range, Recommendations,
+        RecommendationsRequest, SearchResults, SearchTopic, Show, ShowEpisode, ShowLink,
+        SpotifyUrl, Track, TrackLines, UserProfile,
     },
     error::Error,
     ui::credits::TrackCredits,
@@ -1281,38 +1281,23 @@ impl WebApi {
         Ok(result)
     }
 
-    // https://developer.spotify.com/documentation/web-api/reference/get-multiple-episodes
-    pub fn get_episodes(
-        &self,
-        ids: impl IntoIterator<Item = EpisodeId>,
-    ) -> Result<Vector<Arc<Episode>>, Error> {
-        #[derive(Deserialize)]
-        struct Episodes {
-            episodes: Vector<Arc<Episode>>,
-        }
-
-        let request = &RequestBuilder::new("v1/episodes", Method::Get, None)
-            .query("ids", ids.into_iter().map(|id| id.0.to_base62()).join(","))
-            .query("market", "from_token");
-        let result: Episodes = self.load(request)?;
-        Ok(result.episodes)
-    }
-
     // https://developer.spotify.com/documentation/web-api/reference/get-a-shows-episodes
-    pub fn get_show_episodes(&self, id: &str) -> Result<Vector<Arc<Episode>>, Error> {
-        let request = &RequestBuilder::new(format!("v1/shows/{id}/episodes"), Method::Get, None)
-            .query("market", "from_token");
+    pub fn get_show_episodes(&self, link: &ShowLink) -> Result<Vector<Arc<Episode>>, Error> {
+        let request = &RequestBuilder::new(
+            format!("v1/shows/{id}/episodes", id = link.id),
+            Method::Get,
+            None,
+        )
+        .query("market", "from_token");
 
         let mut results = Vector::new();
-        self.for_all_pages(request, |page: Page<Option<EpisodeLink>>| {
-            if !page.items.is_empty() {
-                let ids = page
-                    .items
+        self.for_all_pages(request, |page: Page<Option<ShowEpisode>>| {
+            results.extend(
+                page.items
                     .into_iter()
-                    .filter_map(|link| link.map(|link| link.id));
-                let episodes = self.get_episodes(ids)?;
-                results.append(episodes);
-            }
+                    .flatten()
+                    .map(|episode| Arc::new(episode.into_episode(link.clone()))),
+            );
             Ok(())
         })?;
 
